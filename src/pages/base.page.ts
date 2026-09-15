@@ -32,9 +32,14 @@ export abstract class BasePage {
     // it can race the React app's own hydration and see neither the gate
     // nor the authenticated content yet, silently reading as "not shown"
     // and skipping the click below. Give it a real window to render first.
+    // 15s (not the 5s this started as) — a remote environment over VPN can
+    // be meaningfully slower to render than a same-machine local server;
+    // the gate reliably appears on every fresh page in this app, so this
+    // is dead time only in the (nonexistent, per that same behavior)
+    // "already authenticated on load" case, not a tax on the happy path.
     const signInButton = this.page.getByRole('button', { name: 'Sign in' });
     const gateShown = await signInButton
-      .waitFor({ state: 'visible', timeout: 5_000 })
+      .waitFor({ state: 'visible', timeout: 15_000 })
       .then(() => true)
       .catch(() => false);
 

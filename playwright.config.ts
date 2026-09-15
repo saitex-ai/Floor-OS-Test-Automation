@@ -33,7 +33,12 @@ const moduleProjects: Project[] = MODULE_IDS.flatMap((id) => {
  * @see https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({
-  timeout: 30_000,
+  // dev's federated module bundles (e.g. the CRM remote) load over a real
+  // network/VPN, not an already-warm local dev server — confirmed by
+  // watching it headed: "Loading CRM…" alone can outlast 30s on dev, with
+  // zero worker contention, every run. Local keeps the tight 30s for fast
+  // feedback; dev gets real headroom for that.
+  timeout: env.testEnv === 'dev' ? 60_000 : 30_000,
   expect: {
     timeout: 5_000,
   },
