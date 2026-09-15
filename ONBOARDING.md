@@ -16,7 +16,7 @@ framework is built so you only ever touch your own module's files —
 ## 2. Clone and install
 
 ```bash
-git clone <THIS_REPO_URL> pw-hybrid-framework
+git clone https://github.com/saitex-ai/Floor-OS-Test-Automation.git pw-hybrid-framework
 cd pw-hybrid-framework
 npm install
 npx playwright install --with-deps

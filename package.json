@@ -4,6 +4,10 @@
   "description": "floorOS QA automation framework: TypeScript + Playwright Test + POM, organized one module per QA (CRM, MILL, ...), runnable against local or dev.",
   "private": true,
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/saitex-ai/Floor-OS-Test-Automation.git"
+  },
   "scripts": {
     "test:local": "playwright test",
     "test:dev": "TEST_ENV=dev playwright test",
