@@ -121,17 +121,30 @@ export class CreateCustomerPage extends BasePage {
     this.saveButton = page.getByRole('button', { name: 'Save Customer' });
     this.cancelButton = page.getByRole('button', { name: 'Cancel' });
 
-    this.duplicateWarningModal = page.getByRole('dialog').filter({ hasText: /may already exist/i });
+    // Confirmed on dev: this app's confirmation-style modals render as
+    // role="alertdialog", not role="dialog" — getByRole('dialog') alone
+    // never matches them. Accepting either role defensively, since it's
+    // plausible not every modal in the app uses the same one.
+    this.duplicateWarningModal = page
+      .getByRole('dialog')
+      .or(page.getByRole('alertdialog'))
+      .filter({ hasText: /may already exist/i });
     this.saveAnywayButton = this.duplicateWarningModal.getByRole('button', { name: 'Save anyway' });
     this.cancelToReviewButton = this.duplicateWarningModal.getByRole('button', {
       name: 'Cancel to review',
     });
 
-    this.postSaveModal = page.getByRole('dialog').filter({ hasText: /created successfully/i });
+    this.postSaveModal = page
+      .getByRole('dialog')
+      .or(page.getByRole('alertdialog'))
+      .filter({ hasText: /created successfully/i });
     this.createContactButton = this.postSaveModal.getByRole('button', { name: 'Create Contact' });
     this.postSaveCancelButton = this.postSaveModal.getByRole('button', { name: 'Cancel' });
 
-    this.toast = page.locator('[data-sonner-toast]');
+    // sonner can stack more than one toast at once (confirmed on dev: 2
+    // renders for a single save) — .first() avoids a strict-mode failure
+    // when checking "a toast is visible" rather than a specific one.
+    this.toast = page.locator('[data-sonner-toast]').first();
   }
 
   async openFromCrmHome(): Promise<void> {
