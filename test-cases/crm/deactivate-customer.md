@@ -2,7 +2,7 @@
 
 - **Test-case set:** [CRM - Sprint 1 - Deactivate Customer](https://app.clickup.com/t/90181912927/86eyr7fap)
 - **Source:** ClickUp, expanded from subtasks 2026-09-16
-- **Automated in:** Pending
+- **Automated in:** [`tests/crm/deactivate-customer.spec.ts`](../../tests/crm/deactivate-customer.spec.ts) — TC:1-5/TC:8 confirmed against dev (2026-09-16); TC:6/TC:7 (Master Data/Tech Pack cascade) `test.fixme()`'d — out of scope for the CRM QA, no page object exists for those modules.
 - **Note:** heavy overlap with `deactivate-customer-screen.md` (same feature, described at two granularities) — kept as a separate spec per team decision, not merged.
 
 | #    | Test case                                                               | Steps                                                                                                                                                                                                                                                                                                                               | Expected result                                                                                                                                    | ClickUp                                      |
@@ -18,4 +18,4 @@
 
 ## Notes for whoever picks this up next
 
-Unlike the Activate Customer pair, TC:6/TC:7 here (Master Data / Tech Pack cascade) are **not** marked `fail` in ClickUp — worth checking whether the equivalent Activate cascade checks being broken implies these might be too, or whether deactivation cascade genuinely works while activation cascade doesn't. Not yet live-probed against the running app — no locators confirmed.
+Unlike the Activate Customer pair, TC:6/TC:7 here (Master Data / Tech Pack cascade) are **not** marked `fail` in ClickUp — worth checking whether the equivalent Activate cascade checks being broken implies these might be too, or whether deactivation cascade genuinely works while activation cascade doesn't. TC:1-5/TC:8 confirmed against dev on 2026-09-16; TC:6/TC:7 `test.fixme()`'d for now — no Master Data/Tech Pack page object exists (out of scope for the CRM QA).

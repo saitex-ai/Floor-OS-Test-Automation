@@ -2,7 +2,7 @@
 
 - **Test-case set:** [CRM - Sprint 1 - Edit customer / contact](https://app.clickup.com/t/90181912927/z941abt7dw)
 - **Source:** ClickUp, expanded from subtasks 2026-09-16
-- **Automated in:** Pending
+- **Automated in:** [`tests/crm/edit-customer-contact.spec.ts`](../../tests/crm/edit-customer-contact.spec.ts) — TC:1-4 confirmed against dev (2026-09-16). TC:5 (dependent-field reset) and TC:7 (audit trail) `test.fixme()`'d, not confirmed to exist/behave as described. TC:6 (0-assignee validation) `test.fixme()`'d after live investigation found the app's own save behavior inconsistent — see the spec file for the full writeup.
 - **Note:** overlaps with `customer-detail.md` (both are fundamentally "inline editing on a detail screen"), but that file is Contact-specific while this one's steps read generically ("Customer or Contact") and TC:6 (Business Process/Assignee editing) is Customer-only content, since Business Processes don't exist on Contacts. Written against the **Customer** Details screen below for that reason. Kept as a separate spec per team decision, not merged.
 
 | #    | Test case                                                                | Steps                                                                                                                                                                                                                                             | Expected result                                                                                                                                     | ClickUp                                      |
@@ -17,4 +17,4 @@
 
 ## Notes for whoever picks this up next
 
-TC:6 is genuinely useful and distinct — it's the "edit an _existing_ Customer's Business Process row down to 0 assignees" case, complementing `create-customer.spec.ts`'s TC:4 which tests the same rule but _during creation_. Not yet live-probed against the running app — no locators confirmed, including how inline edit is actually triggered (hover-to-reveal edit icon vs. always-visible, exact icon/button roles).
+TC:6 is genuinely useful and distinct — it's the "edit an _existing_ Customer's Business Process row down to 0 assignees" case, complementing `create-customer.spec.ts`'s TC:4 which tests the same rule but _during creation_. Confirmed against dev on 2026-09-16: inline edit is always-visible "Edit" buttons per field (not hover-to-reveal), swapping to a textbox + "Save"/"Cancel". TC:6 itself is `test.fixme()`'d — extensive live investigation found the app's own handling of "clear an assignee then save immediately" to be genuinely inconsistent (sometimes blocks correctly, sometimes silently keeps the old assignee), in both headed and headless runs, which reads as a real intermittent app issue rather than a test-side timing bug. Worth a bug report.

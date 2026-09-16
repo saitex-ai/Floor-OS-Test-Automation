@@ -2,7 +2,7 @@
 
 - **Test-case set:** [CRM - Sprint 1 - Deactivate Customer screen](https://app.clickup.com/t/90181912927/z941abt7gv)
 - **Source:** ClickUp, expanded from subtasks 2026-09-16
-- **Automated in:** Pending
+- **Automated in:** [`tests/crm/deactivate-customer-screen.spec.ts`](../../tests/crm/deactivate-customer-screen.spec.ts) — all 6 confirmed against dev (2026-09-16).
 - **Note:** heavy overlap with `deactivate-customer.md` (same feature, this one narrower/more detailed on the modal itself, missing the Master Data / Tech Pack cascade checks). Kept as a separate spec per team decision, not merged.
 
 | #    | Test case                                                                              | Steps                                                                                                                                                                                                      | Expected result                                                                                                                                                                                    | ClickUp                                      |
@@ -16,4 +16,4 @@
 
 ## Notes for whoever picks this up next
 
-Not yet live-probed against the running app — no locators confirmed. Same "Reason for Deactivation" multi-select nuance as the Activate pair (TC:2).
+Confirmed against dev on 2026-09-16 — same "Reason for Deactivation" multi-select nuance as the Activate pair (TC:2), confirmed here too.

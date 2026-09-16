@@ -2,7 +2,7 @@
 
 - **Test-case set:** [CRM - Sprint 1 Activate Customer screen](https://app.clickup.com/t/90181912927/z941abt7hk)
 - **Source:** ClickUp, expanded from subtasks 2026-09-16
-- **Automated in:** Pending
+- **Automated in:** [`tests/crm/activate-customer-screen.spec.ts`](../../tests/crm/activate-customer-screen.spec.ts) — all 6 confirmed against dev (2026-09-16).
 - **Note:** heavy overlap with `activate-customer.md` (same feature, this one narrower/more detailed on the modal itself, missing the Master Data / Tech Pack cascade checks). Kept as a separate spec per team decision, not merged.
 
 | #    | Test case                                                                                         | Steps                                                                                                                                                                                                                     | Expected result                                                                                                                                                                                                  | ClickUp                                      |
@@ -16,4 +16,4 @@
 
 ## Notes for whoever picks this up next
 
-Not yet live-probed against the running app — no locators confirmed. TC:2's wording specifically confirms "Reason for Activation" is a **multi-select** dropdown (not single-select) — worth getting right when building the page object. TC:5's audit-log/notification assertions likely aren't verifiable from the UI alone; may need to scope those down to what's actually checkable (status badge + button toggle) unless there's a visible notification panel.
+Confirmed against dev on 2026-09-16 — TC:2's "Reason for Activation" is indeed a multi-select, as documented. TC:5's audit-log/notification assertions weren't verifiable from the UI alone (no notifications panel found), so that test scopes down to the status-badge change only.
