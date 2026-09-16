@@ -2,7 +2,7 @@
 
 - **Test-case set:** [CRM - Sprint 1 - Contact Creation Screen](https://app.clickup.com/t/90181912927/z941abt3bc)
 - **Source:** ClickUp, expanded from subtasks 2026-09-16
-- **Automated in:** Pending
+- **Automated in:** [`tests/crm/contact-creation-screen.spec.ts`](../../tests/crm/contact-creation-screen.spec.ts) — TC:1/TC:6 confirmed against local; TC:2-5/TC:7 blocked on local data gaps (see spec file for details), not yet re-checked on dev.
 - **Note:** heavy overlap with `create-contact.md` (same feature, this one narrower — hand-off pre-fill/lock behavior and the reverse "create Customer from Contact" flow specifically). Kept as a separate spec per team decision, not merged.
 
 | #    | Test case                                                                         | Steps                                                                                                                                                                   | Expected result                                                                                                                                                                                 | ClickUp                                      |

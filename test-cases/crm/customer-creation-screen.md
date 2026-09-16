@@ -2,7 +2,7 @@
 
 - **Test-case set:** [CRM - Sprint 1 - Customer Creation Screen](https://app.clickup.com/t/90181912927/86eyr7gan)
 - **Source:** ClickUp, expanded from subtasks 2026-09-16
-- **Automated in:** [`tests/crm/create-customer.spec.ts`](../../tests/crm/create-customer.spec.ts) — see note below, not a separate spec.
+- **Automated in:** [`tests/crm/customer-creation-screen.spec.ts`](../../tests/crm/customer-creation-screen.spec.ts) — built as its own file per team decision (2026-09-16), not merged into create-customer.spec.ts. TC:1-3 confirmed against local; TC:4-9 blocked on local data gaps (see spec file for details).
 
 **This is a near-duplicate of the already-automated Create Customer feature** (same screen, filed under a second ClickUp task) — confirmed by reading every subtask's full description, not just titles. 5 of 9 are the same content already covered by `create-customer.spec.ts`'s TC:2, TC:4, TC:7/8, TC:9. The other 4 are genuinely new and worth adding to that same spec (same page object, same screen) rather than building a duplicate file:
 
@@ -20,4 +20,4 @@
 
 ## Notes for whoever picks this up next
 
-Add the 3 new cases (pre-fill from hand-off, conditional-required validation, Customer Code format/immutability) plus the stronger TC:9 assertion to `create-customer.spec.ts` directly — don't build a second `CreateCustomerPage`/spec for the same screen. Not yet done as of 2026-09-16; flagging here so it isn't lost.
+Built as `customer-creation-screen.spec.ts` (2026-09-16), reusing `CreateCustomerPage` — per a later team decision, all 9 cases got their own file rather than folding the 3 new ones into `create-customer.spec.ts`. TC:6 (Customer Code immutability) and TC:8 (audit/notifications) are `test.fixme()`'d pending a `CustomerDetailPage` and a confirmed audit view, respectively.
