@@ -103,8 +103,8 @@ test.describe('CRM - Create Customer', () => {
     await createCustomerPage.openFromCrmHome();
 
     await test.step('Enter details matching an existing Customer', async () => {
-      // TODO(CRM QA): point this at a customer known to exist in the seed
-      // data for TEST_ENV=local, so the duplicate check actually triggers.
+      // "Acme Textiles" is a real existing Customer on dev (confirmed
+      // directly), so this reliably triggers the duplicate check there.
       await createCustomerPage.fillProfile({
         name: 'Acme Textiles',
         email: 'acme-textiles@example.com',
@@ -241,12 +241,29 @@ test.describe('CRM - Create Customer', () => {
   });
 
   test('TC:10 Verify linking existing contacts during Customer creation', async ({
+    createContactPage,
     createCustomerPage,
+    page,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abt4t6', 'TC:10 (ClickUp)');
+    const contactName = 'Playwright Unlinked Contact';
+
+    await test.step('Create a real unlinked Contact to link', async () => {
+      await createContactPage.openFromContactList();
+      await createContactPage.fillProfile({
+        name: contactName,
+        designation: 'Buyer',
+        email: `pw-unlinked-${Date.now()}@example.com`,
+        city: 'Coimbatore',
+        country: 'India',
+      });
+      await createContactPage.save();
+      await expect(createContactPage.toast).toBeVisible();
+    });
+
     await createCustomerPage.openFromCrmHome();
 
-    await test.step('Fill valid details and link an existing Contact', async () => {
+    await test.step('Fill valid details and link that existing Contact', async () => {
       await createCustomerPage.fillProfile({
         name: `Playwright Test Customer ${Date.now()}`,
         email: `pw-test-${Date.now()}@example.com`,
@@ -258,14 +275,18 @@ test.describe('CRM - Create Customer', () => {
         referredBy: 'Jordan Smith',
         crmStage: 'Lead',
       });
-      // TODO(CRM QA): point this at a Contact known to exist, unlinked, in
-      // the seed data for TEST_ENV=local.
-      await createCustomerPage.linkExistingContact('Existing Unlinked Contact');
+      await createCustomerPage.linkExistingContact(contactName);
       await createCustomerPage.save();
     });
 
+    // Confirmed on dev: when a Contact is already linked at save time,
+    // the "created successfully / create a Contact?" modal doesn't
+    // appear at all (that prompt only exists for the "no Contact
+    // linked" case per TC:7/TC:8) — the page just lands on the new
+    // Customer's own Detail screen with the link already in place.
     await test.step('Customer saved and the Contact now references it', async () => {
-      await createCustomerPage.expectSavedSuccessfully();
+      await expect(createCustomerPage.toast).toBeVisible();
+      await expect(page.getByText('Contacts (1)')).toBeVisible();
     });
   });
 

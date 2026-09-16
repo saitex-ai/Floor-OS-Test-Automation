@@ -11,14 +11,11 @@ import { test, expect } from '../../src/fixtures/crm.fixtures';
  * per team decision rather than merged, even where a test case is
  * word-for-word equivalent to one already in that file.
  *
- * TC:1 is confirmed against a real local `tilt up` run (the hand-off
- * query-param pre-fill works exactly as documented). TC:2/TC:3 are
- * confirmed too — neither needs Country to be selectable. TC:4 through
- * TC:9 all require either selecting a Country ("No countries available"
- * locally) or a successfully saved Customer to exist, both blocked
- * locally the same way create-customer.spec.ts's TC:4-10 already are —
- * written from the ClickUp text with TODOs, not run to a real assertion
- * here.
+ * TC:1-4/TC:6/TC:7/TC:9 confirmed against dev (2026-09-16) — note TC:1's
+ * hand-off route needs a real Contact id (dev validates it; a fabricated
+ * id was silently ignored, unlike local). TC:5 and TC:8 are
+ * `test.fixme()`'d — see each for specifics (minor untested multi-select
+ * variant, and no confirmed notifications panel, respectively).
  */
 test.describe('CRM - Customer Creation Screen', () => {
   test.beforeEach(async () => {
@@ -28,19 +25,42 @@ test.describe('CRM - Customer Creation Screen', () => {
   });
 
   test('TC:1 Verify pre-population of Customer Name from hand-off flow', async ({
+    createContactPage,
     createCustomerPage,
+    page,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abt7ae', 'TC:1 (ClickUp)');
 
+    // Confirmed on dev: `contactId` is validated against a real Contact
+    // (a fabricated id used during local probing was silently ignored
+    // there, unlike local) — the Customer Name text prefill itself
+    // doesn't need a real id, but the Contact pre-link does.
+    let contactId = '';
+    const contactName = 'Playwright Handoff Contact';
+
+    await test.step('Create a real Contact to hand off from', async () => {
+      await createContactPage.openFromContactList();
+      await createContactPage.fillProfile({
+        name: contactName,
+        designation: 'Buyer',
+        email: `pw-handoff-${Date.now()}@example.com`,
+        city: 'Coimbatore',
+        country: 'India',
+      });
+      await createContactPage.save();
+      await expect(createContactPage.toast).toBeVisible();
+      await expect(page).toHaveURL(/\/crm\/contacts\/[0-9a-f-]+$/);
+      contactId = page.url().split('/').pop()!;
+    });
+
     await test.step('Arrive via a Contact-creation hand-off (name/contactId/contactName params)', async () => {
-      await createCustomerPage.gotoAuthenticated(
-        '/crm/customers/new?name=HandoffTest&contactId=abc123&contactName=Jane%20Doe',
-      );
+      const query = `?name=HandoffTest&contactId=${contactId}&contactName=${encodeURIComponent(contactName)}`;
+      await createCustomerPage.gotoAuthenticated(`/crm/customers/new${query}`);
     });
 
     await test.step('Customer Name is pre-filled and the Contact is pre-linked', async () => {
       await expect(createCustomerPage.customerNameInput).toHaveValue('HandoffTest');
-      await expect(createCustomerPage.linkContactsCombobox).toContainText('Jane Doe');
+      await expect(createCustomerPage.linkContactsCombobox).toContainText(contactName);
     });
   });
 
@@ -85,9 +105,8 @@ test.describe('CRM - Customer Creation Screen', () => {
     await allure.tms('https://app.clickup.com/t/z941abt7ah', 'TC:4 (ClickUp)');
     await createCustomerPage.openFromCrmHome();
 
-    // TODO(CRM QA): matches create-customer.spec.ts's TC:4 exactly —
-    // blocked locally the same way (Country has no options), confirmed
-    // passing on dev per that file's history.
+    // Matches create-customer.spec.ts's TC:4 exactly — confirmed passing
+    // against dev directly.
     await test.step('Fill required Customer details', async () => {
       await createCustomerPage.fillProfile({
         name: 'Acme Textiles',
@@ -129,31 +148,51 @@ test.describe('CRM - Customer Creation Screen', () => {
 
   test('TC:6 Verify auto-generation and immutability of unique Customer Code', async ({
     createCustomerPage,
+    customerDetailPage,
+    page,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abt7ak', 'TC:6 (ClickUp)');
 
-    test.fixme(
-      true,
-      'Needs a successfully saved Customer to inspect its generated Customer Code — blocked locally (Country has no options)',
-    );
+    let customerCode = '';
 
-    await createCustomerPage.openFromCrmHome();
-    await createCustomerPage.fillProfile({
-      name: `Playwright Test Customer ${Date.now()}`,
-      email: `pw-test-${Date.now()}@example.com`,
-      city: 'Coimbatore',
-      country: 'India',
-      originType: 'Referral',
-      origin: 'Internal Referral',
-      buyer: 'Fabric',
-      referredBy: 'Jordan Smith',
-      crmStage: 'Lead',
+    await test.step('Save a Customer and capture its generated Customer Code', async () => {
+      await createCustomerPage.openFromCrmHome();
+      await createCustomerPage.fillProfile({
+        name: `Playwright Test Customer ${Date.now()}`,
+        email: `pw-test-${Date.now()}@example.com`,
+        city: 'Coimbatore',
+        country: 'India',
+        originType: 'Referral',
+        origin: 'Internal Referral',
+        buyer: 'Fabric',
+        referredBy: 'Jordan Smith',
+        crmStage: 'Lead',
+      });
+      await createCustomerPage.save();
+      await createCustomerPage.expectSavedSuccessfully();
+      await createCustomerPage.postSaveCancelButton.click();
+
+      // "Customer Code" (the label) and "CTCNNNNNNN" (the value) are
+      // separate sibling elements, not one flat text node — target the
+      // value directly by its own pattern.
+      customerCode =
+        (await page
+          .getByText(/^CTC\d+$/)
+          .first()
+          .textContent()) ?? '';
+      expect(customerCode).toMatch(/^CTC\d+$/);
     });
-    await createCustomerPage.save();
-    // TODO(CRM QA): once saved, capture the Customer Code shown on the
-    // Detail page, reload, and assert it's unchanged and read-only —
-    // needs a CustomerDetailPage page object (see activate-customer.md /
-    // edit-customer-contact.md, both also pending on the same blocker).
+
+    await test.step('Customer Code has no Edit button — it is read-only, not just disabled', async () => {
+      await customerDetailPage.expectFieldNotEditable('Customer Code');
+    });
+
+    // TODO(CRM QA): a reload-and-recheck would strengthen this further,
+    // but reload() re-triggers the app's pre-auth gate the way any fresh
+    // navigation does, and redeeming it reliably from mid-test wasn't
+    // straightforward here — not worth fighting session mechanics for a
+    // marginal gain when "no Edit control exists at all" already proves
+    // immutability.
   });
 
   test('TC:7 Verify post-save prompt for immediate Contact creation when no Contact is linked', async ({

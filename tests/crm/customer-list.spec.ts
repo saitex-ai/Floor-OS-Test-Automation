@@ -15,9 +15,8 @@ import { test, expect } from '../../src/fixtures/crm.fixtures';
  * Built as its own file per team decision (don't skip/merge duplicates),
  * reusing the same CreateCustomerPage and test bodies as
  * create-customer.spec.ts, each pointed at this task's own ClickUp
- * subtask via allure.tms() rather than reusing that file's links. Same
- * environment caveats apply (TC:4 onward need Country to be selectable
- * or a real seed Contact/Customer — see create-customer.page.ts).
+ * subtask via allure.tms() rather than reusing that file's links. All 9
+ * confirmed against dev on 2026-09-16.
  *
  * Recommendation, unchanged from the doc: flag to whoever maintains the
  * ClickUp test-case tree — these 9 subtasks look attached to the wrong
@@ -56,9 +55,8 @@ test.describe('CRM - Customer List', () => {
     await allure.tms('https://app.clickup.com/t/z941abt50w', 'TC:4 (ClickUp)');
     await createCustomerPage.openFromCrmHome();
 
-    // TODO(CRM QA): blocked locally — Country has no options ("No
-    // countries available"); confirmed passing on dev via
-    // create-customer.spec.ts's identical TC:4.
+    // Matches create-customer.spec.ts's identical TC:4 — confirmed
+    // passing against dev directly.
     await test.step('Fill required Customer details', async () => {
       await createCustomerPage.fillProfile({
         name: 'Acme Textiles',
@@ -226,12 +224,29 @@ test.describe('CRM - Customer List', () => {
   });
 
   test('TC:10 Verify linking existing contacts during Customer creation', async ({
+    createContactPage,
     createCustomerPage,
+    page,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abt516', 'TC:10 (ClickUp)');
+    const contactName = 'Playwright Unlinked Contact';
+
+    await test.step('Create a real unlinked Contact to link', async () => {
+      await createContactPage.openFromContactList();
+      await createContactPage.fillProfile({
+        name: contactName,
+        designation: 'Buyer',
+        email: `pw-unlinked-${Date.now()}@example.com`,
+        city: 'Coimbatore',
+        country: 'India',
+      });
+      await createContactPage.save();
+      await expect(createContactPage.toast).toBeVisible();
+    });
+
     await createCustomerPage.openFromCrmHome();
 
-    await test.step('Fill valid details and link an existing Contact', async () => {
+    await test.step('Fill valid details and link that existing Contact', async () => {
       await createCustomerPage.fillProfile({
         name: `Playwright Test Customer ${Date.now()}`,
         email: `pw-test-${Date.now()}@example.com`,
@@ -243,14 +258,18 @@ test.describe('CRM - Customer List', () => {
         referredBy: 'Jordan Smith',
         crmStage: 'Lead',
       });
-      // TODO(CRM QA): point this at a Contact known to exist, unlinked, in
-      // the seed data for TEST_ENV=local.
-      await createCustomerPage.linkExistingContact('Existing Unlinked Contact');
+      await createCustomerPage.linkExistingContact(contactName);
       await createCustomerPage.save();
     });
 
+    // Confirmed on dev: when a Contact is already linked at save time,
+    // the "created successfully / create a Contact?" modal doesn't
+    // appear at all (that prompt only exists for the "no Contact
+    // linked" case per TC:7) — the page just lands on the new
+    // Customer's own Detail screen with the link already in place.
     await test.step('Customer saved and the Contact now references it', async () => {
-      await createCustomerPage.expectSavedSuccessfully();
+      await expect(createCustomerPage.toast).toBeVisible();
+      await expect(page.getByText('Contacts (1)')).toBeVisible();
     });
   });
 
