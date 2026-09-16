@@ -81,6 +81,9 @@ test.describe('CRM - Create Customer', () => {
         city: 'Coimbatore',
         country: 'India',
         originType: 'Referral',
+        origin: 'Internal Referral',
+        buyer: 'Fabric',
+        referredBy: 'Jordan Smith',
         crmStage: 'Lead',
       });
     });
@@ -108,6 +111,9 @@ test.describe('CRM - Create Customer', () => {
         city: 'Coimbatore',
         country: 'India',
         originType: 'Referral',
+        origin: 'Internal Referral',
+        buyer: 'Fabric',
+        referredBy: 'Jordan Smith',
         crmStage: 'Lead',
       });
       await createCustomerPage.save();
@@ -127,6 +133,9 @@ test.describe('CRM - Create Customer', () => {
       city: 'Coimbatore',
       country: 'India',
       originType: 'Referral',
+      origin: 'Internal Referral',
+      buyer: 'Fabric',
+      referredBy: 'Jordan Smith',
       crmStage: 'Lead',
     });
     await createCustomerPage.save();
@@ -154,8 +163,11 @@ test.describe('CRM - Create Customer', () => {
         email: `pw-test-${Date.now()}@example.com`,
         city: 'Coimbatore',
         country: 'India',
-        originType: 'Referral',
         crmStage: 'Lead',
+        originType: 'Referral',
+        origin: 'Internal Referral',
+        buyer: 'Fabric',
+        referredBy: 'Jordan Smith',
       });
     });
 
@@ -183,6 +195,9 @@ test.describe('CRM - Create Customer', () => {
       city: 'Coimbatore',
       country: 'India',
       originType: 'Referral',
+      origin: 'Internal Referral',
+      buyer: 'Fabric',
+      referredBy: 'Jordan Smith',
       crmStage: 'Lead',
     });
     await createCustomerPage.save();
@@ -208,6 +223,9 @@ test.describe('CRM - Create Customer', () => {
       city: 'Coimbatore',
       country: 'India',
       originType: 'Referral',
+      origin: 'Internal Referral',
+      buyer: 'Fabric',
+      referredBy: 'Jordan Smith',
       crmStage: 'Lead',
     });
     await createCustomerPage.save();
@@ -235,6 +253,9 @@ test.describe('CRM - Create Customer', () => {
         city: 'Coimbatore',
         country: 'India',
         originType: 'Referral',
+        origin: 'Internal Referral',
+        buyer: 'Fabric',
+        referredBy: 'Jordan Smith',
         crmStage: 'Lead',
       });
       // TODO(CRM QA): point this at a Contact known to exist, unlinked, in

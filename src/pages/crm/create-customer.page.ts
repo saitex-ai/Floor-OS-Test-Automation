@@ -13,15 +13,16 @@ const CUSTOMERS_LIST_PATH = '/crm/customers';
  * text. Two things worth knowing before touching this file:
  *
  * - Country / CRM Stage / Origin Type / Origin / Buyer are custom
- *   comboboxes (a button that opens a `dialog` with a search combobox +
- *   a "Suggestions" listbox of `option`s), not fillable text inputs —
- *   use selectComboboxOption(), not .fill().
- * - As of this writing, none of that reference data is seeded in the
- *   local dev stack (every one of those comboboxes shows "No X
- *   available." / never finishes loading) — confirmed by probing the
- *   live app, not assumed. Every test case here that needs to pick a
- *   real value (TC:4 onward) is blocked on that seed data, independent
- *   of anything in this file. See test-cases/crm/create-customer.md.
+ *   comboboxes (a button that opens a popup with an `option`-per-choice
+ *   list), not fillable text inputs — use selectComboboxOption(), not
+ *   .fill(). Confirmed Country renders its popup as a `dialog`; CRM
+ *   Stage opens a dropdown too but wasn't selecting via that same
+ *   dialog->option path (observed directly in the running app) — likely
+ *   a plain listbox popup with no `dialog` wrapper, not a search-combobox
+ *   like Country's. selectComboboxOption() tries both shapes.
+ * - "Referred By" is a text field that only appears once Origin Type is
+ *   set to "Referral" (matches the user story's acceptance criteria: a
+ *   referral-source field is conditionally required on that value).
  */
 export interface CustomerProfileDetails {
   name?: string;
@@ -32,6 +33,7 @@ export interface CustomerProfileDetails {
   originType?: string;
   origin?: string;
   buyer?: string;
+  referredBy?: string;
   linkedIn?: string;
   facebook?: string;
   instagram?: string;
@@ -52,6 +54,7 @@ export class CreateCustomerPage extends BasePage {
   readonly emailInput: Locator;
   readonly cityInput: Locator;
   readonly countryCombobox: Locator;
+  readonly referredByInput: Locator;
   readonly linkedInInput: Locator;
   readonly facebookInput: Locator;
   readonly instagramInput: Locator;
@@ -101,6 +104,7 @@ export class CreateCustomerPage extends BasePage {
     // "Country" also substring-matches the "Phone country code" combobox's
     // label — exact: true is required to disambiguate.
     this.countryCombobox = page.getByRole('combobox', { name: 'Country', exact: true });
+    this.referredByInput = page.getByLabel('Referred By');
     this.linkedInInput = page.getByLabel('LinkedIn');
     this.facebookInput = page.getByLabel('Facebook');
     this.instagramInput = page.getByLabel('Instagram');
@@ -150,19 +154,28 @@ export class CreateCustomerPage extends BasePage {
       await this.selectComboboxOption(this.originCombobox, details.origin);
     if (details.buyer !== undefined)
       await this.selectComboboxOption(this.buyerCombobox, details.buyer);
+    // Only rendered once Origin Type is "Referral" — set that first if this is provided.
+    if (details.referredBy !== undefined) await this.referredByInput.fill(details.referredBy);
     if (details.linkedIn !== undefined) await this.linkedInInput.fill(details.linkedIn);
     if (details.facebook !== undefined) await this.facebookInput.fill(details.facebook);
     if (details.instagram !== undefined) await this.instagramInput.fill(details.instagram);
   }
 
   /**
-   * Country / CRM Stage / Origin Type / Origin / Buyer all share this
-   * component: clicking the trigger opens a `dialog` containing a search
-   * combobox and a "Suggestions" listbox of `option`s.
+   * Country / CRM Stage / Origin Type / Origin / Buyer are all triggered
+   * the same way, but don't all render their popup the same way underneath
+   * — Country's is a search combobox inside a `dialog`; CRM Stage opens a
+   * dropdown that doesn't match that same dialog->option path (observed
+   * directly, not assumed). Try the `dialog`-scoped option first since
+   * that's confirmed for at least one field, and fall back to an
+   * unscoped `option` search (a plain listbox popup, no dialog wrapper)
+   * for whichever fields turn out to use the other shape.
    */
   private async selectComboboxOption(trigger: Locator, optionText: string | RegExp): Promise<void> {
     await trigger.click();
-    await this.page.getByRole('dialog').last().getByRole('option', { name: optionText }).click();
+    const inDialog = this.page.getByRole('dialog').last().getByRole('option', { name: optionText });
+    const anywhere = this.page.getByRole('option', { name: optionText });
+    await inDialog.or(anywhere).first().click();
   }
 
   /** Adds a Business Process/Department row without assigning anyone (TC:4). */

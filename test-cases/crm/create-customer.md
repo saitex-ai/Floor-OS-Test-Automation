@@ -24,27 +24,29 @@
 
 ## Notes for whoever picks this up next
 
-As of 2026-09-03, verified against a local `tilt up` stack (`npm run
-test:crm`): **6 passing** (auth setup, TC:1, TC:2, TC:3, TC:11, and the
-module smoke test), **7 blocked** (TC:4–TC:10).
+**Update (2026-09-16):** the "none of that reference data is seeded"
+note below is now out of date — Country/CRM Stage/Origin Type/Origin/
+Buyer all have real options now (confirmed directly in the running app),
+and `origin: 'Internal Referral'`, `buyer: 'Fabric'`, and a new
+`referredBy` field (only rendered once Origin Type is "Referral") are
+now filled in on every test case that needs a full valid profile
+(TC:4–TC:10 in `create-customer.spec.ts`). Also fixed:
+`selectComboboxOption()` in `create-customer.page.ts` previously assumed
+every combobox's popup is a search-combobox inside a `dialog` (true for
+Country) — CRM Stage opens a plain dropdown that doesn't match that
+shape, so the selector now tries both. Re-verify against local/dev and
+adjust `origin`/`buyer`/`referredBy` values here if your seed data uses
+different labels than "Internal Referral" / "Fabric".
 
-The blocked ones all fail at the same point, for the same reason — not a
-locator bug. `Country`, `CRM Stage`, `Origin Type`, `Origin`, and `Buyer`
-are custom comboboxes (click the trigger → a dialog opens with a
-"Suggestions" listbox of options — see `selectComboboxOption()` in
-`create-customer.page.ts`), and **none of that reference data is seeded
-in this local environment**: every one of those comboboxes shows "No ...
-available." (confirmed by inspecting the live app), and "Add" under
-Departments and Assignees never leaves its disabled/"Loading
-departments…" state. This matches the user story's own stated
+As of 2026-09-03 (superseded by the above), verified against a local
+`tilt up` stack (`npm run test:crm`): **6 passing** (auth setup, TC:1,
+TC:2, TC:3, TC:11, and the module smoke test), **7 blocked** (TC:4–TC:10)
+on missing reference data. This matched the user story's own stated
 prerequisite ("Reference/master data needed by the form is configured:
 origin types, buyer/segment types, business-process catalogue, ...
-country/region list") — it just isn't configured on this machine yet.
+country/region list") — it just wasn't configured on that machine yet.
 
-Once that reference data is seeded locally, TC:4–TC:10 should be usable
-as-is — the interaction code (`selectComboboxOption`,
-`addBusinessProcessWithAssignee`, `linkExistingContact`) is written and
-correct against the real DOM, it just has nothing to select yet. Also
-worth knowing: TC:5/TC:6 (duplicate detection) additionally need an
-_existing_ Customer in local data that matches the test's name/email —
-there's a TODO for that in `create-customer.spec.ts`.
+Still worth knowing: TC:5/TC:6 (duplicate detection) need an _existing_
+Customer in the data that matches the test's name/email, and TC:10 needs
+an _existing, unlinked_ Contact — both currently placeholder values with
+a TODO in `create-customer.spec.ts`, unconfirmed against real seed data.
