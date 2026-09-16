@@ -1,10 +1,12 @@
 import { test as base } from '@playwright/test';
 import { CrmPage } from '../pages/crm/crm.page';
 import { CreateCustomerPage } from '../pages/crm/create-customer.page';
+import { ContactListPage } from '../pages/crm/contact-list.page';
 
 interface CrmFixtures {
   crmPage: CrmPage;
   createCustomerPage: CreateCustomerPage;
+  contactListPage: ContactListPage;
 }
 
 /**
@@ -19,6 +21,10 @@ export const test = base.extend<CrmFixtures>({
 
   createCustomerPage: async ({ page }, use) => {
     await use(new CreateCustomerPage(page));
+  },
+
+  contactListPage: async ({ page }, use) => {
+    await use(new ContactListPage(page));
   },
 });
 
