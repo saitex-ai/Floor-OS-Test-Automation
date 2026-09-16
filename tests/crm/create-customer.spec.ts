@@ -89,7 +89,7 @@ test.describe('CRM - Create Customer', () => {
     });
 
     await test.step('Add a Business Process/Department line with no assignee', async () => {
-      await createCustomerPage.addBusinessProcessWithoutAssignee('Sourcing');
+      await createCustomerPage.addBusinessProcessWithoutAssignee('Cutting');
       await createCustomerPage.save();
     });
 

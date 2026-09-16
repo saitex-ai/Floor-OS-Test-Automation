@@ -178,21 +178,24 @@ export class CreateCustomerPage extends BasePage {
     await inDialog.or(anywhere).first().click();
   }
 
-  /** Adds a Business Process/Department row without assigning anyone (TC:4). */
-  async addBusinessProcessWithoutAssignee(process: string): Promise<void> {
+  /**
+   * Adds a Business Process/Department row without assigning anyone
+   * (TC:4). "Department" and "Assignees" are both comboboxes — same
+   * selectComboboxOption() pattern as Country/CRM Stage/etc, not fillable
+   * text inputs (confirmed directly: the previous .fill() attempt
+   * resolved to the row's "Remove department" button instead, since that
+   * button's aria-label also matched a loose /department/i search).
+   */
+  async addBusinessProcessWithoutAssignee(department: string): Promise<void> {
     await this.addBusinessProcessButton.click();
-    await this.page
-      .getByLabel(/business process|department/i)
-      .last()
-      .fill(process);
+    const departmentCombobox = this.page.getByRole('combobox', { name: 'Department' }).last();
+    await this.selectComboboxOption(departmentCombobox, department);
   }
 
-  async addBusinessProcessWithAssignee(process: string, assignee: string): Promise<void> {
-    await this.addBusinessProcessWithoutAssignee(process);
-    await this.page
-      .getByLabel(/assignee/i)
-      .last()
-      .fill(assignee);
+  async addBusinessProcessWithAssignee(department: string, assignee: string): Promise<void> {
+    await this.addBusinessProcessWithoutAssignee(department);
+    const assigneeCombobox = this.page.getByRole('combobox', { name: 'Assignees' }).last();
+    await this.selectComboboxOption(assigneeCombobox, assignee);
   }
 
   async linkExistingContact(contactName: string): Promise<void> {
