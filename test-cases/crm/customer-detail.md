@@ -2,7 +2,7 @@
 
 - **Test-case set:** [CRM - Sprint 1 - Customer detail Screen](https://app.clickup.com/t/90181912927/z941abt7jj)
 - **Source:** ClickUp, expanded from subtasks 2026-09-16
-- **Automated in:** Pending
+- **Automated in:** [`tests/crm/customer-detail.spec.ts`](../../tests/crm/customer-detail.spec.ts) — TC:1-5 confirmed against dev (2026-09-16); TC:6 (audit log) `test.fixme()`'d, no Audit/History section exists on this screen. TC:3 only covers the locked fields that actually exist ("Contact ID" is in the ClickUp text but not on the real screen).
 - **Note:** despite the ClickUp task's name ("Customer detail Screen"), every subtask's actual steps are about the **Contact** Details screen (TC:2 explicitly navigates _from_ Contact _to_ a linked Customer) — another ClickUp mislabeling, confirmed by reading the real subtask text, not assumed. Kept the file name as-is to match the existing repo structure; title corrected above.
 
 | #    | Test case                                                                    | Steps                                                                                                                                                                                     | Expected result                                                                                                                                                                            | ClickUp                                      |
@@ -16,4 +16,6 @@
 
 ## Notes for whoever picks this up next
 
-This overlaps significantly with `edit-customer-contact.md` (both are fundamentally "inline editing on a detail screen"), but that file's TC:1-7 apply generically to "Customer or Contact" while every case here is specifically Contact-side, including a Contact→Customer navigation link (TC:2) that has no Customer-side equivalent in this file. Kept separate per team decision. Not yet live-probed — no locators confirmed. Needs a `ContactDetailPage` (distinct from the existing `CreateCustomerPage`/`ContactListPage`), reachable by clicking a row in `tests/crm/contact-list.spec.ts`'s Contact List — currently blocked there too (zero contacts in local/dev), so getting to a real Contact Details screen at all may need a contact created via the (also still-pending) Create Contact automation first.
+This overlaps significantly with `edit-customer-contact.md` (both are fundamentally "inline editing on a detail screen"), but that file's TC:1-7 apply generically to "Customer or Contact" while every case here is specifically Contact-side, including a Contact→Customer navigation link (TC:2) that has no Customer-side equivalent in this file. Kept separate per team decision.
+
+Confirmed against dev on 2026-09-16 via a `ContactDetailPage` (route `/crm/contacts/{uuid}`, reached by creating a Contact linked to a real Customer — the Contact List route was still zero-seeded, so this went through `CreateContactPage.openFromCustomerContext()` instead). Two things worth flagging to whoever maintains the ClickUp test-case tree: TC:3's "Contact ID" locked field doesn't exist anywhere on the real screen, and TC:6's Audit/History section doesn't exist at all (not just unconfirmed — actively searched for and not found).

@@ -4,6 +4,7 @@ import { CreateCustomerPage } from '../pages/crm/create-customer.page';
 import { ContactListPage } from '../pages/crm/contact-list.page';
 import { CreateContactPage } from '../pages/crm/create-contact.page';
 import { CustomerDetailPage } from '../pages/crm/customer-detail.page';
+import { ContactDetailPage } from '../pages/crm/contact-detail.page';
 
 interface CrmFixtures {
   crmPage: CrmPage;
@@ -11,6 +12,7 @@ interface CrmFixtures {
   contactListPage: ContactListPage;
   createContactPage: CreateContactPage;
   customerDetailPage: CustomerDetailPage;
+  contactDetailPage: ContactDetailPage;
 }
 
 /**
@@ -37,6 +39,10 @@ export const test = base.extend<CrmFixtures>({
 
   customerDetailPage: async ({ page }, use) => {
     await use(new CustomerDetailPage(page));
+  },
+
+  contactDetailPage: async ({ page }, use) => {
+    await use(new ContactDetailPage(page));
   },
 });
 
