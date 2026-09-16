@@ -43,7 +43,7 @@ test.describe('CRM - Create Customer', () => {
     });
 
     await test.step('Save is blocked with inline "Required" errors', async () => {
-      await expect(createCustomerPage.saveButton).toBeVisible(); // still on the form, not navigated away
+      await expect(createCustomerPage.locators.saveButton).toBeVisible(); // still on the form, not navigated away
       await createCustomerPage.expectFieldError(/required/i);
     });
   });
@@ -142,12 +142,12 @@ test.describe('CRM - Create Customer', () => {
     await createCustomerPage.expectDuplicateWarningVisible();
 
     await test.step('Click "Cancel to review"', async () => {
-      await createCustomerPage.cancelToReviewButton.click();
+      await createCustomerPage.locators.cancelToReviewButton.click();
     });
 
     await test.step('Modal closes and the form is still editable, unsaved', async () => {
-      await expect(createCustomerPage.duplicateWarningModal).toBeHidden();
-      await expect(createCustomerPage.saveButton).toBeVisible();
+      await expect(createCustomerPage.locators.duplicateWarningModal).toBeHidden();
+      await expect(createCustomerPage.locators.saveButton).toBeVisible();
     });
   });
 
@@ -173,8 +173,8 @@ test.describe('CRM - Create Customer', () => {
 
     await test.step('Save (confirming "Save anyway" if a duplicate warning appears)', async () => {
       await createCustomerPage.save();
-      if (await createCustomerPage.duplicateWarningModal.isVisible()) {
-        await createCustomerPage.saveAnywayButton.click();
+      if (await createCustomerPage.locators.duplicateWarningModal.isVisible()) {
+        await createCustomerPage.locators.saveAnywayButton.click();
       }
     });
 
@@ -204,7 +204,7 @@ test.describe('CRM - Create Customer', () => {
     await createCustomerPage.expectSavedSuccessfully();
 
     await test.step('Click "Create Contact" on the post-save modal', async () => {
-      await createCustomerPage.createContactButton.click();
+      await createCustomerPage.locators.createContactButton.click();
     });
 
     await test.step('Routed to Create Contact, pre-linked to the new Customer', async () => {
@@ -232,11 +232,11 @@ test.describe('CRM - Create Customer', () => {
     await createCustomerPage.expectSavedSuccessfully();
 
     await test.step('Click "Cancel" on the post-save modal', async () => {
-      await createCustomerPage.postSaveCancelButton.click();
+      await createCustomerPage.locators.postSaveCancelButton.click();
     });
 
     await test.step('Redirected to the Customer Detail view or Customer List', async () => {
-      await expect(createCustomerPage.postSaveModal).toBeHidden();
+      await expect(createCustomerPage.locators.postSaveModal).toBeHidden();
     });
   });
 
@@ -258,7 +258,7 @@ test.describe('CRM - Create Customer', () => {
         country: 'India',
       });
       await createContactPage.save();
-      await expect(createContactPage.toast).toBeVisible();
+      await expect(createContactPage.locators.toast).toBeVisible();
     });
 
     await createCustomerPage.openFromCrmHome();
@@ -285,7 +285,7 @@ test.describe('CRM - Create Customer', () => {
     // linked" case per TC:7/TC:8) — the page just lands on the new
     // Customer's own Detail screen with the link already in place.
     await test.step('Customer saved and the Contact now references it', async () => {
-      await expect(createCustomerPage.toast).toBeVisible();
+      await expect(createCustomerPage.locators.toast).toBeVisible();
       await expect(page.getByText('Contacts (1)')).toBeVisible();
     });
   });

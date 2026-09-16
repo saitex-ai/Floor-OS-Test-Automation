@@ -48,11 +48,11 @@ test.describe('CRM - Contact Creation Screen', () => {
         crmStage: 'Lead',
       });
       await createCustomerPage.save();
-      if (await createCustomerPage.duplicateWarningModal.isVisible().catch(() => false)) {
-        await createCustomerPage.saveAnywayButton.click();
+      if (await createCustomerPage.locators.duplicateWarningModal.isVisible().catch(() => false)) {
+        await createCustomerPage.locators.saveAnywayButton.click();
       }
       await createCustomerPage.expectSavedSuccessfully();
-      await createCustomerPage.postSaveCancelButton.click();
+      await createCustomerPage.locators.postSaveCancelButton.click();
       await expect(page).toHaveURL(/\/crm\/customers\/[0-9a-f-]+$/);
       customerId = page.url().split('/').pop()!;
     });
@@ -88,7 +88,7 @@ test.describe('CRM - Contact Creation Screen', () => {
         country: 'India',
       });
       await createContactPage.save();
-      await expect(createContactPage.toast).toBeVisible();
+      await expect(createContactPage.locators.toast).toBeVisible();
     });
   });
 
@@ -122,18 +122,18 @@ test.describe('CRM - Contact Creation Screen', () => {
         city: 'Coimbatore',
         country: 'India',
       });
-      await createContactPage.customerNameCombobox.click();
-      await createContactPage.customerNameCombobox.fill('newcustt');
+      await createContactPage.locators.customerNameCombobox.click();
+      await createContactPage.locators.customerNameCombobox.fill('newcustt');
     });
 
     await test.step('Save — toast confirms, modal prompts to create the Customer', async () => {
       await createContactPage.save();
-      await expect(createContactPage.toast).toBeVisible();
-      await expect(createContactPage.postSaveCreateCustomerModal).toBeVisible();
+      await expect(createContactPage.locators.toast).toBeVisible();
+      await expect(createContactPage.locators.postSaveCreateCustomerModal).toBeVisible();
     });
 
     await test.step('Click "Create customer" — redirected with pre-fill params', async () => {
-      await createContactPage.createCustomerButton.click();
+      await createContactPage.locators.createCustomerButton.click();
       await expect(page).toHaveURL(/\/crm\/customers\/new\?name=newcustt.*contactId=/);
     });
   });

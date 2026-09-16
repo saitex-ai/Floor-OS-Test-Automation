@@ -40,7 +40,7 @@ test.describe('CRM - Activate Customer', () => {
     });
     await createCustomerPage.save();
     await createCustomerPage.expectSavedSuccessfully();
-    await createCustomerPage.postSaveCancelButton.click();
+    await createCustomerPage.locators.postSaveCancelButton.click();
 
     await customerDetailPage.deactivate(
       ['Business misalignment'],
@@ -70,16 +70,16 @@ test.describe('CRM - Activate Customer', () => {
       });
       await createCustomerPage.save();
       await createCustomerPage.expectSavedSuccessfully();
-      await createCustomerPage.postSaveCancelButton.click();
+      await createCustomerPage.locators.postSaveCancelButton.click();
 
-      await expect(customerDetailPage.deactivateButton).toBeVisible();
-      await expect(customerDetailPage.activateButton).not.toBeVisible();
+      await expect(customerDetailPage.locators.deactivateButton).toBeVisible();
+      await expect(customerDetailPage.locators.activateButton).not.toBeVisible();
     });
 
     await test.step('Deactivate it — "Activate" is now shown, not "Deactivate"', async () => {
       await customerDetailPage.deactivate(['Business misalignment'], 'TC:1 setup');
-      await expect(customerDetailPage.activateButton).toBeVisible();
-      await expect(customerDetailPage.deactivateButton).not.toBeVisible();
+      await expect(customerDetailPage.locators.activateButton).toBeVisible();
+      await expect(customerDetailPage.locators.deactivateButton).not.toBeVisible();
     });
   });
 
@@ -91,8 +91,8 @@ test.describe('CRM - Activate Customer', () => {
     await createAndDeactivateCustomer(createCustomerPage, customerDetailPage);
 
     await test.step('Open Activate modal, leave both fields blank, click Proceed', async () => {
-      await customerDetailPage.activateButton.click();
-      await customerDetailPage.reasonProceedButton.click();
+      await customerDetailPage.locators.activateButton.click();
+      await customerDetailPage.locators.reasonProceedButton.click();
     });
 
     await test.step('Activation is blocked with both validation errors', async () => {
@@ -110,15 +110,19 @@ test.describe('CRM - Activate Customer', () => {
     await createAndDeactivateCustomer(createCustomerPage, customerDetailPage);
 
     await test.step('Select a valid reason and enter detailed text', async () => {
-      await customerDetailPage.activateButton.click();
-      await customerDetailPage.reasonMultiSelect.click();
+      await customerDetailPage.locators.activateButton.click();
+      await customerDetailPage.locators.reasonMultiSelect.click();
       await page.getByRole('option', { name: 'Negotiation' }).click();
       await page.keyboard.press('Escape');
-      await customerDetailPage.detailedReasonTextbox.fill('Reactivating after negotiation');
+      await customerDetailPage.locators.detailedReasonTextbox.fill(
+        'Reactivating after negotiation',
+      );
     });
 
     await test.step('Selected reason chip appears; character counter updates', async () => {
-      await expect(customerDetailPage.reasonMultiSelect.getByText('Negotiation')).toBeVisible();
+      await expect(
+        customerDetailPage.locators.reasonMultiSelect.getByText('Negotiation'),
+      ).toBeVisible();
       await customerDetailPage.expectCharacterCount('Reactivating after negotiation'.length);
     });
   });
@@ -132,18 +136,22 @@ test.describe('CRM - Activate Customer', () => {
     await createAndDeactivateCustomer(createCustomerPage, customerDetailPage);
 
     await test.step('Complete mandatory fields and click Proceed', async () => {
-      await customerDetailPage.activateButton.click();
-      await customerDetailPage.reasonMultiSelect.click();
+      await customerDetailPage.locators.activateButton.click();
+      await customerDetailPage.locators.reasonMultiSelect.click();
       await page.getByRole('option', { name: 'Negotiation' }).click();
       await page.keyboard.press('Escape');
-      await customerDetailPage.detailedReasonTextbox.fill('Reactivating after negotiation');
-      await customerDetailPage.reasonProceedButton.click();
+      await customerDetailPage.locators.detailedReasonTextbox.fill(
+        'Reactivating after negotiation',
+      );
+      await customerDetailPage.locators.reasonProceedButton.click();
     });
 
     await test.step('Confirmation modal names the Customer and impact', async () => {
-      await expect(customerDetailPage.confirmDialog).toBeVisible();
-      await expect(customerDetailPage.confirmDialog).toContainText('and its Contacts?');
-      await expect(customerDetailPage.confirmDialog.getByText(/linked contacts/i)).toBeVisible();
+      await expect(customerDetailPage.locators.confirmDialog).toBeVisible();
+      await expect(customerDetailPage.locators.confirmDialog).toContainText('and its Contacts?');
+      await expect(
+        customerDetailPage.locators.confirmDialog.getByText(/linked contacts/i),
+      ).toBeVisible();
     });
   });
 
@@ -160,8 +168,8 @@ test.describe('CRM - Activate Customer', () => {
 
     await test.step('Status badge → Active, button toggles to Deactivate', async () => {
       await customerDetailPage.expectStatus('Active');
-      await expect(customerDetailPage.deactivateButton).toBeVisible();
-      await expect(customerDetailPage.activateButton).not.toBeVisible();
+      await expect(customerDetailPage.locators.deactivateButton).toBeVisible();
+      await expect(customerDetailPage.locators.activateButton).not.toBeVisible();
     });
 
     // TODO(CRM QA): "All previously deactivated linked Contacts are
@@ -215,23 +223,23 @@ test.describe('CRM - Activate Customer', () => {
     await createAndDeactivateCustomer(createCustomerPage, customerDetailPage);
 
     await test.step('Open the Activate modal, then Cancel on the reason step', async () => {
-      await customerDetailPage.activateButton.click();
-      await customerDetailPage.reasonCancelButton.click();
+      await customerDetailPage.locators.activateButton.click();
+      await customerDetailPage.locators.reasonCancelButton.click();
     });
 
     await test.step('Modal closes, nothing saved, still Inactive', async () => {
-      await expect(customerDetailPage.reasonDialog).toBeHidden();
+      await expect(customerDetailPage.locators.reasonDialog).toBeHidden();
       await customerDetailPage.expectStatus('Inactive');
     });
 
     await test.step('Open again, proceed to final confirmation, then Cancel there', async () => {
-      await customerDetailPage.activateButton.click();
-      await customerDetailPage.reasonMultiSelect.click();
+      await customerDetailPage.locators.activateButton.click();
+      await customerDetailPage.locators.reasonMultiSelect.click();
       await page.getByRole('option', { name: 'Negotiation' }).click();
       await page.keyboard.press('Escape');
-      await customerDetailPage.detailedReasonTextbox.fill('Testing cancel');
-      await customerDetailPage.reasonProceedButton.click();
-      await customerDetailPage.confirmCancelButton.click();
+      await customerDetailPage.locators.detailedReasonTextbox.fill('Testing cancel');
+      await customerDetailPage.locators.reasonProceedButton.click();
+      await customerDetailPage.locators.confirmCancelButton.click();
     });
 
     await test.step('Still Inactive after canceling the final confirmation too', async () => {

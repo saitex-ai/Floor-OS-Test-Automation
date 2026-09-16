@@ -48,7 +48,7 @@ test.describe('CRM - Customer Creation Screen', () => {
         country: 'India',
       });
       await createContactPage.save();
-      await expect(createContactPage.toast).toBeVisible();
+      await expect(createContactPage.locators.toast).toBeVisible();
       await expect(page).toHaveURL(/\/crm\/contacts\/[0-9a-f-]+$/);
       contactId = page.url().split('/').pop()!;
     });
@@ -59,8 +59,8 @@ test.describe('CRM - Customer Creation Screen', () => {
     });
 
     await test.step('Customer Name is pre-filled and the Contact is pre-linked', async () => {
-      await expect(createCustomerPage.customerNameInput).toHaveValue('HandoffTest');
-      await expect(createCustomerPage.linkContactsCombobox).toContainText(contactName);
+      await expect(createCustomerPage.locators.customerNameInput).toHaveValue('HandoffTest');
+      await expect(createCustomerPage.locators.linkContactsCombobox).toContainText(contactName);
     });
   });
 
@@ -75,7 +75,7 @@ test.describe('CRM - Customer Creation Screen', () => {
     });
 
     await test.step('Save is blocked with inline "Required" errors', async () => {
-      await expect(createCustomerPage.saveButton).toBeVisible();
+      await expect(createCustomerPage.locators.saveButton).toBeVisible();
       await createCustomerPage.expectFieldError(/required/i);
     });
   });
@@ -170,7 +170,7 @@ test.describe('CRM - Customer Creation Screen', () => {
       });
       await createCustomerPage.save();
       await createCustomerPage.expectSavedSuccessfully();
-      await createCustomerPage.postSaveCancelButton.click();
+      await createCustomerPage.locators.postSaveCancelButton.click();
 
       // "Customer Code" (the label) and "CTCNNNNNNN" (the value) are
       // separate sibling elements, not one flat text node — target the
@@ -266,11 +266,11 @@ test.describe('CRM - Customer Creation Screen', () => {
     await createCustomerPage.expectSavedSuccessfully();
 
     await test.step('Click "Cancel" on the post-save modal', async () => {
-      await createCustomerPage.postSaveCancelButton.click();
+      await createCustomerPage.locators.postSaveCancelButton.click();
     });
 
     await test.step("Lands on the new Customer's own Detail page", async () => {
-      await expect(createCustomerPage.postSaveModal).toBeHidden();
+      await expect(createCustomerPage.locators.postSaveModal).toBeHidden();
       // TODO(CRM QA): assert a specific Customer Detail URL/heading once
       // that page object exists — not yet confirmed what that route is.
       await expect(page).not.toHaveURL(/\/crm\/customers\/new/);

@@ -81,7 +81,7 @@ test.describe('CRM - Create Contact', () => {
 
     await test.step('Save and verify success', async () => {
       await createContactPage.save();
-      await expect(createContactPage.toast).toBeVisible();
+      await expect(createContactPage.locators.toast).toBeVisible();
     });
   });
 
@@ -101,7 +101,7 @@ test.describe('CRM - Create Contact', () => {
 
     await test.step('Save without linking a Customer', async () => {
       await createContactPage.save();
-      await expect(createContactPage.toast).toBeVisible();
+      await expect(createContactPage.locators.toast).toBeVisible();
     });
   });
 
@@ -132,17 +132,17 @@ test.describe('CRM - Create Contact', () => {
         city: 'Coimbatore',
         country: 'India',
       });
-      await createContactPage.customerNameCombobox.click();
-      await createContactPage.customerNameCombobox.fill('Totally New Customer XYZ');
+      await createContactPage.locators.customerNameCombobox.click();
+      await createContactPage.locators.customerNameCombobox.fill('Totally New Customer XYZ');
     });
 
     await test.step('Save and expect the "create this Customer now?" prompt', async () => {
       await createContactPage.save();
-      await expect(createContactPage.postSaveCreateCustomerModal).toBeVisible();
+      await expect(createContactPage.locators.postSaveCreateCustomerModal).toBeVisible();
     });
 
     await test.step('Accept the prompt — routed into Customer creation, pre-linked', async () => {
-      await createContactPage.createCustomerButton.click();
+      await createContactPage.locators.createCustomerButton.click();
       await expect(page).toHaveURL(/\/crm\/customers\/new\?.*contactId=/);
     });
   });
@@ -172,11 +172,11 @@ test.describe('CRM - Create Contact', () => {
         crmStage: 'Lead',
       });
       await createCustomerPage.save();
-      if (await createCustomerPage.duplicateWarningModal.isVisible().catch(() => false)) {
-        await createCustomerPage.saveAnywayButton.click();
+      if (await createCustomerPage.locators.duplicateWarningModal.isVisible().catch(() => false)) {
+        await createCustomerPage.locators.saveAnywayButton.click();
       }
       await createCustomerPage.expectSavedSuccessfully();
-      await createCustomerPage.postSaveCancelButton.click();
+      await createCustomerPage.locators.postSaveCancelButton.click();
       await expect(page).toHaveURL(/\/crm\/customers\/[0-9a-f-]+$/);
       customerId = page.url().split('/').pop()!;
     });
@@ -198,7 +198,7 @@ test.describe('CRM - Create Contact', () => {
         country: 'India',
       });
       await createContactPage.save();
-      await expect(createContactPage.toast).toBeVisible();
+      await expect(createContactPage.locators.toast).toBeVisible();
     });
   });
 
@@ -223,7 +223,7 @@ test.describe('CRM - Create Contact', () => {
         country: 'India',
       });
       await createContactPage.save();
-      await expect(createContactPage.toast).toBeVisible();
+      await expect(createContactPage.locators.toast).toBeVisible();
     });
 
     await test.step('Attempt a second Contact with the same email', async () => {

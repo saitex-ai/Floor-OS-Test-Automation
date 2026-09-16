@@ -34,12 +34,12 @@ test.describe('CRM - Contact List', () => {
     });
 
     await test.step('The list loads with the expected columns and controls', async () => {
-      await expect(contactListPage.heading).toBeVisible();
-      await expect(contactListPage.allTab).toBeVisible();
-      await expect(contactListPage.linkedTab).toBeVisible();
-      await expect(contactListPage.unlinkedTab).toBeVisible();
-      await expect(contactListPage.searchInput).toBeVisible();
-      await expect(contactListPage.table).toBeVisible();
+      await expect(contactListPage.locators.heading).toBeVisible();
+      await expect(contactListPage.locators.allTab).toBeVisible();
+      await expect(contactListPage.locators.linkedTab).toBeVisible();
+      await expect(contactListPage.locators.unlinkedTab).toBeVisible();
+      await expect(contactListPage.locators.searchInput).toBeVisible();
+      await expect(contactListPage.locators.table).toBeVisible();
       for (const column of [
         'Contact Name',
         'Customer Name',
@@ -48,7 +48,7 @@ test.describe('CRM - Contact List', () => {
         'Location',
         'Status',
       ]) {
-        await expect(contactListPage.columnHeader(column)).toBeVisible();
+        await expect(contactListPage.locators.columnHeader(column)).toBeVisible();
       }
     });
   });
@@ -65,7 +65,7 @@ test.describe('CRM - Contact List', () => {
     });
 
     await test.step('Matching contacts are displayed', async () => {
-      await expect(contactListPage.dataRows.first()).toBeVisible();
+      await expect(contactListPage.locators.dataRows.first()).toBeVisible();
     });
   });
 
@@ -80,7 +80,7 @@ test.describe('CRM - Contact List', () => {
     });
 
     await test.step('Matching contacts are displayed accurately', async () => {
-      await expect(contactListPage.dataRows.first()).toBeVisible();
+      await expect(contactListPage.locators.dataRows.first()).toBeVisible();
     });
   });
 
@@ -90,13 +90,13 @@ test.describe('CRM - Contact List', () => {
 
     await test.step('Switch to the Linked tab', async () => {
       await contactListPage.selectRelationshipTab('Linked');
-      await expect(contactListPage.linkedTab).toHaveAttribute('aria-pressed', 'true');
+      await expect(contactListPage.locators.linkedTab).toHaveAttribute('aria-pressed', 'true');
     });
 
     await test.step('Switch to the Unlinked tab', async () => {
       await contactListPage.selectRelationshipTab('Unlinked');
-      await expect(contactListPage.unlinkedTab).toHaveAttribute('aria-pressed', 'true');
-      await expect(contactListPage.linkedTab).not.toHaveAttribute('aria-pressed', 'true');
+      await expect(contactListPage.locators.unlinkedTab).toHaveAttribute('aria-pressed', 'true');
+      await expect(contactListPage.locators.linkedTab).not.toHaveAttribute('aria-pressed', 'true');
     });
 
     // NOTE: with zero contacts in the current data, "only contacts in the
@@ -112,9 +112,9 @@ test.describe('CRM - Contact List', () => {
 
     await test.step('Open Filters', async () => {
       await contactListPage.openFilters();
-      await expect(contactListPage.statusFilterButton).toBeVisible();
-      await expect(contactListPage.countryFilterButton).toBeVisible();
-      await expect(contactListPage.addRuleButton).toBeVisible();
+      await expect(contactListPage.locators.statusFilterButton).toBeVisible();
+      await expect(contactListPage.locators.countryFilterButton).toBeVisible();
+      await expect(contactListPage.locators.addRuleButton).toBeVisible();
     });
 
     // TODO(CRM QA): pick a real Status option and a custom attribute rule
@@ -137,12 +137,12 @@ test.describe('CRM - Contact List', () => {
     // attribute, localStorage key, or visible sort icon are the likely
     // candidates — check with the team once real rows exist).
     await test.step('Sort by the Contact Name column', async () => {
-      await contactListPage.columnSortButton('Contact Name').click();
+      await contactListPage.locators.columnSortButton('Contact Name').click();
     });
 
     await test.step('Reload the page', async () => {
       await page.reload();
-      await expect(contactListPage.columnHeader('Contact Name')).toBeVisible();
+      await expect(contactListPage.locators.columnHeader('Contact Name')).toBeVisible();
     });
   });
 
@@ -160,10 +160,10 @@ test.describe('CRM - Contact List', () => {
       // click at all) was unreliable in practice (observed: Apply stayed
       // disabled, meaning no change was registered). A plain click always
       // acts, sidestepping that.
-      await contactListPage.columnToggle('Phone').click();
-      await expect(contactListPage.applyColumnsButton).toBeEnabled();
-      await contactListPage.applyColumnsButton.click();
-      await expect(contactListPage.columnHeader('Phone')).toBeHidden();
+      await contactListPage.locators.columnToggle('Phone').click();
+      await expect(contactListPage.locators.applyColumnsButton).toBeEnabled();
+      await contactListPage.locators.applyColumnsButton.click();
+      await expect(contactListPage.locators.columnHeader('Phone')).toBeHidden();
     });
 
     // "New session" interpreted as a fresh page load of the same SPA
@@ -171,7 +171,7 @@ test.describe('CRM - Contact List', () => {
     // new login is exercised implicitly by every other test's own setup.
     await test.step('Reload: the column stays hidden', async () => {
       await page.reload();
-      await expect(contactListPage.columnHeader('Phone')).toBeHidden();
+      await expect(contactListPage.locators.columnHeader('Phone')).toBeHidden();
     });
   });
 
@@ -240,7 +240,7 @@ test.describe('CRM - Contact List', () => {
     await contactListPage.open();
 
     await test.step('Use the Create Contact action from the list', async () => {
-      await contactListPage.createContactButton.click();
+      await contactListPage.locators.createContactButton.click();
     });
 
     await test.step('The Create Contact flow opens', async () => {

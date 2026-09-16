@@ -35,7 +35,7 @@ test.describe('CRM - Deactivate Customer', () => {
     });
     await createCustomerPage.save();
     await createCustomerPage.expectSavedSuccessfully();
-    await createCustomerPage.postSaveCancelButton.click();
+    await createCustomerPage.locators.postSaveCancelButton.click();
   }
 
   test('TC:1 Verify visibility of the "Deactivate" button on active Customer profile', async ({
@@ -45,8 +45,8 @@ test.describe('CRM - Deactivate Customer', () => {
     await allure.tms('https://app.clickup.com/t/z941abt53d', 'TC:1 (ClickUp)');
     await createActiveCustomer(createCustomerPage);
 
-    await expect(customerDetailPage.deactivateButton).toBeVisible();
-    await expect(customerDetailPage.activateButton).not.toBeVisible();
+    await expect(customerDetailPage.locators.deactivateButton).toBeVisible();
+    await expect(customerDetailPage.locators.activateButton).not.toBeVisible();
   });
 
   test('TC:2 Verify validation when mandatory deactivation fields are empty', async ({
@@ -57,8 +57,8 @@ test.describe('CRM - Deactivate Customer', () => {
     await createActiveCustomer(createCustomerPage);
 
     await test.step('Open Deactivate modal, leave both fields blank, click Proceed', async () => {
-      await customerDetailPage.deactivateButton.click();
-      await customerDetailPage.reasonProceedButton.click();
+      await customerDetailPage.locators.deactivateButton.click();
+      await customerDetailPage.locators.reasonProceedButton.click();
     });
 
     await test.step('Deactivation is blocked with both validation errors', async () => {
@@ -76,8 +76,8 @@ test.describe('CRM - Deactivate Customer', () => {
     await createActiveCustomer(createCustomerPage);
 
     await test.step('Expand the Reason dropdown and select a reason', async () => {
-      await customerDetailPage.deactivateButton.click();
-      await customerDetailPage.reasonMultiSelect.click();
+      await customerDetailPage.locators.deactivateButton.click();
+      await customerDetailPage.locators.reasonMultiSelect.click();
       await expect(page.getByRole('option', { name: 'Business misalignment' })).toBeVisible();
       await expect(page.getByRole('option', { name: 'Payment issues' })).toBeVisible();
       await expect(page.getByRole('option', { name: 'Low order frequency' })).toBeVisible();
@@ -88,7 +88,7 @@ test.describe('CRM - Deactivate Customer', () => {
     });
 
     await test.step('Enter detail text and check the character counter', async () => {
-      await customerDetailPage.detailedReasonTextbox.fill('Customer relocated overseas');
+      await customerDetailPage.locators.detailedReasonTextbox.fill('Customer relocated overseas');
       await customerDetailPage.expectCharacterCount('Customer relocated overseas'.length);
     });
   });
@@ -102,18 +102,20 @@ test.describe('CRM - Deactivate Customer', () => {
     await createActiveCustomer(createCustomerPage);
 
     await test.step('Fill mandatory reasons and click Proceed', async () => {
-      await customerDetailPage.deactivateButton.click();
-      await customerDetailPage.reasonMultiSelect.click();
+      await customerDetailPage.locators.deactivateButton.click();
+      await customerDetailPage.locators.reasonMultiSelect.click();
       await page.getByRole('option', { name: 'Business misalignment' }).click();
       await page.keyboard.press('Escape');
-      await customerDetailPage.detailedReasonTextbox.fill('Customer relocated overseas');
-      await customerDetailPage.reasonProceedButton.click();
+      await customerDetailPage.locators.detailedReasonTextbox.fill('Customer relocated overseas');
+      await customerDetailPage.locators.reasonProceedButton.click();
     });
 
     await test.step('Confirmation modal names the Customer and impact', async () => {
-      await expect(customerDetailPage.confirmDialog).toBeVisible();
-      await expect(customerDetailPage.confirmDialog).toContainText('and its Contacts?');
-      await expect(customerDetailPage.confirmDialog.getByText(/linked contacts/i)).toBeVisible();
+      await expect(customerDetailPage.locators.confirmDialog).toBeVisible();
+      await expect(customerDetailPage.locators.confirmDialog).toContainText('and its Contacts?');
+      await expect(
+        customerDetailPage.locators.confirmDialog.getByText(/linked contacts/i),
+      ).toBeVisible();
     });
   });
 
@@ -130,8 +132,8 @@ test.describe('CRM - Deactivate Customer', () => {
 
     await test.step('Status badge → Inactive, button toggles to Activate', async () => {
       await customerDetailPage.expectStatus('Inactive');
-      await expect(customerDetailPage.activateButton).toBeVisible();
-      await expect(customerDetailPage.deactivateButton).not.toBeVisible();
+      await expect(customerDetailPage.locators.activateButton).toBeVisible();
+      await expect(customerDetailPage.locators.deactivateButton).not.toBeVisible();
     });
 
     // TODO(CRM QA): "All linked contacts also go inactive" needs a real
@@ -183,23 +185,23 @@ test.describe('CRM - Deactivate Customer', () => {
     await createActiveCustomer(createCustomerPage);
 
     await test.step('Open the Deactivate modal, then Cancel on the reason step', async () => {
-      await customerDetailPage.deactivateButton.click();
-      await customerDetailPage.reasonCancelButton.click();
+      await customerDetailPage.locators.deactivateButton.click();
+      await customerDetailPage.locators.reasonCancelButton.click();
     });
 
     await test.step('Modal closes, nothing saved, still Active', async () => {
-      await expect(customerDetailPage.reasonDialog).toBeHidden();
+      await expect(customerDetailPage.locators.reasonDialog).toBeHidden();
       await customerDetailPage.expectStatus('Active');
     });
 
     await test.step('Open again, proceed to final confirmation, then Cancel there', async () => {
-      await customerDetailPage.deactivateButton.click();
-      await customerDetailPage.reasonMultiSelect.click();
+      await customerDetailPage.locators.deactivateButton.click();
+      await customerDetailPage.locators.reasonMultiSelect.click();
       await page.getByRole('option', { name: 'Business misalignment' }).click();
       await page.keyboard.press('Escape');
-      await customerDetailPage.detailedReasonTextbox.fill('Testing cancel');
-      await customerDetailPage.reasonProceedButton.click();
-      await customerDetailPage.confirmCancelButton.click();
+      await customerDetailPage.locators.detailedReasonTextbox.fill('Testing cancel');
+      await customerDetailPage.locators.reasonProceedButton.click();
+      await customerDetailPage.locators.confirmCancelButton.click();
     });
 
     await test.step('Still Active after canceling the final confirmation too', async () => {

@@ -33,7 +33,7 @@ test.describe('CRM - Edit Customer / Contact', () => {
     });
     await createCustomerPage.save();
     await createCustomerPage.expectSavedSuccessfully();
-    await createCustomerPage.postSaveCancelButton.click();
+    await createCustomerPage.locators.postSaveCancelButton.click();
   }
 
   test('TC:1 Verify system-generated and locked fields cannot be edited', async ({
@@ -158,7 +158,7 @@ test.describe('CRM - Edit Customer / Contact', () => {
       await customerDetailPage.openDepartmentsEdit();
       await customerDetailPage.addDepartmentRow('Cutting', 'Anjali Krishnakumar');
       await customerDetailPage.saveDepartments();
-      await expect(customerDetailPage.toast).toBeVisible();
+      await expect(customerDetailPage.locators.toast).toBeVisible();
     });
 
     await test.step('Edit again and remove the only assignee (0 assignees)', async () => {

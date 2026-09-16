@@ -1,19 +1,21 @@
-import { type Locator, type Page, expect } from '@playwright/test';
+import { type Page, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
 import { MODULES } from '../../config/modules';
+import { MasterDataLocators } from '../../locators/master-data/master-data.locators';
 
 /**
- * Owned by the Master Data QA. Add this module's real locators/actions here
- * — nothing else in the framework needs to change to extend Master Data coverage.
+ * Owned by the Master Data QA. Add this module's real locators/actions
+ * here — nothing else in the framework needs to change to extend
+ * Master Data coverage. Element locators live in MasterDataLocators
+ * (`this.locators`) — this class only holds flows/actions/assertions
+ * built on top of them.
  */
 export class MasterDataPage extends BasePage {
-  readonly heading: Locator;
+  readonly locators: MasterDataLocators;
 
   constructor(page: Page) {
     super(page);
-    // TODO(Master Data QA): replace with a locator specific to this module's
-    // landing view once you've confirmed it against the running app.
-    this.heading = page.getByRole('heading', { level: 1 });
+    this.locators = new MasterDataLocators(page);
   }
 
   async open(): Promise<void> {
@@ -22,6 +24,6 @@ export class MasterDataPage extends BasePage {
 
   async expectLoaded(): Promise<void> {
     await expect(this.page).toHaveURL(new RegExp(`${MODULES['master-data'].path}`));
-    await expect(this.heading).toBeVisible();
+    await expect(this.locators.heading).toBeVisible();
   }
 }

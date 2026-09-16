@@ -40,7 +40,7 @@ test.describe('CRM - Activate Customer Screen', () => {
     });
     await createCustomerPage.save();
     await createCustomerPage.expectSavedSuccessfully();
-    await createCustomerPage.postSaveCancelButton.click();
+    await createCustomerPage.locators.postSaveCancelButton.click();
 
     await customerDetailPage.deactivate(
       ['Business misalignment'],
@@ -57,14 +57,14 @@ test.describe('CRM - Activate Customer Screen', () => {
     await createAndDeactivateCustomer(createCustomerPage, customerDetailPage);
 
     await test.step('Inactive Customer shows "Activate", not "Deactivate"', async () => {
-      await expect(customerDetailPage.activateButton).toBeVisible();
-      await expect(customerDetailPage.deactivateButton).not.toBeVisible();
+      await expect(customerDetailPage.locators.activateButton).toBeVisible();
+      await expect(customerDetailPage.locators.deactivateButton).not.toBeVisible();
     });
 
     await test.step('Activate it — now shows "Deactivate", not "Activate"', async () => {
       await customerDetailPage.activate(['Negotiation'], 'TC:1 setup');
-      await expect(customerDetailPage.deactivateButton).toBeVisible();
-      await expect(customerDetailPage.activateButton).not.toBeVisible();
+      await expect(customerDetailPage.locators.deactivateButton).toBeVisible();
+      await expect(customerDetailPage.locators.activateButton).not.toBeVisible();
     });
   });
 
@@ -76,9 +76,11 @@ test.describe('CRM - Activate Customer Screen', () => {
     await createAndDeactivateCustomer(createCustomerPage, customerDetailPage);
 
     await test.step('Leave the multi-select empty, enter detail text, click Proceed', async () => {
-      await customerDetailPage.activateButton.click();
-      await customerDetailPage.detailedReasonTextbox.fill('Some detail with no reason selected');
-      await customerDetailPage.reasonProceedButton.click();
+      await customerDetailPage.locators.activateButton.click();
+      await customerDetailPage.locators.detailedReasonTextbox.fill(
+        'Some detail with no reason selected',
+      );
+      await customerDetailPage.locators.reasonProceedButton.click();
     });
 
     await test.step('Blocked with "at least one reason" validation error', async () => {
@@ -95,11 +97,11 @@ test.describe('CRM - Activate Customer Screen', () => {
     await createAndDeactivateCustomer(createCustomerPage, customerDetailPage);
 
     await test.step('Select a reason, leave detail blank, click Proceed', async () => {
-      await customerDetailPage.activateButton.click();
-      await customerDetailPage.reasonMultiSelect.click();
+      await customerDetailPage.locators.activateButton.click();
+      await customerDetailPage.locators.reasonMultiSelect.click();
       await page.getByRole('option', { name: 'Negotiation' }).click();
       await page.keyboard.press('Escape');
-      await customerDetailPage.reasonProceedButton.click();
+      await customerDetailPage.locators.reasonProceedButton.click();
     });
 
     await test.step('Blocked with the missing-detail validation error', async () => {
@@ -116,17 +118,21 @@ test.describe('CRM - Activate Customer Screen', () => {
     await createAndDeactivateCustomer(createCustomerPage, customerDetailPage);
 
     await test.step('Select valid reasons, enter a detailed explanation, click Proceed', async () => {
-      await customerDetailPage.activateButton.click();
-      await customerDetailPage.reasonMultiSelect.click();
+      await customerDetailPage.locators.activateButton.click();
+      await customerDetailPage.locators.reasonMultiSelect.click();
       await page.getByRole('option', { name: 'Negotiation' }).click();
       await page.keyboard.press('Escape');
-      await customerDetailPage.detailedReasonTextbox.fill('Reactivating after negotiation');
-      await customerDetailPage.reasonProceedButton.click();
+      await customerDetailPage.locators.detailedReasonTextbox.fill(
+        'Reactivating after negotiation',
+      );
+      await customerDetailPage.locators.reasonProceedButton.click();
     });
 
     await test.step('Final modal names the Customer and states linked-Contacts impact', async () => {
-      await expect(customerDetailPage.confirmDialog).toContainText('and its Contacts?');
-      await expect(customerDetailPage.confirmDialog.getByText(/linked contacts/i)).toBeVisible();
+      await expect(customerDetailPage.locators.confirmDialog).toContainText('and its Contacts?');
+      await expect(
+        customerDetailPage.locators.confirmDialog.getByText(/linked contacts/i),
+      ).toBeVisible();
     });
   });
 
@@ -161,27 +167,27 @@ test.describe('CRM - Activate Customer Screen', () => {
     await createAndDeactivateCustomer(createCustomerPage, customerDetailPage);
 
     await test.step('Enter valid details, then Cancel on the reason-capture screen', async () => {
-      await customerDetailPage.activateButton.click();
-      await customerDetailPage.reasonMultiSelect.click();
+      await customerDetailPage.locators.activateButton.click();
+      await customerDetailPage.locators.reasonMultiSelect.click();
       await page.getByRole('option', { name: 'Negotiation' }).click();
       await page.keyboard.press('Escape');
-      await customerDetailPage.detailedReasonTextbox.fill('Testing cancel');
-      await customerDetailPage.reasonCancelButton.click();
+      await customerDetailPage.locators.detailedReasonTextbox.fill('Testing cancel');
+      await customerDetailPage.locators.reasonCancelButton.click();
     });
 
     await test.step('Flow abandoned, Customer remains Inactive', async () => {
-      await expect(customerDetailPage.reasonDialog).toBeHidden();
+      await expect(customerDetailPage.locators.reasonDialog).toBeHidden();
       await customerDetailPage.expectStatus('Inactive');
     });
 
     await test.step('Enter valid details again, Proceed, then Cancel on the final popup', async () => {
-      await customerDetailPage.activateButton.click();
-      await customerDetailPage.reasonMultiSelect.click();
+      await customerDetailPage.locators.activateButton.click();
+      await customerDetailPage.locators.reasonMultiSelect.click();
       await page.getByRole('option', { name: 'Negotiation' }).click();
       await page.keyboard.press('Escape');
-      await customerDetailPage.detailedReasonTextbox.fill('Testing cancel again');
-      await customerDetailPage.reasonProceedButton.click();
-      await customerDetailPage.confirmCancelButton.click();
+      await customerDetailPage.locators.detailedReasonTextbox.fill('Testing cancel again');
+      await customerDetailPage.locators.reasonProceedButton.click();
+      await customerDetailPage.locators.confirmCancelButton.click();
     });
 
     await test.step('Still Inactive after canceling the final confirmation too', async () => {

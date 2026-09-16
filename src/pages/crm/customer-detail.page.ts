@@ -1,5 +1,6 @@
 import { type Locator, type Page, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
+import { CustomerDetailLocators } from '../../locators/crm/customer-detail.locators';
 
 /**
  * Customer Detail screen (route confirmed on dev: `/crm/customers/{uuid}`,
@@ -8,6 +9,8 @@ import { BasePage } from '../base.page';
  * deactivate-customer(.md/-screen.md), and edit-customer-contact.md — all
  * three ClickUp tasks describe this same screen. Owned by the CRM QA.
  *
+ * Element locators live in CustomerDetailLocators (`this.locators`) —
+ * this class only holds flows/actions/assertions built on top of them.
  * Everything below is confirmed against a real save-and-probe run on dev
  * (2026-09-16, local blocked this screen entirely — no selectable Country
  * meant no Customer could ever be saved there). Notable, non-obvious
@@ -35,72 +38,11 @@ import { BasePage } from '../base.page';
  *   "A department needs at least one assignee".
  */
 export class CustomerDetailPage extends BasePage {
-  readonly nameHeading: Locator;
-  readonly activateButton: Locator;
-  readonly deactivateButton: Locator;
-
-  // Activate/Deactivate reason-capture dialog (shared shape)
-  readonly reasonDialog: Locator;
-  readonly reasonMultiSelect: Locator;
-  readonly detailedReasonTextbox: Locator;
-  readonly reasonProceedButton: Locator;
-  readonly reasonCancelButton: Locator;
-
-  // Final confirmation dialog (shared shape)
-  readonly confirmDialog: Locator;
-  readonly confirmCancelButton: Locator;
-
-  // Departments and Assignees
-  readonly departmentsHeading: Locator;
-  readonly departmentsEditButton: Locator;
-  readonly departmentsSaveButton: Locator;
-  readonly departmentsCancelButton: Locator;
-  readonly departmentsAddButton: Locator;
-
-  readonly toast: Locator;
+  readonly locators: CustomerDetailLocators;
 
   constructor(page: Page) {
     super(page);
-
-    this.nameHeading = page.getByRole('heading', { level: 1 });
-    // exact: true is required — "Activate" is a substring of "Deactivate"
-    // (case-insensitive accessible-name matching), so without it
-    // activateButton also matches the Deactivate button and vice versa
-    // (confirmed directly: caused a real false-negative on dev).
-    this.activateButton = page.getByRole('button', { name: 'Activate', exact: true });
-    this.deactivateButton = page.getByRole('button', { name: 'Deactivate', exact: true });
-
-    this.reasonDialog = page
-      .getByRole('dialog')
-      .filter({ hasText: 'Select a reason and provide detail before proceeding.' });
-    this.reasonMultiSelect = this.reasonDialog.getByRole('button', {
-      name: /Reason for (Activation|Deactivation)/,
-    });
-    this.detailedReasonTextbox = this.reasonDialog.getByRole('textbox', {
-      name: /Detailed Reason for (Activation|Deactivation)/,
-    });
-    this.reasonProceedButton = this.reasonDialog.getByRole('button', { name: 'Proceed' });
-    this.reasonCancelButton = this.reasonDialog.getByRole('button', { name: 'Cancel' });
-
-    this.confirmDialog = page.getByRole('dialog').filter({ hasText: /and its Contacts\?/ });
-    this.confirmCancelButton = this.confirmDialog.getByRole('button', { name: 'Cancel' });
-
-    this.departmentsHeading = page.getByRole('heading', { name: 'Departments and Assignees' });
-    // Not a labeled field row like Profile/Management fields — it's the
-    // last "Edit" button on the page (confirmed directly; the heading's
-    // own parent doesn't contain it, so a text-proximity locator doesn't
-    // work here the way it does for every other field).
-    this.departmentsEditButton = page.getByRole('button', { name: 'Edit' }).last();
-    this.departmentsSaveButton = page.getByRole('button', { name: 'Save' }).last();
-    this.departmentsCancelButton = page.getByRole('button', { name: 'Cancel' }).last();
-    this.departmentsAddButton = page.getByRole('button', { name: 'Add', exact: true });
-
-    this.toast = page.locator('[data-sonner-toast]').first();
-  }
-
-  /** Every Profile/Management field row is "{Label} • {value}" + its own Edit button. */
-  private fieldContainer(label: string): Locator {
-    return this.page.getByText(label, { exact: false }).first().locator('..');
+    this.locators = new CustomerDetailLocators(page);
   }
 
   async expectStatus(status: 'Active' | 'Inactive'): Promise<void> {
@@ -108,23 +50,25 @@ export class CustomerDetailPage extends BasePage {
   }
 
   async expectFieldNotEditable(label: string): Promise<void> {
-    await expect(this.fieldContainer(label).getByRole('button', { name: 'Edit' })).toHaveCount(0);
+    await expect(
+      this.locators.fieldContainer(label).getByRole('button', { name: 'Edit' }),
+    ).toHaveCount(0);
   }
 
   async openFieldEdit(label: string): Promise<void> {
-    await this.fieldContainer(label).getByRole('button', { name: 'Edit' }).click();
+    await this.locators.fieldContainer(label).getByRole('button', { name: 'Edit' }).click();
   }
 
   async fillFieldEdit(value: string): Promise<void> {
-    await this.page.getByRole('textbox').last().fill(value);
+    await this.locators.lastTextbox().fill(value);
   }
 
   async saveFieldEdit(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Save' }).last().click();
+    await this.locators.lastButton('Save').click();
   }
 
   async cancelFieldEdit(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Cancel' }).last().click();
+    await this.locators.lastButton('Cancel').click();
   }
 
   /** Opens a field's inline editor, sets a value, and saves in one step. */
@@ -139,7 +83,7 @@ export class CustomerDetailPage extends BasePage {
   }
 
   private async selectReasons(reasons: string[]): Promise<void> {
-    await this.reasonMultiSelect.click();
+    await this.locators.reasonMultiSelect.click();
     for (const reason of reasons) {
       await this.page.getByRole('option', { name: reason }).click();
     }
@@ -148,37 +92,35 @@ export class CustomerDetailPage extends BasePage {
 
   /** Deactivate flow, reason-capture step through the final confirm dialog. */
   async deactivate(reasons: string[], detail: string): Promise<void> {
-    await this.deactivateButton.click();
+    await this.locators.deactivateButton.click();
     await this.selectReasons(reasons);
-    await this.detailedReasonTextbox.fill(detail);
-    await this.reasonProceedButton.click();
-    await this.confirmDialog.getByRole('button', { name: 'Deactivate', exact: true }).click();
+    await this.locators.detailedReasonTextbox.fill(detail);
+    await this.locators.reasonProceedButton.click();
+    await this.locators.confirmActionButton('Deactivate').click();
   }
 
   /** Activate flow — same shape as deactivate(), reversed. */
   async activate(reasons: string[], detail: string): Promise<void> {
-    await this.activateButton.click();
+    await this.locators.activateButton.click();
     await this.selectReasons(reasons);
-    await this.detailedReasonTextbox.fill(detail);
-    await this.reasonProceedButton.click();
-    await this.confirmDialog.getByRole('button', { name: 'Activate', exact: true }).click();
+    await this.locators.detailedReasonTextbox.fill(detail);
+    await this.locators.reasonProceedButton.click();
+    await this.locators.confirmActionButton('Activate').click();
   }
 
   async expectCharacterCount(count: number, max = 1000): Promise<void> {
-    await expect(this.reasonDialog.getByText(`${count} / ${max}`)).toBeVisible();
+    await expect(this.locators.reasonDialog.getByText(`${count} / ${max}`)).toBeVisible();
   }
 
   async openDepartmentsEdit(): Promise<void> {
-    await this.departmentsEditButton.click();
+    await this.locators.departmentsEditButton.click();
   }
 
   async addDepartmentRow(department: string, assignee?: string): Promise<void> {
-    await this.departmentsAddButton.click();
-    const departmentCombobox = this.page.getByRole('combobox', { name: 'Department' }).last();
-    await this.selectComboboxOption(departmentCombobox, department);
+    await this.locators.departmentsAddButton.click();
+    await this.selectComboboxOption(this.locators.departmentCombobox(), department);
     if (assignee !== undefined) {
-      const assigneeCombobox = this.page.getByRole('combobox', { name: 'Assignees' }).last();
-      await this.selectComboboxOption(assigneeCombobox, assignee);
+      await this.selectComboboxOption(this.locators.assigneesCombobox(), assignee);
       // Unlike Department's popup, the Assignees picker here stays open
       // (aria-expanded stays true) after selecting an option — it's a
       // multi-select-capable widget, not single-select-and-close like
@@ -201,14 +143,12 @@ export class CustomerDetailPage extends BasePage {
    * edit-customer-contact.spec.ts, marked fixme with the full writeup.
    */
   async clearLastRowAssignee(): Promise<void> {
-    await this.page.getByRole('combobox', { name: 'Assignees' }).last().click();
-    await expect(this.page.getByRole('combobox', { name: 'Assignees' }).last()).toHaveText(
-      'Assignee',
-    );
+    await this.locators.assigneesCombobox().click();
+    await expect(this.locators.assigneesCombobox()).toHaveText('Assignee');
   }
 
   async saveDepartments(): Promise<void> {
-    await this.departmentsSaveButton.click();
+    await this.locators.lastButton('Save').click();
   }
 
   private async selectComboboxOption(trigger: Locator, optionText: string | RegExp): Promise<void> {
