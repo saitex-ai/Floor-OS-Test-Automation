@@ -5,6 +5,50 @@ framework is built so you only ever touch your own module's files —
 `tests/<module>/`, `src/pages/<module>/`, `src/locators/<module>/`,
 `src/fixtures/<module>.fixtures.ts` — never anyone else's.
 
+## 0. Framework structure
+
+```
+pw-hybrid-framework/
+├── src/
+│   ├── config/             → env.ts (TEST_ENV=local|dev switch), modules.ts (module registry)
+│   ├── locators/<module>/  → *.locators.ts — raw Locator properties only, no actions
+│   ├── pages/<module>/     → *.page.ts — methods/flows built on top of a screen's locators
+│   ├── fixtures/           → <module>.fixtures.ts — wires page objects into Playwright's test()
+│   ├── api/                → base.api-client.ts — for modules that hit their backend directly
+│   └── data/               → data-reader.ts — loads JSON for data-driven tests
+├── test-cases/<module>/    → *.md — human-readable test-case docs, one per ClickUp user story
+├── tests/<module>/         → auth.setup.ts (logs in once, caches session) + *.spec.ts
+├── playwright.config.ts    → builds a "<module>-setup" + "<module>" project pair per module
+└── CODEOWNERS              → one QA per module
+```
+
+One module = one vertical slice through every folder above. For CRM,
+that's `test-cases/crm/`, `src/locators/crm/`, `src/pages/crm/`,
+`src/fixtures/crm.fixtures.ts`, `tests/crm/` — no other module ever
+touches these, enforced by `CODEOWNERS`.
+
+How a request flows, top to bottom, for any spec you run:
+
+1. **`src/config/env.ts`** reads `TEST_ENV` and builds the right
+   `shellBaseUrl` + credentials for the module being run.
+2. **`tests/<module>/auth.setup.ts`** logs in once via `ShellLoginPage`,
+   saves the session to `.auth/<module>.json`.
+3. **`playwright.config.ts`** wires that saved session into the
+   `<module>` project, so every spec starts already authenticated.
+4. **`src/locators/<module>/<screen>.locators.ts`** defines _what_
+   elements exist on a screen.
+5. **`src/pages/<module>/<screen>.page.ts`** defines _what you can do_
+   with them (`fillProfile()`, `save()`, `expectSavedSuccessfully()`),
+   using `this.locators`.
+6. **`src/fixtures/<module>.fixtures.ts`** exposes those page objects as
+   fixtures (`createCustomerPage`, `contactListPage`, etc.).
+7. **`tests/<module>/*.spec.ts`** imports `test`/`expect` from that
+   fixtures file and calls page methods only — never a raw locator.
+
+Everything above the module folders (`playwright.config.ts`,
+`src/config/`) is shared infrastructure nobody needs to touch to add a
+new test.
+
 ## 1. Prerequisites
 
 - Node.js (whatever version the team's using — check `.node-version` in
