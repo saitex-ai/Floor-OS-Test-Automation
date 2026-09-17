@@ -2,7 +2,7 @@
 
 - **Test-case set:** [CRM - Sprint 1 - Deactivate Customer screen](https://app.clickup.com/t/90181912927/z941abt7gv)
 - **Source:** ClickUp, expanded from subtasks 2026-09-16
-- **Automated in:** [`tests/crm/08-deactivate-customer-screen.spec.ts`](../../tests/crm/08-deactivate-customer-screen.spec.ts) — all 6 confirmed against dev (2026-09-16).
+- **Automated in:** [`tests/regression/crm/08-deactivate-customer-screen.spec.ts`](../../tests/regression/crm/08-deactivate-customer-screen.spec.ts) — all 6 confirmed against dev (2026-09-16).
 - **Note:** heavy overlap with `deactivate-customer.md` (same feature, this one narrower/more detailed on the modal itself, missing the Master Data / Tech Pack cascade checks). Kept as a separate spec per team decision, not merged.
 
 | #    | Test case                                                                              | Steps                                                                                                                                                                                                      | Expected result                                                                                                                                                                                    | ClickUp                                      |

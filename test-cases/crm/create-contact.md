@@ -2,7 +2,7 @@
 
 - **Test-case set:** [CRM - Sprint 1 - Create Contact](https://app.clickup.com/t/90181912927/86eyr7daq)
 - **Source:** ClickUp, expanded from subtasks 2026-09-16
-- **Automated in:** [`tests/crm/11-create-contact.spec.ts`](../../tests/crm/11-create-contact.spec.ts) — TC:1/TC:2 confirmed against local; TC:3-10 blocked on local data gaps (see spec file for details), not yet re-checked on dev.
+- **Automated in:** [`tests/regression/crm/11-create-contact.spec.ts`](../../tests/regression/crm/11-create-contact.spec.ts) — TC:1/TC:2 confirmed against local; TC:3-10 blocked on local data gaps (see spec file for details), not yet re-checked on dev.
 - **Note:** heavy overlap with `contact-creation-screen.md` (same feature, described at two granularities) — kept as a separate spec per team decision, not merged.
 
 | #     | Test case                                                              | Steps                                                                                                                                                                                   | Expected result                                                                                                                                       | ClickUp                                     |

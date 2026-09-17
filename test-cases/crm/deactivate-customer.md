@@ -2,7 +2,7 @@
 
 - **Test-case set:** [CRM - Sprint 1 - Deactivate Customer](https://app.clickup.com/t/90181912927/86eyr7fap)
 - **Source:** ClickUp, expanded from subtasks 2026-09-16
-- **Automated in:** [`tests/crm/07-deactivate-customer.spec.ts`](../../tests/crm/07-deactivate-customer.spec.ts) — TC:1-5/TC:8 confirmed against dev (2026-09-16); TC:6/TC:7 (Master Data/Tech Pack cascade) `test.fixme()`'d — out of scope for the CRM QA, no page object exists for those modules.
+- **Automated in:** [`tests/regression/crm/07-deactivate-customer.spec.ts`](../../tests/regression/crm/07-deactivate-customer.spec.ts) — TC:1-5/TC:8 confirmed against dev (2026-09-16); TC:6/TC:7 (Master Data/Tech Pack cascade) `test.fixme()`'d — out of scope for the CRM QA, no page object exists for those modules.
 - **Note:** heavy overlap with `deactivate-customer-screen.md` (same feature, described at two granularities) — kept as a separate spec per team decision, not merged.
 
 | #    | Test case                                                               | Steps                                                                                                                                                                                                                                                                                                                               | Expected result                                                                                                                                    | ClickUp                                      |

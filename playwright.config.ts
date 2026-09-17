@@ -5,13 +5,15 @@ import { authFile } from './src/fixtures/auth-setup';
 
 /**
  * Two Playwright projects per floorOS module: "<id>-setup" logs in once
- * (see src/fixtures/auth-setup.ts) and "<id>" runs that module's specs
- * reusing the saved session. This is what makes `npm run test:crm` touch
- * only the CRM QA's files — module projects are fully independent, each
- * pointed at its own testDir and its own storage state.
+ * (see src/fixtures/auth-setup.ts) and "<id>" runs that module's full
+ * regression suite reusing the saved session. This is what makes
+ * `npm run test:crm` touch only the CRM QA's files — module projects are
+ * fully independent, each pointed at its own testDir and its own storage
+ * state. Full suites live under tests/regression/<id>/, parallel to the
+ * lighter tests/sanity/<id>/ suites below.
  */
 const moduleProjects: Project[] = MODULE_IDS.flatMap((id) => {
-  const testDir = `./tests/${id}`;
+  const testDir = `./tests/regression/${id}`;
   return [
     {
       name: `${id}-setup`,
@@ -32,7 +34,7 @@ const moduleProjects: Project[] = MODULE_IDS.flatMap((id) => {
 /**
  * A lighter, separate suite per module — `tests/sanity/<id>/` — for a
  * small smoke-test subset, distinct from that module's full regression
- * suite in `tests/<id>/`. Reuses the same `<id>-setup` auth project
+ * suite in `tests/regression/<id>/`. Reuses the same `<id>-setup` auth project
  * above (same login, same cached session) rather than logging in twice.
  * Not every module needs one yet — add an id here when its QA is ready
  * to build sanity coverage for it.

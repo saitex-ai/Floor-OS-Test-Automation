@@ -2,7 +2,7 @@
 
 You're picking up ownership of one floorOS module's automated tests. This
 framework is built so you only ever touch your own module's files —
-`tests/<module>/`, `src/pages/<module>/`, `src/locators/<module>/`,
+`tests/regression/<module>/`, `src/pages/<module>/`, `src/locators/<module>/`,
 `src/fixtures/<module>.fixtures.ts` — never anyone else's.
 
 ## 0. Framework structure
@@ -17,21 +17,21 @@ pw-hybrid-framework/
 │   ├── api/                → base.api-client.ts — for modules that hit their backend directly
 │   └── data/               → data-reader.ts — loads JSON for data-driven tests
 ├── test-cases/<module>/    → *.md — human-readable test-case docs, one per ClickUp user story
-├── tests/<module>/         → auth.setup.ts (logs in once, caches session) + *.spec.ts
+├── tests/regression/<module>/         → auth.setup.ts (logs in once, caches session) + *.spec.ts
 ├── playwright.config.ts    → builds a "<module>-setup" + "<module>" project pair per module
 └── CODEOWNERS              → one QA per module
 ```
 
 One module = one vertical slice through every folder above. For CRM,
 that's `test-cases/crm/`, `src/locators/crm/`, `src/pages/crm/`,
-`src/fixtures/crm.fixtures.ts`, `tests/crm/` — no other module ever
+`src/fixtures/crm.fixtures.ts`, `tests/regression/crm/` — no other module ever
 touches these, enforced by `CODEOWNERS`.
 
 How a request flows, top to bottom, for any spec you run:
 
 1. **`src/config/env.ts`** reads `TEST_ENV` and builds the right
    `shellBaseUrl` + credentials for the module being run.
-2. **`tests/<module>/auth.setup.ts`** logs in once via `ShellLoginPage`,
+2. **`tests/regression/<module>/auth.setup.ts`** logs in once via `ShellLoginPage`,
    saves the session to `.auth/<module>.json`.
 3. **`playwright.config.ts`** wires that saved session into the
    `<module>` project, so every spec starts already authenticated.
@@ -42,7 +42,7 @@ How a request flows, top to bottom, for any spec you run:
    using `this.locators`.
 6. **`src/fixtures/<module>.fixtures.ts`** exposes those page objects as
    fixtures (`createCustomerPage`, `contactListPage`, etc.).
-7. **`tests/<module>/*.spec.ts`** imports `test`/`expect` from that
+7. **`tests/regression/<module>/*.spec.ts`** imports `test`/`expect` from that
    fixtures file and calls page methods only — never a raw locator.
 
 Everything above the module folders (`playwright.config.ts`,
@@ -89,7 +89,7 @@ tilt up                    # in the floorOS repo — start the local stack first
 npm run test:<your-module> # e.g. npm run test:crm, npm run test:mill, ...
 ```
 
-First run should authenticate once (via `tests/<module>/auth.setup.ts`)
+First run should authenticate once (via `tests/regression/<module>/auth.setup.ts`)
 and then run your module's specs. If `<your-module>` isn't in
 `package.json`'s scripts yet, use `npx playwright test --project=<your-module>`
 — see `src/config/modules.ts` for the full list of registered modules.
@@ -118,7 +118,7 @@ method in the same file:
    actually applies (see the comment on that method). See
    `src/locators/crm/create-customer.locators.ts` +
    `src/pages/crm/create-customer.page.ts` for the reference pair.
-4. Automate the case as a `test()` in `tests/<your-module>/*.spec.ts`,
+4. Automate the case as a `test()` in `tests/regression/<your-module>/*.spec.ts`,
    calling page methods only — never a raw locator or
    `page.getByRole(...)` directly in the spec.
 5. Wire new page objects into `src/fixtures/<your-module>.fixtures.ts`.

@@ -18,7 +18,7 @@ at its own path. That has two consequences for this framework:
    user (Keycloak), caches the session, and every spec in that module
    reuses it. No spec re-logs-in.
 
-Modules are otherwise fully isolated: `tests/<module>/`,
+Modules are otherwise fully isolated: `tests/regression/<module>/`,
 `src/pages/<module>/`, `src/locators/<module>/`,
 `src/fixtures/<module>.fixtures.ts`. A QA working on CRM never has a
 reason to open a file under `mill/`, and two QAs never collide in the
@@ -83,15 +83,16 @@ pw-hybrid-framework/
 │   │   └── data-reader.ts        # data-driven test-case loader
 │   └── utils/logger.ts
 └── tests/
-    ├── crm/
-    │   ├── auth.setup.ts          # logs in as the CRM test user, caches session
-    │   └── crm.spec.ts
-    ├── mill/
-    │   ├── auth.setup.ts
-    │   └── mill.spec.ts
-    ├── <module>/...               # costing, planning, techpack, master-data, admin, copilot
-    └── sanity/
-        ├── crm/                    # smoke-test subset, reuses crm-setup's login
+    ├── regression/                 # each module's full test-case coverage
+    │   ├── crm/
+    │   │   ├── auth.setup.ts       # logs in as the CRM test user, caches session
+    │   │   └── crm.spec.ts
+    │   ├── mill/
+    │   │   ├── auth.setup.ts
+    │   │   └── mill.spec.ts
+    │   └── <module>/...            # costing, planning, techpack, master-data, admin, copilot
+    └── sanity/                     # a lighter smoke-test subset per module
+        ├── crm/                    # reuses regression/crm's auth.setup.ts login
         └── <module>/...            # mill, costing, planning, techpack, master-data
 ```
 
@@ -167,7 +168,7 @@ them and always runs last.
 
 ## Sanity suites
 
-Alongside each module's full regression suite in `tests/<module>/`,
+Alongside each module's full regression suite in `tests/regression/<module>/`,
 there's a lighter, separate suite in `tests/sanity/<module>/` for a
 small smoke-test subset — a handful of critical-path checks meant to
 run quickly, not the full test-case coverage. It's its own Playwright
@@ -214,7 +215,7 @@ floorOS frontends are pre-wired) if you're just picking up ownership:
    flows/actions/assertions built on it — see
    `src/locators/crm/create-customer.locators.ts` +
    `src/pages/crm/create-customer.page.ts` for the reference pair).
-3. Write specs in `tests/<module>/`, importing `test`/`expect` from
+3. Write specs in `tests/regression/<module>/`, importing `test`/`expect` from
    `src/fixtures/<module>.fixtures.ts`. Specs call page methods only —
    never a raw locator or `page.getByRole(...)` directly.
 4. Wire each new page object into `src/fixtures/<module>.fixtures.ts`.
@@ -230,7 +231,7 @@ pair (copy an existing module's two lines in each).
 Module tests are UI-first (through the shell), but if a module needs to
 hit its backend service directly, add `src/api/<module>.api-client.ts`
 extending `BaseApiClient`, wire it into that module's fixtures file, and
-consume it from a spec in `tests/<module>/`.
+consume it from a spec in `tests/regression/<module>/`.
 
 ## Adding data-driven cases
 
@@ -244,7 +245,7 @@ Every run also collects [Allure](https://allurereport.org) results
 (`allure-results/`, gitignored) via `allure-playwright` — richer than
 Playwright's own HTML report: tests grouped by Epic/Feature (see the
 `allure.epic()`/`allure.feature()`/`allure.owner()` calls in
-`tests/crm/01-create-customer.spec.ts`), a `tms` link on each test straight
+`tests/regression/crm/01-create-customer.spec.ts`), a `tms` link on each test straight
 back to its ClickUp task, `test.step()` breakdowns, retries, and history
 across runs.
 

@@ -2,7 +2,7 @@
 
 - **Test-case set:** [CRM - Sprint 1 - Contact list screen](https://app.clickup.com/t/90181912927/86eyr7a7w)
 - **Source:** ClickUp, read-only import
-- **Automated in:** [`tests/crm/09-contact-list.spec.ts`](../../tests/crm/09-contact-list.spec.ts)
+- **Automated in:** [`tests/regression/crm/09-contact-list.spec.ts`](../../tests/regression/crm/09-contact-list.spec.ts)
 - **Page object:** [`src/pages/crm/contact-list.page.ts`](../../src/pages/crm/contact-list.page.ts)
 
 | #     | Test case                                                             | Steps                                              | Expected result                                               | ClickUp                                                  | Automated                                                            |

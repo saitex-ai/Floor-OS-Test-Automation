@@ -5,43 +5,57 @@
 # own rows below.
 
 # CRM
-/tests/crm/                    @sathishnagarajanQAlead
-/src/pages/crm/                @sathishnagarajanQAlead
-/src/fixtures/crm.fixtures.ts  @sathishnagarajanQAlead
+/tests/regression/crm/          @sathishnagarajanQAlead
+/tests/sanity/crm/              @sathishnagarajanQAlead
+/src/pages/crm/                 @sathishnagarajanQAlead
+/src/locators/crm/              @sathishnagarajanQAlead
+/src/fixtures/crm.fixtures.ts   @sathishnagarajanQAlead
 
 # Fabric Mill
-/tests/mill/                    @sathishnagarajanQAlead
+/tests/regression/mill/         @sathishnagarajanQAlead
+/tests/sanity/mill/             @sathishnagarajanQAlead
 /src/pages/mill/                @sathishnagarajanQAlead
+/src/locators/mill/             @sathishnagarajanQAlead
 /src/fixtures/mill.fixtures.ts  @sathishnagarajanQAlead
 
 # Costing
-/tests/costing/                    @sathishnagarajanQAlead
+/tests/regression/costing/         @sathishnagarajanQAlead
+/tests/sanity/costing/             @sathishnagarajanQAlead
 /src/pages/costing/                @sathishnagarajanQAlead
+/src/locators/costing/             @sathishnagarajanQAlead
 /src/fixtures/costing.fixtures.ts  @sathishnagarajanQAlead
 
 # Planning
-/tests/planning/                    @sathishnagarajanQAlead
+/tests/regression/planning/         @sathishnagarajanQAlead
+/tests/sanity/planning/             @sathishnagarajanQAlead
 /src/pages/planning/                @sathishnagarajanQAlead
+/src/locators/planning/             @sathishnagarajanQAlead
 /src/fixtures/planning.fixtures.ts  @sathishnagarajanQAlead
 
 # Techpack
-/tests/techpack/                    @sathishnagarajanQAlead
+/tests/regression/techpack/         @sathishnagarajanQAlead
+/tests/sanity/techpack/             @sathishnagarajanQAlead
 /src/pages/techpack/                @sathishnagarajanQAlead
+/src/locators/techpack/             @sathishnagarajanQAlead
 /src/fixtures/techpack.fixtures.ts  @sathishnagarajanQAlead
 
 # Master Data
-/tests/master-data/                       @sathishnagarajanQAlead
-/src/pages/master-data/                   @sathishnagarajanQAlead
-/src/fixtures/master-data.fixtures.ts     @sathishnagarajanQAlead
+/tests/regression/master-data/         @sathishnagarajanQAlead
+/tests/sanity/master-data/             @sathishnagarajanQAlead
+/src/pages/master-data/                @sathishnagarajanQAlead
+/src/locators/master-data/             @sathishnagarajanQAlead
+/src/fixtures/master-data.fixtures.ts  @sathishnagarajanQAlead
 
-# Admin
-/tests/admin/                    @sathishnagarajanQAlead
+# Admin (no tests/sanity/admin/ yet — add a row here if that's built later)
+/tests/regression/admin/         @sathishnagarajanQAlead
 /src/pages/admin/                @sathishnagarajanQAlead
+/src/locators/admin/             @sathishnagarajanQAlead
 /src/fixtures/admin.fixtures.ts  @sathishnagarajanQAlead
 
-# Copilot
-/tests/copilot/                    @sathishnagarajanQAlead
+# Copilot (no tests/sanity/copilot/ yet — add a row here if that's built later)
+/tests/regression/copilot/         @sathishnagarajanQAlead
 /src/pages/copilot/                @sathishnagarajanQAlead
+/src/locators/copilot/             @sathishnagarajanQAlead
 /src/fixtures/copilot.fixtures.ts  @sathishnagarajanQAlead
 
 # Shared framework internals (config, shell login, base classes, CI) —
@@ -50,6 +64,7 @@
 /playwright.config.ts       @sathishnagarajanQAlead
 /src/config/                @sathishnagarajanQAlead
 /src/pages/base.page.ts     @sathishnagarajanQAlead
-/src/pages/shell/           @sathishnagarajanQAlead
+/src/pages/shell/            @sathishnagarajanQAlead
+/src/locators/shell/         @sathishnagarajanQAlead
 /src/api/base.api-client.ts @sathishnagarajanQAlead
 /src/fixtures/auth-setup.ts @sathishnagarajanQAlead
