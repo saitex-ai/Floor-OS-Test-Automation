@@ -13,6 +13,8 @@
     "test:dev": "TEST_ENV=dev playwright test",
     "test:crm": "playwright test --project=crm",
     "test:crm:dev": "TEST_ENV=dev playwright test --project=crm",
+    "test:crm:ordered": "playwright test --project=crm --workers=1",
+    "test:crm:ordered:dev": "TEST_ENV=dev playwright test --project=crm --workers=1",
     "test:mill": "playwright test --project=mill",
     "test:mill:dev": "TEST_ENV=dev playwright test --project=mill",
     "test:costing": "playwright test --project=costing",

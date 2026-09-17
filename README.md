@@ -141,6 +141,27 @@ npm run report
 > `TEST_ENV=dev npm run test:crm` (inline env var) assumes a POSIX shell
 > (macOS/Linux/CI). The `test:*:dev` npm scripts already do this for you.
 
+### Running spec files in a specific order
+
+By default, `fullyParallel`/multiple workers means spec files don't
+start in any guaranteed order. CRM's spec files are named with numeric
+prefixes (`01-create-customer.spec.ts`, `02-customer-creation-screen.spec.ts`,
+... `12-contact-creation-screen.spec.ts`) so that when you force a single
+worker, they run strictly one after another in that exact sequence:
+
+```bash
+npm run test:crm:ordered       # local, single worker, files run 01 -> 12 in order
+npm run test:crm:ordered:dev   # same, against dev
+```
+
+This is `--workers=1` under the hood, so the whole run is single-threaded
+— much slower than the default parallel run — use it only when the order
+itself matters (e.g. demoing the suite end to end), not for everyday
+development. If you add a new CRM spec file and it needs a place in this
+sequence, give it the next number (or renumber, if it needs to run
+earlier) — `crm.spec.ts` (unnumbered) intentionally sorts after all of
+them and always runs last.
+
 ## The local → dev workflow
 
 1. `tilt up` the floorOS stack locally (see the floorOS repo's quickstart).
@@ -199,7 +220,7 @@ Every run also collects [Allure](https://allurereport.org) results
 (`allure-results/`, gitignored) via `allure-playwright` — richer than
 Playwright's own HTML report: tests grouped by Epic/Feature (see the
 `allure.epic()`/`allure.feature()`/`allure.owner()` calls in
-`tests/crm/create-customer.spec.ts`), a `tms` link on each test straight
+`tests/crm/01-create-customer.spec.ts`), a `tms` link on each test straight
 back to its ClickUp task, `test.step()` breakdowns, retries, and history
 across runs.
 

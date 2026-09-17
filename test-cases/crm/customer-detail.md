@@ -2,7 +2,7 @@
 
 - **Test-case set:** [CRM - Sprint 1 - Customer detail Screen](https://app.clickup.com/t/90181912927/z941abt7jj)
 - **Source:** ClickUp, expanded from subtasks 2026-09-16
-- **Automated in:** [`tests/crm/customer-detail.spec.ts`](../../tests/crm/customer-detail.spec.ts) — TC:1-5 confirmed against dev (2026-09-16); TC:6 (audit log) `test.fixme()`'d, no Audit/History section exists on this screen. TC:3 only covers the locked fields that actually exist ("Contact ID" is in the ClickUp text but not on the real screen).
+- **Automated in:** [`tests/crm/04-customer-detail.spec.ts`](../../tests/crm/04-customer-detail.spec.ts) — TC:1-5 confirmed against dev (2026-09-16); TC:6 (audit log) `test.fixme()`'d, no Audit/History section exists on this screen. TC:3 only covers the locked fields that actually exist ("Contact ID" is in the ClickUp text but not on the real screen).
 - **Note:** despite the ClickUp task's name ("Customer detail Screen"), every subtask's actual steps are about the **Contact** Details screen (TC:2 explicitly navigates _from_ Contact _to_ a linked Customer) — another ClickUp mislabeling, confirmed by reading the real subtask text, not assumed. Kept the file name as-is to match the existing repo structure; title corrected above.
 
 | #    | Test case                                                                    | Steps                                                                                                                                                                                     | Expected result                                                                                                                                                                            | ClickUp                                      |

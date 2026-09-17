@@ -5,7 +5,7 @@
   detail, so the organization has a single authoritative record for a
   buying entity before any commercial activity begins.
 - **Test-case set:** [CRM - Sprint 1 - Create Customer](https://app.clickup.com/t/86eyqvaq4)
-- **Automated in:** [`tests/crm/create-customer.spec.ts`](../../tests/crm/create-customer.spec.ts)
+- **Automated in:** [`tests/crm/01-create-customer.spec.ts`](../../tests/crm/01-create-customer.spec.ts)
 - **Page object:** [`src/pages/crm/create-customer.page.ts`](../../src/pages/crm/create-customer.page.ts)
 
 | #     | Test case                                                            | Steps                                                                                                                                                                       | Expected result                                                                                                                           | ClickUp                                      | Automated | Verified locally      |

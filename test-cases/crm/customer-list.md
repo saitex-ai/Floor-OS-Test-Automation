@@ -2,7 +2,7 @@
 
 - **Test-case set:** [CRM - Sprint 1 - Customer list Screen](https://app.clickup.com/t/90181912927/86eyqwcrp)
 - **Source:** ClickUp, expanded from subtasks 2026-09-16
-- **Automated in:** [`tests/crm/customer-list.spec.ts`](../../tests/crm/customer-list.spec.ts) — built despite the duplication, per team decision not to skip duplicates. Same content/bodies as `create-customer.spec.ts`'s TC:3-11, pointed at this task's own ClickUp subtasks.
+- **Automated in:** [`tests/crm/03-customer-list.spec.ts`](../../tests/crm/03-customer-list.spec.ts) — built despite the duplication, per team decision not to skip duplicates. Same content/bodies as `create-customer.spec.ts`'s TC:3-11, pointed at this task's own ClickUp subtasks.
 
 ## This ClickUp task has no real Customer List content
 

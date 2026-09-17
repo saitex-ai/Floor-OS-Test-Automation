@@ -2,7 +2,7 @@
 
 - **Test-case set:** [CRM - Sprint 1 - activate Customer](https://app.clickup.com/t/90181912927/86eyr7fkc)
 - **Source:** ClickUp, expanded from subtasks 2026-09-16
-- **Automated in:** [`tests/crm/activate-customer.spec.ts`](../../tests/crm/activate-customer.spec.ts) — TC:1-5/TC:8 confirmed against dev (2026-09-16); TC:6/TC:7 (Master Data/Tech Pack cascade) `test.fixme()`'d per the `fail`-in-ClickUp note below.
+- **Automated in:** [`tests/crm/05-activate-customer.spec.ts`](../../tests/crm/05-activate-customer.spec.ts) — TC:1-5/TC:8 confirmed against dev (2026-09-16); TC:6/TC:7 (Master Data/Tech Pack cascade) `test.fixme()`'d per the `fail`-in-ClickUp note below.
 - **Note:** heavy overlap with `activate-customer-screen.md` (same feature, described at two granularities) — kept as a separate spec per team decision, not merged.
 
 | #    | Test case                                                                         | Steps                                                                                                                                                                           | Expected result                                                                                                                                             | ClickUp                                      |
