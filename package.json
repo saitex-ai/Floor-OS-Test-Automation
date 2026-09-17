@@ -31,7 +31,7 @@
     "test:debug": "playwright test --debug",
     "report": "playwright show-report",
     "report:allure:generate": "rm -rf allure-report && allure generate allure-results --output allure-report",
-    "report:allure:open": "allure open allure-results",
+    "report:allure:open": "allure open allure-report",
     "install:browsers": "playwright install --with-deps",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",

@@ -19,9 +19,30 @@ at its own path. That has two consequences for this framework:
    reuses it. No spec re-logs-in.
 
 Modules are otherwise fully isolated: `tests/<module>/`,
-`src/pages/<module>/`, `src/fixtures/<module>.fixtures.ts`. A QA working
-on CRM never has a reason to open a file under `mill/`, and two QAs never
-collide in the same file — enforced by [CODEOWNERS](./CODEOWNERS).
+`src/pages/<module>/`, `src/locators/<module>/`,
+`src/fixtures/<module>.fixtures.ts`. A QA working on CRM never has a
+reason to open a file under `mill/`, and two QAs never collide in the
+same file — enforced by [CODEOWNERS](./CODEOWNERS).
+
+Each module's Page Object is itself split in two, so a screen's element
+locators and its behavior never live in the same file:
+
+- **`src/locators/<module>/<screen>.locators.ts`** — a `<Screen>Locators`
+  class holding only `readonly Locator` properties (plus parameterized
+  "find me the element matching this argument" lookups, since those
+  still just locate, e.g. `columnHeader(name)`). Nothing here clicks,
+  fills, or asserts.
+- **`src/pages/<module>/<screen>.page.ts`** — a `<Screen>Page` class
+  holding a single `readonly locators: <Screen>Locators` plus every
+  flow/action/assertion built on top of it (`fillProfile()`, `save()`,
+  `expectSavedSuccessfully()`, ...). Anything that actually performs an
+  interaction (even a small one, like trying two possible popup shapes)
+  belongs here, not in the Locators class.
+
+Specs then only ever call page methods — `await createCustomerPage.save()` —
+never reach into a raw `page.getByRole(...)` themselves. See
+`src/locators/crm/create-customer.locators.ts` +
+`src/pages/crm/create-customer.page.ts` for the reference pair.
 
 ## Stack
 
@@ -41,12 +62,17 @@ pw-hybrid-framework/
 │   ├── config/
 │   │   ├── modules.ts           # THE module registry — id, route, env-var prefix
 │   │   └── env.ts                # TEST_ENV switch (local|dev), shell URL, per-module creds
+│   ├── locators/
+│   │   ├── shell/shell-login.locators.ts   # raw Keycloak/pre-auth-gate locators
+│   │   ├── crm/crm.locators.ts
+│   │   ├── mill/mill.locators.ts
+│   │   └── <module>/<screen>.locators.ts   # one file per screen, locators only
 │   ├── pages/
 │   │   ├── base.page.ts          # shared page behavior
 │   │   ├── shell/shell-login.page.ts   # Keycloak login (shell-owned, shared by every module)
 │   │   ├── crm/crm.page.ts
 │   │   ├── mill/mill.page.ts
-│   │   └── <module>/<module>.page.ts   # one folder per module
+│   │   └── <module>/<screen>.page.ts   # one file per screen, methods only
 │   ├── api/
 │   │   └── base.api-client.ts    # thin wrapper over Playwright's APIRequestContext
 │   ├── fixtures/
@@ -131,15 +157,26 @@ The module already exists in `src/config/modules.ts` (all 8 current
 floorOS frontends are pre-wired) if you're just picking up ownership:
 
 1. Add your credentials to `.env` under your module's prefix.
-2. Open `src/pages/<module>/<module>.page.ts` — it's a smoke-test stub
-   (`expectLoaded()` just checks an `<h1>` renders). Replace the `heading`
-   locator and add the locators/actions your module actually needs.
+2. Your module already has a matching pair of smoke-test stubs:
+   `src/locators/<module>/<module>.locators.ts` (one `heading` locator)
+   and `src/pages/<module>/<module>.page.ts` (`expectLoaded()` just
+   checks that heading renders). As you cover more of your module's
+   screens, add one new pair per screen — e.g. for a "Create Order"
+   screen, add `src/locators/<module>/create-order.locators.ts` (every
+   element the screen needs, confirmed against the real running app, not
+   guessed) and `src/pages/<module>/create-order.page.ts` (a
+   `CreateOrderPage` class holding `readonly locators` plus the
+   flows/actions/assertions built on it — see
+   `src/locators/crm/create-customer.locators.ts` +
+   `src/pages/crm/create-customer.page.ts` for the reference pair).
 3. Write specs in `tests/<module>/`, importing `test`/`expect` from
-   `src/fixtures/<module>.fixtures.ts`.
-4. Claim your rows in [CODEOWNERS](./CODEOWNERS).
+   `src/fixtures/<module>.fixtures.ts`. Specs call page methods only —
+   never a raw locator or `page.getByRole(...)` directly.
+4. Wire each new page object into `src/fixtures/<module>.fixtures.ts`.
+5. Claim your rows in [CODEOWNERS](./CODEOWNERS).
 
 If floorOS ships a genuinely new frontend later, add one entry to
-`MODULES` in `src/config/modules.ts`, then repeat steps 1-4 above for it —
+`MODULES` in `src/config/modules.ts`, then repeat steps 1-5 above for it —
 `playwright.config.ts` and `package.json` need a matching project/script
 pair (copy an existing module's two lines in each).
 
@@ -168,7 +205,7 @@ across runs.
 
 ```bash
 npm run report:allure:generate   # build allure-report/ (static site) from the last run's results
-npm run report:allure:open       # regenerate + serve + open in the browser (blocking — Ctrl+C to stop)
+npm run report:allure:open       # serve the already-generated allure-report/ and open it in the browser (blocking — Ctrl+C to stop); run report:allure:generate first
 ```
 
 This uses [Allure 3](https://allurereport.org/blog/allure-report-3/) (the

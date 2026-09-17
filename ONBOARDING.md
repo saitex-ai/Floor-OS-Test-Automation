@@ -2,8 +2,8 @@
 
 You're picking up ownership of one floorOS module's automated tests. This
 framework is built so you only ever touch your own module's files —
-`tests/<module>/`, `src/pages/<module>/`, `src/fixtures/<module>.fixtures.ts`
-— never anyone else's.
+`tests/<module>/`, `src/pages/<module>/`, `src/locators/<module>/`,
+`src/fixtures/<module>.fixtures.ts` — never anyone else's.
 
 ## 1. Prerequisites
 
@@ -52,16 +52,33 @@ and then run your module's specs. If `<your-module>` isn't in
 
 ## 5. Add your own test cases
 
+Every screen's Page Object is split in two — never put a locator and a
+method in the same file:
+
 1. Document the case in `test-cases/<your-module>/<story>.md` (see
    `test-cases/crm/create-customer.md` for the format — one file per user
    story, each row linking back to its ClickUp task).
-2. Automate it as a `test()` in `tests/<your-module>/*.spec.ts`.
-3. Add any locators/actions you need to
-   `src/pages/<your-module>/<page>.page.ts` — extend `BasePage`, and use
-   `gotoAuthenticated()` (not `goto()`) for your entry point, so the
-   cached shell login actually applies (see the comment on that method).
-4. Wire new page objects into `src/fixtures/<your-module>.fixtures.ts`.
-5. Claim your rows in [`CODEOWNERS`](./CODEOWNERS) — every row currently
+2. Add the screen's element locators to
+   `src/locators/<your-module>/<screen>.locators.ts` — a
+   `<Screen>Locators` class with only `readonly Locator` properties
+   (confirmed against the real running app, not guessed from the
+   ClickUp text), plus any parameterized "find me the element matching
+   this argument" lookups (e.g. `columnHeader(name)`) since those still
+   just locate. Nothing here clicks, fills, or asserts.
+3. Add the screen's flows/actions/assertions to
+   `src/pages/<your-module>/<screen>.page.ts` — a `<Screen>Page` class
+   extending `BasePage`, holding a single `readonly locators:
+<Screen>Locators` plus methods built on top of it (`fillProfile()`,
+   `save()`, `expectSavedSuccessfully()`, ...). Use `gotoAuthenticated()`
+   (not `goto()`) for your entry point, so the cached shell login
+   actually applies (see the comment on that method). See
+   `src/locators/crm/create-customer.locators.ts` +
+   `src/pages/crm/create-customer.page.ts` for the reference pair.
+4. Automate the case as a `test()` in `tests/<your-module>/*.spec.ts`,
+   calling page methods only — never a raw locator or
+   `page.getByRole(...)` directly in the spec.
+5. Wire new page objects into `src/fixtures/<your-module>.fixtures.ts`.
+6. Claim your rows in [`CODEOWNERS`](./CODEOWNERS) — every row currently
    points at `@sathishnagarajanQAlead` as a stand-in; replace your
    module's rows with your own GitHub handle.
 
@@ -70,4 +87,4 @@ Full details, including the local → dev promotion flow, are in the
 
 ## Questions
 
-Ask in [team channel — fill in] or ping [framework lead — fill in].
+Ping Sathish Nagarajan ([@sathishnagarajanQAlead](https://github.com/sathishnagarajanQAlead)).
