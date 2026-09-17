@@ -30,6 +30,30 @@ const moduleProjects: Project[] = MODULE_IDS.flatMap((id) => {
 });
 
 /**
+ * A lighter, separate suite per module — `tests/sanity/<id>/` — for a
+ * small smoke-test subset, distinct from that module's full regression
+ * suite in `tests/<id>/`. Reuses the same `<id>-setup` auth project
+ * above (same login, same cached session) rather than logging in twice.
+ * Not every module needs one yet — add an id here when its QA is ready
+ * to build sanity coverage for it.
+ */
+const SANITY_MODULE_IDS = [
+  'crm',
+  'mill',
+  'costing',
+  'planning',
+  'techpack',
+  'master-data',
+] as const;
+
+const sanityProjects: Project[] = SANITY_MODULE_IDS.map((id) => ({
+  name: `sanity-${id}`,
+  testDir: `./tests/sanity/${id}`,
+  dependencies: [`${id}-setup`],
+  use: { ...devices['Desktop Chrome'], storageState: authFile(id) },
+}));
+
+/**
  * @see https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({
@@ -62,5 +86,5 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
 
-  projects: moduleProjects,
+  projects: [...moduleProjects, ...sanityProjects],
 });

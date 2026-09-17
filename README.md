@@ -89,7 +89,10 @@ pw-hybrid-framework/
     ├── mill/
     │   ├── auth.setup.ts
     │   └── mill.spec.ts
-    └── <module>/...               # costing, planning, techpack, master-data, admin, copilot
+    ├── <module>/...               # costing, planning, techpack, master-data, admin, copilot
+    └── sanity/
+        ├── crm/                    # smoke-test subset, reuses crm-setup's login
+        └── <module>/...            # mill, costing, planning, techpack, master-data
 ```
 
 ## Setup
@@ -161,6 +164,27 @@ development. If you add a new CRM spec file and it needs a place in this
 sequence, give it the next number (or renumber, if it needs to run
 earlier) — `crm.spec.ts` (unnumbered) intentionally sorts after all of
 them and always runs last.
+
+## Sanity suites
+
+Alongside each module's full regression suite in `tests/<module>/`,
+there's a lighter, separate suite in `tests/sanity/<module>/` for a
+small smoke-test subset — a handful of critical-path checks meant to
+run quickly, not the full test-case coverage. It's its own Playwright
+project (`sanity-<module>`) that reuses the same `<module>-setup` login
+as the full suite, so there's no extra auth setup to write — just add
+spec files under `tests/sanity/<module>/` and they'll run.
+
+```bash
+npm run test:sanity:crm        # local
+npm run test:sanity:crm:dev    # dev
+npm run test:sanity            # every module's sanity suite, local
+npm run test:sanity:dev        # every module's sanity suite, dev
+```
+
+Currently wired up for `crm`, `mill`, `costing`, `planning`, `techpack`,
+and `master-data` (see `SANITY_MODULE_IDS` in `playwright.config.ts`) —
+add `admin`/`copilot` there too whenever those QAs want sanity coverage.
 
 ## The local → dev workflow
 
