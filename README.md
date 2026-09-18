@@ -260,6 +260,32 @@ ClickUp-backed test cases in a new module, follow the same pattern: an
 `allure.tms(url, label)` call per test, `epic`/`feature`/`owner` in a
 `test.beforeEach`.
 
+## CI: run the full suite and email a summary
+
+`.github/workflows/run-tests-and-notify.yml` runs `npx playwright test`
+against dev (same as `npm run test:dev`), publishes the resulting Allure
+report to GitHub Pages, and emails a pass/fail summary with a link to
+it. It's **manual-trigger only** for now (`workflow_dispatch`) — run it
+from the repo's Actions tab, "Run tests and notify" → "Run workflow".
+Add a `push`/`schedule` trigger to the workflow file once the team wants
+this automatic.
+
+It needs these repo secrets/variables (Settings → Secrets and variables
+→ Actions):
+
+| Name                                          | Type                | Notes                                                                                                                                                                                                                                      |
+| --------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `RESEND_API_KEY`                              | Secret              | From [resend.com](https://resend.com)'s dashboard. Without this, the email step logs a message and skips — the run/report still complete.                                                                                                  |
+| `<PREFIX>_USER_DEV` / `<PREFIX>_PASSWORD_DEV` | Secret              | Per module, same prefixes as `.env` (`CRM_USER_DEV`, `MILL_USER_DEV`, ...). A module with no secrets set here just fails its own `auth.setup.ts` — an honest signal that module has no dev coverage configured yet, not a broken workflow. |
+| `DEV_APP_SHELL_URL`                           | Variable            | Same value as `.env`'s `DEV_APP_SHELL_URL`.                                                                                                                                                                                                |
+| `NOTIFY_EMAILS`                               | Variable            | Comma-separated recipient list.                                                                                                                                                                                                            |
+| `NOTIFY_FROM_EMAIL`                           | Variable (optional) | Defaults to Resend's shared `onboarding@resend.dev` sender, which works immediately but is rate-limited and clearly not your own domain. Verify a real sending domain in Resend and set this once you're past initial testing.             |
+
+CRM's `_DEV` secrets and the two variables above are already set on this
+repo as of 2026-09-18 — only `RESEND_API_KEY` is still needed to make
+the email step actually send (everything else in the workflow runs
+without it).
+
 ## Lint / format
 
 ```bash

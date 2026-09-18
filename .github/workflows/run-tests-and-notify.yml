@@ -1,0 +1,84 @@
+name: Run tests and notify
+
+# Manual only, on purpose (per team decision, 2026-09-18) — nothing
+# triggers this automatically yet. Add `push`/`schedule` triggers here
+# once the team is ready for that.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  test-and-notify:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx playwright install --with-deps chromium
+
+      # Same command a developer runs locally (npm run test:dev) — CI
+      # shouldn't diverge from that. Modules with no real *_USER_DEV /
+      # *_PASSWORD_DEV secrets configured below will fail their own
+      # auth.setup.ts (empty credentials), which is an honest reflection
+      # of "this module has no dev coverage configured yet", not a
+      # workflow bug.
+      - name: Run full suite against dev
+        env:
+          TEST_ENV: dev
+          DEV_APP_SHELL_URL: ${{ vars.DEV_APP_SHELL_URL }}
+          CRM_USER_DEV: ${{ secrets.CRM_USER_DEV }}
+          CRM_PASSWORD_DEV: ${{ secrets.CRM_PASSWORD_DEV }}
+          MILL_USER_DEV: ${{ secrets.MILL_USER_DEV }}
+          MILL_PASSWORD_DEV: ${{ secrets.MILL_PASSWORD_DEV }}
+          COSTING_USER_DEV: ${{ secrets.COSTING_USER_DEV }}
+          COSTING_PASSWORD_DEV: ${{ secrets.COSTING_PASSWORD_DEV }}
+          PLANNING_USER_DEV: ${{ secrets.PLANNING_USER_DEV }}
+          PLANNING_PASSWORD_DEV: ${{ secrets.PLANNING_PASSWORD_DEV }}
+          TECHPACK_USER_DEV: ${{ secrets.TECHPACK_USER_DEV }}
+          TECHPACK_PASSWORD_DEV: ${{ secrets.TECHPACK_PASSWORD_DEV }}
+          MASTER_DATA_USER_DEV: ${{ secrets.MASTER_DATA_USER_DEV }}
+          MASTER_DATA_PASSWORD_DEV: ${{ secrets.MASTER_DATA_PASSWORD_DEV }}
+          ADMIN_USER_DEV: ${{ secrets.ADMIN_USER_DEV }}
+          ADMIN_PASSWORD_DEV: ${{ secrets.ADMIN_PASSWORD_DEV }}
+          COPILOT_USER_DEV: ${{ secrets.COPILOT_USER_DEV }}
+          COPILOT_PASSWORD_DEV: ${{ secrets.COPILOT_PASSWORD_DEV }}
+          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/results.json
+        run: npx playwright test --reporter=list,allure-playwright,json
+
+      - name: Generate Allure report
+        if: always()
+        run: npm run report:allure:generate
+
+      - name: Upload Allure report to Pages
+        if: always()
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: allure-report
+
+      - name: Deploy to GitHub Pages
+        if: always()
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Email summary
+        if: always()
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          NOTIFY_FROM_EMAIL: ${{ vars.NOTIFY_FROM_EMAIL }}
+          NOTIFY_EMAILS: ${{ vars.NOTIFY_EMAILS }}
+          REPORT_URL: ${{ steps.deployment.outputs.page_url }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node .github/scripts/send-report-email.mjs

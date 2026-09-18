@@ -27,4 +27,12 @@ module.exports = tseslint.config(
       '@typescript-eslint/no-require-imports': 'off',
     },
   },
+  {
+    // CI-only scripts — plain Node ESM, not part of the TypeScript project.
+    files: ['.github/scripts/**/*.mjs'],
+    languageOptions: {
+      sourceType: 'module',
+      globals: { process: 'readonly', console: 'readonly', fetch: 'readonly' },
+    },
+  },
 );
