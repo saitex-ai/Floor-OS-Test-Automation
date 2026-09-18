@@ -62,11 +62,18 @@ export default defineConfig({
   // dev's federated module bundles (e.g. the CRM remote) load over a real
   // network/VPN, not an already-warm local dev server — confirmed by
   // watching it headed: "Loading CRM…" alone can outlast 30s on dev, with
-  // zero worker contention, every run. Local keeps the tight 30s for fast
-  // feedback; dev gets real headroom for that.
-  timeout: env.testEnv === 'dev' ? 60_000 : 30_000,
+  // zero worker contention, every run. Bumped 60s -> 90s on 2026-09-18
+  // after a run under real worker contention (5 parallel workers all
+  // hitting dev at once) saw 39 failures, every one a plain timeout
+  // waiting on a basic element like the "Create Customer" button — not
+  // a locator/app bug, just not enough headroom for dev under load.
+  // Local keeps the tight 30s for fast feedback; dev gets real headroom.
+  timeout: env.testEnv === 'dev' ? 90_000 : 30_000,
   expect: {
-    timeout: 5_000,
+    // Same reasoning as the test timeout above — individual
+    // expect(...).toBeVisible() calls need more than 5s when dev's
+    // remote is slow to render, not just the overall test budget.
+    timeout: env.testEnv === 'dev' ? 15_000 : 5_000,
   },
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
