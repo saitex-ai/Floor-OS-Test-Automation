@@ -1,0 +1,1 @@
+{"id":"40f8c368474179e5a6175471d22dbcf4","fullName":"customer-creation-screen.spec.ts:198:7","name":"TC:7 Verify post-save prompt for immediate Contact creation when no Contact is linked","status":"broken","testResultsByEnv":{"default":"1fdc7502b8718dd036c630c7a41b271a"}}
