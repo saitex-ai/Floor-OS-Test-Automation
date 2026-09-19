@@ -28,25 +28,20 @@ export abstract class BasePage {
   async gotoAuthenticated(path = '/'): Promise<void> {
     await this.goto(path);
 
-    // isVisible() doesn't wait — called immediately after goto() resolves,
-    // it can race the React app's own hydration and see neither the gate
-    // nor the authenticated content yet, silently reading as "not shown"
-    // and skipping the click below. Give it a real window to render first.
-    // 15s (not the 5s this started as) — a remote environment over VPN can
-    // be meaningfully slower to render than a same-machine local server;
-    // the gate reliably appears on every fresh page in this app, so this
-    // is dead time only in the (nonexistent, per that same behavior)
-    // "already authenticated on load" case, not a tax on the happy path.
+    // The gate reliably appears on every fresh page in this app — there is
+    // no legitimate "already authenticated on load" case where it's absent.
+    // So if it doesn't show up within the timeout, that's a real problem
+    // (dev too slow, or something actually broken), not a signal to assume
+    // we're already past it. Let waitFor() throw here instead of swallowing
+    // the timeout: this used to catch it and silently skip the click below,
+    // which left the page stuck on the welcome gate and failed confusingly
+    // at some unrelated later locator (e.g. "Create Customer") instead of
+    // here, where the real cause is. 60s (not the 15s this was) gives dev
+    // real headroom under worker contention before this is called a failure.
     const signInButton = this.page.getByRole('button', { name: 'Sign in' });
-    const gateShown = await signInButton
-      .waitFor({ state: 'visible', timeout: 15_000 })
-      .then(() => true)
-      .catch(() => false);
-
-    if (gateShown) {
-      await signInButton.click();
-      await signInButton.waitFor({ state: 'hidden', timeout: 20_000 });
-    }
+    await signInButton.waitFor({ state: 'visible', timeout: 60_000 });
+    await signInButton.click();
+    await signInButton.waitFor({ state: 'hidden', timeout: 20_000 });
   }
 
   async title(): Promise<string> {

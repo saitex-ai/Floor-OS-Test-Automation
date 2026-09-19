@@ -62,13 +62,15 @@ export default defineConfig({
   // dev's federated module bundles (e.g. the CRM remote) load over a real
   // network/VPN, not an already-warm local dev server — confirmed by
   // watching it headed: "Loading CRM…" alone can outlast 30s on dev, with
-  // zero worker contention, every run. Bumped 60s -> 90s on 2026-09-18
-  // after a run under real worker contention (5 parallel workers all
-  // hitting dev at once) saw 39 failures, every one a plain timeout
-  // waiting on a basic element like the "Create Customer" button — not
-  // a locator/app bug, just not enough headroom for dev under load.
-  // Local keeps the tight 30s for fast feedback; dev gets real headroom.
-  timeout: env.testEnv === 'dev' ? 90_000 : 30_000,
+  // zero worker contention, every run. This was bumped 60s -> 90s on
+  // 2026-09-18 after a run under worker contention saw 39 failures, all
+  // timeouts waiting on a basic element like "Create Customer" — but the
+  // real cause turned out to be gotoAuthenticated() silently skipping the
+  // sign-in click when its own 15s guard timed out (fixed in base.page.ts),
+  // not insufficient headroom here. Reverted back to 60s now that the
+  // actual bug is fixed; workers is also capped for dev below so this
+  // shouldn't need raising again. Local keeps the same value for parity.
+  timeout: env.testEnv === 'dev' ? 60_000 : 30_000,
   expect: {
     // Same reasoning as the test timeout above — individual
     // expect(...).toBeVisible() calls need more than 5s when dev's
@@ -78,7 +80,12 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 2 : undefined,
+  // Dev is a shared, VPN-gated remote environment, not a local server — too
+  // many concurrent workers all logging in/loading modules at once is what
+  // triggered the gotoAuthenticated() timing bug above in the first place.
+  // Cap dev at 2 workers (matching CI) until that load is addressed on the
+  // dev side; local keeps full parallelism since there's no shared load.
+  workers: process.env.CI ? 2 : env.testEnv === 'dev' ? 2 : undefined,
   reporter: [
     ['html', { open: 'never' }],
     ['list'],
