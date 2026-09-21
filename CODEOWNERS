@@ -7,6 +7,7 @@
 # CRM
 /tests/regression/crm/          @sathishnagarajanQAlead
 /tests/sanity/crm/              @sathishnagarajanQAlead
+/tests/smoke/crm/               @sathishnagarajanQAlead
 /src/pages/crm/                 @sathishnagarajanQAlead
 /src/locators/crm/              @sathishnagarajanQAlead
 /src/fixtures/crm.fixtures.ts   @sathishnagarajanQAlead
@@ -14,6 +15,7 @@
 # Fabric Mill
 /tests/regression/mill/         @sathishnagarajanQAlead
 /tests/sanity/mill/             @sathishnagarajanQAlead
+/tests/smoke/mill/              @sathishnagarajanQAlead
 /src/pages/mill/                @sathishnagarajanQAlead
 /src/locators/mill/             @sathishnagarajanQAlead
 /src/fixtures/mill.fixtures.ts  @sathishnagarajanQAlead
@@ -21,6 +23,7 @@
 # Costing
 /tests/regression/costing/         @sathishnagarajanQAlead
 /tests/sanity/costing/             @sathishnagarajanQAlead
+/tests/smoke/costing/              @sathishnagarajanQAlead
 /src/pages/costing/                @sathishnagarajanQAlead
 /src/locators/costing/             @sathishnagarajanQAlead
 /src/fixtures/costing.fixtures.ts  @sathishnagarajanQAlead
@@ -28,6 +31,7 @@
 # Planning
 /tests/regression/planning/         @sathishnagarajanQAlead
 /tests/sanity/planning/             @sathishnagarajanQAlead
+/tests/smoke/planning/              @sathishnagarajanQAlead
 /src/pages/planning/                @sathishnagarajanQAlead
 /src/locators/planning/             @sathishnagarajanQAlead
 /src/fixtures/planning.fixtures.ts  @sathishnagarajanQAlead
@@ -35,6 +39,7 @@
 # Techpack
 /tests/regression/techpack/         @sathishnagarajanQAlead
 /tests/sanity/techpack/             @sathishnagarajanQAlead
+/tests/smoke/techpack/              @sathishnagarajanQAlead
 /src/pages/techpack/                @sathishnagarajanQAlead
 /src/locators/techpack/             @sathishnagarajanQAlead
 /src/fixtures/techpack.fixtures.ts  @sathishnagarajanQAlead
@@ -42,18 +47,21 @@
 # Master Data
 /tests/regression/master-data/         @sathishnagarajanQAlead
 /tests/sanity/master-data/             @sathishnagarajanQAlead
+/tests/smoke/master-data/              @sathishnagarajanQAlead
 /src/pages/master-data/                @sathishnagarajanQAlead
 /src/locators/master-data/             @sathishnagarajanQAlead
 /src/fixtures/master-data.fixtures.ts  @sathishnagarajanQAlead
 
 # Admin (no tests/sanity/admin/ yet — add a row here if that's built later)
 /tests/regression/admin/         @sathishnagarajanQAlead
+/tests/smoke/admin/              @sathishnagarajanQAlead
 /src/pages/admin/                @sathishnagarajanQAlead
 /src/locators/admin/             @sathishnagarajanQAlead
 /src/fixtures/admin.fixtures.ts  @sathishnagarajanQAlead
 
 # Copilot (no tests/sanity/copilot/ yet — add a row here if that's built later)
 /tests/regression/copilot/         @sathishnagarajanQAlead
+/tests/smoke/copilot/              @sathishnagarajanQAlead
 /src/pages/copilot/                @sathishnagarajanQAlead
 /src/locators/copilot/             @sathishnagarajanQAlead
 /src/fixtures/copilot.fixtures.ts  @sathishnagarajanQAlead

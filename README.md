@@ -166,26 +166,40 @@ sequence, give it the next number (or renumber, if it needs to run
 earlier) — `crm.spec.ts` (unnumbered) intentionally sorts after all of
 them and always runs last.
 
-## Sanity suites
+## Smoke, sanity, and regression suites
 
-Alongside each module's full regression suite in `tests/regression/<module>/`,
-there's a lighter, separate suite in `tests/sanity/<module>/` for a
-small smoke-test subset — a handful of critical-path checks meant to
-run quickly, not the full test-case coverage. It's its own Playwright
-project (`sanity-<module>`) that reuses the same `<module>-setup` login
-as the full suite, so there's no extra auth setup to write — just add
-spec files under `tests/sanity/<module>/` and they'll run.
+Three tiers per module, narrowest to broadest:
+
+- **`tests/smoke/<module>/`** — the fastest, smallest check: is anything
+  badly broken. For CRM, one happy-path test per regression spec file
+  (create/activate/deactivate/edit/list-loads, etc.); every other module
+  currently has just the module-loads check, same as its regression
+  suite, until real coverage is built out. Project name `smoke-<module>`.
+- **`tests/sanity/<module>/`** — a broader targeted subset, still not full
+  coverage. Project name `sanity-<module>`.
+- **`tests/regression/<module>/`** — the full test-case suite.
+
+All three reuse the same `<module>-setup` login project, so there's no
+extra auth setup to write for a new suite — just add spec files under
+the right folder and they'll run.
 
 ```bash
+npm run test:smoke:crm         # local
+npm run test:smoke:crm:dev     # dev
+npm run test:smoke             # every module's smoke suite, local
+npm run test:smoke:dev         # every module's smoke suite, dev
+
 npm run test:sanity:crm        # local
 npm run test:sanity:crm:dev    # dev
 npm run test:sanity            # every module's sanity suite, local
 npm run test:sanity:dev        # every module's sanity suite, dev
 ```
 
-Currently wired up for `crm`, `mill`, `costing`, `planning`, `techpack`,
-and `master-data` (see `SANITY_MODULE_IDS` in `playwright.config.ts`) —
-add `admin`/`copilot` there too whenever those QAs want sanity coverage.
+Smoke is wired up for all 8 modules (see `smokeProjects` in
+`playwright.config.ts`). Sanity is currently wired up for `crm`, `mill`,
+`costing`, `planning`, `techpack`, and `master-data` (see
+`SANITY_MODULE_IDS` in `playwright.config.ts`) — add `admin`/`copilot`
+there too whenever those QAs want sanity coverage.
 
 ## The local → dev workflow
 

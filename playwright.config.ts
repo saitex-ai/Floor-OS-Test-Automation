@@ -56,6 +56,20 @@ const sanityProjects: Project[] = SANITY_MODULE_IDS.map((id) => ({
 }));
 
 /**
+ * The fastest, smallest suite per module — `tests/smoke/<id>/` — just
+ * enough to say "is anything badly broken," smaller in scope than that
+ * module's sanity suite above. Covers all 8 modules (unlike sanity)
+ * since even a module with no built-out test cases yet still gets a
+ * module-loads check here. Reuses the same `<id>-setup` auth project.
+ */
+const smokeProjects: Project[] = MODULE_IDS.map((id) => ({
+  name: `smoke-${id}`,
+  testDir: `./tests/smoke/${id}`,
+  dependencies: [`${id}-setup`],
+  use: { ...devices['Desktop Chrome'], storageState: authFile(id) },
+}));
+
+/**
  * @see https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({
@@ -102,5 +116,5 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
 
-  projects: [...moduleProjects, ...sanityProjects],
+  projects: [...moduleProjects, ...sanityProjects, ...smokeProjects],
 });

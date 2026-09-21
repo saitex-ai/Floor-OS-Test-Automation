@@ -17,8 +17,10 @@ pw-hybrid-framework/
 │   ├── api/                → base.api-client.ts — for modules that hit their backend directly
 │   └── data/               → data-reader.ts — loads JSON for data-driven tests
 ├── test-cases/<module>/    → *.md — human-readable test-case docs, one per ClickUp user story
-├── tests/regression/<module>/         → auth.setup.ts (logs in once, caches session) + *.spec.ts
-├── playwright.config.ts    → builds a "<module>-setup" + "<module>" project pair per module
+├── tests/regression/<module>/         → auth.setup.ts (logs in once, caches session) + full *.spec.ts coverage
+├── tests/sanity/<module>/             → a broader targeted subset, still not full coverage
+├── tests/smoke/<module>/              → the fastest, smallest "is anything badly broken" check
+├── playwright.config.ts    → builds a "<module>-setup" + "<module>"/"sanity-<module>"/"smoke-<module>" project set per module
 └── CODEOWNERS              → one QA per module
 ```
 
