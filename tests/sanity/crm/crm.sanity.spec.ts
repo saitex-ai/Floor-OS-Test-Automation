@@ -9,15 +9,18 @@ import { CustomerDetailPage } from '../../../src/pages/crm/customer-detail.page'
 import { ContactDetailPage } from '../../../src/pages/crm/contact-detail.page';
 
 /**
- * CRM — Smoke suite. One happy-path test per distinct capability, so a
- * run here is a fast "is anything badly broken" check rather than full
- * coverage — that still lives in the regression suite. Deliberately
- * deduplicated: the regression suite keeps near-identical tests that
- * reach the same action from a different screen (each traces to its own
- * ClickUp subtask, so those are kept there even when word-for-word
- * identical), but smoke has no traceability goal — only one test per
- * capability survives here (e.g. one "create a Customer" check, not
- * three).
+ * CRM — Sanity suite. One happy-path test per distinct capability — a
+ * broader targeted subset than the smoke suite (tests/smoke/crm/), still
+ * not full coverage, which lives in the regression suite. Originally
+ * built as the smoke suite itself; moved here once tests/smoke/crm/ got
+ * its own deliberately smaller set (login, create Customer, create
+ * Contact), leaving this broader set to serve as sanity instead.
+ * Deliberately deduplicated: the regression suite keeps near-identical
+ * tests that reach the same action from a different screen (each traces
+ * to its own ClickUp subtask, so those are kept there even when
+ * word-for-word identical), but sanity has no traceability goal — only
+ * one test per capability survives here (e.g. one "create a Customer"
+ * check, not three).
  *
  * Unlike every other suite in this framework, these tests share one
  * browser tab (opened once in beforeAll) instead of each getting its
@@ -26,13 +29,13 @@ import { ContactDetailPage } from '../../../src/pages/crm/contact-detail.page';
  * tab costs ~7s (still a real page load, just no click) — sharing one
  * tab across this file's 8 tests saves roughly 30s of an ~5.5min run.
  * That's a deliberate trade against test independence, acceptable here
- * because smoke is meant to be fast, not diagnostic: test.describe.serial
- * stops the file at the first failure rather than let a corrupted shared
- * page produce confusing failures in every test after it. Each test
- * still creates its own fresh Customer/Contact data, only the tab itself
- * is shared.
+ * because this suite is meant to be fast, not diagnostic:
+ * test.describe.serial stops the file at the first failure rather than
+ * let a corrupted shared page produce confusing failures in every test
+ * after it. Each test still creates its own fresh Customer/Contact data,
+ * only the tab itself is shared.
  */
-test.describe.serial('CRM Smoke', () => {
+test.describe.serial('CRM Sanity', () => {
   let page: Page;
   let crmPage: CrmPage;
   let createCustomerPage: CreateCustomerPage;

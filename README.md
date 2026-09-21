@@ -171,15 +171,16 @@ them and always runs last.
 Three tiers per module, narrowest to broadest:
 
 - **`tests/smoke/<module>/`** — the fastest, smallest check: is anything
-  badly broken. For CRM, one happy-path test per distinct capability
+  badly broken. For CRM: real login, create a Customer, create a
+  Contact — nothing more; every other module currently has just the
+  module-loads check, same as its regression suite, until real coverage
+  is built out. Project name `smoke-<module>`.
+- **`tests/sanity/<module>/`** — a broader targeted subset, still not full
+  coverage. For CRM: one happy-path test per distinct capability
   (create/activate/deactivate/edit/list-loads, etc.) — deliberately
   deduplicated, unlike the regression suite, which keeps a separate test
-  per ClickUp subtask even where two are word-for-word identical; every
-  other module currently has just the module-loads check, same as its
-  regression suite, until real coverage is built out. Project name
-  `smoke-<module>`.
-- **`tests/sanity/<module>/`** — a broader targeted subset, still not full
-  coverage. Project name `sanity-<module>`.
+  per ClickUp subtask even where two are word-for-word identical.
+  Project name `sanity-<module>`.
 - **`tests/regression/<module>/`** — the full test-case suite.
 
 All three reuse the same `<module>-setup` login project, so there's no
