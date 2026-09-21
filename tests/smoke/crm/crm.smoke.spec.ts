@@ -1,9 +1,12 @@
 import * as allure from 'allure-js-commons';
-import type { Page } from '@playwright/test';
-import { test, expect } from '../../../src/fixtures/crm.fixtures';
-import type { CreateCustomerPage } from '../../../src/pages/crm/create-customer.page';
-import type { CreateContactPage } from '../../../src/pages/crm/create-contact.page';
-import type { CustomerDetailPage } from '../../../src/pages/crm/customer-detail.page';
+import { test, expect, type Page } from '@playwright/test';
+import { authFile } from '../../../src/fixtures/auth-setup';
+import { CrmPage } from '../../../src/pages/crm/crm.page';
+import { CreateCustomerPage } from '../../../src/pages/crm/create-customer.page';
+import { ContactListPage } from '../../../src/pages/crm/contact-list.page';
+import { CreateContactPage } from '../../../src/pages/crm/create-contact.page';
+import { CustomerDetailPage } from '../../../src/pages/crm/customer-detail.page';
+import { ContactDetailPage } from '../../../src/pages/crm/contact-detail.page';
 
 /**
  * CRM — Smoke suite. One happy-path test per distinct capability, so a
@@ -14,17 +17,51 @@ import type { CustomerDetailPage } from '../../../src/pages/crm/customer-detail.
  * ClickUp subtask, so those are kept there even when word-for-word
  * identical), but smoke has no traceability goal — only one test per
  * capability survives here (e.g. one "create a Customer" check, not
- * three). Each test is self-contained (creates whatever Customer/Contact
- * it needs) rather than depending on another test's state.
+ * three).
+ *
+ * Unlike every other suite in this framework, these tests share one
+ * browser tab (opened once in beforeAll) instead of each getting its
+ * own fresh one. Measured 2026-09-21: a fresh tab's sign-in handshake
+ * costs ~11s (wait + click); a later navigation in an already-signed-in
+ * tab costs ~7s (still a real page load, just no click) — sharing one
+ * tab across this file's 8 tests saves roughly 30s of an ~5.5min run.
+ * That's a deliberate trade against test independence, acceptable here
+ * because smoke is meant to be fast, not diagnostic: test.describe.serial
+ * stops the file at the first failure rather than let a corrupted shared
+ * page produce confusing failures in every test after it. Each test
+ * still creates its own fresh Customer/Contact data, only the tab itself
+ * is shared.
  */
-test.describe('CRM Smoke', () => {
+test.describe.serial('CRM Smoke', () => {
+  let page: Page;
+  let crmPage: CrmPage;
+  let createCustomerPage: CreateCustomerPage;
+  let contactListPage: ContactListPage;
+  let createContactPage: CreateContactPage;
+  let customerDetailPage: CustomerDetailPage;
+  let contactDetailPage: ContactDetailPage;
+
+  test.beforeAll(async ({ browser }) => {
+    page = await browser.newPage({ storageState: authFile('crm') });
+    crmPage = new CrmPage(page);
+    createCustomerPage = new CreateCustomerPage(page);
+    contactListPage = new ContactListPage(page);
+    createContactPage = new CreateContactPage(page);
+    customerDetailPage = new CustomerDetailPage(page);
+    contactDetailPage = new ContactDetailPage(page);
+  });
+
+  test.afterAll(async () => {
+    await page.close();
+  });
+
   test.beforeEach(async () => {
     await allure.epic('CRM');
     await allure.owner('CRM QA');
   });
 
   /** From createActiveCustomer() in 07/08/10-*.spec.ts — new Customers save as Active. */
-  async function createActiveCustomer(createCustomerPage: CreateCustomerPage): Promise<void> {
+  async function createActiveCustomer(): Promise<void> {
     await createCustomerPage.openFromCrmHome();
     await createCustomerPage.fillProfile({
       name: `Playwright Smoke Customer ${Date.now()}`,
@@ -43,21 +80,14 @@ test.describe('CRM Smoke', () => {
   }
 
   /** From createAndDeactivateCustomer() in 05/06-*.spec.ts — Activate needs an Inactive Customer first. */
-  async function createAndDeactivateCustomer(
-    createCustomerPage: CreateCustomerPage,
-    customerDetailPage: CustomerDetailPage,
-  ): Promise<void> {
-    await createActiveCustomer(createCustomerPage);
+  async function createAndDeactivateCustomer(): Promise<void> {
+    await createActiveCustomer();
     await customerDetailPage.deactivate(['Business misalignment'], 'Setup for Activate smoke test');
     await customerDetailPage.expectStatus('Inactive');
   }
 
   /** From createLinkedContact() in 04-customer-detail.spec.ts. */
-  async function createLinkedContact(
-    createCustomerPage: CreateCustomerPage,
-    createContactPage: CreateContactPage,
-    page: Page,
-  ): Promise<{ customerName: string; contactName: string }> {
+  async function createLinkedContact(): Promise<{ customerName: string; contactName: string }> {
     const customerName = `Playwright Smoke Detail Customer ${Date.now()}`;
     await createCustomerPage.openFromCrmHome();
     await createCustomerPage.fillProfile({
@@ -97,9 +127,7 @@ test.describe('CRM Smoke', () => {
   }
 
   /** From 01-create-customer.spec.ts TC:7. */
-  test('Create Customer: successful creation without a linked Contact', async ({
-    createCustomerPage,
-  }) => {
+  test('Create Customer: successful creation without a linked Contact', async () => {
     await allure.feature('Create Customer');
     await createCustomerPage.openFromCrmHome();
     await createCustomerPage.fillProfile({
@@ -121,30 +149,18 @@ test.describe('CRM Smoke', () => {
   });
 
   /** From 04-customer-detail.spec.ts TC:1. */
-  test('Contact Detail: layout and header summary render for a real Contact', async ({
-    createCustomerPage,
-    createContactPage,
-    contactDetailPage,
-    page,
-  }) => {
+  test('Contact Detail: layout and header summary render for a real Contact', async () => {
     await allure.feature('Contact Detail');
-    const { customerName, contactName } = await createLinkedContact(
-      createCustomerPage,
-      createContactPage,
-      page,
-    );
+    const { customerName, contactName } = await createLinkedContact();
     await expect(contactDetailPage.locators.nameHeading).toHaveText(contactName);
     await contactDetailPage.expectHeaderSummary('Active', 'Buyer');
     await contactDetailPage.expectLinkedToCustomer(customerName);
   });
 
   /** From 05-activate-customer.spec.ts TC:5. */
-  test('Activate Customer: reactivating an Inactive Customer succeeds', async ({
-    createCustomerPage,
-    customerDetailPage,
-  }) => {
+  test('Activate Customer: reactivating an Inactive Customer succeeds', async () => {
     await allure.feature('Activate Customer');
-    await createAndDeactivateCustomer(createCustomerPage, customerDetailPage);
+    await createAndDeactivateCustomer();
     await customerDetailPage.activate(['Negotiation'], 'Reactivating after negotiation');
     await customerDetailPage.expectStatus('Active');
     await expect(customerDetailPage.locators.deactivateButton).toBeVisible();
@@ -152,12 +168,9 @@ test.describe('CRM Smoke', () => {
   });
 
   /** From 07-deactivate-customer.spec.ts TC:5. */
-  test('Deactivate Customer: deactivating an active Customer succeeds', async ({
-    createCustomerPage,
-    customerDetailPage,
-  }) => {
+  test('Deactivate Customer: deactivating an active Customer succeeds', async () => {
     await allure.feature('Deactivate Customer');
-    await createActiveCustomer(createCustomerPage);
+    await createActiveCustomer();
     await customerDetailPage.deactivate(['Business misalignment'], 'Customer relocated overseas');
     await customerDetailPage.expectStatus('Inactive');
     await expect(customerDetailPage.locators.activateButton).toBeVisible();
@@ -165,9 +178,7 @@ test.describe('CRM Smoke', () => {
   });
 
   /** From 09-contact-list.spec.ts TC:1. */
-  test('Contact List: default screen loads with expected columns and controls', async ({
-    contactListPage,
-  }) => {
+  test('Contact List: default screen loads with expected columns and controls', async () => {
     await allure.feature('Contact List');
     await contactListPage.open();
     await expect(contactListPage.locators.heading).toBeVisible();
@@ -179,21 +190,15 @@ test.describe('CRM Smoke', () => {
   });
 
   /** From 10-edit-customer-contact.spec.ts TC:2. */
-  test('Edit Customer / Contact: inline edit saves and reflects immediately', async ({
-    createCustomerPage,
-    customerDetailPage,
-    page,
-  }) => {
+  test('Edit Customer / Contact: inline edit saves and reflects immediately', async () => {
     await allure.feature('Edit Customer / Contact');
-    await createActiveCustomer(createCustomerPage);
+    await createActiveCustomer();
     await customerDetailPage.editField('City', 'Chennai');
     await expect(page.getByText('Chennai', { exact: true })).toBeVisible();
   });
 
   /** From 11-create-contact.spec.ts TC:3. */
-  test('Create Contact: linking to an existing Customer succeeds', async ({
-    createContactPage,
-  }) => {
+  test('Create Contact: linking to an existing Customer succeeds', async () => {
     await allure.feature('Create Contact');
     await createContactPage.openFromContactList();
     await createContactPage.fillProfile({
@@ -209,7 +214,7 @@ test.describe('CRM Smoke', () => {
   });
 
   /** From crm.spec.ts. */
-  test('CRM module: loads after shell login', async ({ crmPage }) => {
+  test('CRM module: loads after shell login', async () => {
     await allure.feature('CRM Module');
     await crmPage.open();
     await crmPage.expectLoaded();
