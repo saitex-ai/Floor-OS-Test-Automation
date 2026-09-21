@@ -19,8 +19,12 @@ test.describe('CRM Smoke — Recent', () => {
 
   test.describe('Login functionality', () => {
     // A genuinely fresh, unauthenticated context — the module project's
-    // cached storageState would skip the real login this test exists to check.
-    test.use({ storageState: undefined });
+    // cached storageState would skip the real login this test exists to
+    // check. `storageState: undefined` does NOT clear it (confirmed
+    // 2026-09-21: Keycloak silently approved via the still-cached session,
+    // never showing the login form, so the username/password fill timed
+    // out) — an explicit empty state is required to actually override it.
+    test.use({ storageState: { cookies: [], origins: [] } });
 
     test('Login functionality', async ({ page }) => {
       const { username, password } = moduleCredentials(MODULES.crm);
