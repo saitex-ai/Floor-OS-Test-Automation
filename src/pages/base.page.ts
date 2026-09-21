@@ -40,7 +40,13 @@ export abstract class BasePage {
     await this.goto(path);
 
     const signInButton = this.page.getByRole('button', { name: 'Sign in' });
-    const authenticatedMarker = this.page.getByRole('button', { name: /Notifications/ });
+    // Scoped to the shell's top banner — an unscoped match on "Notifications"
+    // hits a second, unrelated "Control Center Notifications" button
+    // elsewhere on the page (confirmed 2026-09-21: strict-mode violation,
+    // 2 matches). The banner has exactly one.
+    const authenticatedMarker = this.page
+      .getByRole('banner')
+      .getByRole('button', { name: /Notifications/ });
 
     const outcome = await Promise.race([
       signInButton.waitFor({ state: 'visible', timeout: 60_000 }).then(() => 'gate' as const),
