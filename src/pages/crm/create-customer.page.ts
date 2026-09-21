@@ -136,7 +136,13 @@ export class CreateCustomerPage extends BasePage {
   }
 
   async expectSavedSuccessfully(): Promise<void> {
-    await expect(this.locators.toast).toBeVisible();
+    // The toast (sonner) auto-dismisses in a few seconds — real in a normal
+    // run, but too fast to reliably catch once anything slows execution
+    // down (confirmed 2026-09-21: every save failed this exact check under
+    // Playwright's debug/Inspector pacing, even though the save always
+    // actually succeeded — the durable post-save modal, which carries the
+    // same success message, was already on screen). That modal alone is
+    // sufficient proof of success, so it's the only thing asserted here now.
     await expect(this.locators.postSaveModal).toBeVisible();
   }
 
