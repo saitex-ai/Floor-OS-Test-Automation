@@ -6,12 +6,16 @@ import type { CreateContactPage } from '../../../src/pages/crm/create-contact.pa
 import type { CustomerDetailPage } from '../../../src/pages/crm/customer-detail.page';
 
 /**
- * CRM — Smoke suite. One happy-path test pulled from each of the full
- * regression spec files (tests/regression/crm/), so a run here is a
- * fast "is anything badly broken" check rather than full coverage —
- * that still lives in the regression suite. Each test is self-contained
- * (creates whatever Customer/Contact it needs) rather than depending on
- * another test's state, same as the regression source it came from.
+ * CRM — Smoke suite. One happy-path test per distinct capability, so a
+ * run here is a fast "is anything badly broken" check rather than full
+ * coverage — that still lives in the regression suite. Deliberately
+ * deduplicated: the regression suite keeps near-identical tests that
+ * reach the same action from a different screen (each traces to its own
+ * ClickUp subtask, so those are kept there even when word-for-word
+ * identical), but smoke has no traceability goal — only one test per
+ * capability survives here (e.g. one "create a Customer" check, not
+ * three). Each test is self-contained (creates whatever Customer/Contact
+ * it needs) rather than depending on another test's state.
  */
 test.describe('CRM Smoke', () => {
   test.beforeEach(async () => {
@@ -116,51 +120,6 @@ test.describe('CRM Smoke', () => {
     await createCustomerPage.expectSavedSuccessfully();
   });
 
-  /** From 02-customer-creation-screen.spec.ts TC:7. */
-  test('Customer Creation Screen: save with no Contact linked shows the post-save prompt', async ({
-    createCustomerPage,
-  }) => {
-    await allure.feature('Customer Creation Screen');
-    await createCustomerPage.openFromCrmHome();
-    await createCustomerPage.fillProfile({
-      name: `Playwright Smoke Customer ${Date.now()}`,
-      email: `pw-smoke-${Date.now()}@example.com`,
-      city: 'Coimbatore',
-      country: 'India',
-      originType: 'Referral',
-      origin: 'Internal Referral',
-      buyer: 'Fabric',
-      referredBy: 'Jordan Smith',
-      crmStage: 'Lead',
-    });
-    await createCustomerPage.save();
-    await createCustomerPage.expectSavedSuccessfully();
-  });
-
-  /** From 03-customer-list.spec.ts TC:7 (duplicate ClickUp subtask of 01's TC:7 — kept distinct per team decision not to skip duplicates). */
-  test('Customer List: successful creation without a linked Contact', async ({
-    createCustomerPage,
-  }) => {
-    await allure.feature('Customer List');
-    await createCustomerPage.openFromCrmHome();
-    await createCustomerPage.fillProfile({
-      name: `Playwright Smoke Customer ${Date.now()}`,
-      email: `pw-smoke-${Date.now()}@example.com`,
-      city: 'Coimbatore',
-      country: 'India',
-      crmStage: 'Lead',
-      originType: 'Referral',
-      origin: 'Internal Referral',
-      buyer: 'Fabric',
-      referredBy: 'Jordan Smith',
-    });
-    await createCustomerPage.save();
-    if (await createCustomerPage.locators.duplicateWarningModal.isVisible()) {
-      await createCustomerPage.locators.saveAnywayButton.click();
-    }
-    await createCustomerPage.expectSavedSuccessfully();
-  });
-
   /** From 04-customer-detail.spec.ts TC:1. */
   test('Contact Detail: layout and header summary render for a real Contact', async ({
     createCustomerPage,
@@ -192,17 +151,6 @@ test.describe('CRM Smoke', () => {
     await expect(customerDetailPage.locators.activateButton).not.toBeVisible();
   });
 
-  /** From 06-activate-customer-screen.spec.ts TC:5. */
-  test('Activate Customer Screen: cascading reactivation execution succeeds', async ({
-    createCustomerPage,
-    customerDetailPage,
-  }) => {
-    await allure.feature('Activate Customer Screen');
-    await createAndDeactivateCustomer(createCustomerPage, customerDetailPage);
-    await customerDetailPage.activate(['Negotiation'], 'Reactivating after negotiation');
-    await customerDetailPage.expectStatus('Active');
-  });
-
   /** From 07-deactivate-customer.spec.ts TC:5. */
   test('Deactivate Customer: deactivating an active Customer succeeds', async ({
     createCustomerPage,
@@ -214,17 +162,6 @@ test.describe('CRM Smoke', () => {
     await customerDetailPage.expectStatus('Inactive');
     await expect(customerDetailPage.locators.activateButton).toBeVisible();
     await expect(customerDetailPage.locators.deactivateButton).not.toBeVisible();
-  });
-
-  /** From 08-deactivate-customer-screen.spec.ts TC:5. */
-  test('Deactivate Customer Screen: cascading deactivation execution succeeds', async ({
-    createCustomerPage,
-    customerDetailPage,
-  }) => {
-    await allure.feature('Deactivate Customer Screen');
-    await createActiveCustomer(createCustomerPage);
-    await customerDetailPage.deactivate(['Payment issues'], 'Persistent late payments');
-    await customerDetailPage.expectStatus('Inactive');
   });
 
   /** From 09-contact-list.spec.ts TC:1. */
@@ -267,24 +204,6 @@ test.describe('CRM Smoke', () => {
       country: 'India',
     });
     await createContactPage.linkToCustomer('Acme Textiles');
-    await createContactPage.save();
-    await expect(createContactPage.locators.toast).toBeVisible();
-  });
-
-  /** From 12-contact-creation-screen.spec.ts TC:2. */
-  test('Contact Creation Screen: explicit existing-Customer link saves successfully', async ({
-    createContactPage,
-  }) => {
-    await allure.feature('Contact Creation Screen');
-    await createContactPage.openFromContactList();
-    await createContactPage.linkToCustomer('Acme Textiles');
-    await createContactPage.fillProfile({
-      name: 'Playwright Smoke Contact',
-      designation: 'Buyer',
-      email: `pw-smoke-contact-${Date.now()}@example.com`,
-      city: 'Coimbatore',
-      country: 'India',
-    });
     await createContactPage.save();
     await expect(createContactPage.locators.toast).toBeVisible();
   });
