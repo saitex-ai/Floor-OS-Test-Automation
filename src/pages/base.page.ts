@@ -13,35 +13,46 @@ export abstract class BasePage {
   }
 
   /**
-   * Use this (not goto()) for every module page's entry point. A fresh
-   * browser context always lands on app-shell's "Welcome to FloorOS" gate
-   * first — even one preloaded with the Keycloak session cookies
-   * auth.setup.ts saved via storageState. Only clicking "Sign in" redeems
-   * that session: traced over the network, it's a real OIDC round trip
-   * (discovery → redirect to Keycloak's /authorize → immediate 302 back
-   * with a code → token + userinfo exchange), just one Keycloak skips the
-   * login form for because the session cookie is still valid — so it
-   * takes a few seconds but never prompts for credentials. ShellLoginPage
-   * doesn't use this: its login() drives that same gate deliberately, for
-   * the one real (credentialed) login in auth.setup.ts.
+   * Use this (not goto()) for every module page's entry point. The first
+   * fresh browser context of a run lands on app-shell's "Welcome to
+   * FloorOS" gate first — even one preloaded with the Keycloak session
+   * cookies auth.setup.ts saved via storageState. Only clicking "Sign in"
+   * redeems that session: traced over the network, it's a real OIDC round
+   * trip (discovery → redirect to Keycloak's /authorize → immediate 302
+   * back with a code → token + userinfo exchange), just one Keycloak
+   * skips the login form for because the session cookie is still valid —
+   * so it takes a few seconds but never prompts for credentials.
+   *
+   * A later gotoAuthenticated() call in the same already-authenticated
+   * tab (confirmed 2026-09-21, e.g. a test that navigates twice) can land
+   * straight in the app with no gate at all — the shell doesn't always
+   * replay it once a session is already redeemed in that tab. So this
+   * can't just wait for the gate and treat a timeout as failure: that's
+   * only a real failure if we're not authenticated either. Race the gate
+   * against a marker that's part of the authenticated shell on every
+   * module (the Notifications button), and act on whichever genuinely
+   * shows up first — only throw if neither does.
+   *
+   * ShellLoginPage doesn't use this: its login() drives that same gate
+   * deliberately, for the one real (credentialed) login in auth.setup.ts.
    */
   async gotoAuthenticated(path = '/'): Promise<void> {
     await this.goto(path);
 
-    // The gate reliably appears on every fresh page in this app — there is
-    // no legitimate "already authenticated on load" case where it's absent.
-    // So if it doesn't show up within the timeout, that's a real problem
-    // (dev too slow, or something actually broken), not a signal to assume
-    // we're already past it. Let waitFor() throw here instead of swallowing
-    // the timeout: this used to catch it and silently skip the click below,
-    // which left the page stuck on the welcome gate and failed confusingly
-    // at some unrelated later locator (e.g. "Create Customer") instead of
-    // here, where the real cause is. 60s (not the 15s this was) gives dev
-    // real headroom under worker contention before this is called a failure.
     const signInButton = this.page.getByRole('button', { name: 'Sign in' });
-    await signInButton.waitFor({ state: 'visible', timeout: 60_000 });
-    await signInButton.click();
-    await signInButton.waitFor({ state: 'hidden', timeout: 20_000 });
+    const authenticatedMarker = this.page.getByRole('button', { name: /Notifications/ });
+
+    const outcome = await Promise.race([
+      signInButton.waitFor({ state: 'visible', timeout: 60_000 }).then(() => 'gate' as const),
+      authenticatedMarker
+        .waitFor({ state: 'visible', timeout: 60_000 })
+        .then(() => 'authenticated' as const),
+    ]);
+
+    if (outcome === 'gate') {
+      await signInButton.click();
+      await signInButton.waitFor({ state: 'hidden', timeout: 20_000 });
+    }
   }
 
   async title(): Promise<string> {
