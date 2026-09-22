@@ -4,7 +4,16 @@ name: Run tests and notify
 # triggers this automatically yet. Add `push`/`schedule` triggers here
 # once the team is ready for that.
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: Which suite to run
+        required: true
+        type: choice
+        options:
+          - smoke
+          - full
+        default: smoke
 
 permissions:
   contents: read
@@ -29,13 +38,13 @@ jobs:
 
       - run: npx playwright install --with-deps chromium
 
-      # Same command a developer runs locally (npm run test:dev) — CI
-      # shouldn't diverge from that. Modules with no real *_USER_DEV /
-      # *_PASSWORD_DEV secrets configured below will fail their own
-      # auth.setup.ts (empty credentials), which is an honest reflection
-      # of "this module has no dev coverage configured yet", not a
-      # workflow bug.
-      - name: Run full suite against dev
+      # Same projects a developer runs locally (npm run test:smoke:dev /
+      # test:dev) — CI shouldn't diverge from that. Modules with no real
+      # *_USER_DEV / *_PASSWORD_DEV secrets configured below will fail
+      # their own auth.setup.ts (empty credentials), which is an honest
+      # reflection of "this module has no dev coverage configured yet",
+      # not a workflow bug.
+      - name: Run ${{ inputs.suite }} suite against dev
         env:
           TEST_ENV: dev
           DEV_APP_SHELL_URL: ${{ vars.DEV_APP_SHELL_URL }}
@@ -56,7 +65,16 @@ jobs:
           COPILOT_USER_DEV: ${{ secrets.COPILOT_USER_DEV }}
           COPILOT_PASSWORD_DEV: ${{ secrets.COPILOT_PASSWORD_DEV }}
           PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/results.json
-        run: npx playwright test --reporter=list,allure-playwright,json
+        run: |
+          if [ "${{ inputs.suite }}" = "smoke" ]; then
+            npx playwright test \
+              --project=smoke-crm --project=smoke-mill --project=smoke-costing \
+              --project=smoke-planning --project=smoke-techpack --project=smoke-master-data \
+              --project=smoke-admin --project=smoke-copilot \
+              --reporter=list,allure-playwright,json
+          else
+            npx playwright test --reporter=list,allure-playwright,json
+          fi
 
       - name: Generate Allure report
         if: always()
