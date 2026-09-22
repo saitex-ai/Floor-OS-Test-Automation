@@ -1,0 +1,60 @@
+name: PR Conversations Resolved
+
+# Turns the PR status check red while any review conversation is still open
+# (Claude's inline comments or a human reviewer's), and green only once every
+# thread is resolved. Pair with branch protection ("Require conversation
+# resolution before merging" + mark this check Required) to block the merge
+# button, not just colour the tick.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  pull_request_review_comment:
+    types: [created, deleted]
+  pull_request_review:
+    types: [submitted, dismissed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  conversations-resolved:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any review thread is unresolved
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          # Page through all review threads; an unresolved, non-outdated thread
+          # is an "open conversation". Outdated threads (the line they pointed at
+          # no longer exists) are ignored so stale comments can't block forever.
+          unresolved=$(gh api graphql -f query='
+            query($owner:String!, $repo:String!, $pr:Int!, $cursor:String) {
+              repository(owner:$owner, name:$repo) {
+                pullRequest(number:$pr) {
+                  reviewThreads(first:100, after:$cursor) {
+                    pageInfo { hasNextPage endCursor }
+                    nodes { isResolved isOutdated }
+                  }
+                }
+              }
+            }' -f owner="$OWNER" -f repo="$REPO" -F pr="$PR" --paginate \
+            --jq '[.data.repository.pullRequest.reviewThreads.nodes[]
+                   | select(.isResolved == false and .isOutdated == false)] | length' \
+            | awk '{s+=$1} END {print s+0}')
+
+          echo "Open (unresolved, non-outdated) conversations: $unresolved"
+
+          if [ "$unresolved" -gt 0 ]; then
+            echo "::error::$unresolved unresolved conversation(s) on this PR. Resolve every review thread before merging."
+            exit 1
+          fi
+
+          echo "All conversations resolved — good to merge."
