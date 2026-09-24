@@ -28,4 +28,20 @@ test.describe('Master Data module', () => {
     await departmentFormPage.create();
     await departmentFormPage.expectCreatedSuccessfully();
   });
+
+  test('Create Employee: successful creation with a department assigned', async ({
+    employeesListPage,
+    employeeFormPage,
+  }) => {
+    await employeesListPage.open();
+    await employeesListPage.expectLoaded();
+    await employeesListPage.openNewEmployee();
+    await employeeFormPage.expectOnCreatePage();
+
+    await employeeFormPage.fillRequired({
+      fullName: `Playwright Smoke Employee ${Date.now()}`,
+    });
+    await employeeFormPage.create();
+    await employeeFormPage.expectCreatedSuccessfully();
+  });
 });

@@ -53,12 +53,49 @@ one smoke test case (Create Department only — see `tests/smoke/master-data/mas
   A fixed short `waitForTimeout` before asserting on this screen will flake — wait for the real URL
   (`page.waitForURL(...)`) or a real heading instead.
 
+## Employees (`/master-data/system-management/employees`)
+
+Nav label "Employees & Skills," heading on the screen itself is just "Employees" (matches
+`environment-notes.md`'s earlier route confirmation). Confirmed live 2026-09-24 while building one
+smoke test case (Create Employee only — see `tests/smoke/master-data/master-data.smoke.spec.ts`).
+
+- **List**: heading "Employees", tabs All/From HR System/IE-Assessed (each with a live count —
+  same "Maintained by" split as `TC-LE-13` describes elsewhere in this repo's history), a "New
+  Employee" button (capital E — differs from Departments' "New department", worth double-checking
+  exact casing on any future module rather than assuming a shared convention). Table columns:
+  Employee Number, Name, Department, Reports To, Email, Phone, Maintained By, Status.
+- **Create form** ("New Employee" → same `/employees` URL, no dedicated `/new` route unlike
+  Departments — confirmed by watching `page.url()` stay put through the whole flow): Employee
+  Number (disabled, "Auto-generated" — fully system-assigned, confirmed matches this repo's
+  historical TC-CE-01..03 finding), **Full Name \*** (required), **Department \*** (required),
+  Reports To (optional), Email (optional), Phone (optional), Maintained by (combobox — already
+  defaults to "IE-Assessed" selected, a known pre-existing gap already filed as a bug elsewhere in
+  this repo's history, not something to "fix" by re-selecting it), Active (switch, defaults
+  checked/"Yes"), optional "Links to other systems".
+- **Department is NOT a plain Radix select like Departments' own fields** — it's a real, live,
+  searchable, paginated combobox sourced from the actual Departments master (28+ real departments,
+  including throwaway `PW...`-coded ones created by this session's own Departments smoke test —
+  confirms the live-sourcing is genuine, not a cached/stale list). Clicking it opens a `dialog`
+  (cmdk-style command palette: a "Search…" textbox + a "Load more" pagination button + department
+  options rendered as **plain `button`s**, e.g. `button "Cutting CUT"` — no `role=listbox`/`option`
+  at all, which is why a `getByRole('option')` locator finds nothing and just hangs). Same
+  command-palette shape as Techpack's AI-mode pick-a-value fields, but buttons instead of `option`s
+  is the one real structural difference — worth checking for on any other "live-sourced" combobox
+  in this app before assuming ARIA listbox semantics apply.
+- **Success signal**: real toast text is exactly "Employee created" — **no trailing period**,
+  unlike Departments' "Department created." (confirmed by reading the notification region's own
+  aria snapshot directly, not by eye). Small but a genuine locator-breaking difference if copy-paste
+  from the Departments toast assertion without checking.
+- The same dev OIDC redirect timing quirk and `gotoAuthenticated()` requirement apply here too (see
+  the Departments section above and `environment-notes.md`).
+
 ## Not yet covered
 
-Everything except Create Department: Edit Department (including the site-row
+Everything except Create Department and Create Employee: Edit Department (including the site-row
 add/remove/primary-swap validations — "Exactly one site must be primary" / a generic "Failed to
 update department." on the two-primaries case, per historical notes elsewhere in this repo that
-describe the *same* real screen even though they predate this file), List Department, retiring a
+describe the *same* real screen even though they predate this file), List Department, Edit
+Employee, List Employee, retiring a
 department, and every other Master Data screen (Site Master, Employees & Skills, Company/Customer/
 Vendor Master, GMT Inseam/Waist Master, Size/Color Master, Unit of Measure, Currency Rate, Customer
 Percentage, Techpack Type, Sample Request Creation, Inventory Item Management). Scope for this
