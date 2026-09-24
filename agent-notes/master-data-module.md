@@ -11,6 +11,27 @@ Techpack use. Confirmed working live (the `master-data-setup` auth project passe
 filled in, `npm run test:*:master-data*` could never actually have run — `moduleCredentials()`
 throws on a missing required env var, no fallback.
 
+## Landing view (`/master-data`)
+
+`MasterDataLocators`/`MasterDataPage` were still the original untouched `TODO` stub until
+2026-09-24 (see the module's own `open`/`expectLoaded` — literally never confirmed against a real
+running app before, since credentials didn't even exist to run it). Fixed after it kept failing the
+`loads after shell login` smoke test 3 of 4 runs — two distinct, real bugs, not one:
+
+1. **Wrong heading level.** The stub guessed `getByRole('heading', { level: 1 })`; the real landing
+   view's heading is an **`<h2>`** — "Master Data" / "Select a master from the left navigation." A
+   level-1 heading never appears on this page at all, so the old locator could never have matched,
+   ever, regardless of timing. Fixed to `getByRole('heading', { name: 'Master Data', level: 2 })`.
+2. **Genuine slow load, separate from #1.** Even after fixing the heading level, one run still hit
+   the default 15s assertion timeout while the page's `main` region still read literally "Loading
+   Master Data…" — a real content-load gap, same shape as this app's other slow module bundles
+   (Techpack's "Loading Techpacks…", Difficulty Grade's list). Fixed by bumping
+   `expectLoaded()`'s heading-visibility timeout to 60s, matching the pattern already used on every
+   other Master Data list page built this session (Departments/Employees/Sites `expectLoaded()`).
+
+Confirmed the fix holds: 3 clean isolated runs of just this test, plus 2 clean full-suite runs,
+after both fixes landed — not just one lucky pass.
+
 ## Departments (`/master-data/system-management/departments`)
 
 The "Department Master" screen under System Management. Confirmed live 2026-09-24 while building

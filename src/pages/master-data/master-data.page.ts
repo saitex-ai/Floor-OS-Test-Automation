@@ -24,6 +24,10 @@ export class MasterDataPage extends BasePage {
 
   async expectLoaded(): Promise<void> {
     await expect(this.page).toHaveURL(new RegExp(`${MODULES['master-data'].path}`));
-    await expect(this.locators.heading).toBeVisible();
+    // The landing view can sit on "Loading Master Data…" past the default
+    // 15s assertion timeout on a slow dev moment — confirmed live
+    // 2026-09-24, same shape as this app's other slow-loading module
+    // bundles (see agent-notes/master-data-module.md).
+    await expect(this.locators.heading).toBeVisible({ timeout: 60_000 });
   }
 }

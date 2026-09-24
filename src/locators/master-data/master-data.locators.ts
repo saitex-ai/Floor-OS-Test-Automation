@@ -8,8 +8,11 @@ export class MasterDataLocators {
   readonly heading: Locator;
 
   constructor(page: Page) {
-    // TODO(Master Data QA): replace with a locator specific to this
-    // module's landing view once you've confirmed it against the running app.
-    this.heading = page.getByRole('heading', { level: 1 });
+    // Confirmed live 2026-09-24: the landing view's real heading is an
+    // <h2> ("Master Data" / "Select a master from the left navigation.")
+    // — a level-1 heading never appears here, which is why the old
+    // TODO guess (getByRole('heading', { level: 1 })) failed every time,
+    // not flakiness.
+    this.heading = page.getByRole('heading', { name: 'Master Data', level: 2 });
   }
 }
