@@ -91,7 +91,10 @@ export class CreateContactLocators {
     this.designationInput = page.getByLabel('Designation');
     this.genderCombobox = page.getByRole('combobox', { name: 'Gender' });
     this.emailInput = page.getByLabel('Email');
-    this.phoneInput = page.getByLabel('Phone');
+    // exact: true — getByLabel('Phone') without it also matches the
+    // adjacent "Phone country code" combobox (confirmed: strict-mode
+    // violation, 2 matches).
+    this.phoneInput = page.getByLabel('Phone', { exact: true });
     this.faxInput = page.getByLabel('Fax');
     this.addressInput = page.getByLabel('Address');
     this.cityInput = page.getByLabel('City');
