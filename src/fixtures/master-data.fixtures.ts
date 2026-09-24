@@ -4,6 +4,8 @@ import { DepartmentsListPage } from '../pages/master-data/departments-list.page'
 import { DepartmentFormPage } from '../pages/master-data/department-form.page';
 import { EmployeesListPage } from '../pages/master-data/employees-list.page';
 import { EmployeeFormPage } from '../pages/master-data/employee-form.page';
+import { SitesListPage } from '../pages/master-data/sites-list.page';
+import { SiteFormPage } from '../pages/master-data/site-form.page';
 
 interface MasterDataFixtures {
   masterDataPage: MasterDataPage;
@@ -11,6 +13,8 @@ interface MasterDataFixtures {
   departmentFormPage: DepartmentFormPage;
   employeesListPage: EmployeesListPage;
   employeeFormPage: EmployeeFormPage;
+  sitesListPage: SitesListPage;
+  siteFormPage: SiteFormPage;
 }
 
 /**
@@ -37,6 +41,14 @@ export const test = base.extend<MasterDataFixtures>({
 
   employeeFormPage: async ({ page }, use) => {
     await use(new EmployeeFormPage(page));
+  },
+
+  sitesListPage: async ({ page }, use) => {
+    await use(new SitesListPage(page));
+  },
+
+  siteFormPage: async ({ page }, use) => {
+    await use(new SiteFormPage(page));
   },
 });
 

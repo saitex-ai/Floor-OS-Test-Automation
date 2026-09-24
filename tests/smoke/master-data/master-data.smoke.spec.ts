@@ -44,4 +44,21 @@ test.describe('Master Data module', () => {
     await employeeFormPage.create();
     await employeeFormPage.expectCreatedSuccessfully();
   });
+
+  test('Create Site: successful creation with code and name only', async ({
+    sitesListPage,
+    siteFormPage,
+  }) => {
+    await sitesListPage.open();
+    await sitesListPage.expectLoaded();
+    await sitesListPage.openNewSite();
+    await siteFormPage.expectOnCreatePage();
+
+    await siteFormPage.fillRequired({
+      code: `PWS${Date.now().toString().slice(-7)}`,
+      name: `Playwright Smoke Site ${Date.now()}`,
+    });
+    await siteFormPage.create();
+    await siteFormPage.expectCreatedSuccessfully();
+  });
 });

@@ -89,17 +89,50 @@ smoke test case (Create Employee only — see `tests/smoke/master-data/master-da
 - The same dev OIDC redirect timing quirk and `gotoAuthenticated()` requirement apply here too (see
   the Departments section above and `environment-notes.md`).
 
+## Sites (`/master-data/system-management/sites`)
+
+The "Site Master" screen under System Management. Confirmed live 2026-09-24 while building one
+smoke test case (Create Site only — see `tests/smoke/master-data/master-data.smoke.spec.ts`).
+
+- **List**: heading "Sites", a "New site" button (lowercase — same casing as Departments' "New
+  department", unlike Employees' capital-E "New Employee"; genuinely inconsistent per-screen, not a
+  typo on any one side — confirmed by reading each screen's real button text directly rather than
+  assuming a shared convention). Table columns: Code, Site, Country, Timezone, Legal entities,
+  Departments (a live count + primary count, e.g. "19 departments · 18 primary"), Links to other
+  systems, Status.
+- **Create form** ("New site" → `/master-data/system-management/sites/new`): Site code (textbox,
+  placeholder "SITE-DN"), Site name (textbox, placeholder "Dong Nai"), Country (combobox, defaults
+  "Select…"), Timezone (combobox, defaults "Select…"), Active (switch, defaults checked/"Yes"), a
+  "Legal entities at this site" section ("Add entity" — exactly-one-primary pattern, same shape as
+  Departments' "Operates at" sites), and an optional "Links to other systems" section.
+- **Country and Timezone are NOT actually required, despite looking required** — confirmed live by
+  submitting with only Site code + Site name filled: saved cleanly ("Site created." toast), and the
+  new row shows "Not set" / "Not set" for Country/Timezone and "No entities" for Legal entities on
+  the list. Matches this repo's own historical TC-CS-07 finding, already filed as a real bug
+  ([Sites: Country/Timezone not enforced despite being required
+  fields](https://app.clickup.com/t/z941abwhv2)) — **do not build a test around Country/Timezone
+  being required**, they aren't, and that's a known, already-reported gap, not something to
+  re-discover or "fix" here.
+- **Minimal happy path needs only two fields** — no legal-entity row is required to save (unlike
+  Departments, where at least one site row is a hard save-time block). Confirmed by the same live
+  minimal-fields submit above.
+- **Success signal**: real toast text is exactly "Site created." (with trailing period, same
+  pattern as Departments' "Department created." — Employees' "Employee created" without one is the
+  outlier, not the norm; still worth checking per-screen rather than assuming).
+- Same dev OIDC redirect timing quirk and `gotoAuthenticated()` requirement as the other two
+  screens.
+
 ## Not yet covered
 
-Everything except Create Department and Create Employee: Edit Department (including the site-row
-add/remove/primary-swap validations — "Exactly one site must be primary" / a generic "Failed to
-update department." on the two-primaries case, per historical notes elsewhere in this repo that
-describe the *same* real screen even though they predate this file), List Department, Edit
-Employee, List Employee, retiring a
-department, and every other Master Data screen (Site Master, Employees & Skills, Company/Customer/
-Vendor Master, GMT Inseam/Waist Master, Size/Color Master, Unit of Measure, Currency Rate, Customer
-Percentage, Techpack Type, Sample Request Creation, Inventory Item Management). Scope for this
-session was deliberately just the one smoke case, per direct instruction.
+Everything except Create Department, Create Employee, and Create Site: Edit Department (including
+the site-row add/remove/primary-swap validations — "Exactly one site must be primary" / a generic
+"Failed to update department." on the two-primaries case, per historical notes elsewhere in this
+repo that describe the *same* real screen even though they predate this file), List Department,
+Edit Employee, List Employee, Edit Site, List Site, retiring a department, and every other Master
+Data screen (Company/Customer/Vendor Master, GMT Inseam/Waist Master, Size/Color Master, Unit of
+Measure, Currency Rate, Customer Percentage, Techpack Type, Sample Request Creation, Inventory Item
+Management). Scope for this session was deliberately just one smoke case per screen, per direct
+instruction.
 
 **Ownership note**: `CODEOWNERS` assigns Master Data to `@sathishnagarajanQAlead`, not the QA who
 built this (`@RKsaitex`, who owns Planning + Techpack). Confirmed directly with them 2026-09-24 that
