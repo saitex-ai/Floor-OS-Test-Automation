@@ -12,6 +12,8 @@ import { QualifiedLeadToProspectPage } from '../pages/crm/qualified-lead-to-pros
 import { KeyMeetingNotesPage } from '../pages/crm/key-meeting-notes.page';
 import { BizDocPage } from '../pages/crm/biz-doc.page';
 import { ScanCreatePage } from '../pages/crm/scan-create.page';
+import { LeadQualificationPage } from '../pages/crm/lead-qualification.page';
+import { ExternalEventsPage } from '../pages/crm/external-events.page';
 
 interface CrmFixtures {
   crmPage: CrmPage;
@@ -27,6 +29,8 @@ interface CrmFixtures {
   keyMeetingNotesPage: KeyMeetingNotesPage;
   bizDocPage: BizDocPage;
   scanCreatePage: ScanCreatePage;
+  leadQualificationPage: LeadQualificationPage;
+  externalEventsPage: ExternalEventsPage;
 }
 
 /**
@@ -85,6 +89,14 @@ export const test = base.extend<CrmFixtures>({
 
   scanCreatePage: async ({ page }, use) => {
     await use(new ScanCreatePage(page));
+  },
+
+  leadQualificationPage: async ({ page }, use) => {
+    await use(new LeadQualificationPage(page));
+  },
+
+  externalEventsPage: async ({ page }, use) => {
+    await use(new ExternalEventsPage(page));
   },
 });
 

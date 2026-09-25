@@ -45,7 +45,8 @@ export class LogCommunicationPage extends BasePage {
    * (same pattern as KeyMeetingNotesPage.openGenerateFromCustomerDetail()).
    */
   async openFromCustomerDetail(customerId: string): Promise<void> {
-    await this.gotoAuthenticated(CUSTOMER_DETAIL_PATH(customerId));
+    await this.gotoAuthenticated
+    (CUSTOMER_DETAIL_PATH(customerId));
     await this.locators.communicationTabButton.click();
     const notBuilt = await this.locators.communicationTabNotBuiltPlaceholder
       .isVisible()
@@ -102,6 +103,36 @@ export class LogCommunicationPage extends BasePage {
 
   async expectLoggedEntryVisible(title: string): Promise<void> {
     await expect(this.locators.loggedEntry(title)).toBeVisible();
+  }
+
+  /** Opens a logged entry's own Details screen from the Communication tab's list. */
+  async openLoggedCommunication(title: string): Promise<void> {
+    await this.locators.openLoggedEntryButton(title).click();
+  }
+
+  /** Opens the "Notify Internally" dialog from a logged entry's Details screen — one click, does NOT send (see sendNotification). */
+  async notifyInternally(): Promise<void> {
+    await this.locators.notifyInternallyButton.click();
+  }
+
+  /**
+   * Selects one Manager in the Notify Internally dialog's multi-select.
+   * Confirmed against the running app: clicking the combobox opens a
+   * SEPARATE popup dialog with a "Suggestions" listbox — clicking an
+   * option does not close it, and pressing Escape clears the selection
+   * instead of confirming it. Clicking the dialog's own heading (a
+   * neutral point outside the popup) closes it while keeping the pick.
+   */
+  async selectNotifyManager(name: string): Promise<void> {
+    await this.locators.notifyManagersCombobox.click();
+    await this.page.getByRole('option', { name }).click();
+    await this.locators.notifyDialog.getByRole('heading', { name: 'Notify Internally' }).click();
+  }
+
+  /** Completes a send from an already-open Notify Internally dialog and waits for its toast. */
+  async sendNotification(): Promise<void> {
+    await this.locators.sendNotificationsButton.click();
+    await expect(this.locators.toast).toBeVisible();
   }
 
   async expectDialogClosed(): Promise<void> {

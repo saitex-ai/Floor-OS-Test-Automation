@@ -1,5 +1,9 @@
 import { type Locator, type Page } from '@playwright/test';
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /**
  * Raw element locators for the "Log a Communication" screen (CRM, Sprint 2
  * user story) — no actions or assertions here, see
@@ -42,6 +46,19 @@ export class LogCommunicationLocators {
 
   readonly toast: Locator;
 
+  // "Notify Internally" (CRM Sprint 4 — Notify Internally about a Logged
+  // Communication). Confirmed against the running app: a logged entry's
+  // own Details screen (opened via its list-row button, accessible name
+  // "Open {title}. ...") has a "Notify Internally" button that opens a
+  // dialog with Managers/Executives multi-select comboboxes — the same
+  // shape already confirmed for Key Meeting Notes' own Notify Internally
+  // (see key-meeting-notes.locators.ts).
+  readonly notifyInternallyButton: Locator;
+  readonly notifyDialog: Locator;
+  readonly notifyManagersCombobox: Locator;
+  readonly notifyExecutivesCombobox: Locator;
+  readonly sendNotificationsButton: Locator;
+
   constructor(private readonly page: Page) {
     this.communicationTabButton = page.getByRole('button', { name: 'Communication', exact: true });
     this.communicationTabNotBuiltPlaceholder = page.getByText('Tab content — not built yet.');
@@ -76,10 +93,24 @@ export class LogCommunicationLocators {
     this.cancelButton = this.dialog.getByRole('button', { name: /Cancel|Close/ });
 
     this.toast = page.locator('[data-sonner-toast]').first();
+
+    this.notifyInternallyButton = page.getByRole('button', { name: 'Notify Internally' });
+    this.notifyDialog = page
+      .getByRole('dialog')
+      .or(page.getByRole('alertdialog'))
+      .filter({ hasText: 'Notify Internally' });
+    this.notifyManagersCombobox = this.notifyDialog.getByRole('combobox', { name: 'Managers' });
+    this.notifyExecutivesCombobox = this.notifyDialog.getByRole('combobox', { name: 'Executives' });
+    this.sendNotificationsButton = this.notifyDialog.getByRole('button', { name: 'Send notifications' });
   }
 
   /** A logged communication's row in the Communication section, by its Title. */
   loggedEntry(title: string): Locator {
     return this.page.getByText(title, { exact: false }).first();
+  }
+
+  /** The logged entry's own list-row button (clicking it opens its Details screen) — accessible name is "Open {title}. ...". */
+  openLoggedEntryButton(title: string): Locator {
+    return this.page.getByRole('button', { name: new RegExp(`^Open ${escapeRegExp(title)}`) });
   }
 }
