@@ -5,6 +5,16 @@ import { ContactListPage } from '../pages/crm/contact-list.page';
 import { CreateContactPage } from '../pages/crm/create-contact.page';
 import { CustomerDetailPage } from '../pages/crm/customer-detail.page';
 import { ContactDetailPage } from '../pages/crm/contact-detail.page';
+import { LogCommunicationPage } from '../pages/crm/log-communication.page';
+import { ContactsTabPage } from '../pages/crm/contacts-tab.page';
+import { CommunicationsEmailPage } from '../pages/crm/communications-email.page';
+import { QualifiedLeadToProspectPage } from '../pages/crm/qualified-lead-to-prospect.page';
+import { KeyMeetingNotesPage } from '../pages/crm/key-meeting-notes.page';
+import { BizDocPage } from '../pages/crm/biz-doc.page';
+import { ScanCreatePage } from '../pages/crm/scan-create.page';
+import { LeadQualificationPage } from '../pages/crm/lead-qualification.page';
+import { ExternalEventsPage } from '../pages/crm/external-events.page';
+import { AlertsPage } from '../pages/crm/alerts.page';
 
 interface CrmFixtures {
   crmPage: CrmPage;
@@ -13,6 +23,16 @@ interface CrmFixtures {
   createContactPage: CreateContactPage;
   customerDetailPage: CustomerDetailPage;
   contactDetailPage: ContactDetailPage;
+  logCommunicationPage: LogCommunicationPage;
+  contactsTabPage: ContactsTabPage;
+  communicationsEmailPage: CommunicationsEmailPage;
+  qualifiedLeadToProspectPage: QualifiedLeadToProspectPage;
+  keyMeetingNotesPage: KeyMeetingNotesPage;
+  bizDocPage: BizDocPage;
+  scanCreatePage: ScanCreatePage;
+  leadQualificationPage: LeadQualificationPage;
+  externalEventsPage: ExternalEventsPage;
+  alertsPage: AlertsPage;
 }
 
 /**
@@ -43,6 +63,46 @@ export const test = base.extend<CrmFixtures>({
 
   contactDetailPage: async ({ page }, use) => {
     await use(new ContactDetailPage(page));
+  },
+
+  logCommunicationPage: async ({ page }, use) => {
+    await use(new LogCommunicationPage(page));
+  },
+
+  contactsTabPage: async ({ page }, use) => {
+    await use(new ContactsTabPage(page));
+  },
+
+  communicationsEmailPage: async ({ page }, use) => {
+    await use(new CommunicationsEmailPage(page));
+  },
+
+  qualifiedLeadToProspectPage: async ({ page }, use) => {
+    await use(new QualifiedLeadToProspectPage(page));
+  },
+
+  keyMeetingNotesPage: async ({ page }, use) => {
+    await use(new KeyMeetingNotesPage(page));
+  },
+
+  bizDocPage: async ({ page }, use) => {
+    await use(new BizDocPage(page));
+  },
+
+  scanCreatePage: async ({ page }, use) => {
+    await use(new ScanCreatePage(page));
+  },
+
+  leadQualificationPage: async ({ page }, use) => {
+    await use(new LeadQualificationPage(page));
+  },
+
+  externalEventsPage: async ({ page }, use) => {
+    await use(new ExternalEventsPage(page));
+  },
+
+  alertsPage: async ({ page }, use) => {
+    await use(new AlertsPage(page));
   },
 });
 

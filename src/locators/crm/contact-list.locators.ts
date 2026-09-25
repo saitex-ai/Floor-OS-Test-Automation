@@ -111,8 +111,9 @@ export class ContactListLocators {
     return this.columnsDialog.getByRole('checkbox', { name: `Toggle ${columnName}` });
   }
 
+  /** Confirmed against the running app: a linked Customer cell renders as a `button`, not a `link`, despite navigating like one. */
   linkedCustomerLink(customerName: string): Locator {
-    return this.page.getByRole('link', { name: customerName });
+    return this.page.getByRole('button', { name: customerName, exact: true });
   }
 
   contactRow(contactName: string): Locator {
