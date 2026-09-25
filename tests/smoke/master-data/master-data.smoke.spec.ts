@@ -1,3 +1,4 @@
+import * as allure from 'allure-js-commons';
 import { test } from '../../../src/fixtures/master-data.fixtures';
 
 /**
@@ -7,6 +8,12 @@ import { test } from '../../../src/fixtures/master-data.fixtures';
  * coverage (that's what regression is for).
  */
 test.describe('Master Data module', () => {
+  test.beforeEach(async () => {
+    await allure.epic('Master Data');
+    await allure.feature('Smoke');
+    await allure.owner('Master Data QA');
+  });
+
   test('loads after shell login', async ({ masterDataPage }) => {
     await masterDataPage.open();
     await masterDataPage.expectLoaded();
