@@ -24,6 +24,10 @@ export class PlanningPage extends BasePage {
 
   async expectLoaded(): Promise<void> {
     await expect(this.page).toHaveURL(new RegExp(`${MODULES['planning'].path}`));
-    await expect(this.locators.heading).toBeVisible();
+    // Bumped past the default 15s assertion timeout — same slow-load
+    // headroom given to every other module landing/list page in this
+    // repo (see agent-notes/master-data-module.md's "Landing view" section
+    // for the confirmed-live account of this exact pattern elsewhere).
+    await expect(this.locators.heading).toBeVisible({ timeout: 60_000 });
   }
 }
