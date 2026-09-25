@@ -8,8 +8,12 @@ export class PlanningLocators {
   readonly heading: Locator;
 
   constructor(page: Page) {
-    // TODO(Planning QA): replace with a locator specific to this
-    // module's landing view once you've confirmed it against the running app.
-    this.heading = page.getByRole('heading', { level: 1 });
+    // Confirmed live 2026-09-25: the landing view's real heading is an
+    // <h2> ("Planning" / "Select a screen from the left navigation.") —
+    // a level-1 heading never appears here. Same wrong-guess shape as the
+    // identical Master Data stub bug (see agent-notes/master-data-module.md's
+    // "Landing view" section) — the old level:1 guess could never have
+    // matched, ever, regardless of timing.
+    this.heading = page.getByRole('heading', { name: 'Planning', level: 2 });
   }
 }
