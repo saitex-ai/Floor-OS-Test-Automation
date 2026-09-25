@@ -1,8 +1,10 @@
 import { test as base } from '@playwright/test';
 import { TechpackPage } from '../pages/techpack/techpack.page';
+import { CreateTechpackPage } from '../pages/techpack/create-techpack.page';
 
 interface TechpackFixtures {
   techpackPage: TechpackPage;
+  createTechpackPage: CreateTechpackPage;
 }
 
 /**
@@ -13,6 +15,10 @@ interface TechpackFixtures {
 export const test = base.extend<TechpackFixtures>({
   techpackPage: async ({ page }, use) => {
     await use(new TechpackPage(page));
+  },
+
+  createTechpackPage: async ({ page }, use) => {
+    await use(new CreateTechpackPage(page));
   },
 });
 

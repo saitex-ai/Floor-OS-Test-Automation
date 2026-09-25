@@ -50,7 +50,7 @@ export const MODULES: Record<ModuleId, ModuleConfig> = {
   mill: { id: 'mill', label: 'Fabric Mill', path: '/mill', envPrefix: 'MILL' },
   costing: { id: 'costing', label: 'Costing', path: '/costing', envPrefix: 'COSTING' },
   planning: { id: 'planning', label: 'Planning', path: '/planning', envPrefix: 'PLANNING' },
-  techpack: { id: 'techpack', label: 'Techpack', path: '/techpack', envPrefix: 'TECHPACK' },
+  techpack: { id: 'techpack', label: 'Techpack', path: '/techpacks', envPrefix: 'TECHPACK' },
   'master-data': {
     id: 'master-data',
     label: 'Master Data',
