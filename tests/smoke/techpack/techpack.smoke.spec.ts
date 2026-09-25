@@ -1,3 +1,4 @@
+import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/techpack.fixtures';
 
 /**
@@ -13,6 +14,12 @@ const DUMMY_PDF = {
 };
 
 test.describe('Techpack module', () => {
+  test.beforeEach(async () => {
+    await allure.epic('Techpack');
+    await allure.feature('Smoke');
+    await allure.owner('Techpack QA');
+  });
+
   test('loads after shell login', async ({ techpackPage }) => {
     await techpackPage.open();
     await techpackPage.expectLoaded();
