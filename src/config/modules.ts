@@ -51,7 +51,7 @@ export const MODULES: Record<ModuleId, ModuleConfig> = {
   mill: { id: 'mill', label: 'Fabric Mill', path: '/mill', envPrefix: 'MILL' },
   costing: { id: 'costing', label: 'Costing', path: '/costing', envPrefix: 'COSTING' },
   planning: { id: 'planning', label: 'Planning', path: '/planning', envPrefix: 'PLANNING' },
-  techpack: { id: 'techpack', label: 'Techpack', path: '/techpack', envPrefix: 'TECHPACK' },
+  techpack: { id: 'techpack', label: 'Techpack', path: '/techpacks', envPrefix: 'TECHPACK' },
   // Served by app-techpack (its `./BomRoot` export), but the shell mounts it
   // at its own /bom route and it's tested/owned as a module of its own.
   bom: { id: 'bom', label: 'BOM', path: '/bom', envPrefix: 'BOM' },
