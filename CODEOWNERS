@@ -44,6 +44,13 @@
 /src/locators/techpack/             @sathishnagarajanQAlead
 /src/fixtures/techpack.fixtures.ts  @sathishnagarajanQAlead
 
+# BOM (no tests/sanity/bom/ yet — add a row here if that's built later)
+/tests/regression/bom/         @sathishnagarajanQAlead
+/tests/smoke/bom/              @sathishnagarajanQAlead
+/src/pages/bom/                @sathishnagarajanQAlead
+/src/locators/bom/             @sathishnagarajanQAlead
+/src/fixtures/bom.fixtures.ts  @sathishnagarajanQAlead
+
 # Master Data
 /tests/regression/master-data/         @sathishnagarajanQAlead
 /tests/sanity/master-data/             @sathishnagarajanQAlead

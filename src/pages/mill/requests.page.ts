@@ -30,7 +30,9 @@ export class RequestsPage extends MillScreenPage {
     if (await this.locators.requestingDepartmentSelect.isVisible()) {
       await this.locators.requestingDepartmentSelect.selectOption({ label: department });
     }
-    await expect(this.locators.requestMaterialsCard).toHaveText(`Request materials for ${department}`);
+    await expect(this.locators.requestMaterialsCard).toHaveText(
+      `Request materials for ${department}`,
+    );
   }
 
   /**
