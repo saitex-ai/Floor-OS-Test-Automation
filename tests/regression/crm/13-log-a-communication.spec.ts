@@ -144,9 +144,21 @@ test.describe('CRM - Log a Communication', () => {
       await logCommunicationPage.expectSavedSuccessfully();
     });
 
-    // TODO(CRM QA): once the real Communication section/audit view is
-    // confirmed, assert the created-by user and created date/time are
-    // shown against this entry (FR-1.6/AC-1.5 in the User Story).
+    await test.step('The entry is audit-stamped with the acting user and a created timestamp', async () => {
+      // Confirmed against the running app (2026-09-29): the logged entry's
+      // own Details screen shows a real "Created On"/"Created By" pair
+      // (FR-1.6/AC-1.5) — e.g. "Created On 2026-09-29 15:09" / "Created
+      // By Alice Planner". Confirmed directly: this label's casing is NOT
+      // stable across runs — a CSS text-transform timing race renders it
+      // all-caps in some runs, Title Case in others, on the identical
+      // screen/flow — so this matches case-insensitively rather than
+      // pinning to one literal casing.
+      await logCommunicationPage.openLoggedCommunication(title);
+      const body = page.locator('main').last();
+      await expect(body).toContainText(/created on/i);
+      await expect(body).toContainText(/created by/i);
+      await expect(body).toContainText('Alice Planner');
+    });
   });
 
   test('TC-4 Verify retrieval and display of saved communication log', async ({

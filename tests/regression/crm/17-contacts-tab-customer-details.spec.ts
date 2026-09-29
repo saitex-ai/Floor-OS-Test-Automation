@@ -52,13 +52,32 @@ test.describe('CRM - Contacts tab in Customer Details', () => {
     return { customerId: page.url().split('/').pop()!, customerName };
   }
 
+  /**
+   * Confirmed against the running app: unlike Customer Name, Contact Name
+   * rejects digits outright ("Alphabets only" validation error) — a plain
+   * `Date.now()` suffix (this repo's usual uniqueness idiom) doesn't work
+   * here, which is why every other spec touching Contact Name (e.g.
+   * 11-create-contact.spec.ts) uses a fixed literal instead. This converts
+   * the timestamp to a pure-letter base-26 suffix so it stays unique
+   * across runs without tripping that validation.
+   */
+  function alphabeticSuffix(): string {
+    let n = Date.now();
+    let suffix = '';
+    while (n > 0) {
+      suffix = String.fromCharCode(65 + (n % 26)) + suffix;
+      n = Math.floor(n / 26);
+    }
+    return suffix;
+  }
+
   /** Creates a Contact pre-linked to the given Customer, via the confirmed hand-off pattern. */
   async function createContactLinkedTo(
     createContactPage: import('../../../src/pages/crm/create-contact.page').CreateContactPage,
     customerId: string,
     customerName: string,
   ): Promise<string> {
-    const contactName = 'Playwright Test Contact';
+    const contactName = `Playwright Test Contact ${alphabeticSuffix()}`;
     await createContactPage.openFromCustomerContext(customerId, customerName);
     await createContactPage.fillProfile({
       name: contactName,
@@ -158,11 +177,11 @@ test.describe('CRM - Contacts tab in Customer Details', () => {
     await test.step('The Contact record itself still exists, now unlinked', async () => {
       // Confirmed against the running app: a delinked Contact reappears
       // in the "Contacts to link" popup's unlinked pool immediately —
-      // the record survives, only the link is removed. `.first()`: the
-      // helper's hardcoded name means other runs' now-unlinked Contacts
-      // of the same name can also be in this pool.
+      // the record survives, only the link is removed. contactName now
+      // carries a Date.now() suffix (like every sibling spec), so this
+      // provably checks this run's own record, not an older run's.
       await contactsTabPage.openLinkPanel();
-      await expect(contactsTabPage.locators.linkContactOption(contactName).first()).toBeVisible();
+      await expect(contactsTabPage.locators.linkContactOption(contactName)).toBeVisible();
     });
   });
 

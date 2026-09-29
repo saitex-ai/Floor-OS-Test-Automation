@@ -119,14 +119,61 @@ export class LogCommunicationPage extends BasePage {
    * Selects one Manager in the Notify Internally dialog's multi-select.
    * Confirmed against the running app: clicking the combobox opens a
    * SEPARATE popup dialog with a "Suggestions" listbox — clicking an
-   * option does not close it, and pressing Escape clears the selection
-   * instead of confirming it. Clicking the dialog's own heading (a
-   * neutral point outside the popup) closes it while keeping the pick.
+   * option does not close it.
+   *
+   * CORRECTED 2026-09-25 (CRM Sprint 4 regression pass): the previous
+   * close mechanism here (clicking the Notify Internally dialog's own
+   * heading) is NOT reliable once a second combobox's popup has also been
+   * opened in the same dialog session — confirmed directly: doing
+   * Managers-then-Executives that way threw a real Playwright timeout,
+   * the Executives popup's own option list rendered low enough to
+   * intercept the click meant for the heading. Pressing Escape instead
+   * closes either popup just as reliably and — confirmed directly,
+   * twice, immediately after an option click — does NOT clear the pick
+   * either (the selection's own "1" count and name chip stay in the
+   * dialog before and after Escape). Switched to Escape for both
+   * selectNotifyManager/selectNotifyExecutive so they compose safely in
+   * the same dialog session; still safe for the single-Manager shape the
+   * smoke test (`smoke-recent.spec.ts`) already exercises.
    */
   async selectNotifyManager(name: string): Promise<void> {
     await this.locators.notifyManagersCombobox.click();
     await this.page.getByRole('option', { name }).click();
-    await this.locators.notifyDialog.getByRole('heading', { name: 'Notify Internally' }).click();
+    await this.page.keyboard.press('Escape');
+  }
+
+  /** Selects one Executive in the Notify Internally dialog's multi-select — same shape/behavior as selectNotifyManager(). */
+  async selectNotifyExecutive(name: string): Promise<void> {
+    await this.locators.notifyExecutivesCombobox.click();
+    await this.page.getByRole('option', { name }).click();
+    await this.page.keyboard.press('Escape');
+  }
+
+  /**
+   * Types a query into an already-visible Notify Internally recipient
+   * combobox (Managers or Executives) and returns the option texts the
+   * typeahead currently shows, without picking one — used to probe
+   * whether external/non-internal queries ever surface any option (TC:5).
+   * Closes the popup with Escape afterward, same as the select* methods.
+   */
+  async queryNotifyRecipientOptions(combobox: Locator, query: string): Promise<string[]> {
+    await combobox.click();
+    await this.page.keyboard.type(query);
+    // Confirmed against the running app: the typeahead filter has a real,
+    // short debounce — reading options immediately after typing races it.
+    await this.page.waitForTimeout(600);
+    const options = await this.page.getByRole('option').allInnerTexts();
+    await this.page.keyboard.press('Escape');
+    return options;
+  }
+
+  /** Clicks Send notifications without asserting a toast — for the blocked, zero-recipient path (TC:4). */
+  async attemptSendNotifications(): Promise<void> {
+    await this.locators.sendNotificationsButton.click();
+  }
+
+  async expectNotifyValidationErrorVisible(): Promise<void> {
+    await expect(this.locators.notifyValidationError).toBeVisible();
   }
 
   /** Completes a send from an already-open Notify Internally dialog and waits for its toast. */
@@ -137,5 +184,15 @@ export class LogCommunicationPage extends BasePage {
 
   async expectDialogClosed(): Promise<void> {
     await expect(this.locators.dialog).toBeHidden();
+  }
+
+  async expectNotifyDialogClosed(): Promise<void> {
+    await expect(this.locators.notifyDialog).toBeHidden();
+  }
+
+  /** Opens the shell's in-app notifications bell/panel — shared across every CRM screen. */
+  async openNotificationsPanel(): Promise<void> {
+    await this.locators.notificationsBellButton.click();
+    await expect(this.locators.notificationsPanelOpenMarker).toBeVisible();
   }
 }

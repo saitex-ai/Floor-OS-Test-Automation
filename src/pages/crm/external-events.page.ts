@@ -58,6 +58,16 @@ export class ExternalEventsPage extends BasePage {
     await this.locators.submitButton.click();
   }
 
+  async cancel(): Promise<void> {
+    await this.locators.cancelButton.click();
+  }
+
+  /** SAITEX Attendees has no search/filter — confirmed a plain fixed-list pick. */
+  async selectAttendee(name: string): Promise<void> {
+    await this.locators.attendeesButton.click();
+    await this.locators.attendeeOption(name).click();
+  }
+
   async expectFieldError(message: string | RegExp): Promise<void> {
     await expect(this.page.getByText(message).first()).toBeVisible();
   }
@@ -272,5 +282,48 @@ export class ExternalEventsPage extends BasePage {
 
   async expectStatus(status: string): Promise<void> {
     await expect(this.page.getByText(status, { exact: false }).first()).toBeVisible();
+  }
+
+  // ---------------------------------------------------------------------
+  // Details/workspace — manually-created event (CRM Sprint 4 — "External
+  // Events [created by user manually] Details screen")
+  // ---------------------------------------------------------------------
+
+  async openOverviewTab(): Promise<void> {
+    await this.locators.overviewTabButton.click();
+  }
+
+  /**
+   * TC:1 — the Overview tab's own event fields + its "System" section
+   * (status, created/updated on/by). Checked against the whole tab body
+   * rather than per-field locators, matching this app's plain label/value
+   * block layout. Confirmed directly (2026-09-29, on the Log a
+   * Communication screen's own equivalent labels — the same component
+   * family): this label casing is NOT stable across runs — a CSS
+   * text-transform timing race can render it all-caps in one run, Title
+   * Case in another, on the identical screen — so these match
+   * case-insensitively rather than pinning to one literal casing.
+   */
+  async expectOverviewShows(fields: {
+    title: string;
+    venue: string;
+    about: string;
+    status: string;
+  }): Promise<void> {
+    const body = this.page.locator('main').last();
+    await expect(body).toContainText(fields.title);
+    await expect(body).toContainText(fields.venue);
+    await expect(body).toContainText(fields.about);
+    await expect(body).toContainText(/system/i);
+    await expect(body).toContainText(fields.status);
+    await expect(body).toContainText(/created on/i);
+    await expect(body).toContainText(/created by/i);
+    await expect(body).toContainText(/updated on/i);
+    await expect(body).toContainText(/updated by/i);
+  }
+
+  /** TC:4 — opens the event's own "Create Customer" lead-capture link from its Leads tab (pre-links eventId via query params). Does NOT complete the save — see class doc: the resulting form's "Origin" field is confirmed permanently disabled while still required, blocking Save through this entry point in this environment. */
+  async openCreateCustomerFromLeads(): Promise<void> {
+    await this.locators.createCustomerLeadLink.click();
   }
 }

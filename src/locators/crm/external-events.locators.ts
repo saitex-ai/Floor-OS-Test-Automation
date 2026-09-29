@@ -68,6 +68,42 @@ export const EXTERNAL_EVENTS_LIST_PATH = '/crm/events';
  *   required, confirmed via real validation errors ("Select at least
  *   one reason" / "Detailed reason is required"). Its confirm button
  *   reads "Proceed", not "Confirm".
+ *
+ * Also confirmed (2026-09-25) for Sprint 4's "Create External Event" and
+ * "External Events [created by user manually] Details screen" stories:
+ * - Every mandatory field (Title/Venue/Date/About/SAITEX Attendees/Score/
+ *   Number of Leads/all three Feedback Form free-text fields) shows its
+ *   own inline "Required" text on blank submit — SAITEX Attendees shows
+ *   "Select at least one attendee" instead.
+ * - Cancel navigates straight back to the List screen (`/crm/events`),
+ *   discarding whatever was typed — no confirmation prompt.
+ * - The SAITEX Attendees popup has NO search/filter input at all — just a
+ *   fixed, short `listbox` of 5 employees (Alice Planner, Banupriya
+ *   Palanivel, CRM Manager, SamuelRaj Suresh, Sathish Nagarajan), and
+ *   typing while it's open does not filter them. TC:5's "type to search"
+ *   premise does not hold — it's a plain pick-one-from-a-short-list.
+ * - A manually-created event has NO "Planning" tab at all (unlike an
+ *   AI-discovered one, which always shows one regardless of status) —
+ *   its tab bar is just Overview/Feedback Form/Leads (N). It is born
+ *   directly at status "Attended" (tagged "Created manually") because
+ *   the create form itself requires the full Feedback Form to be filled
+ *   in before it can even submit — there is no reachable "un-attended
+ *   manual event" state to test a lock, and no separate empty Feedback
+ *   Form to "complete" afterward: the tab immediately renders the
+ *   already-submitted answers read-only (no Edit button anywhere on it).
+ * - The Leads tab's "Scan & Create"/"Create Customer" affordances are
+ *   real `link`s (role `link`, NOT `button` — a common Playwright
+ *   locator trap), each a plain `<a href>` to the existing
+ *   `/crm/customers/scan`/`/crm/customers/new` routes with `eventId`/
+ *   `eventName`/`eventType` query params. Confirmed directly: the
+ *   resulting Create Customer form pre-locks CRM Stage to "Lead" and
+ *   Origin Type to "External Event" — but ALSO locks the still-required
+ *   "Origin" combobox in a permanently disabled state with no visible
+ *   way to satisfy it (confirmed after a 3s wait and inspecting its
+ *   `disabled` state directly), which blocks Save from ever succeeding
+ *   through this entry point. This is a genuine, confirmed app gap, not
+ *   a locator guess — see external-events.page.ts's class doc and
+ *   test-cases/crm/external-event-manual-details.md's Notes.
  */
 export class ExternalEventsLocators {
   readonly createEventButton: Locator;
@@ -90,6 +126,12 @@ export class ExternalEventsLocators {
   readonly planningTabButton: Locator;
   readonly feedbackFormTabButton: Locator;
   readonly leadsTabButton: Locator;
+
+  // Details/workspace — manually-created event (Sprint 4)
+  readonly overviewTabButton: Locator;
+  readonly scanCreateLink: Locator;
+  readonly createCustomerLeadLink: Locator;
+  readonly leadsEmptyStateMessage: Locator;
 
   // Decline ("Not Attending") modal
   readonly declineDialog: Locator;
@@ -138,6 +180,13 @@ export class ExternalEventsLocators {
     this.planningTabButton = page.getByRole('button', { name: 'Planning', exact: true });
     this.feedbackFormTabButton = page.getByRole('button', { name: 'Feedback Form', exact: true });
     this.leadsTabButton = page.getByRole('button', { name: /^Leads \(\d+\)$/ });
+
+    this.overviewTabButton = page.getByRole('button', { name: 'Overview', exact: true });
+    // Confirmed against the running app: these render as <a href> links,
+    // not buttons — role 'link' is required or the locator never matches.
+    this.scanCreateLink = page.getByRole('link', { name: 'Scan & Create' });
+    this.createCustomerLeadLink = page.getByRole('link', { name: 'Create Customer' });
+    this.leadsEmptyStateMessage = page.getByText('No customers created from this event yet.');
 
     this.declineDialog = page.getByRole('dialog', { name: /^Not Attending/ });
     this.declineReasonButton = this.declineDialog.getByRole('button', {
@@ -204,5 +253,10 @@ export class ExternalEventsLocators {
   /** A reason chip option in the decline modal's multi-select (e.g. "Travel constraints"). */
   declineReasonOption(name: string): Locator {
     return this.page.getByRole('option', { name, exact: true });
+  }
+
+  /** Every one of this form's inline "Required" errors — one per blank mandatory field. */
+  requiredFieldErrors(): Locator {
+    return this.page.getByText('Required', { exact: true });
   }
 }
