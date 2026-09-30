@@ -10,12 +10,6 @@ const CONTACTS_LIST_PATH = '/crm/contacts';
  *
  * Element locators live in ContactListLocators (`this.locators`) — this
  * class only holds flows/actions/assertions built on top of them.
- *
- * As of this writing, **both local and dev have zero contacts**
- * ("All 0" / "Linked 0" / "Unlinked 0", confirmed on both) — anything
- * that needs a real row (search matches, row-click navigation, linked
- * Customer navigation, inline editing) is blocked on seed data,
- * independent of anything in this file. See test-cases/crm/contact-list.md.
  */
 export class ContactListPage extends BasePage {
   readonly locators: ContactListLocators;

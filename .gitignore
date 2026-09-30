@@ -13,3 +13,7 @@ allure-report/
 *.log
 .DS_Store
 .claude/
+# Generated per-run scan fixtures (20-scan-create-customer-contact.spec.ts's
+# renderUniqueBusinessCardPdf()) — test-data/crm/sample-business-card.pdf
+# itself IS committed, just not these.
+test-data/crm/generated-business-card-*.pdf

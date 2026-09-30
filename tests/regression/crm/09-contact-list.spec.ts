@@ -9,14 +9,19 @@ import { test, expect } from '../../../src/fixtures/crm.fixtures';
  * state from auth.setup.ts is already applied via the "crm" project's
  * dependency — no login needed here.
  *
- * Both local and dev currently have **zero contacts** (confirmed:
- * "All 0" / "Linked 0" / "Unlinked 0" on both) — TC:2, TC:3, TC:9,
- * TC:10, TC:11 all need at least one real (and, for TC:10, linked)
- * contact to mean anything, and are written against best-effort
- * placeholder data with a TODO until that exists. TC:11 additionally
- * needs a Contact Details page object, which doesn't exist yet — out of
- * scope for this pass.
+ * TC:9 and TC:10 create a real Contact (and, for TC:10, a real linked
+ * Customer) rather than relying on seed data, confirmed against the
+ * running app (2026-09-23) — same reasoning as
+ * 17-contacts-tab-customer-details.spec.ts's own note on hardcoded
+ * seeded names. TC:11 is still skipped: it needs a Contact Details page
+ * object, which doesn't exist yet — out of scope for this pass.
  */
+
+/** Contact Name is validated "Alphabets only" — no digits allowed, so timestamps can't be used for uniqueness there. */
+function randomLetters(length = 8): string {
+  return Array.from({ length }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join('');
+}
+
 test.describe('CRM - Contact List', () => {
   test.beforeEach(async () => {
     await allure.epic('CRM');
@@ -197,15 +202,32 @@ test.describe('CRM - Contact List', () => {
 
   test('TC:9 Verify row selection navigates to Contact Details', async ({
     contactListPage,
+    createContactPage,
     page,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abt52h', 'TC:9 (ClickUp)');
+
+    // A real Contact — created fresh rather than relying on seed data (see
+    // 17-contacts-tab-customer-details.spec.ts's own note on why a
+    // hardcoded seeded name is unreliable). Contact Name is "Alphabets
+    // only" (confirmed — create-contact.locators.ts), so a random
+    // letters-only suffix, not a timestamp, keeps it unique.
+    const contactName = `Playwright Contact List Row ${randomLetters()}`;
+    await createContactPage.openFromContactList();
+    await createContactPage.fillProfile({
+      name: contactName,
+      designation: 'Buyer',
+      email: `pw-contact-list-row-${Date.now()}@example.com`,
+      city: 'Coimbatore',
+      country: 'India',
+    });
+    await createContactPage.save();
+    await expect(createContactPage.locators.toast).toBeVisible();
+
     await contactListPage.open();
 
-    // TODO(CRM QA): needs at least one real contact row — both
-    // environments currently have zero.
     await test.step('Select a contact row', async () => {
-      await contactListPage.selectContactRow('Existing Contact Name');
+      await contactListPage.selectContactRow(contactName);
     });
 
     await test.step('The Contact Details screen opens', async () => {
@@ -213,13 +235,52 @@ test.describe('CRM - Contact List', () => {
     });
   });
 
-  test('TC:10 Verify linked Customer navigation', async ({ contactListPage, page }) => {
+  test('TC:10 Verify linked Customer navigation', async ({
+    contactListPage,
+    createCustomerPage,
+    createContactPage,
+    page,
+  }) => {
     await allure.tms('https://app.clickup.com/t/z941abt52j', 'TC:10 (ClickUp)');
+
+    // A real Customer with a real linked Contact — same reasoning as TC:9.
+    const customerName = `Playwright Contact List Customer ${Date.now()}`;
+    await createCustomerPage.openFromCrmHome();
+    await createCustomerPage.fillProfile({
+      name: customerName,
+      email: `pw-contact-list-customer-${Date.now()}@example.com`,
+      city: 'Coimbatore',
+      country: 'India',
+      originType: 'Referral',
+      origin: 'Internal Referral',
+      buyer: 'Fabric',
+      referredBy: 'Jordan Smith',
+      crmStage: 'Lead',
+    });
+    await createCustomerPage.save();
+    if (await createCustomerPage.locators.duplicateWarningModal.isVisible().catch(() => false)) {
+      await createCustomerPage.locators.saveAnywayButton.click();
+    }
+    await createCustomerPage.expectSavedSuccessfully();
+    await createCustomerPage.locators.postSaveCancelButton.click();
+    await expect(page).toHaveURL(/\/crm\/customers\/[0-9a-f-]+$/);
+    const customerId = page.url().split('/').pop()!;
+
+    await createContactPage.openFromCustomerContext(customerId, customerName);
+    await createContactPage.fillProfile({
+      name: `Playwright Contact List Linked ${randomLetters()}`,
+      designation: 'Buyer',
+      email: `pw-contact-list-linked-${Date.now()}@example.com`,
+      city: 'Coimbatore',
+      country: 'India',
+    });
+    await createContactPage.save();
+    await expect(createContactPage.locators.toast).toBeVisible();
+
     await contactListPage.open();
 
-    // TODO(CRM QA): needs a contact row with a linked Customer.
     await test.step('Select a linked Customer from a contact row', async () => {
-      await contactListPage.selectLinkedCustomer('Existing Linked Customer');
+      await contactListPage.selectLinkedCustomer(customerName);
     });
 
     await test.step('The Customer Details screen opens for that Customer', async () => {
