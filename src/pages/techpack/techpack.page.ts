@@ -86,4 +86,57 @@ export class TechpackPage extends BasePage {
       .filter({ hasText: /^(Draft|Open|Approved)$/ })
       .allInnerTexts();
   }
+
+  /**
+   * All cell texts, in on-screen column order (including the leading,
+   * always-blank select-row checkbox cell at index 0), for one specific
+   * row found by its Techpack Code link. Pair with a
+   * `page.getByRole('columnheader').allInnerTexts()` read (same column
+   * order/count) to look up a specific column by its header label rather
+   * than a hardcoded index — the header set changes over time (see
+   * techpack-list.md's TC:18) and a hardcoded position would silently
+   * drift.
+   */
+  async rowCellTexts(techpackCode: string): Promise<string[]> {
+    const row = this.locators.rowLink(techpackCode).locator('xpath=ancestor::tr[1]');
+    return row.getByRole('cell').allInnerTexts();
+  }
+
+  /** The grid's column header labels, in display order. */
+  async columnHeaderTexts(): Promise<string[]> {
+    return (await this.locators.columnHeaders.allInnerTexts()).map((h) => h.trim());
+  }
+
+  /**
+   * Every visible row as `{ <column label>: <cell text> }`, for the given
+   * columns. The grid can briefly render a full page of blank skeleton cells
+   * with the right row count (seen on uat right after a CSV export), so this
+   * first waits for the first row's cell under `columns[0]` to have real text.
+   */
+  async visibleRows(columns: string[]): Promise<Record<string, string>[]> {
+    const headers = await this.columnHeaderTexts();
+    const index = columns.map((c) => headers.findIndex((h) => h === c || h.startsWith(c)));
+    const missing = columns.filter((_, i) => index[i] === -1);
+    if (missing.length) throw new Error(`Grid has no column(s): ${missing.join(', ')}`);
+    const first = index[0] ?? 0;
+    const rows = this.locators.bodyRows;
+    await expect
+      .poll(
+        async () => ((await rows.first().getByRole('cell').allInnerTexts())[first] ?? '').trim(),
+        {
+          timeout: 30_000,
+          message: 'grid still showing blank/skeleton row content',
+        },
+      )
+      .not.toBe('');
+    const out: Record<string, string>[] = [];
+    const count = await rows.count();
+    for (let r = 0; r < count; r++) {
+      const cells = await rows.nth(r).getByRole('cell').allInnerTexts();
+      out.push(
+        Object.fromEntries(columns.map((c, i) => [c, (cells[index[i] ?? -1] ?? '').trim()])),
+      );
+    }
+    return out;
+  }
 }

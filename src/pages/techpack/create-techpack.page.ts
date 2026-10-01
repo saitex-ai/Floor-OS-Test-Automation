@@ -3,6 +3,9 @@ import { BasePage } from '../base.page';
 import { MODULES } from '../../config/modules';
 import { CreateTechpackLocators } from '../../locators/techpack/create-techpack.locators';
 
+/** The server's real `techpackTypeCode` maxLength, from its own AJV error (TC:9). */
+export const TECHPACK_TYPE_CODE_MAX = 20;
+
 /**
  * "New Techpack" — Classic (manual form). Owned by the Techpack QA.
  *
@@ -111,12 +114,21 @@ export class CreateTechpackPage extends BasePage {
     const listbox = this.page.getByRole('listbox').last();
     const options = listbox.getByRole('option');
     await options.first().waitFor({ state: 'visible', timeout: 20_000 });
-    const count = await options.count();
-    const index = Math.floor(Math.random() * count);
-    const chosen = options.nth(index);
-    const text = await chosen.innerText();
-    await chosen.click();
-    return text;
+    const texts = await options.allInnerTexts();
+    // uat's Techpack Type master data holds codes over the server's 20-char
+    // limit (some real, some left by TC:9's bug repro) that Create always
+    // rejects — never pick those here; TC:9 covers that bug on purpose.
+    const usable = texts
+      .map((text, index) => ({ text, index }))
+      .filter(({ text }) =>
+        labelText !== 'Techpack Type*'
+          ? true
+          : (text.split('\n')[0] ?? '').trim().length <= TECHPACK_TYPE_CODE_MAX,
+      );
+    const pool = usable.length > 0 ? usable : texts.map((text, index) => ({ text, index }));
+    const pick = pool[Math.floor(Math.random() * pool.length)]!;
+    await options.nth(pick.index).click();
+    return pick.text;
   }
 
   /**
@@ -156,7 +168,8 @@ export class CreateTechpackPage extends BasePage {
     if (details.wash !== undefined) await this.selectComboboxOption('Wash*', details.wash);
     if (details.productType !== undefined)
       await this.selectComboboxOption('Product Type*', details.productType);
-    if (details.description !== undefined) await this.locators.descriptionTextarea.fill(details.description);
+    if (details.description !== undefined)
+      await this.locators.descriptionTextarea.fill(details.description);
   }
 
   /** Fills all 7 required combobox fields, each with whatever its first available option is. */
@@ -180,9 +193,12 @@ export class CreateTechpackPage extends BasePage {
    * this re-picks a different random Customer and checks again, up to 8
    * tries, rather than failing outright.
    */
-  async fillAllRequiredWithRandomAvailable(): Promise<Record<string, string>> {
+  async fillAllRequiredWithRandomAvailable(
+    skipLabels: readonly string[] = [],
+  ): Promise<Record<string, string>> {
     const picked: Record<string, string> = {};
     for (const label of REQUIRED_COMBOBOX_LABELS) {
+      if (skipLabels.includes(label)) continue;
       if (label === 'Season*') {
         let hasSeason = !(await this.comboboxHasNoOptions('Season*'));
         for (let attempt = 0; !hasSeason && attempt < 8; attempt++) {
@@ -253,6 +269,121 @@ export class CreateTechpackPage extends BasePage {
     throw new Error(
       `createExpectingResult: neither success nor duplicate after ${maxAttempts} attempts`,
     );
+  }
+
+  /**
+   * Opens a required combobox and types a search string into its own
+   * `[cmdk-input]` box — used to drive it to a "no match" state so its
+   * "Add new value" affordance appears. Doesn't assert the no-match text
+   * itself; callers that care can check `page.getByText('No <label>s
+   * match.')` right after.
+   */
+  /**
+   * Searches a combobox for an existing value whose name starts with `code`
+   * and picks it. Returns false (picking nothing) if no such option exists.
+   */
+  async selectExistingValue(labelText: string, code: string): Promise<boolean> {
+    await this.searchComboboxForNewValue(labelText, code);
+    const option = this.locators.comboboxOption(new RegExp(`^${code}`)).first();
+    const exists = await option
+      .waitFor({ state: 'visible', timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (exists) await option.click();
+    return exists;
+  }
+
+  async searchComboboxForNewValue(labelText: string, searchText: string): Promise<void> {
+    await this.locators.fieldTrigger(labelText).click();
+    const listbox = this.page.getByRole('listbox').last();
+    await listbox.waitFor({ state: 'visible', timeout: 20_000 });
+    const searchBox = this.page.locator('[cmdk-input], input[type="text"]').last();
+    await searchBox.fill(searchText);
+  }
+
+  /**
+   * Drives the Techpack Type combobox's "Add new value" dialog end to
+   * end (click the affordance, fill Code/Name, click Add) and classifies
+   * what actually happened:
+   *
+   * - `'blocked'` — the CORRECT/desired behavior per TC:9: the dialog
+   *   itself rejects the over-length code (stays open with a validation
+   *   error, or otherwise never saves it) before it can ever reach master
+   *   data.
+   * - `'accepted'` — the CONFIRMED BUG (2026-09-29, ClickUp z941abxb20):
+   *   the dialog has no client-side length check at all, closes, and
+   *   auto-selects the new (invalid) value into the field — a value that
+   *   is now permanently unusable, since the server's own 20-character
+   *   limit will reject it at Create with a raw, unformatted JSON error
+   *   (see `createOnceExpectingResult()`).
+   *
+   * Doesn't retry — this is a one-shot classification of the dialog's
+   * real current behavior, deliberately not the data-quality-workaround
+   * retry loop `createExpectingResult()` uses elsewhere in this file.
+   */
+  async addNewTechpackTypeValueExpectingResult(
+    code: string,
+    name: string,
+  ): Promise<'blocked' | 'accepted'> {
+    await this.locators.addNewValueButton.click();
+    await this.locators.addTechpackTypeDialog.waitFor({ state: 'visible', timeout: 10_000 });
+    await this.locators.addTechpackTypeCodeInput.fill(code);
+    await this.locators.addTechpackTypeNameInput.fill(name);
+    await this.locators.addTechpackTypeAddButton.click();
+    const accepted = await this.locators.addTechpackTypeDialog
+      .waitFor({ state: 'hidden', timeout: 8_000 })
+      .then(() => true)
+      .catch(() => false);
+    return accepted ? 'accepted' : 'blocked';
+  }
+
+  /**
+   * Fills the "Add techpack type" dialog with an over-length code and
+   * reports whether the dialog itself would stop it — WITHOUT clicking Add,
+   * so nothing is saved to master data (an earlier version of TC:9 clicked
+   * Add every run and left a permanently-invalid Techpack Type behind each
+   * time, which other tests' random picks then hit). Closes the dialog after.
+   */
+  async probeAddNewValueDialog(code: string, name: string): Promise<'blocked' | 'would-accept'> {
+    await this.locators.addNewValueButton.click();
+    await this.locators.addTechpackTypeDialog.waitFor({ state: 'visible', timeout: 10_000 });
+    await this.locators.addTechpackTypeCodeInput.fill(code);
+    await this.locators.addTechpackTypeNameInput.fill(name);
+    const keptLength = (await this.locators.addTechpackTypeCodeInput.inputValue()).length;
+    const addEnabled = await this.locators.addTechpackTypeAddButton.isEnabled();
+    const invalid =
+      (await this.locators.addTechpackTypeCodeInput.getAttribute('aria-invalid')) === 'true';
+    await this.page.keyboard.press('Escape');
+    await this.locators.addTechpackTypeDialog
+      .waitFor({ state: 'hidden', timeout: 5_000 })
+      .catch(() => {});
+    return keptLength <= TECHPACK_TYPE_CODE_MAX || !addEnabled || invalid
+      ? 'blocked'
+      : 'would-accept';
+  }
+
+  /**
+   * A one-shot (no-retry) variant of `createExpectingResult()` — clicks
+   * Create exactly once and classifies the result, including the raw
+   * AJV/JSON-Schema toast this file's own bug (TC:9, ClickUp z941abxb20)
+   * produces. Doesn't retry on that toast the way `createExpectingResult()`
+   * does, because TC:9 deliberately manufactures that exact condition and
+   * needs to observe it directly, not have it silently retried away with a
+   * fresh (valid) identity.
+   */
+  async createOnceExpectingResult(): Promise<'created' | 'raw-json-error' | 'other'> {
+    await this.create();
+    const outcome = await Promise.race([
+      this.locators.createButton
+        .waitFor({ state: 'hidden', timeout: 15_000 })
+        .then((): 'created' => 'created')
+        .catch(() => null),
+      this.locators.rawJsonErrorToast
+        .waitFor({ state: 'visible', timeout: 15_000 })
+        .then((): 'raw-json-error' => 'raw-json-error')
+        .catch(() => null),
+    ]);
+    return outcome ?? 'other';
   }
 
   /** Clicks Cancel and, if the form has unsaved input, confirms "Discard & leave". */
