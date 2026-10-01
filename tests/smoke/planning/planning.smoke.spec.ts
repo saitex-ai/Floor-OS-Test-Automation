@@ -37,7 +37,7 @@ test.describe('Planning module', () => {
     await calendarFormPage.expectCreatedSuccessfully(code);
   });
 
-  test('Create Work Centre: successful creation with the 5 required fields set', async ({
+  test('Create Work Centre: successful creation with the required fields set', async ({
     workCentresListPage,
     workCentreFormPage,
   }) => {

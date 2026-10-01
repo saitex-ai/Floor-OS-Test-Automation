@@ -6,6 +6,8 @@ export interface EmployeeFieldValues {
   fullName: string;
   /** Which real department to pick from the live-sourced picker — defaults to the first result shown. */
   department?: string | RegExp;
+  /** "Maintained by" — required since 2026-10-01; defaults to "By hand". */
+  maintainedBy?: string;
 }
 
 /**
@@ -32,9 +34,9 @@ export class EmployeeFormPage extends BasePage {
   }
 
   /**
-   * Fills the two required fields (Full Name, Department — both marked
-   * `*` on the real form; everything else, including "Maintained by",
-   * already carries a usable default). Department is a live-sourced,
+   * Fills the three required fields (Full Name, Department, Maintained by —
+   * all marked `*`; "Maintained by" became required with no default on dev,
+   * confirmed 2026-10-01). Department is a live-sourced,
    * searchable picker (see EmployeeFormLocators) — clicking it opens a
    * dialog whose options are plain buttons, picked directly rather than
    * typed into the search box for a happy-path pick.
@@ -43,7 +45,14 @@ export class EmployeeFormPage extends BasePage {
     await this.locators.fullName.fill(values.fullName);
 
     await this.locators.department.click();
-    await this.locators.departmentOption(values.department ?? /.+/).first().click();
+    await this.locators
+      .departmentOption(values.department ?? /.+/)
+      .first()
+      .click();
+
+    // Same picker-dialog shape as Department: "HR system (synchronised)" / "By hand".
+    await this.locators.maintainedBy.click();
+    await this.locators.departmentOption(values.maintainedBy ?? 'By hand').click();
   }
 
   async create(): Promise<void> {

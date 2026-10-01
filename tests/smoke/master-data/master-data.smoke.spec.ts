@@ -19,7 +19,7 @@ test.describe('Master Data module', () => {
     await masterDataPage.expectLoaded();
   });
 
-  test('Create Department: successful creation with one primary site', async ({
+  test('Create Department: successful creation with code, name and calendar', async ({
     departmentsListPage,
     departmentFormPage,
   }) => {
@@ -52,7 +52,7 @@ test.describe('Master Data module', () => {
     await employeeFormPage.expectCreatedSuccessfully();
   });
 
-  test('Create Site: successful creation with code and name only', async ({
+  test('Create Site: successful creation with code, name, country and timezone', async ({
     sitesListPage,
     siteFormPage,
   }) => {

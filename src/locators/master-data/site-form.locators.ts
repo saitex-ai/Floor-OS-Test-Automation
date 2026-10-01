@@ -29,4 +29,9 @@ export class SiteFormLocators {
     this.saveChangesButton = page.getByRole('button', { name: 'Save changes' });
     this.cancelButton = page.getByRole('button', { name: 'Cancel' });
   }
+
+  /** An option in the open Country/Timezone dropdown. */
+  option(name: string | RegExp): Locator {
+    return this.page.getByRole('option', { name });
+  }
 }

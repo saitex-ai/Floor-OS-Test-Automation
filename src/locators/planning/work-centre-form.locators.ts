@@ -26,6 +26,7 @@ export class WorkCentreFormLocators {
   readonly capacityMeasuredBy: Locator;
   readonly capacityUnit: Locator;
   readonly status: Locator;
+  readonly centreType: Locator;
   readonly createButton: Locator;
   readonly cancelButton: Locator;
 
@@ -40,6 +41,7 @@ export class WorkCentreFormLocators {
     });
     this.capacityUnit = page.getByRole('combobox', { name: 'Capacity unit', exact: true });
     this.status = page.getByRole('combobox', { name: 'Status', exact: true });
+    this.centreType = page.getByRole('combobox', { name: 'Centre type', exact: true });
     this.createButton = page.getByRole('button', { name: 'Create work centre' });
     this.cancelButton = page.getByRole('button', { name: 'Cancel' });
   }

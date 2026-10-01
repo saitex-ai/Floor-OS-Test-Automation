@@ -6,9 +6,9 @@ import { type Locator, type Page } from '@playwright/test';
  * edit, reached via a row's Edit action). No actions or assertions here,
  * see src/pages/master-data/department-form.page.ts for those.
  *
- * Locator trap confirmed live: `getByRole('combobox', { name: 'Site' })`
- * also matches "Role at this site" and "Calendar at this site" (substring
- * match) — every combobox here needs `exact: true`.
+ * Every combobox here uses `exact: true`: accessible names on this form
+ * overlap (e.g. "Role" vs "Department type"-style substrings), and a
+ * substring match picks the wrong field.
  */
 export class DepartmentFormLocators {
   readonly departmentCode: Locator;
@@ -17,10 +17,9 @@ export class DepartmentFormLocators {
   readonly defaultWorkingCalendar: Locator;
   readonly capacityMeasuredIn: Locator;
   readonly activeSwitch: Locator;
-  readonly addSiteButton: Locator;
-  readonly siteAtRow: Locator;
-  readonly roleAtSite: Locator;
-  readonly calendarAtSite: Locator;
+  readonly addFacilityButton: Locator;
+  readonly facilityAtRow: Locator;
+  readonly roleAtFacility: Locator;
   readonly createButton: Locator;
   readonly saveChangesButton: Locator;
   readonly cancelButton: Locator;
@@ -39,10 +38,10 @@ export class DepartmentFormLocators {
       exact: true,
     });
     this.activeSwitch = page.getByRole('switch', { name: 'Active' });
-    this.addSiteButton = page.getByRole('button', { name: 'Add site' });
-    this.siteAtRow = page.getByRole('combobox', { name: 'Site', exact: true });
-    this.roleAtSite = page.getByRole('combobox', { name: 'Role at this site', exact: true });
-    this.calendarAtSite = page.getByRole('combobox', { name: 'Calendar at this site', exact: true });
+    // "Operates at" sites became optional "Facility" rows (confirmed live on dev 2026-10-01).
+    this.addFacilityButton = page.getByRole('button', { name: 'Add facility' });
+    this.facilityAtRow = page.getByRole('combobox', { name: 'Facility', exact: true });
+    this.roleAtFacility = page.getByRole('combobox', { name: 'Role', exact: true });
     this.createButton = page.getByRole('button', { name: 'Create department' });
     this.saveChangesButton = page.getByRole('button', { name: 'Save changes' });
     this.cancelButton = page.getByRole('button', { name: 'Cancel' });

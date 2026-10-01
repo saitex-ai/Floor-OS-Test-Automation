@@ -7,6 +7,8 @@ export interface WorkCentreFieldValues {
   name: string;
   /** Live-sourced from the Departments master — defaults to "Sewing" (a real seeded department). */
   owningDepartment?: string | RegExp;
+  /** "Centre type" — required since 2026-10-01; defaults to "Sewing lines". */
+  centreType?: string | RegExp;
 }
 
 /**
@@ -35,9 +37,10 @@ export class WorkCentreFormPage extends BasePage {
   }
 
   /**
-   * Centre code + Name + the 5 fields confirmed live to actually block
-   * save (Owning department, What it is used for, How capacity is
-   * measured, Capacity unit, Status) — everything else on this 21-field
+   * Centre code + Name + the 6 fields confirmed live to actually block
+   * save (Owning department, What it is used for, Centre type — new and
+   * required since 2026-10-01 — How capacity is measured, Capacity unit,
+   * Status) — everything else on this form
    * form is genuinely optional or already has a usable default. "What it
    * is used for" is deliberately fixed to "Bulk" here, not made
    * configurable — picking "Subcontractor" makes "Confirmation time
@@ -50,6 +53,7 @@ export class WorkCentreFormPage extends BasePage {
 
     await this.pick(this.locators.owningDepartment, values.owningDepartment ?? 'Sewing');
     await this.pick(this.locators.usedFor, 'Bulk');
+    await this.pick(this.locators.centreType, values.centreType ?? 'Sewing lines');
     await this.pick(this.locators.capacityMeasuredBy, 'Time based');
     await this.pick(this.locators.capacityUnit, 'Minutes');
     await this.pick(this.locators.status, 'Active');
