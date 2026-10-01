@@ -357,8 +357,6 @@ test.describe('Techpack - Canvas Review (AI Mode)', () => {
       await aiModeCopilotPage.locators.openTechpackLink.click();
     }
     await page.waitForURL((url) => url.toString() !== startUrl, { timeout: 30_000 });
-    // An AI-created draft's canvas can take well over the default to settle.
-    await canvasPage.expectLoaded(60_000);
 
     // Confirmed live 2026-09-10 by reading an existing AI-created record's
     // toolbar (Creator "copilot"): these two actions ARE genuinely
@@ -369,7 +367,9 @@ test.describe('Techpack - Canvas Review (AI Mode)', () => {
     // sometimes unreliable (a pre-existing "Create draft" backend
     // flakiness, already documented for ai-mode.spec.ts's TC:7 — not a new
     // problem introduced here).
-    await expect(canvasPage.locators.reExtractButton).toBeVisible({ timeout: 20_000 });
+    // An AI-created draft's canvas (no "Techpack Details" tab, unlike a Classic
+    // one) can take well over the default to settle, so wait on the button itself.
+    await expect(canvasPage.locators.reExtractButton).toBeVisible({ timeout: 60_000 });
     await expect(canvasPage.locators.askAboutTechpackButton).toBeVisible();
   });
 });
