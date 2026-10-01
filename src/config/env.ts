@@ -6,7 +6,7 @@ import type { ModuleConfig } from './modules';
 // Types
 // ─────────────────────────────────────────────────────────────────────
 
-export type TestEnv = 'local' | 'dev';
+export type TestEnv = 'local' | 'dev' | 'uat';
 
 export interface ModuleCredentials {
   username: string;
@@ -35,12 +35,12 @@ function optional(name: string, fallback: string): string {
 /** Reads TEST_ENV, defaulting to "local"; rejects anything else outright. */
 function resolveTestEnv(): TestEnv {
   const raw = (process.env.TEST_ENV ?? 'local').toLowerCase();
-  if (raw !== 'local' && raw !== 'dev') {
+  if (raw !== 'local' && raw !== 'dev' && raw !== 'uat') {
     throw new Error(
-      `TEST_ENV must be "local" or "dev" (got "${raw}"). Run e.g. TEST_ENV=dev npm run test:crm`,
+      `TEST_ENV must be "local", "dev", or "uat" (got "${raw}"). Run e.g. TEST_ENV=dev npm run test:crm`,
     );
   }
-  return raw;
+  return raw as TestEnv;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -69,12 +69,13 @@ export const env = {
    * app-shell is the only app every module test talks to directly — it
    * owns auth and mounts every remote under its own routes. Local defaults
    * to the shell's Vite dev port (see floorOS docs/handbook/14-frontends.md);
-   * dev has no safe default and must be set explicitly.
+   * dev and uat have no safe default and must be set explicitly
+   * (DEV_APP_SHELL_URL / UAT_APP_SHELL_URL).
    */
   shellBaseUrl:
     testEnv === 'local'
       ? optional('LOCAL_APP_SHELL_URL', 'http://localhost:3100')
-      : required('DEV_APP_SHELL_URL'),
+      : required(`${testEnv.toUpperCase()}_APP_SHELL_URL`),
 };
 
 /**

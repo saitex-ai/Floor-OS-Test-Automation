@@ -84,22 +84,26 @@ export default defineConfig({
   // not insufficient headroom here. Reverted back to 60s now that the
   // actual bug is fixed; workers is also capped for dev below so this
   // shouldn't need raising again. Local keeps the same value for parity.
-  timeout: env.testEnv === 'dev' ? 60_000 : 30_000,
+  // uat is a shared remote environment with the same cold-start/network
+  // characteristics as dev (not a local server) — treat both the same,
+  // distinct only from local.
+  timeout: env.testEnv !== 'local' ? 60_000 : 30_000,
   expect: {
     // Same reasoning as the test timeout above — individual
-    // expect(...).toBeVisible() calls need more than 5s when dev's
+    // expect(...).toBeVisible() calls need more than 5s when dev/uat's
     // remote is slow to render, not just the overall test budget.
-    timeout: env.testEnv === 'dev' ? 15_000 : 5_000,
+    timeout: env.testEnv !== 'local' ? 15_000 : 5_000,
   },
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  // Dev is a shared, VPN-gated remote environment, not a local server — too
-  // many concurrent workers all logging in/loading modules at once is what
-  // triggered the gotoAuthenticated() timing bug above in the first place.
-  // Cap dev at 2 workers (matching CI) until that load is addressed on the
-  // dev side; local keeps full parallelism since there's no shared load.
-  workers: process.env.CI ? 2 : env.testEnv === 'dev' ? 2 : undefined,
+  // Dev/uat are shared, VPN-gated remote environments, not a local server —
+  // too many concurrent workers all logging in/loading modules at once is
+  // what triggered the gotoAuthenticated() timing bug above in the first
+  // place. Cap dev/uat at 2 workers (matching CI) until that load is
+  // addressed server-side; local keeps full parallelism since there's no
+  // shared load.
+  workers: process.env.CI ? 2 : env.testEnv !== 'local' ? 2 : undefined,
   reporter: [
     ['html', { open: 'never' }],
     ['list'],
