@@ -1,10 +1,16 @@
 import { test as base } from '@playwright/test';
 import { TechpackPage } from '../pages/techpack/techpack.page';
 import { CreateTechpackPage } from '../pages/techpack/create-techpack.page';
+import { AiModeCopilotPage } from '../pages/techpack/ai-mode-copilot.page';
+import { CanvasPage } from '../pages/techpack/canvas.page';
+import { ValidationRulesPage } from '../pages/techpack/validation-rules.page';
 
 interface TechpackFixtures {
   techpackPage: TechpackPage;
   createTechpackPage: CreateTechpackPage;
+  aiModeCopilotPage: AiModeCopilotPage;
+  canvasPage: CanvasPage;
+  validationRulesPage: ValidationRulesPage;
 }
 
 /**
@@ -19,6 +25,18 @@ export const test = base.extend<TechpackFixtures>({
 
   createTechpackPage: async ({ page }, use) => {
     await use(new CreateTechpackPage(page));
+  },
+
+  aiModeCopilotPage: async ({ page }, use) => {
+    await use(new AiModeCopilotPage(page));
+  },
+
+  canvasPage: async ({ page }, use) => {
+    await use(new CanvasPage(page));
+  },
+
+  validationRulesPage: async ({ page }, use) => {
+    await use(new ValidationRulesPage(page));
   },
 });
 

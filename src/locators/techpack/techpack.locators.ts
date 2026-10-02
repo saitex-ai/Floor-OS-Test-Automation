@@ -62,6 +62,14 @@ export class TechpackLocators {
   readonly classicMenuItem: Locator;
 
   readonly table: Locator;
+  readonly columnHeaders: Locator;
+  readonly bodyRows: Locator;
+
+  // Filters panel's rule-builder labels
+  readonly filterRulesLabel: Locator;
+  readonly filterAttributeLabel: Locator;
+  readonly filterOperatorContains: Locator;
+  readonly filterValuePlaceholder: Locator;
   readonly selectAllRowsCheckbox: Locator;
 
   constructor(private readonly page: Page) {
@@ -112,6 +120,13 @@ export class TechpackLocators {
     this.classicMenuItem = page.getByRole('menuitem', { name: /Classic/ });
 
     this.table = page.getByRole('table');
+    this.columnHeaders = page.getByRole('columnheader');
+    this.bodyRows = this.table.locator('tbody').getByRole('row');
+    this.filterRulesLabel = page.getByText('Rules', { exact: true });
+    this.filterAttributeLabel = page.getByText('Attribute');
+    this.filterOperatorContains = page.getByText('contains');
+    // A bare "Value" also matches grid column names ("Style Value Code", ...).
+    this.filterValuePlaceholder = page.getByText('Value...', { exact: true });
     this.selectAllRowsCheckbox = page.getByRole('checkbox', { name: 'Select all rows' });
   }
 
@@ -166,6 +181,11 @@ export class TechpackLocators {
   }
 
   /** Live count badge on a status tab's own locator, e.g. "Open 11" -> the "Open" tab. */
+  /** A status tab by its full accessible name, e.g. a translated "Mở 12". */
+  statusTabNamed(name: RegExp): Locator {
+    return this.page.getByRole('button', { name });
+  }
+
   statusTab(tab: 'All' | 'Draft' | 'Open' | 'Approved'): Locator {
     return {
       All: this.allTab,
