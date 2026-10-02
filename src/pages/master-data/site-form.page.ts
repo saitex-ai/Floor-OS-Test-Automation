@@ -5,6 +5,10 @@ import { SiteFormLocators } from '../../locators/master-data/site-form.locators'
 export interface SiteFieldValues {
   code: string;
   name: string;
+  /** Defaults to Vietnam. */
+  country?: string | RegExp;
+  /** Defaults to Asia/Ho_Chi_Minh. */
+  timezone?: string | RegExp;
 }
 
 /**
@@ -29,17 +33,25 @@ export class SiteFormPage extends BasePage {
   }
 
   /**
-   * Site code + Site name are the only two fields actually needed to
-   * save — confirmed live: Country, Timezone, Legal entities, and Links
-   * to other systems are all genuinely optional despite Country/Timezone
-   * visually looking required (matches this repo's own historical
-   * TC-CS-07 finding, filed as a bug: "Country/Timezone not enforced
-   * despite being required fields"). A save with none of those set
-   * succeeds and the new row shows "Not set" / "No entities" on the list.
+   * Site code, Site name, Country and Timezone. Country/Timezone are now
+   * enforced (confirmed live on dev 2026-10-01 — Create shows "Required"
+   * under both), fixing the earlier "Country/Timezone not enforced"
+   * finding. Legal entities and Links to other systems stay optional.
    */
   async fillRequired(values: SiteFieldValues): Promise<void> {
     await this.locators.siteCode.fill(values.code);
     await this.locators.siteName.fill(values.name);
+
+    await this.locators.country.click();
+    await this.locators
+      .option(values.country ?? /^VN — /)
+      .first()
+      .click();
+    await this.locators.timezone.click();
+    await this.locators
+      .option(values.timezone ?? /Ho_Chi_Minh|Saigon/)
+      .first()
+      .click();
   }
 
   async create(): Promise<void> {

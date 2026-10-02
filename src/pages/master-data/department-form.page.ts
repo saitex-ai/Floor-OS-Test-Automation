@@ -5,8 +5,8 @@ import { DepartmentFormLocators } from '../../locators/master-data/department-fo
 export interface DepartmentFieldValues {
   code: string;
   name: string;
-  /** Which "Operates at" site to pick — defaults to the first real option. */
-  site?: string | RegExp;
+  /** Optional facility row to add (Role defaults to "Home facility"). Omitted by default. */
+  facility?: string | RegExp;
   /** "Default working calendar" is required — defaults to the first real option. */
   calendar?: string | RegExp;
 }
@@ -33,26 +33,28 @@ export class DepartmentFormPage extends BasePage {
   }
 
   /**
-   * Fills the fields needed for a real save: code, name, one "Operates at"
-   * site row (required — the form blocks save with "At least one site is
-   * required" otherwise, confirmed live), and Default working calendar
-   * (also required — confirmed live via the "Required" inline error it
-   * shows if left unset, not obvious from the field list alone). Leaves
-   * Department type / Capacity measured in / Active on their own defaults
-   * (Internal / Line / Yes) since nothing in this flow needs them changed.
+   * Fills the fields needed for a real save: code, name and Default working
+   * calendar (required — shows a "Required" inline error if unset). The old
+   * required "Operates at" site row is now an optional "Facility" row —
+   * confirmed live on dev 2026-10-01 that a department saves without one —
+   * so it's only added when `facility` is given. Leaves Department type /
+   * Capacity measured in / Active on their defaults (Internal / Line / Yes).
    */
   async fillRequired(values: DepartmentFieldValues): Promise<void> {
     await this.locators.departmentCode.fill(values.code);
     await this.locators.departmentName.fill(values.name);
 
-    await this.locators.addSiteButton.click();
-    await this.locators.siteAtRow.click();
-    await this.locators.option(values.site ?? /.+/).first().click();
-    // "Role at this site" already defaults to "Primary (home site)" once a
-    // site row exists — no need to touch it for a single-site happy path.
+    if (values.facility) {
+      await this.locators.addFacilityButton.click();
+      await this.locators.facilityAtRow.click();
+      await this.locators.option(values.facility).first().click();
+    }
 
     await this.locators.defaultWorkingCalendar.click();
-    await this.locators.option(values.calendar ?? /.+/).first().click();
+    await this.locators
+      .option(values.calendar ?? /.+/)
+      .first()
+      .click();
   }
 
   async create(): Promise<void> {
