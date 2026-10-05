@@ -67,7 +67,7 @@ test.describe('Techpack - Canvas Multi-User Presence', () => {
     const second = secondUserCredentials('TECHPACK');
     test.skip(
       !second,
-      'Needs a second, non-admin login: set TECHPACK_SECOND_USER_<ENV> / TECHPACK_SECOND_PASSWORD_<ENV> (e.g. bob on dev; none exists on uat)',
+      'Needs a second, non-admin login: set TECHPACK_SECOND_USER_<ENV> / TECHPACK_SECOND_PASSWORD_<ENV> (e.g. bob, Qc-lead)',
     );
     if (!second) return;
 

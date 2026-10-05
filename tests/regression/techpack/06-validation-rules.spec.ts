@@ -26,14 +26,11 @@ import { ValidationRulesPage } from '../../../src/pages/techpack/validation-rule
  * EVERLANE-INTERLINING-COLOR-DARK, for TC:22 specifically (see there).
  *
  * **Environment split.** Everything runs as alice on uat (the primary
- * target). TC:26/TC:28/TC:29 need a second, non-Admin login (bob, Qc-lead),
- * which only exists on dev — uat has no working bob account (same gap as
- * 05-multi-user-presence.spec.ts TC:2, see multi-user-presence.md). Rather
- * than let those three hang on a login that can never succeed, they skip
- * cleanly unless TECHPACK_SECOND_USER_<ENV> / TECHPACK_SECOND_PASSWORD_<ENV>
- * are set (bob's login, on dev). They use only the `browser` fixture (never
- * alice's `page`), so they can be run on dev with `--no-deps` without
- * touching .auth/techpack.json.
+ * target). TC:26/TC:28/TC:29 need a second, non-Admin login (bob, Qc-lead,
+ * working on both dev and uat since 2026-10-05) and skip cleanly unless
+ * TECHPACK_SECOND_USER_<ENV> / TECHPACK_SECOND_PASSWORD_<ENV> are set. They
+ * use only the `browser` fixture (never alice's `page`), so they can run
+ * with `--no-deps` without touching .auth/techpack.json.
  */
 
 const RUN_ID = Date.now();
@@ -745,25 +742,14 @@ test.describe('Techpack - Validation Rules', () => {
     });
   });
 
-  // ─── TC:27: no UI path exists ───
+  // ─── Non-Admin (bob, Qc-lead) ───
 
-  test('TC:27 [Not yet confirmed] Origin of the "Suggested" status', async () => {
-    test.skip(
-      true,
-      'No user-facing way to create a Suggested rule exists — "New rule" only ever creates Drafts ' +
-        '("New rules are created as drafts"), and Suggested has sat at 0 on every session. Likely a ' +
-        'system/AI-generated state; nothing to drive here without fabricating one. See validation-rules.md.',
-    );
-  });
-
-  // ─── Non-Admin (bob, Qc-lead) — dev only ───
-
-  test.describe('Non-Admin role (bob, Qc-lead) — dev only', () => {
+  test.describe('Non-Admin role (bob, Qc-lead)', () => {
     const second = secondUserCredentials('TECHPACK');
     test.beforeEach(() => {
       test.skip(
         !second,
-        `Needs a second, non-admin login: set TECHPACK_SECOND_USER_${env.testEnv.toUpperCase()} / TECHPACK_SECOND_PASSWORD_${env.testEnv.toUpperCase()} (bob on dev; none exists on uat)`,
+        `Needs a second, non-admin login: set TECHPACK_SECOND_USER_${env.testEnv.toUpperCase()} / TECHPACK_SECOND_PASSWORD_${env.testEnv.toUpperCase()} (e.g. bob, Qc-lead)`,
       );
     });
     const loginAsSecondUser = (browser: Browser) =>

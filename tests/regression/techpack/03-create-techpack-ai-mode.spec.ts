@@ -144,16 +144,16 @@ test.describe('Techpack - New Techpack (AI Mode)', () => {
     });
   });
 
-  test.describe('Copilot session-sensitive flow (TC:5-8)', () => {
-    // TC:7 and TC:8 both drive the copilot as the same stored user across a
-    // full upload/fill/create sequence; letting Playwright's fullyParallel
+  test.describe('Copilot session-sensitive flow (TC:5, TC:6, TC:8)', () => {
+    // TC:5, TC:6 and TC:8 drive the copilot as the same stored user through
+    // upload/fill/create; letting Playwright's fullyParallel
     // config (2 workers on dev/uat) run these in different workers races
     // the same backend copilot session — confirmed live as the source of
     // intermittent, hard-to-reproduce "I couldn't create the draft"
     // failures unrelated to either test's own logic. Scoped to just this
     // nested block (not the whole file) so a failure here doesn't cascade
     // into skipping TC:9/TC:10, which don't touch the copilot session at
-    // all and have no reason to depend on TC:5-8's outcome.
+    // all and have no reason to depend on this block's outcome.
     test.describe.configure({ mode: 'serial' });
 
     test('TC:5 Verify uploading a valid file surfaces "Start extraction", then the 7 required fields', async ({
@@ -224,19 +224,6 @@ test.describe('Techpack - New Techpack (AI Mode)', () => {
       await test.step('Now enabled, without ever touching Sample Request', async () => {
         await aiModeCopilotPage.expectCreateDraftEnabled();
       });
-    });
-
-    test('TC:7 Verify the duplicate-identity check applies in AI Mode too', async () => {
-      // Deliberately skipped: this needs "Create draft" to actually succeed
-      // at least once to establish a real identity to collide with, and
-      // TC:8 (below) confirms live that it currently never does — every
-      // attempt silently resets instead. There is no way to reach the
-      // duplicate-identity message while that holds. Revisit once TC:8
-      // passes again.
-      test.skip(
-        true,
-        'Blocked on TC:8: "Create draft" currently never succeeds in AI Mode (silently resets), so no identity can ever be established to collide with — see test-cases/techpack/create-techpack-ai-mode.md',
-      );
     });
 
     test('TC:8 Verify successful draft creation with all required fields filled', async ({
