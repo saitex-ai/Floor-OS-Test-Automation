@@ -15,7 +15,10 @@ export class SpinningLocators {
   readonly laydownTab: Locator;
   readonly yarnOutputTab: Locator;
 
-  // Mixing orders tab → "New mixing order" card (starts at 60% / 40%)
+  // Mixing orders tab → "New mixing order" button, opens a popup (was an
+  // always-visible card before the 2026-09 mill UI redesign; the default
+  // view now shows the most recent real order's own recipe instead).
+  readonly newMixingOrderButton: Locator;
   readonly firstRecipeUnitSelect: Locator;
   readonly secondRecipeUnitSelect: Locator;
   readonly firstRecipeShareInput: Locator;
@@ -35,6 +38,7 @@ export class SpinningLocators {
     this.laydownTab = page.getByRole('tab', { name: /^Laydown/ });
     this.yarnOutputTab = page.getByRole('tab', { name: /^Yarn output/ });
 
+    this.newMixingOrderButton = page.getByRole('button', { name: /New mixing order/i });
     this.firstRecipeUnitSelect = page.getByLabel('Recipe line 1 cotton unit');
     this.secondRecipeUnitSelect = page.getByLabel('Recipe line 2 cotton unit');
     this.firstRecipeShareInput = page.getByLabel('Recipe line 1 share');

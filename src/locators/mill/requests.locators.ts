@@ -5,29 +5,33 @@ import { type Locator, type Page } from '@playwright/test';
  * (/mill/requests) — no actions or assertions here, see
  * src/pages/mill/requests.page.ts for those.
  *
- * An approver (mill:requests:approve) sees Approvals (default) / New
- * request / Direct transfer / Receive goods; everyone else sees New
- * request / Receive goods / My requests. "Cleared" is not a tab — it's
- * a caption over the archive list inside Approvals (or My requests).
+ * Since the 2026-09 redesign, an approver (mill:requests:approve) sees
+ * Approvals (default) / Direct transfer tabs, with "New request" and
+ * "Receive goods" as buttons that open a popup dialog — not tabs. The
+ * Approvals tab shows a single unified list of requests (Request /
+ * Status / For / Transfer to / Raised columns); there is no separate
+ * "Cleared" archive.
  */
 export class RequestsLocators {
   readonly heading: Locator;
 
   // Tabs
   readonly approvalsTab: Locator;
-  readonly newRequestTab: Locator;
-  readonly receiveGoodsTab: Locator;
+  readonly directTransferTab: Locator;
 
-  // New request tab — each source ("From Cotton", "From Spinning", ...)
-  // is its own region with its own material picker, quantity and Add.
+  // Opens the "New request" popup dialog
+  readonly newRequestButton: Locator;
+  readonly newRequestDialog: Locator;
+
+  // New request dialog — the single "From {source}" region for the
+  // chosen department's own upstream source, with its own material
+  // picker (a searchable combobox, not a native <select>), quantity and
+  // Add button.
   readonly requestMaterialsCard: Locator;
   readonly requestingDepartmentSelect: Locator;
   readonly sourceRegions: Locator;
   readonly nothingToPull: Locator;
   readonly valueAboveZeroHint: Locator;
-
-  // Approvals tab — archive rows under "Cleared", e.g. "Fulfilled REQ-2026-000019 …"
-  readonly clearedRows: Locator;
 
   readonly toast: Locator;
 
@@ -35,8 +39,10 @@ export class RequestsLocators {
     this.heading = page.getByRole('heading', { level: 1, name: 'Goods request & approval' });
 
     this.approvalsTab = page.getByRole('tab', { name: /^Approvals/ });
-    this.newRequestTab = page.getByRole('tab', { name: /^New request/ });
-    this.receiveGoodsTab = page.getByRole('tab', { name: /^Receive goods/ });
+    this.directTransferTab = page.getByRole('tab', { name: /^Direct transfer/ });
+
+    this.newRequestButton = page.getByRole('button', { name: /^New request/i });
+    this.newRequestDialog = page.getByRole('dialog');
 
     this.requestMaterialsCard = page.getByRole('heading', { name: /^Request materials for / });
     this.requestingDepartmentSelect = page.getByLabel('Requesting department');
@@ -44,15 +50,16 @@ export class RequestsLocators {
     this.nothingToPull = page.getByText('Nothing to pull right now');
     this.valueAboveZeroHint = page.getByText('Enter a value above zero.');
 
-    this.clearedRows = page.getByRole('button', {
-      name: /^(Fulfilled|Rejected|Closed short|In transit) REQ-/,
-    });
-
     this.toast = page.locator('[data-sonner-toast]');
   }
 
-  /** The "From {source}" region on the New request tab. */
+  /** The "From {source}" region on the New request popup. */
   sourceRegion(source: string): Locator {
     return this.page.getByRole('region', { name: `From ${source}` });
+  }
+
+  /** The cmdk search popover's option rows, opened by a source region's material combobox. */
+  get materialOptions(): Locator {
+    return this.page.locator('[cmdk-item]');
   }
 }

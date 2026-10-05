@@ -20,6 +20,12 @@ export class RequestsPage extends MillScreenPage {
     return this.locators.heading;
   }
 
+  /** Opens the "New request" popup dialog from wherever it is on this screen. */
+  async openNewRequestForm(): Promise<void> {
+    await this.locators.newRequestButton.click();
+    await expect(this.locators.newRequestDialog).toBeVisible();
+  }
+
   /**
    * Only a raise-any user (e.g. a stores admin) sees "Requesting
    * department", and on dev it starts with nothing applied ("Request
@@ -36,28 +42,27 @@ export class RequestsPage extends MillScreenPage {
   }
 
   /**
-   * The first "From {source}" region on the New request tab that has
-   * something to pull, skipping Cotton (its By weight / By bales toggle
-   * makes it the odd one out). Returns null if nothing is pullable.
+   * The "From {source}" region for the chosen department's upstream
+   * source — there is just the one per department since the redesign
+   * (e.g. Preparation only pulls from Spinning). Returns null if nothing
+   * is pullable right now ("Nothing to pull right now").
    */
   async firstPullableSource(): Promise<Locator | null> {
     await expect(this.locators.requestMaterialsCard).toBeVisible();
-    // The source regions render after the card heading — wait for them (or
-    // the empty state) before listing, since all() doesn't wait.
     await expect(this.locators.sourceRegions.first().or(this.locators.nothingToPull)).toBeVisible();
-    const regions = await this.locators.sourceRegions.all();
-    for (const region of regions) {
-      const name = (await region.getAttribute('aria-label')) ?? '';
-      if (name === 'From Cotton') continue;
-      const options = await region.getByRole('combobox').first().locator('option').count();
-      if (options > 1) return region;
-    }
-    return null;
+    if (await this.locators.nothingToPull.isVisible()) return null;
+    return this.locators.sourceRegions.first();
   }
 
-  /** Picks the first unit in `source`'s picker and types a quantity — without pressing Add. */
+  /**
+   * Picks the first unit in `source`'s searchable-combobox material
+   * picker (a popup list of "{code} · {batch} · {qty} available" rows,
+   * not a native <select>), then overwrites the quantity it auto-fills
+   * with the full available amount.
+   */
   async enterFirstUnit(source: Locator, quantity: string): Promise<void> {
-    await source.getByRole('combobox').first().selectOption({ index: 1 });
+    await source.getByRole('combobox').first().click();
+    await this.locators.materialOptions.first().click();
     await source.getByRole('textbox').first().fill(quantity);
   }
 

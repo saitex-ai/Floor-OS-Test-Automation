@@ -21,6 +21,16 @@ export class SpinningPage extends MillScreenPage {
     return this.locators.heading;
   }
 
+  /**
+   * Opens the "New mixing order" form — a popup since the mill UI
+   * redesign (2026-09), not an always-visible card on the Mixing
+   * orders tab as it was before. Recipe line fields only exist once
+   * this is open.
+   */
+  async openNewMixingOrderForm(): Promise<void> {
+    await this.locators.newMixingOrderButton.click();
+  }
+
   /** Picks the `index`-th open cotton unit for a recipe line (form state only). */
   async pickRecipeUnit(unitPicker: Locator, index: number): Promise<void> {
     await unitPicker.click();

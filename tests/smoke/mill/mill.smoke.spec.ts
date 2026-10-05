@@ -79,6 +79,10 @@ test.describe('Fabric Mill Smoke', () => {
       const l = spinningPage.locators;
       await spinningPage.openViaNav();
       await spinningPage.selectTab(l.mixingOrdersTab);
+      // "New mixing order" is a popup since the redesign (2026-09) — the
+      // Mixing orders tab now shows the most recent real order's own
+      // recipe by default, not an always-visible blank form.
+      await spinningPage.openNewMixingOrderForm();
       // Shares only count once a line has a cotton unit. Pick two distinct
       // units (form state only — Create order is never pressed), then drop
       // line 1 from 60% to 50% so the recipe totals 90%.
@@ -100,13 +104,17 @@ test.describe('Fabric Mill Smoke', () => {
   });
 
   test.describe('Preparation', () => {
-    test('SM-MILL-05: Preparation loads with Create dye-lot, Scan yarn, Load beams and Orders tabs', async () => {
+    test('SM-MILL-05: Preparation loads with Scan yarn, Load beams and Orders tabs', async () => {
       const l = prepPage.locators;
       await prepPage.openViaNav();
-      await expect(l.createDyeLotTab).toHaveAttribute('aria-selected', 'true');
-      await expect(l.scanYarnTab).toBeVisible();
+      // Since the 2026-09 redesign, Scan yarn is the default tab and
+      // "Create dye-lot" is no longer one of the three tabs — it moved to
+      // a per-order button on the Orders tab.
+      await expect(l.scanYarnTab).toHaveAttribute('aria-selected', 'true');
       await expect(l.loadBeamsTab).toBeVisible();
       await expect(l.ordersTab).toBeVisible();
+      await prepPage.selectTab(l.ordersTab);
+      await expect(l.createDyeLotButton.first()).toBeVisible();
     });
 
     test('SM-MILL-06: Scan yarn — an empty scan sheet cannot be committed', async () => {
@@ -194,21 +202,23 @@ test.describe('Fabric Mill Smoke', () => {
   });
 
   test.describe('Goods request & approval', () => {
-    test('SM-MILL-13: Goods requests loads with Approvals and New request tabs for a stores approver', async () => {
+    test('SM-MILL-13: Goods requests loads with Approvals default and a New request action for a stores approver', async () => {
       const l = requestsPage.locators;
       await requestsPage.openViaNav();
+      // "New request" and "Receive goods" are popup-opening buttons since
+      // the redesign (2026-09), not tabs — see RequestsLocators.
       await expect(l.approvalsTab).toHaveAttribute('aria-selected', 'true');
-      await expect(l.newRequestTab).toBeVisible();
-      await expect(l.clearedRows.first()).toBeVisible();
+      await expect(l.directTransferTab).toBeVisible();
+      await expect(l.newRequestButton).toBeVisible();
     });
 
     test('SM-MILL-14: New request refuses a zero quantity', async () => {
       const l = requestsPage.locators;
       await requestsPage.openViaNav();
-      await requestsPage.selectTab(l.newRequestTab);
+      await requestsPage.openNewRequestForm();
       await requestsPage.chooseRequestingDepartment('Preparation');
       const source = await requestsPage.firstPullableSource();
-      test.skip(!source, 'Nothing on dev is pullable from any non-cotton source');
+      test.skip(!source, 'Nothing on dev is pullable for Preparation');
       await requestsPage.enterFirstUnit(source!, '0');
       await expect(l.valueAboveZeroHint).toBeVisible();
       await expect(requestsPage.addButton(source!)).toBeDisabled();
