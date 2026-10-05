@@ -19,22 +19,73 @@ function randomLetters(length = 6): string {
  * typed into a `fillProfile()` call because this data has to arrive via a
  * scan.
  *
- * The Contact NAME stays the fixed, realistic "Jordan Ecclestone" —
- * confirmed directly that this is NOT what needs to vary (the duplicate
- * check is keyed on email, not name), and that varying it to something
- * random/gibberish backfires: the vision model has its own confidence
- * check and will read a realistic name reliably but reject an implausible
- * one as untrustworthy ("N values were read but could not be trusted, so
- * they were left out"), leaving Contact Name/Email blank and failing
- * mandatory-field validation instead of the save this is meant to prove.
+ * CORRECTED (2026-10-05): the Contact NAME also needs to vary per run,
+ * not just stay fixed as "Jordan Ecclestone" — confirmed directly that
+ * reusing one fixed name (alongside a fixed-enough company name/address)
+ * across this session's many real runs eventually surfaces the SAME
+ * "linked with existing Customer" smart-match dialog TC:8's own doc
+ * already found for the Company name, even after varying company/
+ * address — a genuinely fixed Contact name is itself still a collision
+ * vector. Picked from a small pool of plausible real full names instead
+ * of one fixed value or random/gibberish: a gibberish name backfires,
+ * since the vision model has its own confidence check and will read a
+ * realistic name reliably but reject an implausible one as untrustworthy
+ * ("N values were read but could not be trusted, so they were left
+ * out"), leaving Contact Name/Email blank and failing mandatory-field
+ * validation instead of the save this is meant to prove.
  *
  * Built with Playwright's own headless Chromium (`page.pdf()`, which only
  * works headless) rather than the shared test's own `page` fixture, so
  * this works regardless of whether the suite itself runs headed.
  */
+/**
+ * A small pool of realistic-sounding company name prefixes — confirmed
+ * directly (2026-10-05) that the Customer name also needs to vary per
+ * run, not just the Contact's email: reusing a fixed "Meridian Apparel
+ * Group" across many real saves means a LATER run's scan finds that
+ * earlier run's own Customer already exists and links the Contact to it
+ * instead of creating a new one (a real, confirmed smart-match behavior,
+ * surfaced as a differently-worded success dialog — see
+ * ScanCreatePage.expectSavedSuccessfully()'s class doc) — which defeats
+ * any TC whose whole point is proving a NEW Customer gets created. A
+ * random/gibberish company name risks the same vision-model distrust
+ * already confirmed for Contact Name (see this function's own doc below),
+ * so this picks from a small set of plausible real-sounding names instead
+ * of generating gibberish.
+ */
+const COMPANY_NAME_PREFIXES = [
+  'Meridian',
+  'Highland',
+  'Cascade',
+  'Summit',
+  'Pacific',
+  'Lakeside',
+  'Northgate',
+  'Ironwood',
+];
+const COMPANY_NAME_SUFFIXES = ['Apparel Group', 'Garment Works', 'Textiles Co.', 'Apparel Partners'];
+const CONTACT_NAME_POOL = [
+  'Jordan Ecclestone',
+  'Morgan Whitfield',
+  'Avery Lindqvist',
+  'Dakota Marchetti',
+  'Reese Kowalski',
+  'Emerson Delacroix',
+];
+
 async function renderUniqueBusinessCardPdf(): Promise<{ filePath: string; contactName: string }> {
-  const contactName = 'Jordan Ecclestone';
+  const contactName = CONTACT_NAME_POOL[Math.floor(Math.random() * CONTACT_NAME_POOL.length)]!;
   const suffix = randomLetters(8);
+  const companyPrefix = COMPANY_NAME_PREFIXES[Math.floor(Math.random() * COMPANY_NAME_PREFIXES.length)]!;
+  const companySuffix =
+    COMPANY_NAME_SUFFIXES[Math.floor(Math.random() * COMPANY_NAME_SUFFIXES.length)]!;
+  const companyName = `${companyPrefix} ${companySuffix}`;
+  // Confirmed directly (2026-10-05): a company name alone wasn't enough
+  // to avoid dev's "linked with existing Customer" smart-match path even
+  // across a 32-combination name pool — varying the street number too,
+  // since the Company Address line was otherwise identical on every
+  // generated card.
+  const streetNumber = 100 + Math.floor(Math.random() * 900);
   const filePath = `test-data/crm/generated-business-card-${suffix}.pdf`;
 
   const browser = await chromium.launch();
@@ -45,11 +96,14 @@ async function renderUniqueBusinessCardPdf(): Promise<{ filePath: string; contac
         <body style="font-family: Arial, sans-serif; padding: 40px; width: 500px;">
           <h1 style="margin: 0 0 4px 0; font-size: 24px;">${contactName}</h1>
           <div style="font-size: 16px; color: #333; margin-bottom: 16px;">Senior Buyer</div>
-          <div style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">Meridian Apparel Group</div>
+          <div style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">${companyName}</div>
           <div style="font-size: 14px; line-height: 1.8;">
-            <div>Email: jordan.ecclestone.${suffix}@meridianapparel.example</div>
+            <div>Email: jordan.ecclestone.${suffix}@${companyPrefix.toLowerCase()}apparel.example</div>
             <div>Phone: +1 415 555 0148</div>
             <div>San Francisco, United States</div>
+          </div>
+          <div style="font-size: 13px; line-height: 1.6; margin-top: 12px; color: #555;">
+            Company Address: ${streetNumber} Mission Street, San Francisco, United States
           </div>
         </body>
       </html>
@@ -112,10 +166,17 @@ test.describe('CRM - Scan&Create Customer/Contact', () => {
     // (confirmed: cuts startScan()'s own wait off early) — set explicitly.
     test.setTimeout(180_000);
 
+    // Switched from the static SAMPLE_SCAN_FILE_PATH (2026-10-05): that
+    // fixture's single ambiguous city line gave the vision model no clear
+    // signal to populate Customer City separately from Contact City,
+    // confirmed by two consecutive real failures on that one field.
+    // renderUniqueBusinessCardPdf()'s card has an explicit, separate
+    // "Company Address" line for exactly this reason.
+    const { filePath } = await renderUniqueBusinessCardPdf();
     await scanCreatePage.openFromCustomersList();
 
     await test.step('Upload a file and start the scan', async () => {
-      await scanCreatePage.uploadFile(SAMPLE_SCAN_FILE_PATH);
+      await scanCreatePage.uploadFile(filePath);
       await scanCreatePage.startScan();
     });
 
@@ -181,6 +242,10 @@ test.describe('CRM - Scan&Create Customer/Contact', () => {
 
     await test.step('Confirm/complete mandatory fields left blank by the scan', async () => {
       await scanCreatePage.fillCustomerProfile({ email: `pw-scan-${Date.now()}@example.com` });
+      // Confirmed directly: the vision model's confidence check can leave
+      // EITHER email blank, not reliably always Customer's — see
+      // fillContactEmailIfMissing()'s class doc.
+      await scanCreatePage.fillContactEmailIfMissing(`pw-scan-contact-${Date.now()}@example.com`);
       // Confirmed against the running app: no Customer Management option
       // is seeded consistently enough to hardcode — the first available
       // option in each dropdown is picked instead (mirrors how the real
@@ -197,14 +262,16 @@ test.describe('CRM - Scan&Create Customer/Contact', () => {
       if (await scanCreatePage.locators.duplicateWarningModal.isVisible().catch(() => false)) {
         await scanCreatePage.locators.saveAnywayButton.click();
       }
+      // Confirmed against the running app (2026-10-05): there is no
+      // "Creation Method" system field (FR-9's premise) — no toast either
+      // anymore (see ScanCreatePage's class doc). The real, closest
+      // analog is the post-save confirmation dialog's own heading, the
+      // only place "created" is stated at all — checked here, before
+      // expectSavedSuccessfully() dismisses it via "View Customer".
+      await expect(scanCreatePage.locators.savedConfirmDialog).toContainText(
+        /created successfully/i,
+      );
       await scanCreatePage.expectSavedSuccessfully();
-    });
-
-    await test.step('The toast names how the record was created', async () => {
-      // Confirmed against the running app: there is no "Creation Method"
-      // system field (FR-9's premise) — the real, closest analog is this
-      // toast text, which states the creation method inline.
-      await expect(scanCreatePage.locators.toast).toContainText(/created from scan/i);
     });
   });
 
@@ -298,6 +365,9 @@ test.describe('CRM - Scan&Create Customer/Contact', () => {
     await scanCreatePage.uploadFile(filePath);
     await scanCreatePage.startScan();
     await scanCreatePage.fillCustomerProfile({ email: `pw-scan-${Date.now()}@example.com` });
+    // See fillContactEmailIfMissing()'s class doc — the vision model can
+    // leave either email blank, not reliably always Customer's.
+    await scanCreatePage.fillContactEmailIfMissing(`pw-scan-contact-${Date.now()}@example.com`);
     await scanCreatePage.selectFirstOption(scanCreatePage.locators.crmStageCombobox);
     await scanCreatePage.selectFirstOption(scanCreatePage.locators.originTypeCombobox);
     await scanCreatePage.selectFirstOption(scanCreatePage.locators.originCombobox);

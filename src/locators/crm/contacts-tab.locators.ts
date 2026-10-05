@@ -86,14 +86,29 @@ export class ContactsTabLocators {
     this.toast = page.locator('[data-sonner-toast]').first();
   }
 
-  /** A selectable, still-unlinked Contact inside the "Contacts to link" popup. Matched by name PREFIX — options carry a trailing designation, e.g. "Owen Bradley Buyer". */
+  /**
+   * A selectable, still-unlinked Contact inside the "Contacts to link"
+   * popup. Matched as a SUBSTRING anywhere in the option's accessible
+   * name — confirmed directly (2026-10-05) the real order is "{email}
+   * {name} {designation} · {city}", email FIRST, not name-leading as
+   * originally assumed (a `^name` anchor never matched).
+   */
   linkContactOption(name: string): Locator {
-    return this.linkContactListbox.getByRole('option', { name: new RegExp(`^${escapeRegExp(name)}`) });
+    return this.linkContactListbox.getByRole('option', { name: new RegExp(escapeRegExp(name)) });
   }
 
-  /** A linked Contact's own name+designation button — clicking it navigates to that Contact's Details screen. */
+  /**
+   * A linked Contact's own name+designation button — clicking it
+   * navigates to that Contact's Details screen. Matched as a substring,
+   * not a `^`-anchored prefix — same confirmed reason as
+   * linkContactOption(): the real accessible name is "{email} {name}
+   * {designation}", email first. The negative lookbehind excludes the
+   * row's own icon-only "Delink {name}" button, whose aria-label also
+   * contains the plain name substring (confirmed directly: a bare
+   * substring match hit both in one strict-mode violation).
+   */
   linkedContactButton(name: string): Locator {
-    return this.page.getByRole('button', { name: new RegExp(`^${escapeRegExp(name)}\\b`) });
+    return this.page.getByRole('button', { name: new RegExp(`(?<!Delink )${escapeRegExp(name)}`) });
   }
 
   /** A linked Contact's own "Delink {name}" button. */

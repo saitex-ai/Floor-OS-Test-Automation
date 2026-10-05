@@ -9,12 +9,29 @@ import { type Locator, type Page } from '@playwright/test';
  * three ClickUp tasks describe this same screen.
  *
  * Every editable Profile/Management field renders as "{Label} • {value}"
- * plus an adjacent "Edit" button — fieldContainer() locates that row by
- * its label text. System fields (Customer Code, Created On/By, Updated
- * On/By) have no Edit button at all. "Departments and Assignees" edits as
- * a whole section rather than per-row — its own Edit button is the last
- * "Edit" button on the page (confirmed directly; the heading's own
- * parent doesn't contain it).
+ * — fieldContainer() locates that row by its label text. System fields
+ * (Customer Code, Created On/By, Updated On/By) are never editable.
+ *
+ * CORRECTED (2026-10-05, dev): editing is now per-SECTION, not per-field
+ * — a redesign since this was last confirmed (2026-09-16), the same
+ * change already found on Contact Detail. Each of the three editable
+ * sections (Customer Profile, Customer Management, Departments and
+ * Assignees) has its own single icon-only "Edit" button (no visible
+ * text, just an accessible name of plain "Edit" — all three identical
+ * and otherwise indistinguishable by name, confirmed directly) that
+ * switches every field in that section into its own plain `<input>` at
+ * once, with one "Save"/"Cancel" pair for the whole section. There is NO
+ * `<label for>`, `aria-label`, or any other ARIA association between a
+ * field's label text and its input — confirmed directly (`getByLabel()`
+ * matches nothing). `fieldContainer(label)` still works to target one
+ * field's own input WITHIN an already-open section (its structure is
+ * unchanged — a label text div with an input-wrapping div as its
+ * sibling), but opening/closing edit mode now goes through the
+ * section-level Edit/Save/Cancel buttons below, not a per-field one.
+ * Confirmed DOM order of the three "Edit" buttons: Customer Profile
+ * (index 0), Customer Management (index 1), Departments and Assignees
+ * (last/index 2) — `departmentsEditButton` already relied on `.last()`,
+ * which still correctly resolves.
  */
 export class CustomerDetailLocators {
   readonly nameHeading: Locator;
@@ -31,6 +48,10 @@ export class CustomerDetailLocators {
   // Final confirmation dialog (shared shape)
   readonly confirmDialog: Locator;
   readonly confirmCancelButton: Locator;
+
+  // Section-level edit entry points (Profile/Management) — see class doc.
+  readonly profileEditButton: Locator;
+  readonly managementEditButton: Locator;
 
   // Departments and Assignees
   readonly departmentsHeading: Locator;
@@ -62,6 +83,11 @@ export class CustomerDetailLocators {
 
     this.confirmDialog = page.getByRole('dialog').filter({ hasText: /and its Contacts\?/ });
     this.confirmCancelButton = this.confirmDialog.getByRole('button', { name: 'Cancel' });
+
+    // Confirmed DOM order: Customer Profile, then Customer Management,
+    // then Departments and Assignees (departmentsEditButton below).
+    this.profileEditButton = page.getByRole('button', { name: 'Edit' }).nth(0);
+    this.managementEditButton = page.getByRole('button', { name: 'Edit' }).nth(1);
 
     this.departmentsHeading = page.getByRole('heading', { name: 'Departments and Assignees' });
     // Not a labeled field row like Profile/Management fields — it's the

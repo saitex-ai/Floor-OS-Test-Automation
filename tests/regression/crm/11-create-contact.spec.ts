@@ -34,7 +34,13 @@ test.describe('CRM - Create Contact', () => {
     });
 
     await test.step('Every mandatory field is individually flagged', async () => {
-      await createContactPage.expectValidationBanner(/fields need attention/i);
+      // Case-insensitive, singular/plural-agnostic: confirmed directly
+      // (2026-10-05) the banner reads "1 field needs attention" when a
+      // single field is flagged, not "fields need attention" — the
+      // count/grammar vary with however many fields are actually
+      // mandatory right now (see 12-contact-creation-screen.spec.ts
+      // TC:6's class-doc note on that count itself changing over time).
+      await createContactPage.expectValidationBanner(/\d+ fields? needs? attention/i);
       await createContactPage.expectFieldError('Required');
     });
   });

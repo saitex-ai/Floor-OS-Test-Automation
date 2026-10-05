@@ -124,7 +124,7 @@ test.describe('CRM - Create Customer', () => {
     });
   });
 
-  test('TC:6 Verify duplicate detection cancel action', async ({ createCustomerPage }) => {
+  test('TC:6 Verify duplicate detection cancel action', async ({ createCustomerPage, page }) => {
     await allure.tms('https://app.clickup.com/t/z941abt4ru', 'TC:6 (ClickUp)');
     await createCustomerPage.openFromCrmHome();
     await createCustomerPage.fillProfile({
@@ -141,13 +141,20 @@ test.describe('CRM - Create Customer', () => {
     await createCustomerPage.save();
     await createCustomerPage.expectDuplicateWarningVisible();
 
-    await test.step('Click "Cancel to review"', async () => {
+    await test.step('Click "Cancel"', async () => {
       await createCustomerPage.locators.cancelToReviewButton.click();
     });
 
-    await test.step('Modal closes and the form is still editable, unsaved', async () => {
+    await test.step('The duplicate is not created and the user returns to the Customers list', async () => {
+      // Corrected from the original premise: confirmed directly against
+      // the running app (2026-10-01) — for an exact Customer Name match,
+      // this is a hard block (heading "Match in Customer Name", no "Save
+      // anyway" override at all). Cancel here abandons the whole
+      // creation attempt and navigates back to the Customers list — it
+      // does not just dismiss the modal and leave the create form open
+      // for further editing.
       await expect(createCustomerPage.locators.duplicateWarningModal).toBeHidden();
-      await expect(createCustomerPage.locators.saveButton).toBeVisible();
+      await expect(page).toHaveURL(/\/crm\/customers$/);
     });
   });
 

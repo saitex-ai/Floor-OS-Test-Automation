@@ -49,18 +49,46 @@ export class CustomerDetailPage extends BasePage {
     await expect(this.page.getByText(new RegExp(`Status\\s*${status}`))).toBeVisible();
   }
 
+  /** Fields that live in the Customer Management section — every other Profile field defaults to the Profile section's edit button. */
+  private static readonly MANAGEMENT_FIELD_LABELS = new Set([
+    'Company',
+    'CRM Stage',
+    'Origin Type',
+    'Origin',
+    'Buyer',
+    'Referred By',
+    'Status',
+  ]);
+
   async expectFieldNotEditable(label: string): Promise<void> {
-    await expect(
-      this.locators.fieldContainer(label).getByRole('button', { name: 'Edit' }),
-    ).toHaveCount(0);
+    // Confirmed directly (2026-10-05): System fields (Customer Code,
+    // Created On/By, Updated On/By) have no edit affordance anywhere —
+    // not even a shared section-level one, since System isn't an
+    // editable section at all. A field-local check still correctly
+    // reads "not editable" for them.
+    await expect(this.locators.fieldContainer(label).getByRole('button')).toHaveCount(0);
   }
 
+  /**
+   * Opens the section that owns this field (see class doc — editing is
+   * per-section now, not per-field). `label` only decides which
+   * section's Edit button to click; the actual field is targeted
+   * separately by fillFieldEdit().
+   */
   async openFieldEdit(label: string): Promise<void> {
-    await this.locators.fieldContainer(label).getByRole('button', { name: 'Edit' }).click();
+    const editButton = CustomerDetailPage.MANAGEMENT_FIELD_LABELS.has(label)
+      ? this.locators.managementEditButton
+      : this.locators.profileEditButton;
+    await editButton.click();
   }
 
-  async fillFieldEdit(value: string): Promise<void> {
-    await this.locators.lastTextbox().fill(value);
+  /**
+   * Targets this specific field's own input within the now-open section
+   * — NOT lastTextbox(), which would grab whichever textbox happens to
+   * be last among every field the whole section just opened at once.
+   */
+  async fillFieldEdit(label: string, value: string): Promise<void> {
+    await this.locators.fieldContainer(label).getByRole('textbox').fill(value);
   }
 
   async saveFieldEdit(): Promise<void> {
@@ -74,7 +102,7 @@ export class CustomerDetailPage extends BasePage {
   /** Opens a field's inline editor, sets a value, and saves in one step. */
   async editField(label: string, value: string): Promise<void> {
     await this.openFieldEdit(label);
-    await this.fillFieldEdit(value);
+    await this.fillFieldEdit(label, value);
     await this.saveFieldEdit();
   }
 

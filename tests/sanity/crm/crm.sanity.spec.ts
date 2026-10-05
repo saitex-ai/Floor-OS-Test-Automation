@@ -14,21 +14,6 @@ import { LeadQualificationPage } from '../../../src/pages/crm/lead-qualification
 import { ExternalEventsPage } from '../../../src/pages/crm/external-events.page';
 
 /**
- * Confirmed on dev (2026-09-25) but NOT on local: Create Customer's
- * Management section can carry a required "Company" combobox that
- * createCustomerPage.fillProfile() doesn't fill. Defensive rather than
- * unconditional — only acts when the field is actually present, so this
- * doesn't change behavior on local or on a dev deploy where it's absent.
- */
-async function fillCompanyIfPresent(page: Page): Promise<void> {
-  const combo = page.getByRole('combobox', { name: 'Company', exact: true });
-  if (await combo.isVisible().catch(() => false)) {
-    await combo.click();
-    await page.getByRole('option').first().click();
-  }
-}
-
-/**
  * CRM — Sanity suite. One happy-path test per distinct capability — a
  * broader targeted subset than the smoke suite (tests/smoke/crm/), still
  * not full coverage, which lives in the regression suite. Originally
@@ -196,7 +181,6 @@ test.describe.serial('CRM Sanity', () => {
     if (withAssignee) {
       await createCustomerPage.addBusinessProcessWithAssignee('Cutting', 'Anjali Krishnakumar');
     }
-    await fillCompanyIfPresent(page);
     await createCustomerPage.save();
     if (await createCustomerPage.locators.duplicateWarningModal.isVisible().catch(() => false)) {
       await createCustomerPage.locators.saveAnywayButton.click();
