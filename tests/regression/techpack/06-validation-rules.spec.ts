@@ -742,17 +742,6 @@ test.describe('Techpack - Validation Rules', () => {
     });
   });
 
-  // ─── TC:27: no UI path exists ───
-
-  test('TC:27 [Not yet confirmed] Origin of the "Suggested" status', async () => {
-    test.skip(
-      true,
-      'No user-facing way to create a Suggested rule exists — "New rule" only ever creates Drafts ' +
-        '("New rules are created as drafts"), and Suggested has sat at 0 on every session. Likely a ' +
-        'system/AI-generated state; nothing to drive here without fabricating one. See validation-rules.md.',
-    );
-  });
-
   // ─── Non-Admin (bob, Qc-lead) ───
 
   test.describe('Non-Admin role (bob, Qc-lead)', () => {
