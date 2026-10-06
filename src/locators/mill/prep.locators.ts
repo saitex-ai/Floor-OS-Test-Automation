@@ -8,13 +8,14 @@ import { type Locator, type Page } from '@playwright/test';
 export class PrepLocators {
   readonly heading: Locator;
 
-  // Tabs
-  readonly createDyeLotTab: Locator;
+  // Tabs (as of the 2026-09 redesign: Scan yarn is the default tab, and
+  // Create dye-lot is no longer one of them — it moved to a per-order
+  // button on the Orders tab, see createDyeLotButton below).
   readonly scanYarnTab: Locator;
   readonly loadBeamsTab: Locator;
   readonly ordersTab: Locator;
 
-  // Create dye-lot tab
+  // Orders tab → each order row has its own "Create dye-lot" button.
   readonly createDyeLotButton: Locator;
 
   // Scan yarn tab — reads "Scan lots into dye-lot" while the sheet is empty
@@ -30,7 +31,6 @@ export class PrepLocators {
   constructor(page: Page) {
     this.heading = page.getByRole('heading', { level: 1, name: 'Warping, sizing & rope dyeing' });
 
-    this.createDyeLotTab = page.getByRole('tab', { name: /^Create dye-lot/ });
     this.scanYarnTab = page.getByRole('tab', { name: /^Scan yarn/ });
     this.loadBeamsTab = page.getByRole('tab', { name: /^Load beams/ });
     this.ordersTab = page.getByRole('tab', { name: /^Orders/ });
