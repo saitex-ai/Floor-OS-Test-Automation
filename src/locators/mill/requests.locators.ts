@@ -23,12 +23,13 @@ export class RequestsLocators {
   readonly newRequestButton: Locator;
   readonly newRequestDialog: Locator;
 
-  // New request dialog — the single "From {source}" region for the
-  // chosen department's own upstream source, with its own material
-  // picker (a searchable combobox, not a native <select>), quantity and
-  // Add button.
+  // New request dialog — "Requesting department" is a searchable
+  // combobox too (as of 2026-10, was a native <select> as recently as
+  // 2026-10-05). The single "From {source}" region for the chosen
+  // department's own upstream source has its own material picker
+  // (also a searchable combobox), quantity and Add button.
   readonly requestMaterialsCard: Locator;
-  readonly requestingDepartmentSelect: Locator;
+  readonly requestingDepartmentCombobox: Locator;
   readonly sourceRegions: Locator;
   readonly nothingToPull: Locator;
   readonly valueAboveZeroHint: Locator;
@@ -45,7 +46,7 @@ export class RequestsLocators {
     this.newRequestDialog = page.getByRole('dialog');
 
     this.requestMaterialsCard = page.getByRole('heading', { name: /^Request materials for / });
-    this.requestingDepartmentSelect = page.getByLabel('Requesting department');
+    this.requestingDepartmentCombobox = page.getByRole('combobox', { name: 'Requesting department' });
     this.sourceRegions = page.getByRole('region', { name: /^From / });
     this.nothingToPull = page.getByText('Nothing to pull right now');
     this.valueAboveZeroHint = page.getByText('Enter a value above zero.');
@@ -58,8 +59,8 @@ export class RequestsLocators {
     return this.page.getByRole('region', { name: `From ${source}` });
   }
 
-  /** The cmdk search popover's option rows, opened by a source region's material combobox. */
-  get materialOptions(): Locator {
+  /** The cmdk search popover's option rows — opened by any combobox on this screen (department or material). */
+  get comboboxOptions(): Locator {
     return this.page.locator('[cmdk-item]');
   }
 }
