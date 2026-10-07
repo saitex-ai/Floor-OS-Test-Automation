@@ -39,20 +39,27 @@ export class ContactDetailPage extends BasePage {
     await expect(this.locators.editButton(label)).toHaveCount(0);
   }
 
-  async openFieldEdit(label: string): Promise<void> {
-    await this.locators.editButton(label).click();
+  /**
+   * Corrected (2026-10-01, dev): the Contact Profile section edits as a
+   * whole — one "Edit Contact Profile" button opens every field at once,
+   * with one Save/Cancel pair for the section. `label` is accepted only
+   * to keep this method's shape consistent with other pages' per-field
+   * edit flows; it isn't used to target a specific button anymore.
+   */
+  async openFieldEdit(_label: string): Promise<void> {
+    await this.locators.editProfileButton.click();
   }
 
   async fillFieldEdit(label: string, value: string): Promise<void> {
-    await this.locators.fieldContainer(label).getByRole('textbox').fill(value);
+    await this.locators.fieldInput(label).fill(value);
   }
 
-  async saveFieldEdit(label: string): Promise<void> {
-    await this.locators.saveButton(label).click();
+  async saveFieldEdit(_label: string): Promise<void> {
+    await this.locators.saveProfileButton.click();
   }
 
-  async cancelFieldEdit(label: string): Promise<void> {
-    await this.locators.cancelButton(label).click();
+  async cancelFieldEdit(_label: string): Promise<void> {
+    await this.locators.cancelProfileButton.click();
   }
 
   /** Opens a field's inline editor, sets a value, and saves in one step. */

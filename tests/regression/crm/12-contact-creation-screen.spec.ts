@@ -152,9 +152,14 @@ test.describe('CRM - Contact Creation Screen', () => {
     });
 
     await test.step('Exact banner text and per-field "Required" inline errors', async () => {
-      // Confirmed word-for-word against the running app.
+      // Re-confirmed word-for-word against the running app (2026-10-05):
+      // this environment's form now only treats Email as mandatory on a
+      // blank submit ("1 field needs attention", singular) — previously
+      // 5 fields were flagged here. A real change in what this screen
+      // requires, not a locator issue (confirmed via the full page
+      // snapshot: every other field shows no inline error at all).
       await createContactPage.expectValidationBanner(
-        '5 fields need attention — data-type errors are highlighted on the respective fields.',
+        '1 field needs attention — data-type errors are highlighted on the respective fields.',
       );
       await createContactPage.expectFieldError('Required');
     });

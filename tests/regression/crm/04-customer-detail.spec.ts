@@ -162,9 +162,12 @@ test.describe('CRM - Contact Detail', () => {
       await contactDetailPage.saveFieldEdit('Email');
     });
 
-    await test.step('Update is blocked with an inline error, field stays in edit mode', async () => {
+    await test.step('Update is blocked with an inline error, section stays in edit mode', async () => {
+      // Corrected (2026-10-01, dev): the whole Contact Profile section
+      // edits/saves/cancels as one unit now, not per-field — see
+      // ContactDetailLocators' class doc.
       await contactDetailPage.expectFieldEditError('Enter a valid email address');
-      await expect(contactDetailPage.locators.cancelButton('Email')).toBeVisible();
+      await expect(contactDetailPage.locators.cancelProfileButton).toBeVisible();
     });
   });
 

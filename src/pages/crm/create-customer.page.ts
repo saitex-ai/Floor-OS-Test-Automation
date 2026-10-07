@@ -59,6 +59,20 @@ export class CreateCustomerPage extends BasePage {
     if (details.city !== undefined) await l.cityInput.fill(details.city);
     if (details.country !== undefined)
       await this.selectComboboxOption(l.countryCombobox, details.country);
+    // Confirmed directly (2026-10-01): dev-only required field, absent on
+    // local — see CreateCustomerLocators' class doc. Defensive rather than
+    // unconditional so this doesn't change behavior on an environment
+    // where it's genuinely absent. Checks it's still showing "Select"
+    // (not just visible) before acting — confirmed directly (2026-10-05,
+    // see ScanCreatePage.fillCompanyIfPresent()) this combobox
+    // toggles/clears on a second click rather than re-confirming the same
+    // choice, which would otherwise clear a value already selected by an
+    // earlier fillProfile() call on the same still-open form.
+    const companyIsEmpty = (await l.companyCombobox.innerText().catch(() => '')).trim() === 'Select';
+    if (companyIsEmpty) {
+      await l.companyCombobox.click();
+      await this.page.getByRole('option').first().click();
+    }
     if (details.crmStage !== undefined)
       await this.selectComboboxOption(l.crmStageCombobox, details.crmStage);
     if (details.originType !== undefined) {

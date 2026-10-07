@@ -1,25 +1,9 @@
 import * as allure from 'allure-js-commons';
-import type { Page } from '@playwright/test';
 import { test, expect } from '../../../src/fixtures/crm.fixtures';
 import { ShellLoginPage } from '../../../src/pages/shell/shell-login.page';
 import { CrmPage } from '../../../src/pages/crm/crm.page';
 import { MODULES } from '../../../src/config/modules';
 import { moduleCredentials } from '../../../src/config/env';
-
-/**
- * Confirmed on dev (2026-09-25) but NOT on local: Create Customer's
- * Management section can carry a required "Company" combobox that
- * createCustomerPage.fillProfile() doesn't fill. Defensive rather than
- * unconditional — only acts when the field is actually present, so this
- * doesn't change behavior on local or on a dev deploy where it's absent.
- */
-async function fillCompanyIfPresent(page: Page): Promise<void> {
-  const combo = page.getByRole('combobox', { name: 'Company', exact: true });
-  if (await combo.isVisible().catch(() => false)) {
-    await combo.click();
-    await page.getByRole('option').first().click();
-  }
-}
 
 /**
  * A small, separately-requested smoke check covering just three
@@ -56,7 +40,6 @@ test.describe('CRM Smoke — Recent', () => {
 
   test('Create Customer: successful creation without a linked Contact', async ({
     createCustomerPage,
-    page,
   }) => {
     await createCustomerPage.openFromCrmHome();
     await createCustomerPage.fillProfile({
@@ -70,7 +53,6 @@ test.describe('CRM Smoke — Recent', () => {
       buyer: 'Fabric',
       referredBy: 'Jordan Smith',
     });
-    await fillCompanyIfPresent(page);
     await createCustomerPage.save();
     if (await createCustomerPage.locators.duplicateWarningModal.isVisible()) {
       await createCustomerPage.locators.saveAnywayButton.click();
