@@ -85,4 +85,14 @@ export class UomLocators {
   requiredError(): Locator {
     return this.formDialog.getByText('Required', { exact: true });
   }
+
+  /** A data row on the main list grid whose text contains `text` — e.g. an updated Description. */
+  rowContainingText(text: string): Locator {
+    return this.page.getByRole('row').filter({ hasText: text });
+  }
+
+  /** The "Upload" button this screen deliberately lacks, unlike Size/Color Master (TC:1). */
+  uploadButton(): Locator {
+    return this.page.getByRole('button', { name: 'Upload' });
+  }
 }

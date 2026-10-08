@@ -1,6 +1,5 @@
-import { test } from '../../../src/fixtures/master-data.fixtures';
-import { expect } from '@playwright/test';
-import { CurrencyRatePage } from '../../../src/pages/master-data/currency-rate.page';
+import * as allure from 'allure-js-commons';
+import { test, expect } from '../../../src/fixtures/master-data.fixtures';
 
 /**
  * Master Data — Currency Rate (System Management).
@@ -14,17 +13,15 @@ import { CurrencyRatePage } from '../../../src/pages/master-data/currency-rate.p
  * user (no Create/Edit/Delete anywhere), so every case here is
  * List/Filter/Load-shaped rather than CRUD-shaped — see the page
  * object's own doc comment for details.
- *
- * `currencyRatePage` isn't a named fixture yet on master-data.fixtures.ts
- * (that file is being edited centrally elsewhere) — constructed directly
- * from the standard `page` fixture per test instead. Swap this for a
- * named fixture once `currencyRatePage: ... ` is added there; the tests
- * themselves don't need to change.
  */
 test.describe('Master Data - Currency Rate', () => {
-  test('TC:1 Verify screen layout and both tabs load', async ({ page }) => {
-    const currencyRatePage = new CurrencyRatePage(page);
+  test.beforeEach(async () => {
+    await allure.epic('Master Data');
+    await allure.feature('Currency Rate');
+    await allure.owner('Master Data QA');
+  });
 
+  test('TC:1 Verify screen layout and both tabs load', async ({ currencyRatePage }) => {
     await test.step('Navigate to Currency Rate', async () => {
       await currencyRatePage.open();
     });
@@ -34,8 +31,10 @@ test.describe('Master Data - Currency Rate', () => {
     });
   });
 
-  test('TC:2 Verify no Create/New entry point exists for this role', async ({ page }) => {
-    const currencyRatePage = new CurrencyRatePage(page);
+  test('TC:2 Verify no Create/New entry point exists for this role', async ({
+    page,
+    currencyRatePage,
+  }) => {
     await currencyRatePage.open();
     await currencyRatePage.expectLoaded();
 
@@ -52,9 +51,8 @@ test.describe('Master Data - Currency Rate', () => {
   });
 
   test('TC:3 Verify "Rate Details" Load button is disabled until required filters are filled', async ({
-    page,
+    currencyRatePage,
   }) => {
-    const currencyRatePage = new CurrencyRatePage(page);
     await currencyRatePage.open();
     await currencyRatePage.expectLoaded();
     await currencyRatePage.openRateDetailsTab();
@@ -66,8 +64,8 @@ test.describe('Master Data - Currency Rate', () => {
 
   test('TC:4 Verify Load returns the latest rate on/before the picked Effective Date ("as of" lookup)', async ({
     page,
+    currencyRatePage,
   }) => {
-    const currencyRatePage = new CurrencyRatePage(page);
     await currencyRatePage.open();
     await currencyRatePage.expectLoaded();
     await currencyRatePage.openRateDetailsTab();
@@ -87,14 +85,13 @@ test.describe('Master Data - Currency Rate', () => {
   });
 
   test('TC:5 Verify Load with a date before any seeded rate shows the "no rates found" empty state', async ({
-    page,
+    currencyRatePage,
   }) => {
     // Several sequential calendar-navigation clicks on top of dev's own
     // slow page loads can exceed the module-wide 60s default — bumped
     // defensively, same reasoning as this repo's other slow-interaction
     // timeout bumps (see agent-notes/master-data-module.md).
     test.setTimeout(120_000);
-    const currencyRatePage = new CurrencyRatePage(page);
     await currencyRatePage.open();
     await currencyRatePage.expectLoaded();
     await currencyRatePage.openRateDetailsTab();
@@ -117,8 +114,9 @@ test.describe('Master Data - Currency Rate', () => {
     });
   });
 
-  test('TC:6 Verify "Currency Rate Details" tab shows the full rate list', async ({ page }) => {
-    const currencyRatePage = new CurrencyRatePage(page);
+  test('TC:6 Verify "Currency Rate Details" tab shows the full rate list', async ({
+    currencyRatePage,
+  }) => {
     await currencyRatePage.open();
     await currencyRatePage.expectLoaded();
 
@@ -132,8 +130,7 @@ test.describe('Master Data - Currency Rate', () => {
     });
   });
 
-  test('TC:7 Verify column sort on "Currency Rate Details" tab', async ({ page }) => {
-    const currencyRatePage = new CurrencyRatePage(page);
+  test('TC:7 Verify column sort on "Currency Rate Details" tab', async ({ currencyRatePage }) => {
     await currencyRatePage.open();
     await currencyRatePage.expectLoaded();
     await currencyRatePage.openCurrencyRateDetailsTab();
@@ -150,8 +147,10 @@ test.describe('Master Data - Currency Rate', () => {
     });
   });
 
-  test('TC:8 Verify Export CSV on "Currency Rate Details" tab', async ({ page }) => {
-    const currencyRatePage = new CurrencyRatePage(page);
+  test('TC:8 Verify Export CSV on "Currency Rate Details" tab', async ({
+    page,
+    currencyRatePage,
+  }) => {
     await currencyRatePage.open();
     await currencyRatePage.expectLoaded();
     await currencyRatePage.openCurrencyRateDetailsTab();
@@ -166,9 +165,8 @@ test.describe('Master Data - Currency Rate', () => {
   });
 
   test('TC:9 Verify "Configure columns" panel lists exactly the 6 real columns', async ({
-    page,
+    currencyRatePage,
   }) => {
-    const currencyRatePage = new CurrencyRatePage(page);
     await currencyRatePage.open();
     await currencyRatePage.expectLoaded();
     await currencyRatePage.openCurrencyRateDetailsTab();
@@ -186,8 +184,9 @@ test.describe('Master Data - Currency Rate', () => {
     });
   });
 
-  test('TC:10 Verify Clear resets the "Currency Rate Details" filter bar', async ({ page }) => {
-    const currencyRatePage = new CurrencyRatePage(page);
+  test('TC:10 Verify Clear resets the "Currency Rate Details" filter bar', async ({
+    currencyRatePage,
+  }) => {
     await currencyRatePage.open();
     await currencyRatePage.expectLoaded();
     await currencyRatePage.openCurrencyRateDetailsTab();
@@ -200,14 +199,11 @@ test.describe('Master Data - Currency Rate', () => {
       );
 
       await currencyRatePage.locators.clearButton.click();
-      await expect(currencyRatePage.locators.fromCurrencyFilter).toHaveText(
-        'All from currencies',
-      );
+      await expect(currencyRatePage.locators.fromCurrencyFilter).toHaveText('All from currencies');
     });
   });
 
-  test('TC:11 Verify tab accessible-name locator trap', async ({ page }) => {
-    const currencyRatePage = new CurrencyRatePage(page);
+  test('TC:11 Verify tab accessible-name locator trap', async ({ page, currencyRatePage }) => {
     await currencyRatePage.open();
     await currencyRatePage.expectLoaded();
 
@@ -222,10 +218,9 @@ test.describe('Master Data - Currency Rate', () => {
   });
 
   test('TC:12 Verify the Effective Date picker allows navigating to arbitrary past dates', async ({
-    page,
+    currencyRatePage,
   }) => {
     test.setTimeout(120_000);
-    const currencyRatePage = new CurrencyRatePage(page);
     await currencyRatePage.open();
     await currencyRatePage.expectLoaded();
     await currencyRatePage.openRateDetailsTab();

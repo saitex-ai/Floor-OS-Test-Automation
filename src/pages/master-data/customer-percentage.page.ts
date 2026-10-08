@@ -173,7 +173,10 @@ export class CustomerPercentagePage extends BasePage {
    * server-persisted post-mutation state rather than a cached
    * pre-mutation value.
    */
-  async expectPersistedAfterReload(searchTerm: string, expectedRowText: string | RegExp): Promise<void> {
+  async expectPersistedAfterReload(
+    searchTerm: string,
+    expectedRowText: string | RegExp,
+  ): Promise<void> {
     await this.open();
     await this.expectLoaded();
     await this.search(searchTerm);

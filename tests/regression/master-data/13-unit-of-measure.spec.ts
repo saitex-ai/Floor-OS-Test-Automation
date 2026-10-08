@@ -1,7 +1,5 @@
 import * as allure from 'allure-js-commons';
-import { type Page } from '@playwright/test';
 import { test, expect } from '../../../src/fixtures/master-data.fixtures';
-import { UomPage } from '../../../src/pages/master-data/uom.page';
 
 /**
  * Master Data — Unit of Measure.
@@ -11,12 +9,6 @@ import { UomPage } from '../../../src/pages/master-data/uom.page';
  * tasks exist for this story yet (brand-new coverage, no `allure.tms()`
  * calls). Storage state from auth.setup.ts is already applied via the
  * "master-data" project's dependency — no login needed here.
- *
- * `uomPage` is built directly from the `page` fixture rather than a
- * shared `master-data.fixtures.ts` entry — that file is being extended
- * concurrently for `sizePage`/`colorPage`/`uomPage` by another change;
- * once merged, this can switch to destructuring `uomPage` from the test
- * fixture like the other Master Data specs do.
  *
  * Test data: UoM Code is confirmed live to allow only 5 characters — too
  * short for the usual `PW MD UoM ` prefix this repo's other specs use, so
@@ -35,15 +27,10 @@ function uniqueDescription(): string {
 }
 
 test.describe('Master Data - Unit of Measure', () => {
-  let uomPage: UomPage;
-  let page: Page;
-
-  test.beforeEach(async ({ page: pw }) => {
+  test.beforeEach(async ({ uomPage }) => {
     await allure.epic('Master Data');
     await allure.feature('Unit of Measure');
     await allure.owner('Master Data QA');
-    page = pw;
-    uomPage = new UomPage(page);
     await uomPage.open();
     // Confirmed live (agent-notes/master-data-module.md): the dev OIDC
     // redirect can take 15-18s to client-side-route to the real target
@@ -52,17 +39,19 @@ test.describe('Master Data - Unit of Measure', () => {
     await uomPage.expectLoaded();
   });
 
-  test('TC:1 Verify Unit of Measure list screen layout', async () => {
+  test('TC:1 Verify Unit of Measure list screen layout', async ({ uomPage }) => {
     await uomPage.expectLoaded();
     await expect(uomPage.locators.allTab).toBeVisible();
     await expect(uomPage.locators.activeTab).toBeVisible();
     await expect(uomPage.locators.inactiveTab).toBeVisible();
     await expect(uomPage.locators.searchInput).toBeVisible();
     // Confirmed live: unlike Size/Color Master, there is no bulk "Upload" button here.
-    await expect(page.getByRole('button', { name: 'Upload' })).toHaveCount(0);
+    await uomPage.expectNoUploadButton();
   });
 
-  test('TC:2 Verify successful UoM creation with valid Code and Description', async () => {
+  test('TC:2 Verify successful UoM creation with valid Code and Description', async ({
+    uomPage,
+  }) => {
     const code = uniqueCode();
     const description = uniqueDescription();
 
@@ -78,7 +67,7 @@ test.describe('Master Data - Unit of Measure', () => {
     });
   });
 
-  test("TC:3 Verify editing an existing UoM's Description", async () => {
+  test("TC:3 Verify editing an existing UoM's Description", async ({ uomPage }) => {
     const code = uniqueCode();
     const description = uniqueDescription();
 
@@ -98,11 +87,11 @@ test.describe('Master Data - Unit of Measure', () => {
     await test.step('Toast reads "UoM updated." and the grid reflects the new text', async () => {
       await uomPage.expectUpdatedSuccessfully();
       await uomPage.search(code);
-      await expect(page.getByRole('row').filter({ hasText: `${description} v2` })).toBeVisible();
+      await uomPage.expectRowWithTextVisible(`${description} v2`);
     });
   });
 
-  test('TC:4 Verify Cancel on Edit discards unsaved changes', async () => {
+  test('TC:4 Verify Cancel on Edit discards unsaved changes', async ({ uomPage }) => {
     const code = uniqueCode();
     const description = uniqueDescription();
 
@@ -125,7 +114,7 @@ test.describe('Master Data - Unit of Measure', () => {
     });
   });
 
-  test('TC:5 Verify searching the UoM list by code', async () => {
+  test('TC:5 Verify searching the UoM list by code', async ({ uomPage }) => {
     const code = uniqueCode();
     const description = uniqueDescription();
 
@@ -142,7 +131,7 @@ test.describe('Master Data - Unit of Measure', () => {
     });
   });
 
-  test('TC:6 Verify permanently deleting a UoM', async () => {
+  test('TC:6 Verify permanently deleting a UoM', async ({ uomPage }) => {
     const code = uniqueCode();
     const description = uniqueDescription();
 
@@ -173,7 +162,7 @@ test.describe('Master Data - Unit of Measure', () => {
     });
   });
 
-  test('TC:7 Verify cancelling the delete confirmation aborts it', async () => {
+  test('TC:7 Verify cancelling the delete confirmation aborts it', async ({ uomPage }) => {
     const code = uniqueCode();
     const description = uniqueDescription();
 
@@ -202,7 +191,7 @@ test.describe('Master Data - Unit of Measure', () => {
     });
   });
 
-  test('TC:8 Verify UoM Code is a genuinely required field', async () => {
+  test('TC:8 Verify UoM Code is a genuinely required field', async ({ uomPage }) => {
     await uomPage.openNewUom();
     await uomPage.fillDescription(uniqueDescription());
 
@@ -212,7 +201,7 @@ test.describe('Master Data - Unit of Measure', () => {
     await expect(uomPage.locators.uomCodeInput).toBeVisible();
   });
 
-  test('TC:9 Verify Description is a genuinely required field', async () => {
+  test('TC:9 Verify Description is a genuinely required field', async ({ uomPage }) => {
     await uomPage.openNewUom();
     await uomPage.locators.uomCodeInput.fill(uniqueCode());
 
@@ -222,7 +211,7 @@ test.describe('Master Data - Unit of Measure', () => {
     await expect(uomPage.locators.descriptionInput).toBeVisible();
   });
 
-  test('TC:10 Verify duplicate UoM Code is rejected', async () => {
+  test('TC:10 Verify duplicate UoM Code is rejected', async ({ uomPage }) => {
     const code = uniqueCode();
 
     await test.step('Create a UoM (succeeds)', async () => {
@@ -245,7 +234,9 @@ test.describe('Master Data - Unit of Measure', () => {
     await expect(uomPage.locators.formDialog).toBeVisible();
   });
 
-  test('TC:11 Verify UoM Code and Description respect their max-length limits', async () => {
+  test('TC:11 Verify UoM Code and Description respect their max-length limits', async ({
+    uomPage,
+  }) => {
     await uomPage.openNewUom();
 
     await expect(uomPage.locators.uomCodeInput).toHaveAttribute('maxlength', '5');

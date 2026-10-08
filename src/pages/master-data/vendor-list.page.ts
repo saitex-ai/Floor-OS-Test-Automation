@@ -65,7 +65,10 @@ export class VendorListPage extends BasePage {
     await expect(this.locators.row(code)).toBeVisible({ timeout: 15_000 });
   }
 
-  async expectRowStatus(code: string, status: 'Draft' | 'Approved' | 'Inactive' | 'Rejected'): Promise<void> {
+  async expectRowStatus(
+    code: string,
+    status: 'Draft' | 'Approved' | 'Inactive' | 'Rejected',
+  ): Promise<void> {
     await expect(this.locators.statusButton(code)).toHaveText(status, { timeout: 15_000 });
   }
 

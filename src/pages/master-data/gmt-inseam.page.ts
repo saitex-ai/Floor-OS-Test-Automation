@@ -61,7 +61,8 @@ export class GmtInseamPage extends BasePage {
 
   async fillRequired(values: InseamFieldValues): Promise<void> {
     if (values.code !== undefined) await this.locators.codeInput.fill(values.code);
-    if (values.description !== undefined) await this.locators.descriptionInput.fill(values.description);
+    if (values.description !== undefined)
+      await this.locators.descriptionInput.fill(values.description);
   }
 
   /**
@@ -83,7 +84,8 @@ export class GmtInseamPage extends BasePage {
   }
 
   async expectRequiredError(fieldAnchor: 'code' | 'description'): Promise<void> {
-    const anchor = fieldAnchor === 'code' ? this.locators.codeInput : this.locators.descriptionInput;
+    const anchor =
+      fieldAnchor === 'code' ? this.locators.codeInput : this.locators.descriptionInput;
     await expect(this.locators.requiredErrorFor(anchor)).toHaveText(/required/i);
   }
 

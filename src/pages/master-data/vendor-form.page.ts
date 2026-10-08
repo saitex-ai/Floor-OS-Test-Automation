@@ -65,13 +65,15 @@ export class VendorFormPage extends BasePage {
     if (values.prefixId !== undefined) await l.prefixIdInput.fill(values.prefixId);
     if (values.vendorName !== undefined) await l.vendorNameInput.fill(values.vendorName);
     if (values.currency !== undefined) await this.pickCurrency(values.currency);
-    if (values.creditTerms !== undefined) await this.selectDropdown(l.creditTermsCombobox, values.creditTerms);
+    if (values.creditTerms !== undefined)
+      await this.selectDropdown(l.creditTermsCombobox, values.creditTerms);
     if (values.paymentMethod !== undefined)
       await this.selectDropdown(l.paymentMethodCombobox, values.paymentMethod);
     if (values.addressLine1 !== undefined) await l.addressLine1Input.fill(values.addressLine1);
     if (values.city !== undefined) await l.cityInput.fill(values.city);
     if (values.country !== undefined) await this.pickCountry(values.country);
-    if (values.registeredName !== undefined) await l.registeredNameInput.fill(values.registeredName);
+    if (values.registeredName !== undefined)
+      await l.registeredNameInput.fill(values.registeredName);
     if (values.email !== undefined) await l.emailInput.fill(values.email);
     if (values.website !== undefined) await l.websiteInput.fill(values.website);
   }

@@ -1,7 +1,5 @@
 import { test, expect } from '../../../src/fixtures/master-data.fixtures';
 import * as allure from 'allure-js-commons';
-import { CustomerSeasonListPage } from '../../../src/pages/master-data/customer-season-list.page';
-import { CustomerSeasonFormPage } from '../../../src/pages/master-data/customer-season-form.page';
 
 /**
  * Master Data — Customer Season Master.
@@ -11,12 +9,6 @@ import { CustomerSeasonFormPage } from '../../../src/pages/master-data/customer-
  * No ClickUp test-case tasks exist for this story (first-ever coverage for
  * this screen). Storage state from auth.setup.ts is already applied via
  * the "master-data" project's dependency — no login needed here.
- *
- * `customerSeasonListPage`/`customerSeasonFormPage` are not registered on
- * the shared master-data fixtures yet (another agent owns that file) —
- * constructed directly from the `page` fixture here instead. See this
- * session's report for the exact fixture entries to add once that merge
- * lands.
  *
  * Unlike Company/Customer Master, Create and Edit here are modal dialogs
  * on top of the list, and "Customer" is picked via a grid-based lookup
@@ -34,9 +26,10 @@ test.describe('Master Data - Customer Season Master', () => {
     await allure.owner('Master Data QA');
   });
 
-  test('TC:1 Verify successful creation with all fields filled', async ({ page }) => {
-    const seasonListPage = new CustomerSeasonListPage(page);
-    const seasonFormPage = new CustomerSeasonFormPage(page);
+  test('TC:1 Verify successful creation with all fields filled', async ({
+    customerSeasonListPage: seasonListPage,
+    customerSeasonFormPage: seasonFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const seasonCode = `PWS${suffix}`;
     const description = `PW MD Season ${suffix}`;
@@ -58,10 +51,10 @@ test.describe('Master Data - Customer Season Master', () => {
     });
   });
 
-  test('TC:2 Verify the Customer picker dialog and its search', async ({ page }) => {
-    const seasonListPage = new CustomerSeasonListPage(page);
-    const seasonFormPage = new CustomerSeasonFormPage(page);
-
+  test('TC:2 Verify the Customer picker dialog and its search', async ({
+    customerSeasonListPage: seasonListPage,
+    customerSeasonFormPage: seasonFormPage,
+  }) => {
     await seasonListPage.open();
     await seasonListPage.openNewSeason();
 
@@ -87,13 +80,16 @@ test.describe('Master Data - Customer Season Master', () => {
     await test.step('An unmatched search in the picker shows no matches', async () => {
       await seasonFormPage.locators.pickCustomerButton.click();
       await seasonFormPage.locators.customerPickerSearchInput.fill('ZZZZZZ-no-such-customer-999');
-      await expect(seasonFormPage.locators.customerPickerDataRows()).toHaveCount(0, { timeout: 10_000 });
+      await expect(seasonFormPage.locators.customerPickerDataRows()).toHaveCount(0, {
+        timeout: 10_000,
+      });
     });
   });
 
-  test('TC:3 Verify successful edit of an existing season', async ({ page }) => {
-    const seasonListPage = new CustomerSeasonListPage(page);
-    const seasonFormPage = new CustomerSeasonFormPage(page);
+  test('TC:3 Verify successful edit of an existing season', async ({
+    customerSeasonListPage: seasonListPage,
+    customerSeasonFormPage: seasonFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const seasonCode = `PWS${suffix}`;
     const editedDescription = `PW MD Season Edited ${suffix}`;
@@ -122,9 +118,10 @@ test.describe('Master Data - Customer Season Master', () => {
     });
   });
 
-  test('TC:4 Verify Customer and Season Code become locked once saved', async ({ page }) => {
-    const seasonListPage = new CustomerSeasonListPage(page);
-    const seasonFormPage = new CustomerSeasonFormPage(page);
+  test('TC:4 Verify Customer and Season Code become locked once saved', async ({
+    customerSeasonListPage: seasonListPage,
+    customerSeasonFormPage: seasonFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const seasonCode = `PWS${suffix}`;
 
@@ -149,9 +146,10 @@ test.describe('Master Data - Customer Season Master', () => {
     });
   });
 
-  test('TC:5 Verify list search by Season Code, Description, and Customer', async ({ page }) => {
-    const seasonListPage = new CustomerSeasonListPage(page);
-    const seasonFormPage = new CustomerSeasonFormPage(page);
+  test('TC:5 Verify list search by Season Code, Description, and Customer', async ({
+    customerSeasonListPage: seasonListPage,
+    customerSeasonFormPage: seasonFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const seasonCode = `PWS${suffix}`;
     const description = `PW MD Season Search ${suffix}`;
@@ -174,16 +172,17 @@ test.describe('Master Data - Customer Season Master', () => {
       await seasonListPage.expectRowVisible(description);
     });
 
-    await test.step('Search by the linked Customer\'s name', async () => {
+    await test.step("Search by the linked Customer's name", async () => {
       await seasonListPage.search(customerName);
       await seasonListPage.expectRowVisible(seasonCode);
       await seasonListPage.expectRowVisible(customerCode);
     });
   });
 
-  test('TC:6 Verify status tab filters, and that counts scope to an active search', async ({ page }) => {
-    const seasonListPage = new CustomerSeasonListPage(page);
-    const seasonFormPage = new CustomerSeasonFormPage(page);
+  test('TC:6 Verify status tab filters, and that counts scope to an active search', async ({
+    customerSeasonListPage: seasonListPage,
+    customerSeasonFormPage: seasonFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const seasonCode = `PWS${suffix}`;
 
@@ -211,9 +210,10 @@ test.describe('Master Data - Customer Season Master', () => {
     });
   });
 
-  test('TC:7 Verify validation when all required fields are left blank', async ({ page }) => {
-    const seasonListPage = new CustomerSeasonListPage(page);
-    const seasonFormPage = new CustomerSeasonFormPage(page);
+  test('TC:7 Verify validation when all required fields are left blank', async ({
+    customerSeasonListPage: seasonListPage,
+    customerSeasonFormPage: seasonFormPage,
+  }) => {
     const l = seasonFormPage.locators;
 
     await seasonListPage.open();
@@ -237,10 +237,9 @@ test.describe('Master Data - Customer Season Master', () => {
   });
 
   test('TC:8 Verify duplicate Season Code for the same Customer is blocked, with a specific message', async ({
-    page,
+    customerSeasonListPage: seasonListPage,
+    customerSeasonFormPage: seasonFormPage,
   }) => {
-    const seasonListPage = new CustomerSeasonListPage(page);
-    const seasonFormPage = new CustomerSeasonFormPage(page);
     const suffix = uniqueSuffix();
     const sharedCode = `PWS${suffix}`;
     let customerCode = '';
@@ -249,7 +248,10 @@ test.describe('Master Data - Customer Season Master', () => {
       await seasonListPage.open();
       await seasonListPage.openNewSeason();
       customerCode = await seasonFormPage.pickCustomerByIndex(0);
-      await seasonFormPage.fillFields({ seasonCode: sharedCode, description: `PW MD Season A ${suffix}` });
+      await seasonFormPage.fillFields({
+        seasonCode: sharedCode,
+        description: `PW MD Season A ${suffix}`,
+      });
       await seasonFormPage.create();
       await seasonFormPage.expectCreatedSuccessfully();
     });
@@ -257,7 +259,10 @@ test.describe('Master Data - Customer Season Master', () => {
     await test.step('Attempt a second season for the SAME customer reusing the exact same Season Code', async () => {
       await seasonListPage.openNewSeason();
       await seasonFormPage.pickCustomer(customerCode, customerCode);
-      await seasonFormPage.fillFields({ seasonCode: sharedCode, description: `PW MD Season B ${suffix}` });
+      await seasonFormPage.fillFields({
+        seasonCode: sharedCode,
+        description: `PW MD Season B ${suffix}`,
+      });
       await seasonFormPage.create();
     });
 
@@ -267,9 +272,10 @@ test.describe('Master Data - Customer Season Master', () => {
     });
   });
 
-  test('TC:9 Verify the same Season Code is allowed across different customers', async ({ page }) => {
-    const seasonListPage = new CustomerSeasonListPage(page);
-    const seasonFormPage = new CustomerSeasonFormPage(page);
+  test('TC:9 Verify the same Season Code is allowed across different customers', async ({
+    customerSeasonListPage: seasonListPage,
+    customerSeasonFormPage: seasonFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const sharedCode = `PWS${suffix}`;
 
@@ -277,7 +283,10 @@ test.describe('Master Data - Customer Season Master', () => {
       await seasonListPage.open();
       await seasonListPage.openNewSeason();
       await seasonFormPage.pickCustomerByIndex(0);
-      await seasonFormPage.fillFields({ seasonCode: sharedCode, description: `PW MD Season CustA ${suffix}` });
+      await seasonFormPage.fillFields({
+        seasonCode: sharedCode,
+        description: `PW MD Season CustA ${suffix}`,
+      });
       await seasonFormPage.create();
       await seasonFormPage.expectCreatedSuccessfully();
     });
@@ -285,7 +294,10 @@ test.describe('Master Data - Customer Season Master', () => {
     await test.step('Create a season for Customer B (picker row 1) reusing the exact same Season Code', async () => {
       await seasonListPage.openNewSeason();
       await seasonFormPage.pickCustomerByIndex(1);
-      await seasonFormPage.fillFields({ seasonCode: sharedCode, description: `PW MD Season CustB ${suffix}` });
+      await seasonFormPage.fillFields({
+        seasonCode: sharedCode,
+        description: `PW MD Season CustB ${suffix}`,
+      });
       await seasonFormPage.create();
     });
 
@@ -294,10 +306,10 @@ test.describe('Master Data - Customer Season Master', () => {
     });
   });
 
-  test('TC:10 Verify Cancel ("Close") discards changes on create', async ({ page }) => {
-    const seasonListPage = new CustomerSeasonListPage(page);
-    const seasonFormPage = new CustomerSeasonFormPage(page);
-
+  test('TC:10 Verify Cancel ("Close") discards changes on create', async ({
+    customerSeasonListPage: seasonListPage,
+    customerSeasonFormPage: seasonFormPage,
+  }) => {
     await seasonListPage.open();
     const countBefore = await seasonListPage.getAllCount();
 
@@ -317,9 +329,10 @@ test.describe('Master Data - Customer Season Master', () => {
     });
   });
 
-  test('TC:11 Verify Deactivate action', async ({ page }) => {
-    const seasonListPage = new CustomerSeasonListPage(page);
-    const seasonFormPage = new CustomerSeasonFormPage(page);
+  test('TC:11 Verify Deactivate action', async ({
+    customerSeasonListPage: seasonListPage,
+    customerSeasonFormPage: seasonFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const seasonCode = `PWS${suffix}`;
 
@@ -327,7 +340,10 @@ test.describe('Master Data - Customer Season Master', () => {
       await seasonListPage.open();
       await seasonListPage.openNewSeason();
       await seasonFormPage.pickCustomerByIndex(0);
-      await seasonFormPage.fillFields({ seasonCode, description: `PW MD Season Deactivate ${suffix}` });
+      await seasonFormPage.fillFields({
+        seasonCode,
+        description: `PW MD Season Deactivate ${suffix}`,
+      });
       await seasonFormPage.create();
       await seasonFormPage.expectCreatedSuccessfully();
     });
@@ -345,9 +361,10 @@ test.describe('Master Data - Customer Season Master', () => {
     });
   });
 
-  test('TC:12 Verify Delete action and its confirmation dialog — unique to this module', async ({ page }) => {
-    const seasonListPage = new CustomerSeasonListPage(page);
-    const seasonFormPage = new CustomerSeasonFormPage(page);
+  test('TC:12 Verify Delete action and its confirmation dialog — unique to this module', async ({
+    customerSeasonListPage: seasonListPage,
+    customerSeasonFormPage: seasonFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const seasonCode = `PWS${suffix}`;
 
@@ -385,9 +402,10 @@ test.describe('Master Data - Customer Season Master', () => {
     });
   });
 
-  test('TC:13 Edge: Season Code has no max-length cap', async ({ page }) => {
-    const seasonListPage = new CustomerSeasonListPage(page);
-    const seasonFormPage = new CustomerSeasonFormPage(page);
+  test('TC:13 Edge: Season Code has no max-length cap', async ({
+    customerSeasonListPage: seasonListPage,
+    customerSeasonFormPage: seasonFormPage,
+  }) => {
     const longCode = 'ABCDEFGHIJKLMNOPQRST';
 
     await seasonListPage.open();
@@ -399,10 +417,10 @@ test.describe('Master Data - Customer Season Master', () => {
     });
   });
 
-  test('TC:14 Edge: the Customer field cannot be free-typed — picker-only', async ({ page }) => {
-    const seasonListPage = new CustomerSeasonListPage(page);
-    const seasonFormPage = new CustomerSeasonFormPage(page);
-
+  test('TC:14 Edge: the Customer field cannot be free-typed — picker-only', async ({
+    customerSeasonListPage: seasonListPage,
+    customerSeasonFormPage: seasonFormPage,
+  }) => {
     await seasonListPage.open();
     await seasonListPage.openNewSeason();
 

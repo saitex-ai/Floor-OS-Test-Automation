@@ -1,3 +1,4 @@
+import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/master-data.fixtures';
 import { SampleRequestCreationPage } from '../../../src/pages/master-data/sample-request-creation.page';
 
@@ -11,13 +12,6 @@ import { SampleRequestCreationPage } from '../../../src/pages/master-data/sample
  * applied via the "master-data" project's dependency — no login needed
  * here.
  *
- * Not using the module's shared fixtures file for the page object itself
- * (another agent owns src/fixtures/master-data.fixtures.ts concurrently) —
- * instantiating SampleRequestCreationPage directly from the `page` fixture
- * instead. Once `sampleRequestCreationPage` is added there, this can
- * switch to destructuring it from the test args like the module's other
- * specs do.
- *
  * "ACME Apparel" (CTC0000002, 9 real seasons) and "Acme Textiles" (2 real
  * seasons: FW26/SS26) are real, pre-existing seeded Customers on dev used
  * for the per-customer Season filtering test — "Acme Textiles" is the same
@@ -28,21 +22,28 @@ import { SampleRequestCreationPage } from '../../../src/pages/master-data/sample
  * tearing down throwaway dev data between runs.
  */
 test.describe('Master Data - Sample Request Creation', () => {
-  let sampleRequestPage: SampleRequestCreationPage;
-
-  test.beforeEach(async ({ page }) => {
-    sampleRequestPage = new SampleRequestCreationPage(page);
+  test.beforeEach(async ({ sampleRequestCreationPage: sampleRequestPage }) => {
+    await allure.epic('Master Data');
+    await allure.feature('Sample Request Creation');
+    await allure.owner('Master Data QA');
     await sampleRequestPage.open();
     await sampleRequestPage.expectLoaded();
   });
 
   /** Fills Name + a real Customer/Season/Company in one go (first available Season/Company). */
-  async function fillMinimalValidRequest(name: string, customer: string | RegExp = /ACME Apparel/) {
+  async function fillMinimalValidRequest(
+    sampleRequestPage: SampleRequestCreationPage,
+    name: string,
+    customer: string | RegExp = /ACME Apparel/,
+  ) {
     await sampleRequestPage.openCreateModal();
     await sampleRequestPage.fillForm({ name, customer, season: /.+/, company: /.+/ });
   }
 
-  test('TC:1 Verify Sample Request Creation list layout', async ({ page }) => {
+  test('TC:1 Verify Sample Request Creation list layout', async ({
+    page,
+    sampleRequestCreationPage: sampleRequestPage,
+  }) => {
     await expect(page.getByRole('columnheader', { name: 'SR Code' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Sample Request Name' })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Customer' })).toBeVisible();
@@ -52,7 +53,9 @@ test.describe('Master Data - Sample Request Creation', () => {
     await expect(sampleRequestPage.locators.searchInput).toBeVisible();
   });
 
-  test('TC:2 Verify successful create with all fields (incl. Costing required)', async () => {
+  test('TC:2 Verify successful create with all fields (incl. Costing required)', async ({
+    sampleRequestCreationPage: sampleRequestPage,
+  }) => {
     const name = `PW MD SampleReq ${Date.now()} AllFields`;
 
     await test.step('Fill Name, Customer, Season, Company and toggle Costing on', async () => {
@@ -73,45 +76,53 @@ test.describe('Master Data - Sample Request Creation', () => {
     });
   });
 
-  test('TC:3 Verify successful create with required fields only (Costing off)', async () => {
+  test('TC:3 Verify successful create with required fields only (Costing off)', async ({
+    sampleRequestCreationPage: sampleRequestPage,
+  }) => {
     const name = `PW MD SampleReq ${Date.now()} RequiredOnly`;
 
-    await fillMinimalValidRequest(name);
+    await fillMinimalValidRequest(sampleRequestPage, name);
     await sampleRequestPage.save();
 
     await sampleRequestPage.expectCreatedToast();
     await sampleRequestPage.expectRowVisible(name);
   });
 
-  test("TC:4 Verify Season options are genuinely filtered by the selected Customer", async ({
+  test('TC:4 Verify Season options are genuinely filtered by the selected Customer', async ({
     page,
+    sampleRequestCreationPage: sampleRequestPage,
   }) => {
     await sampleRequestPage.openCreateModal();
 
-    const seasonsForAcme = await test.step('Select ACME Apparel, read its Season options', async () => {
-      await sampleRequestPage.locators.pickerTrigger('customer').click();
-      await sampleRequestPage.locators.pickerOption(/ACME Apparel/).first().click();
-      await sampleRequestPage.locators.pickerTrigger('season').click();
-      // The option list populates asynchronously after the picker opens —
-      // wait for at least one real option before reading, rather than
-      // racing the fetch (confirmed live: an immediate read can see 0).
-      await expect(page.getByRole('option').first()).toBeVisible();
-      const options = await page.getByRole('option').allTextContents();
-      await page.keyboard.press('Escape');
-      return options;
-    });
-
-    const seasonsForAcmeTextiles = await test.step(
-      'Switch Customer to Acme Textiles, read its Season options',
-      async () => {
+    const seasonsForAcme =
+      await test.step('Select ACME Apparel, read its Season options', async () => {
         await sampleRequestPage.locators.pickerTrigger('customer').click();
-        await sampleRequestPage.locators.pickerOption(/Acme Textiles/).first().click();
+        await sampleRequestPage.locators
+          .pickerOption(/ACME Apparel/)
+          .first()
+          .click();
+        await sampleRequestPage.locators.pickerTrigger('season').click();
+        // The option list populates asynchronously after the picker opens —
+        // wait for at least one real option before reading, rather than
+        // racing the fetch (confirmed live: an immediate read can see 0).
+        await expect(page.getByRole('option').first()).toBeVisible();
+        const options = await page.getByRole('option').allTextContents();
+        await page.keyboard.press('Escape');
+        return options;
+      });
+
+    const seasonsForAcmeTextiles =
+      await test.step('Switch Customer to Acme Textiles, read its Season options', async () => {
+        await sampleRequestPage.locators.pickerTrigger('customer').click();
+        await sampleRequestPage.locators
+          .pickerOption(/Acme Textiles/)
+          .first()
+          .click();
         await sampleRequestPage.locators.pickerTrigger('season').click();
         await expect(page.getByRole('option').first()).toBeVisible();
         const options = await page.getByRole('option').allTextContents();
         return options;
-      },
-    );
+      });
 
     expect(seasonsForAcme.length).toBeGreaterThan(0);
     expect(seasonsForAcmeTextiles.length).toBeGreaterThan(0);
@@ -121,21 +132,27 @@ test.describe('Master Data - Sample Request Creation', () => {
     expect(seasonsForAcmeTextiles).not.toEqual(seasonsForAcme);
   });
 
-  test('TC:5 Verify Season field is disabled/empty until a Customer is chosen', async () => {
+  test('TC:5 Verify Season field is disabled/empty until a Customer is chosen', async ({
+    sampleRequestCreationPage: sampleRequestPage,
+  }) => {
     await sampleRequestPage.openCreateModal();
 
     await expect(sampleRequestPage.locators.pickerTrigger('season')).toContainText(
       'Search seasons...',
     );
-    await expect(sampleRequestPage.locators.dialog.getByText('Select a customer first.')).toBeVisible();
+    await expect(
+      sampleRequestPage.locators.dialog.getByText('Select a customer first.'),
+    ).toBeVisible();
   });
 
-  test("TC:6 Verify successful edit of a Draft request's Name", async () => {
+  test("TC:6 Verify successful edit of a Draft request's Name", async ({
+    sampleRequestCreationPage: sampleRequestPage,
+  }) => {
     const originalName = `PW MD SampleReq ${Date.now()} Original`;
     const editedName = `${originalName} Edited`;
 
     await test.step('Create a request to edit', async () => {
-      await fillMinimalValidRequest(originalName);
+      await fillMinimalValidRequest(sampleRequestPage, originalName);
       await sampleRequestPage.save();
       await sampleRequestPage.expectCreatedToast();
     });
@@ -152,10 +169,12 @@ test.describe('Master Data - Sample Request Creation', () => {
     });
   });
 
-  test('TC:7 Verify Customer/Season/Company are locked while a request is Draft', async () => {
+  test('TC:7 Verify Customer/Season/Company are locked while a request is Draft', async ({
+    sampleRequestCreationPage: sampleRequestPage,
+  }) => {
     const name = `PW MD SampleReq ${Date.now()} Locked`;
 
-    await fillMinimalValidRequest(name);
+    await fillMinimalValidRequest(sampleRequestPage, name);
     await sampleRequestPage.save();
     await sampleRequestPage.expectCreatedToast();
 
@@ -167,10 +186,12 @@ test.describe('Master Data - Sample Request Creation', () => {
     await expect(sampleRequestPage.locators.lockedValue('company')).toBeDisabled();
   });
 
-  test('TC:8 Verify "Post" action and its effect on field locking', async () => {
+  test('TC:8 Verify "Post" action and its effect on field locking', async ({
+    sampleRequestCreationPage: sampleRequestPage,
+  }) => {
     const name = `PW MD SampleReq ${Date.now()} Post`;
 
-    await fillMinimalValidRequest(name);
+    await fillMinimalValidRequest(sampleRequestPage, name);
     await sampleRequestPage.save();
     await sampleRequestPage.expectCreatedToast();
 
@@ -198,10 +219,12 @@ test.describe('Master Data - Sample Request Creation', () => {
     });
   });
 
-  test('TC:9 Verify deleting a Sample Request', async () => {
+  test('TC:9 Verify deleting a Sample Request', async ({
+    sampleRequestCreationPage: sampleRequestPage,
+  }) => {
     const name = `PW MD SampleReq ${Date.now()} Delete`;
 
-    await fillMinimalValidRequest(name);
+    await fillMinimalValidRequest(sampleRequestPage, name);
     await sampleRequestPage.save();
     await sampleRequestPage.expectCreatedToast();
 
@@ -217,7 +240,9 @@ test.describe('Master Data - Sample Request Creation', () => {
     });
   });
 
-  test('TC:10 Verify Cancel on the Create modal discards changes', async () => {
+  test('TC:10 Verify Cancel on the Create modal discards changes', async ({
+    sampleRequestCreationPage: sampleRequestPage,
+  }) => {
     const name = `PW MD SampleReq ${Date.now()} ShouldNotSave`;
 
     await sampleRequestPage.openCreateModal();
@@ -228,7 +253,9 @@ test.describe('Master Data - Sample Request Creation', () => {
     await sampleRequestPage.expectRowNotVisible(name);
   });
 
-  test('TC:11 Verify Save is blocked until all four required fields are filled', async () => {
+  test('TC:11 Verify Save is blocked until all four required fields are filled', async ({
+    sampleRequestCreationPage: sampleRequestPage,
+  }) => {
     const name = `PW MD SampleReq ${Date.now()} Progressive`;
 
     await sampleRequestPage.openCreateModal();
@@ -240,7 +267,10 @@ test.describe('Master Data - Sample Request Creation', () => {
 
     await test.step('+ Customer -> still disabled', async () => {
       await sampleRequestPage.locators.pickerTrigger('customer').click();
-      await sampleRequestPage.locators.pickerOption(/ACME Apparel/).first().click();
+      await sampleRequestPage.locators
+        .pickerOption(/ACME Apparel/)
+        .first()
+        .click();
       await sampleRequestPage.expectSaveDisabled();
     });
 
@@ -259,14 +289,16 @@ test.describe('Master Data - Sample Request Creation', () => {
     await sampleRequestPage.cancel();
   });
 
-  test('TC:12 Verify duplicate Sample Request Name is allowed', async () => {
+  test('TC:12 Verify duplicate Sample Request Name is allowed', async ({
+    sampleRequestCreationPage: sampleRequestPage,
+  }) => {
     const sharedName = `PW MD SampleReq ${Date.now()} SharedName`;
 
-    await fillMinimalValidRequest(sharedName);
+    await fillMinimalValidRequest(sampleRequestPage, sharedName);
     await sampleRequestPage.save();
     await sampleRequestPage.expectCreatedToast();
 
-    await fillMinimalValidRequest(sharedName);
+    await fillMinimalValidRequest(sampleRequestPage, sharedName);
     await sampleRequestPage.save();
     await sampleRequestPage.expectCreatedToast();
 
@@ -274,10 +306,12 @@ test.describe('Master Data - Sample Request Creation', () => {
     await sampleRequestPage.expectRowCount(sharedName, 2);
   });
 
-  test('TC:13 Verify list/search by SR code, name, customer, or season', async () => {
+  test('TC:13 Verify list/search by SR code, name, customer, or season', async ({
+    sampleRequestCreationPage: sampleRequestPage,
+  }) => {
     const name = `PW MD SampleReq ${Date.now()} Searchable`;
 
-    await fillMinimalValidRequest(name);
+    await fillMinimalValidRequest(sampleRequestPage, name);
     await sampleRequestPage.save();
     await sampleRequestPage.expectCreatedToast();
 
@@ -292,7 +326,9 @@ test.describe('Master Data - Sample Request Creation', () => {
     });
   });
 
-  test('TC:14 Verify Sample Request Name max length and special characters', async () => {
+  test('TC:14 Verify Sample Request Name max length and special characters', async ({
+    sampleRequestCreationPage: sampleRequestPage,
+  }) => {
     const specialName = `PW MD SampleReq ${Date.now()} !@#$%^&*()`;
 
     await sampleRequestPage.openCreateModal();
@@ -310,10 +346,12 @@ test.describe('Master Data - Sample Request Creation', () => {
     await sampleRequestPage.expectRowVisible(specialName);
   });
 
-  test('Known bug: the list Status column is always blank, even for a request created moments earlier', async () => {
+  test('Known bug: the list Status column is always blank, even for a request created moments earlier', async ({
+    sampleRequestCreationPage: sampleRequestPage,
+  }) => {
     const name = `PW MD SampleReq ${Date.now()} BlankStatus`;
 
-    await fillMinimalValidRequest(name);
+    await fillMinimalValidRequest(sampleRequestPage, name);
     await sampleRequestPage.save();
     await sampleRequestPage.expectCreatedToast();
 

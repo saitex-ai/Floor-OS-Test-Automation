@@ -1,5 +1,5 @@
+import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/master-data.fixtures';
-import { TechpackTypePage } from '../../../src/pages/master-data/techpack-type.page';
 
 /**
  * Master Data — Techpack Type (/master-data/system-management/techpack-types).
@@ -10,26 +10,23 @@ import { TechpackTypePage } from '../../../src/pages/master-data/techpack-type.p
  * applied via the "master-data" project's dependency — no login needed
  * here.
  *
- * Not using the module's shared fixtures file for the page object itself
- * (another agent owns src/fixtures/master-data.fixtures.ts concurrently) —
- * instantiating TechpackTypePage directly from the `page` fixture instead.
- * Once `techpackTypePage` is added there, this can switch to destructuring
- * it from the test args like the module's other specs do.
- *
  * Every created record is prefixed `PW MD TechpackType` + a timestamp, per
  * this repo's existing convention (see CRM's 01-create-customer.spec.ts)
  * of not tearing down throwaway dev data between runs.
  */
 test.describe('Master Data - Techpack Type', () => {
-  let techpackTypePage: TechpackTypePage;
-
-  test.beforeEach(async ({ page }) => {
-    techpackTypePage = new TechpackTypePage(page);
+  test.beforeEach(async ({ techpackTypePage }) => {
+    await allure.epic('Master Data');
+    await allure.feature('Techpack Type');
+    await allure.owner('Master Data QA');
     await techpackTypePage.open();
     await techpackTypePage.expectLoaded();
   });
 
-  test('TC:1 Verify Techpack Type list layout and tab counts', async ({ page }) => {
+  test('TC:1 Verify Techpack Type list layout and tab counts', async ({
+    page,
+    techpackTypePage,
+  }) => {
     await test.step('Tabs, search and table are present', async () => {
       await expect(techpackTypePage.locators.tab('All')).toBeVisible();
       await expect(techpackTypePage.locators.tab('Draft')).toBeVisible();
@@ -44,7 +41,9 @@ test.describe('Master Data - Techpack Type', () => {
     });
   });
 
-  test('TC:2 Verify successful create with all fields (incl. skip demand/forecast validation)', async () => {
+  test('TC:2 Verify successful create with all fields (incl. skip demand/forecast validation)', async ({
+    techpackTypePage,
+  }) => {
     const code = `TCTT${Date.now()}`;
     const name = `PW MD TechpackType ${Date.now()} AllFields`;
 
@@ -65,7 +64,7 @@ test.describe('Master Data - Techpack Type', () => {
     });
   });
 
-  test('TC:3 Verify successful create with required fields only', async () => {
+  test('TC:3 Verify successful create with required fields only', async ({ techpackTypePage }) => {
     const code = `TCTT${Date.now()}`;
     const name = `PW MD TechpackType ${Date.now()} RequiredOnly`;
 
@@ -79,7 +78,7 @@ test.describe('Master Data - Techpack Type', () => {
     await techpackTypePage.expectRowStatus(code, 'Approved');
   });
 
-  test('TC:4 Verify successful edit of an existing Techpack Type', async () => {
+  test('TC:4 Verify successful edit of an existing Techpack Type', async ({ techpackTypePage }) => {
     const code = `TCTT${Date.now()}`;
     const originalName = `PW MD TechpackType ${Date.now()} Original`;
     const editedName = `${originalName} Edited`;
@@ -103,7 +102,7 @@ test.describe('Master Data - Techpack Type', () => {
     });
   });
 
-  test('TC:5 Verify list search by code or name', async () => {
+  test('TC:5 Verify list search by code or name', async ({ techpackTypePage }) => {
     const code = `TCTT${Date.now()}`;
     const name = `PW MD TechpackType ${Date.now()} Searchable`;
 
@@ -123,7 +122,7 @@ test.describe('Master Data - Techpack Type', () => {
     });
   });
 
-  test('TC:6 Verify deactivating a Techpack Type', async () => {
+  test('TC:6 Verify deactivating a Techpack Type', async ({ techpackTypePage }) => {
     const code = `TCTT${Date.now()}`;
     const name = `PW MD TechpackType ${Date.now()} Deactivate`;
 
@@ -132,7 +131,7 @@ test.describe('Master Data - Techpack Type', () => {
     await techpackTypePage.create();
     await techpackTypePage.expectCreatedToast();
 
-    await test.step('Deactivate via the Edit modal\'s icon button (no confirmation)', async () => {
+    await test.step("Deactivate via the Edit modal's icon button (no confirmation)", async () => {
       await techpackTypePage.openRowForEdit(code);
       await techpackTypePage.deactivate();
     });
@@ -143,7 +142,7 @@ test.describe('Master Data - Techpack Type', () => {
     });
   });
 
-  test('TC:7 Verify deleting a Techpack Type', async () => {
+  test('TC:7 Verify deleting a Techpack Type', async ({ techpackTypePage }) => {
     const code = `TCTT${Date.now()}`;
     const name = `PW MD TechpackType ${Date.now()} Delete`;
 
@@ -164,7 +163,7 @@ test.describe('Master Data - Techpack Type', () => {
     });
   });
 
-  test('TC:8 Verify Close on the Create modal discards changes', async () => {
+  test('TC:8 Verify Close on the Create modal discards changes', async ({ techpackTypePage }) => {
     const code = `TCTT${Date.now()}`;
     const name = `PW MD TechpackType ${Date.now()} ShouldNotSave`;
 
@@ -176,7 +175,7 @@ test.describe('Master Data - Techpack Type', () => {
     await techpackTypePage.expectRowNotVisible(code);
   });
 
-  test('TC:9 Verify mandatory field validation - Code', async () => {
+  test('TC:9 Verify mandatory field validation - Code', async ({ techpackTypePage }) => {
     const name = `PW MD TechpackType ${Date.now()} NoCode`;
 
     await techpackTypePage.openCreateModal();
@@ -187,7 +186,7 @@ test.describe('Master Data - Techpack Type', () => {
     await expect(techpackTypePage.locators.dialog).toBeVisible(); // save was blocked, still on the form
   });
 
-  test('TC:10 Verify mandatory field validation - Name', async () => {
+  test('TC:10 Verify mandatory field validation - Name', async ({ techpackTypePage }) => {
     const code = `TCTT${Date.now()}`;
 
     await techpackTypePage.openCreateModal();
@@ -198,7 +197,7 @@ test.describe('Master Data - Techpack Type', () => {
     await expect(techpackTypePage.locators.dialog).toBeVisible();
   });
 
-  test('TC:11 Verify duplicate Code is blocked', async () => {
+  test('TC:11 Verify duplicate Code is blocked', async ({ techpackTypePage }) => {
     const code = `TCTT${Date.now()}`;
     const firstName = `PW MD TechpackType ${Date.now()} First`;
     const secondName = `PW MD TechpackType ${Date.now()} Second`;
@@ -224,7 +223,7 @@ test.describe('Master Data - Techpack Type', () => {
     });
   });
 
-  test('TC:12 Verify duplicate Name (different Code) is allowed', async () => {
+  test('TC:12 Verify duplicate Name (different Code) is allowed', async ({ techpackTypePage }) => {
     const sharedName = `PW MD TechpackType ${Date.now()} SharedName`;
     const codeA = `TCTTA${Date.now()}`;
     const codeB = `TCTTB${Date.now()}`;
@@ -244,7 +243,9 @@ test.describe('Master Data - Techpack Type', () => {
     await techpackTypePage.expectRowVisible(codeB);
   });
 
-  test('TC:13 Verify Code is normalized to uppercase and max length (30)', async () => {
+  test('TC:13 Verify Code is normalized to uppercase and max length (30)', async ({
+    techpackTypePage,
+  }) => {
     const lowerCode = `tctt${Date.now()}`;
     const name = `PW MD TechpackType ${Date.now()} Lowercase`;
 
@@ -259,7 +260,9 @@ test.describe('Master Data - Techpack Type', () => {
     await techpackTypePage.expectRowVisible(lowerCode.toUpperCase());
   });
 
-  test('TC:14 Verify Name accepts special characters and max length (200)', async () => {
+  test('TC:14 Verify Name accepts special characters and max length (200)', async ({
+    techpackTypePage,
+  }) => {
     const code = `TCTT${Date.now()}`;
     const specialName = `PW MD TechpackType ${Date.now()} !@#$%^&*()`;
 
@@ -273,7 +276,9 @@ test.describe('Master Data - Techpack Type', () => {
     await techpackTypePage.expectRowVisible(specialName);
   });
 
-  test('Known bug: an Inactive Techpack Type has no confirmed reactivation path', async () => {
+  test('Known bug: an Inactive Techpack Type has no confirmed reactivation path', async ({
+    techpackTypePage,
+  }) => {
     const code = `TCTT${Date.now()}`;
     const name = `PW MD TechpackType ${Date.now()} NoReactivate`;
 

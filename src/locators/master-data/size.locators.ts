@@ -155,4 +155,20 @@ export class SizeLocators {
   requiredError(): Locator {
     return this.formDialog.getByText('Required', { exact: true });
   }
+
+  /**
+   * A data row on the main (non-picker) list grid whose text contains
+   * `text` — e.g. the auto-derived "<Inseam> - <Waist>" Description combo.
+   * Safe to filter by `hasText` here (unlike pickerDataRows()'s picker
+   * dialogs, see that method's doc): a full Inseam-Waist combo is specific
+   * enough not to collide with an unrelated row the way a bare code can.
+   */
+  rowContainingText(text: string): Locator {
+    return this.page.getByRole('row').filter({ hasText: text });
+  }
+
+  /** Every row on the main list grid, header row included — e.g. for asserting "header row only" after a no-results search. */
+  allRows(): Locator {
+    return this.page.getByRole('row');
+  }
 }

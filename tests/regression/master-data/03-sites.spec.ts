@@ -76,7 +76,10 @@ test.describe('Master Data - Sites', () => {
     });
   });
 
-  test('TC:3 Verify successful edit of an existing site', async ({ sitesListPage, siteFormPage }) => {
+  test('TC:3 Verify successful edit of an existing site', async ({
+    sitesListPage,
+    siteFormPage,
+  }) => {
     const code = `PWMDS${Date.now().toString().slice(-7)}`;
     const name = `PW MD Site Edit ${Date.now()}`;
     const updatedName = `${name} - Updated`;
@@ -151,7 +154,11 @@ test.describe('Master Data - Sites', () => {
     });
   });
 
-  test('TC:6 Verify duplicate Site code is blocked', async ({ sitesListPage, siteFormPage, page }) => {
+  test('TC:6 Verify duplicate Site code is blocked', async ({
+    sitesListPage,
+    siteFormPage,
+    page,
+  }) => {
     const code = `PWMDS${Date.now().toString().slice(-7)}`;
     const name1 = `PW MD Site Dup A ${Date.now()}`;
     const name2 = `PW MD Site Dup B ${Date.now()}`;

@@ -1,7 +1,6 @@
 import { test, expect } from '../../../src/fixtures/master-data.fixtures';
 import * as allure from 'allure-js-commons';
-import { CustomerListPage } from '../../../src/pages/master-data/customer-list.page';
-import { CustomerFormPage, type CustomerFieldValues } from '../../../src/pages/master-data/customer-form.page';
+import { type CustomerFieldValues } from '../../../src/pages/master-data/customer-form.page';
 
 /**
  * Master Data — Customer Master.
@@ -11,11 +10,6 @@ import { CustomerFormPage, type CustomerFieldValues } from '../../../src/pages/m
  * ClickUp test-case tasks exist for this story (first-ever coverage for
  * this screen). Storage state from auth.setup.ts is already applied via
  * the "master-data" project's dependency — no login needed here.
- *
- * `customerListPage`/`customerFormPage` are not registered on the shared
- * master-data fixtures yet (another agent owns that file) — constructed
- * directly from the `page` fixture here instead. See this session's
- * report for the exact fixture entries to add once that merge lands.
  */
 const REQUIRED_COUNTRY = /^AF —/;
 const REQUIRED_CURRENCY = /USD/;
@@ -43,9 +37,10 @@ test.describe('Master Data - Customer Master', () => {
     await allure.owner('Master Data QA');
   });
 
-  test('TC:1 Verify successful creation with all fields filled', async ({ page }) => {
-    const customerListPage = new CustomerListPage(page);
-    const customerFormPage = new CustomerFormPage(page);
+  test('TC:1 Verify successful creation with all fields filled', async ({
+    customerListPage,
+    customerFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const name = `PW MD Customer All ${suffix}`;
 
@@ -80,9 +75,10 @@ test.describe('Master Data - Customer Master', () => {
     });
   });
 
-  test('TC:2 Verify successful creation with only required fields', async ({ page }) => {
-    const customerListPage = new CustomerListPage(page);
-    const customerFormPage = new CustomerFormPage(page);
+  test('TC:2 Verify successful creation with only required fields', async ({
+    customerListPage,
+    customerFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const name = `PW MD Customer RequiredOnly ${suffix}`;
 
@@ -90,7 +86,10 @@ test.describe('Master Data - Customer Master', () => {
     await customerListPage.openNewCustomer();
 
     await test.step('Fill only Prefix ID, Customer Name, Country, Currency', async () => {
-      await customerFormPage.fillRequired({ ...requiredCustomerValues(suffix), customerName: name });
+      await customerFormPage.fillRequired({
+        ...requiredCustomerValues(suffix),
+        customerName: name,
+      });
       await customerFormPage.create();
     });
 
@@ -101,9 +100,10 @@ test.describe('Master Data - Customer Master', () => {
     });
   });
 
-  test('TC:3 Verify Customer Code is system-generated and immutable', async ({ page }) => {
-    const customerListPage = new CustomerListPage(page);
-    const customerFormPage = new CustomerFormPage(page);
+  test('TC:3 Verify Customer Code is system-generated and immutable', async ({
+    customerListPage,
+    customerFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const name = `PW MD Customer CodeLocked ${suffix}`;
 
@@ -115,7 +115,10 @@ test.describe('Master Data - Customer Master', () => {
 
     let generatedCode = '';
     await test.step('Create the customer and capture its generated code from the toast', async () => {
-      await customerFormPage.fillRequired({ ...requiredCustomerValues(suffix), customerName: name });
+      await customerFormPage.fillRequired({
+        ...requiredCustomerValues(suffix),
+        customerName: name,
+      });
       await customerFormPage.create();
       generatedCode = await customerFormPage.getCreatedCustomerCode();
       expect(generatedCode.length).toBeGreaterThan(0);
@@ -130,9 +133,10 @@ test.describe('Master Data - Customer Master', () => {
     });
   });
 
-  test('TC:4 Verify successful edit of an existing customer', async ({ page }) => {
-    const customerListPage = new CustomerListPage(page);
-    const customerFormPage = new CustomerFormPage(page);
+  test('TC:4 Verify successful edit of an existing customer', async ({
+    customerListPage,
+    customerFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const originalName = `PW MD Customer Edit ${suffix}`;
     const editedName = `PW MD Customer Edited ${suffix}`;
@@ -140,7 +144,10 @@ test.describe('Master Data - Customer Master', () => {
     await test.step('Create a throwaway customer to edit', async () => {
       await customerListPage.open();
       await customerListPage.openNewCustomer();
-      await customerFormPage.fillRequired({ ...requiredCustomerValues(suffix), customerName: originalName });
+      await customerFormPage.fillRequired({
+        ...requiredCustomerValues(suffix),
+        customerName: originalName,
+      });
       await customerFormPage.create();
       await customerFormPage.expectCreatedSuccessfully();
     });
@@ -159,9 +166,10 @@ test.describe('Master Data - Customer Master', () => {
     });
   });
 
-  test('TC:5 Verify the "Brands" tab is gated until the customer is first saved', async ({ page }) => {
-    const customerListPage = new CustomerListPage(page);
-    const customerFormPage = new CustomerFormPage(page);
+  test('TC:5 Verify the "Brands" tab is gated until the customer is first saved', async ({
+    customerListPage,
+    customerFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const name = `PW MD Customer Brands ${suffix}`;
 
@@ -175,7 +183,10 @@ test.describe('Master Data - Customer Master', () => {
 
     await test.step('Save the customer', async () => {
       await customerFormPage.openGeneralTab();
-      await customerFormPage.fillRequired({ ...requiredCustomerValues(suffix), customerName: name });
+      await customerFormPage.fillRequired({
+        ...requiredCustomerValues(suffix),
+        customerName: name,
+      });
       await customerFormPage.create();
       await customerFormPage.expectCreatedSuccessfully();
     });
@@ -188,16 +199,21 @@ test.describe('Master Data - Customer Master', () => {
     });
   });
 
-  test('TC:6 Verify list search by Customer Code, Name, and Email', async ({ page }) => {
-    const customerListPage = new CustomerListPage(page);
-    const customerFormPage = new CustomerFormPage(page);
+  test('TC:6 Verify list search by Customer Code, Name, and Email', async ({
+    customerListPage,
+    customerFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const name = `PW MD Customer Search ${suffix}`;
     const email = `pw-md-search-${suffix}@example.com`;
 
     await customerListPage.open();
     await customerListPage.openNewCustomer();
-    await customerFormPage.fillRequired({ ...requiredCustomerValues(suffix), customerName: name, email });
+    await customerFormPage.fillRequired({
+      ...requiredCustomerValues(suffix),
+      customerName: name,
+      email,
+    });
     await customerFormPage.create();
     const code = await customerFormPage.getCreatedCustomerCode();
 
@@ -217,9 +233,10 @@ test.describe('Master Data - Customer Master', () => {
     });
   });
 
-  test('TC:7 Verify status tab filters, and that counts scope to an active search', async ({ page }) => {
-    const customerListPage = new CustomerListPage(page);
-    const customerFormPage = new CustomerFormPage(page);
+  test('TC:7 Verify status tab filters, and that counts scope to an active search', async ({
+    customerListPage,
+    customerFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const name = `PW MD Customer TabScope ${suffix}`;
 
@@ -235,7 +252,10 @@ test.describe('Master Data - Customer Master', () => {
 
     await test.step('Create a uniquely-named customer, then search for it', async () => {
       await customerListPage.openNewCustomer();
-      await customerFormPage.fillRequired({ ...requiredCustomerValues(suffix), customerName: name });
+      await customerFormPage.fillRequired({
+        ...requiredCustomerValues(suffix),
+        customerName: name,
+      });
       await customerFormPage.create();
       await customerFormPage.expectCreatedSuccessfully();
       await customerListPage.search(name);
@@ -246,9 +266,10 @@ test.describe('Master Data - Customer Master', () => {
     });
   });
 
-  test('TC:8 Verify validation when all required fields are left blank', async ({ page }) => {
-    const customerListPage = new CustomerListPage(page);
-    const customerFormPage = new CustomerFormPage(page);
+  test('TC:8 Verify validation when all required fields are left blank', async ({
+    customerListPage,
+    customerFormPage,
+  }) => {
     const l = customerFormPage.locators;
 
     await customerListPage.open();
@@ -267,9 +288,10 @@ test.describe('Master Data - Customer Master', () => {
     });
   });
 
-  test('TC:9 Verify every other field is genuinely optional', async ({ page }) => {
-    const customerListPage = new CustomerListPage(page);
-    const customerFormPage = new CustomerFormPage(page);
+  test('TC:9 Verify every other field is genuinely optional', async ({
+    customerListPage,
+    customerFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const name = `PW MD Customer OptionalSkip ${suffix}`;
 
@@ -277,7 +299,10 @@ test.describe('Master Data - Customer Master', () => {
     await customerListPage.openNewCustomer();
 
     await test.step('Fill only the 4 required fields; Contact/Email/Phone/Address/etc. stay blank', async () => {
-      await customerFormPage.fillRequired({ ...requiredCustomerValues(suffix), customerName: name });
+      await customerFormPage.fillRequired({
+        ...requiredCustomerValues(suffix),
+        customerName: name,
+      });
       await customerFormPage.create();
     });
 
@@ -286,9 +311,10 @@ test.describe('Master Data - Customer Master', () => {
     });
   });
 
-  test('TC:10 Verify Email field format validation', async ({ page }) => {
-    const customerListPage = new CustomerListPage(page);
-    const customerFormPage = new CustomerFormPage(page);
+  test('TC:10 Verify Email field format validation', async ({
+    customerListPage,
+    customerFormPage,
+  }) => {
     const suffix = uniqueSuffix();
 
     await customerListPage.open();
@@ -307,13 +333,14 @@ test.describe('Master Data - Customer Master', () => {
       expect(await customerFormPage.isEmailValid()).toBe(false);
       expect(await customerFormPage.getEmailValidationMessage()).toContain('@');
       await customerFormPage.expectStillOnCreatePage();
-      await expect(page.getByText(/created\.$/)).not.toBeVisible();
+      await customerFormPage.expectNotCreated();
     });
   });
 
-  test('TC:11 Verify duplicate Prefix ID is allowed — surprising, confirmed live', async ({ page }) => {
-    const customerListPage = new CustomerListPage(page);
-    const customerFormPage = new CustomerFormPage(page);
+  test('TC:11 Verify duplicate Prefix ID is allowed — surprising, confirmed live', async ({
+    customerListPage,
+    customerFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const sharedPrefix = `PWDUP${suffix}`;
 
@@ -344,10 +371,10 @@ test.describe('Master Data - Customer Master', () => {
     });
   });
 
-  test('TC:12 Verify Cancel discards changes on create', async ({ page }) => {
-    const customerListPage = new CustomerListPage(page);
-    const customerFormPage = new CustomerFormPage(page);
-
+  test('TC:12 Verify Cancel discards changes on create', async ({
+    customerListPage,
+    customerFormPage,
+  }) => {
     await customerListPage.open();
     const countBefore = await customerListPage.getAllCount();
 
@@ -366,16 +393,20 @@ test.describe('Master Data - Customer Master', () => {
     });
   });
 
-  test('TC:13 Verify Deactivate action and the same reactivation trap as Company Master', async ({ page }) => {
-    const customerListPage = new CustomerListPage(page);
-    const customerFormPage = new CustomerFormPage(page);
+  test('TC:13 Verify Deactivate action and the same reactivation trap as Company Master', async ({
+    customerListPage,
+    customerFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const name = `PW MD Customer Deactivate ${suffix}`;
 
     await test.step('Create and deactivate a throwaway customer', async () => {
       await customerListPage.open();
       await customerListPage.openNewCustomer();
-      await customerFormPage.fillRequired({ ...requiredCustomerValues(suffix), customerName: name });
+      await customerFormPage.fillRequired({
+        ...requiredCustomerValues(suffix),
+        customerName: name,
+      });
       await customerFormPage.create();
       await customerFormPage.expectCreatedSuccessfully();
 
@@ -402,9 +433,10 @@ test.describe('Master Data - Customer Master', () => {
     });
   });
 
-  test('TC:14 Edge: Prefix ID has no max-length cap', async ({ page }) => {
-    const customerListPage = new CustomerListPage(page);
-    const customerFormPage = new CustomerFormPage(page);
+  test('TC:14 Edge: Prefix ID has no max-length cap', async ({
+    customerListPage,
+    customerFormPage,
+  }) => {
     const longPrefix = 'ABCDEFGHIJKLMNOP';
 
     await customerListPage.open();

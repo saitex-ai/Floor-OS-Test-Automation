@@ -1,6 +1,6 @@
-import { test } from '../../../src/fixtures/master-data.fixtures';
-import { expect } from '@playwright/test';
-import { CustomerPercentagePage } from '../../../src/pages/master-data/customer-percentage.page';
+import * as allure from 'allure-js-commons';
+import { test, expect } from '../../../src/fixtures/master-data.fixtures';
+import type { CustomerPercentagePage } from '../../../src/pages/master-data/customer-percentage.page';
 
 /**
  * Master Data — Customer Percentage (System Management).
@@ -24,11 +24,6 @@ import { CustomerPercentagePage } from '../../../src/pages/master-data/customer-
  * the suite is safe to re-run without accumulating rows or hitting
  * duplicate-combo conflicts between runs — a different Item Type is used
  * per test precisely to keep concurrent/re-run rows from colliding.
- *
- * `customerPercentagePage` isn't a named fixture yet on
- * master-data.fixtures.ts (being edited centrally elsewhere) —
- * constructed directly from the standard `page` fixture per test
- * instead. Swap for a named fixture once added there.
  */
 const TEST_CUSTOMER_CODE = 'CTC0000829';
 const TEST_CUSTOMER_FULL_NAME = 'AutoTest_Customer_1790070729752';
@@ -48,9 +43,13 @@ async function deleteRow(
 }
 
 test.describe('Master Data - Customer Percentage', () => {
-  test('TC:1 Verify screen layout and list load', async ({ page }) => {
-    const customerPercentagePage = new CustomerPercentagePage(page);
+  test.beforeEach(async () => {
+    await allure.epic('Master Data');
+    await allure.feature('Customer Percentage');
+    await allure.owner('Master Data QA');
+  });
 
+  test('TC:1 Verify screen layout and list load', async ({ customerPercentagePage }) => {
     await test.step('Navigate to Customer Percentage', async () => {
       await customerPercentagePage.open();
     });
@@ -61,8 +60,9 @@ test.describe('Master Data - Customer Percentage', () => {
     });
   });
 
-  test('TC:2 Verify successful creation with all fields filled', async ({ page }) => {
-    const customerPercentagePage = new CustomerPercentagePage(page);
+  test('TC:2 Verify successful creation with all fields filled', async ({
+    customerPercentagePage,
+  }) => {
     await customerPercentagePage.open();
     await customerPercentagePage.expectLoaded();
 
@@ -100,8 +100,9 @@ test.describe('Master Data - Customer Percentage', () => {
     });
   });
 
-  test('TC:3 Verify successful creation with only required fields', async ({ page }) => {
-    const customerPercentagePage = new CustomerPercentagePage(page);
+  test('TC:3 Verify successful creation with only required fields', async ({
+    customerPercentagePage,
+  }) => {
     await customerPercentagePage.open();
     await customerPercentagePage.expectLoaded();
 
@@ -114,10 +115,7 @@ test.describe('Master Data - Customer Percentage', () => {
     });
 
     await test.step('Persisted correctly after reload, with no Item Category', async () => {
-      await customerPercentagePage.expectPersistedAfterReload(
-        TEST_CUSTOMER_CODE,
-        /CTC0000829.*CH/,
-      );
+      await customerPercentagePage.expectPersistedAfterReload(TEST_CUSTOMER_CODE, /CTC0000829.*CH/);
     });
 
     await test.step('Cleanup', async () => {
@@ -125,8 +123,9 @@ test.describe('Master Data - Customer Percentage', () => {
     });
   });
 
-  test('TC:4 Verify validation when both required fields are left blank', async ({ page }) => {
-    const customerPercentagePage = new CustomerPercentagePage(page);
+  test('TC:4 Verify validation when both required fields are left blank', async ({
+    customerPercentagePage,
+  }) => {
     await customerPercentagePage.open();
     await customerPercentagePage.expectLoaded();
 
@@ -143,8 +142,9 @@ test.describe('Master Data - Customer Percentage', () => {
     await customerPercentagePage.closeDialog();
   });
 
-  test('TC:5 Verify successful edit, including persistence after reload', async ({ page }) => {
-    const customerPercentagePage = new CustomerPercentagePage(page);
+  test('TC:5 Verify successful edit, including persistence after reload', async ({
+    customerPercentagePage,
+  }) => {
     await customerPercentagePage.open();
     await customerPercentagePage.expectLoaded();
 
@@ -178,8 +178,7 @@ test.describe('Master Data - Customer Percentage', () => {
     });
   });
 
-  test('TC:6 Verify Delete flow with confirmation dialog', async ({ page }) => {
-    const customerPercentagePage = new CustomerPercentagePage(page);
+  test('TC:6 Verify Delete flow with confirmation dialog', async ({ customerPercentagePage }) => {
     await customerPercentagePage.open();
     await customerPercentagePage.expectLoaded();
 
@@ -216,8 +215,7 @@ test.describe('Master Data - Customer Percentage', () => {
     });
   });
 
-  test('TC:7 Verify Delete Cancel preserves the row', async ({ page }) => {
-    const customerPercentagePage = new CustomerPercentagePage(page);
+  test('TC:7 Verify Delete Cancel preserves the row', async ({ customerPercentagePage }) => {
     await customerPercentagePage.open();
     await customerPercentagePage.expectLoaded();
 
@@ -240,10 +238,7 @@ test.describe('Master Data - Customer Percentage', () => {
 
     await test.step('Row still exists after reload', async () => {
       await customerPercentagePage.closeDialog();
-      await customerPercentagePage.expectPersistedAfterReload(
-        TEST_CUSTOMER_CODE,
-        /CTC0000829.*IT/,
-      );
+      await customerPercentagePage.expectPersistedAfterReload(TEST_CUSTOMER_CODE, /CTC0000829.*IT/);
     });
 
     await test.step('Cleanup', async () => {
@@ -251,8 +246,10 @@ test.describe('Master Data - Customer Percentage', () => {
     });
   });
 
-  test('TC:8 Verify search works by Customer code but not by Customer name', async ({ page }) => {
-    const customerPercentagePage = new CustomerPercentagePage(page);
+  test('TC:8 Verify search works by Customer code but not by Customer name', async ({
+    page,
+    customerPercentagePage,
+  }) => {
     await customerPercentagePage.open();
     await customerPercentagePage.expectLoaded();
 
@@ -282,8 +279,9 @@ test.describe('Master Data - Customer Percentage', () => {
     });
   });
 
-  test('TC:9 Verify duplicate Customer + Item Type is rejected', async ({ page }) => {
-    const customerPercentagePage = new CustomerPercentagePage(page);
+  test('TC:9 Verify duplicate Customer + Item Type is rejected', async ({
+    customerPercentagePage,
+  }) => {
     await customerPercentagePage.open();
     await customerPercentagePage.expectLoaded();
 
@@ -312,8 +310,9 @@ test.describe('Master Data - Customer Percentage', () => {
     });
   });
 
-  test('TC:10 Verify negative percentage values are rejected', async ({ page }) => {
-    const customerPercentagePage = new CustomerPercentagePage(page);
+  test('TC:10 Verify negative percentage values are rejected', async ({
+    customerPercentagePage,
+  }) => {
     await customerPercentagePage.open();
     await customerPercentagePage.expectLoaded();
     await customerPercentagePage.openAddRow();
@@ -323,7 +322,9 @@ test.describe('Master Data - Customer Percentage', () => {
     await test.step('Entering -5 blocks submission via native min=0 validation', async () => {
       await customerPercentagePage.fillPercentages({ cutticket: '-5' });
       await customerPercentagePage.clickCreate();
-      await customerPercentagePage.expectInputInvalid(customerPercentagePage.locators.cutticketInput);
+      await customerPercentagePage.expectInputInvalid(
+        customerPercentagePage.locators.cutticketInput,
+      );
       const message = await customerPercentagePage.getNativeValidationMessage(
         customerPercentagePage.locators.cutticketInput,
       );
@@ -334,8 +335,9 @@ test.describe('Master Data - Customer Percentage', () => {
     await customerPercentagePage.closeDialog();
   });
 
-  test('TC:11 Verify percentage values over 100 are rejected', async ({ page }) => {
-    const customerPercentagePage = new CustomerPercentagePage(page);
+  test('TC:11 Verify percentage values over 100 are rejected', async ({
+    customerPercentagePage,
+  }) => {
     await customerPercentagePage.open();
     await customerPercentagePage.expectLoaded();
     await customerPercentagePage.openAddRow();
@@ -345,7 +347,9 @@ test.describe('Master Data - Customer Percentage', () => {
     await test.step('Entering 150 blocks submission via native max=100 validation — correct, not a bug', async () => {
       await customerPercentagePage.fillPercentages({ cutticket: '150' });
       await customerPercentagePage.clickCreate();
-      await customerPercentagePage.expectInputInvalid(customerPercentagePage.locators.cutticketInput);
+      await customerPercentagePage.expectInputInvalid(
+        customerPercentagePage.locators.cutticketInput,
+      );
       const message = await customerPercentagePage.getNativeValidationMessage(
         customerPercentagePage.locators.cutticketInput,
       );
@@ -356,8 +360,9 @@ test.describe('Master Data - Customer Percentage', () => {
     await customerPercentagePage.closeDialog();
   });
 
-  test('TC:12 Verify decimal precision is capped at 2 decimal places', async ({ page }) => {
-    const customerPercentagePage = new CustomerPercentagePage(page);
+  test('TC:12 Verify decimal precision is capped at 2 decimal places', async ({
+    customerPercentagePage,
+  }) => {
     await customerPercentagePage.open();
     await customerPercentagePage.expectLoaded();
     await customerPercentagePage.openAddRow();
@@ -367,7 +372,9 @@ test.describe('Master Data - Customer Percentage', () => {
     await test.step('Entering 12.34567 blocks submission via native step=0.01 validation', async () => {
       await customerPercentagePage.fillPercentages({ cutticket: '12.34567' });
       await customerPercentagePage.clickCreate();
-      await customerPercentagePage.expectInputInvalid(customerPercentagePage.locators.cutticketInput);
+      await customerPercentagePage.expectInputInvalid(
+        customerPercentagePage.locators.cutticketInput,
+      );
       const message = await customerPercentagePage.getNativeValidationMessage(
         customerPercentagePage.locators.cutticketInput,
       );
@@ -378,8 +385,9 @@ test.describe('Master Data - Customer Percentage', () => {
     await customerPercentagePage.closeDialog();
   });
 
-  test('TC:13 Verify 0 is a valid value for all four percentage fields', async ({ page }) => {
-    const customerPercentagePage = new CustomerPercentagePage(page);
+  test('TC:13 Verify 0 is a valid value for all four percentage fields', async ({
+    customerPercentagePage,
+  }) => {
     await customerPercentagePage.open();
     await customerPercentagePage.expectLoaded();
 
@@ -402,8 +410,10 @@ test.describe('Master Data - Customer Percentage', () => {
     });
   });
 
-  test('TC:14 Verify Item Category picker is scoped to the picked Item Type', async ({ page }) => {
-    const customerPercentagePage = new CustomerPercentagePage(page);
+  test('TC:14 Verify Item Category picker is scoped to the picked Item Type', async ({
+    page,
+    customerPercentagePage,
+  }) => {
     await customerPercentagePage.open();
     await customerPercentagePage.expectLoaded();
     await customerPercentagePage.openAddRow();
@@ -430,8 +440,7 @@ test.describe('Master Data - Customer Percentage', () => {
     await customerPercentagePage.closeDialog();
   });
 
-  test('TC:15 Verify Export CSV', async ({ page }) => {
-    const customerPercentagePage = new CustomerPercentagePage(page);
+  test('TC:15 Verify Export CSV', async ({ page, customerPercentagePage }) => {
     await customerPercentagePage.open();
     await customerPercentagePage.expectLoaded();
 

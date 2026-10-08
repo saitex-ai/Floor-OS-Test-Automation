@@ -1,8 +1,7 @@
 import * as allure from 'allure-js-commons';
 import { type Locator } from '@playwright/test';
 import { test, expect } from '../../../src/fixtures/master-data.fixtures';
-import { VendorListPage } from '../../../src/pages/master-data/vendor-list.page';
-import { VendorFormPage, type VendorFieldValues } from '../../../src/pages/master-data/vendor-form.page';
+import { type VendorFieldValues } from '../../../src/pages/master-data/vendor-form.page';
 import { VendorFormLocators } from '../../../src/locators/master-data/vendor-form.locators';
 
 /**
@@ -12,11 +11,6 @@ import { VendorFormLocators } from '../../../src/locators/master-data/vendor-for
  * No ClickUp test-case tasks exist for this story (first-ever coverage for
  * this screen). Storage state from auth.setup.ts is already applied via
  * the "master-data" project's dependency — no login needed here.
- *
- * `vendorListPage`/`vendorFormPage` are not registered on the shared
- * master-data fixtures yet (another agent owns that file) — constructed
- * directly from the `page` fixture here instead. See this session's
- * report for the exact fixture entries to add once that merge lands.
  */
 const REQUIRED_CURRENCY = /USD/;
 const REQUIRED_CREDIT_TERMS = /NET30/;
@@ -28,10 +22,19 @@ function uniqueSuffix(): string {
 }
 
 /** All 8 confirmed-required fields, each with a fresh unique Prefix ID/Vendor Name per call. */
-function requiredVendorValues(suffix: string): Required<
+function requiredVendorValues(
+  suffix: string,
+): Required<
   Pick<
     VendorFieldValues,
-    'prefixId' | 'vendorName' | 'currency' | 'creditTerms' | 'paymentMethod' | 'addressLine1' | 'city' | 'country'
+    | 'prefixId'
+    | 'vendorName'
+    | 'currency'
+    | 'creditTerms'
+    | 'paymentMethod'
+    | 'addressLine1'
+    | 'city'
+    | 'country'
   >
 > {
   return {
@@ -53,9 +56,7 @@ test.describe('Master Data - Vendor Master', () => {
     await allure.owner('Master Data QA');
   });
 
-  test('TC:1 Verify Vendor Master list layout', async ({ page }) => {
-    const vendorListPage = new VendorListPage(page);
-
+  test('TC:1 Verify Vendor Master list layout', async ({ page, vendorListPage }) => {
     await test.step('Navigate to Vendor Master', async () => {
       await vendorListPage.open();
     });
@@ -72,10 +73,9 @@ test.describe('Master Data - Vendor Master', () => {
   });
 
   test('TC:2 Verify successful vendor creation with all required fields (plus some optional)', async ({
-    page,
+    vendorListPage,
+    vendorFormPage,
   }) => {
-    const vendorListPage = new VendorListPage(page);
-    const vendorFormPage = new VendorFormPage(page);
     const suffix = uniqueSuffix();
     const name = `PW MD Vendor All ${suffix}`;
 
@@ -99,9 +99,10 @@ test.describe('Master Data - Vendor Master', () => {
     });
   });
 
-  test('TC:3 Verify validation when all required fields are left blank', async ({ page }) => {
-    const vendorListPage = new VendorListPage(page);
-    const vendorFormPage = new VendorFormPage(page);
+  test('TC:3 Verify validation when all required fields are left blank', async ({
+    vendorListPage,
+    vendorFormPage,
+  }) => {
     const l = vendorFormPage.locators;
 
     await vendorListPage.open();
@@ -124,14 +125,19 @@ test.describe('Master Data - Vendor Master', () => {
     });
   });
 
-  test('TC:4 Verify required-field validation — one row per field', async ({ page }) => {
-    const vendorListPage = new VendorListPage(page);
+  test('TC:4 Verify required-field validation — one row per field', async ({
+    vendorListPage,
+    vendorFormPage,
+  }) => {
     await vendorListPage.open();
 
     const suffix = uniqueSuffix();
     const full = requiredVendorValues(suffix);
 
-    const fieldChecks: Array<{ key: keyof typeof full; anchor: (l: VendorFormLocators) => Locator }> = [
+    const fieldChecks: Array<{
+      key: keyof typeof full;
+      anchor: (l: VendorFormLocators) => Locator;
+    }> = [
       { key: 'prefixId', anchor: (l) => l.prefixIdInput },
       { key: 'vendorName', anchor: (l) => l.vendorNameInput },
       { key: 'currency', anchor: (l) => l.pickCurrencyButton },
@@ -144,7 +150,6 @@ test.describe('Master Data - Vendor Master', () => {
 
     for (const { key, anchor } of fieldChecks) {
       await test.step(`Leave "${key}" blank, fill everything else, Create is blocked`, async () => {
-        const vendorFormPage = new VendorFormPage(page);
         await vendorListPage.openNewVendor();
 
         const values: VendorFieldValues = { ...full };
@@ -159,9 +164,10 @@ test.describe('Master Data - Vendor Master', () => {
     }
   });
 
-  test('TC:5 Verify optional fields can be skipped on create', async ({ page }) => {
-    const vendorListPage = new VendorListPage(page);
-    const vendorFormPage = new VendorFormPage(page);
+  test('TC:5 Verify optional fields can be skipped on create', async ({
+    vendorListPage,
+    vendorFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const name = `PW MD Vendor Required Only ${suffix}`;
 
@@ -180,9 +186,7 @@ test.describe('Master Data - Vendor Master', () => {
     });
   });
 
-  test('TC:6 Verify successful vendor edit', async ({ page }) => {
-    const vendorListPage = new VendorListPage(page);
-    const vendorFormPage = new VendorFormPage(page);
+  test('TC:6 Verify successful vendor edit', async ({ vendorListPage, vendorFormPage }) => {
     const suffix = uniqueSuffix();
     const originalName = `PW MD Vendor Edit ${suffix}`;
     const editedName = `PW MD Vendor Edited ${suffix}`;
@@ -190,7 +194,10 @@ test.describe('Master Data - Vendor Master', () => {
     await test.step('Create a throwaway vendor to edit', async () => {
       await vendorListPage.open();
       await vendorListPage.openNewVendor();
-      await vendorFormPage.fillRequired({ ...requiredVendorValues(suffix), vendorName: originalName });
+      await vendorFormPage.fillRequired({
+        ...requiredVendorValues(suffix),
+        vendorName: originalName,
+      });
       await vendorFormPage.create();
       await vendorFormPage.expectCreatedSuccessfully();
     });
@@ -209,9 +216,7 @@ test.describe('Master Data - Vendor Master', () => {
     });
   });
 
-  test('TC:7 Verify Prefix ID is locked on edit', async ({ page }) => {
-    const vendorListPage = new VendorListPage(page);
-    const vendorFormPage = new VendorFormPage(page);
+  test('TC:7 Verify Prefix ID is locked on edit', async ({ vendorListPage, vendorFormPage }) => {
     const suffix = uniqueSuffix();
     const name = `PW MD Vendor Locked ${suffix}`;
 
@@ -231,9 +236,10 @@ test.describe('Master Data - Vendor Master', () => {
     });
   });
 
-  test('TC:8 Verify Cancel discards changes on Create', async ({ page }) => {
-    const vendorListPage = new VendorListPage(page);
-    const vendorFormPage = new VendorFormPage(page);
+  test('TC:8 Verify Cancel discards changes on Create', async ({
+    vendorListPage,
+    vendorFormPage,
+  }) => {
     // Asserting on the specific attempted name rather than the global "All
     // {n}" count — confirmed live (2026-10-07) that comparing a before/after
     // total is flaky on this shared dev environment: several *other*
@@ -257,16 +263,20 @@ test.describe('Master Data - Vendor Master', () => {
     });
   });
 
-  test('TC:9 Verify Cancel discards changes on Edit', async ({ page }) => {
-    const vendorListPage = new VendorListPage(page);
-    const vendorFormPage = new VendorFormPage(page);
+  test('TC:9 Verify Cancel discards changes on Edit', async ({
+    vendorListPage,
+    vendorFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const originalName = `PW MD Vendor CancelEdit ${suffix}`;
     const attemptedName = `PW MD Vendor ShouldRevert ${suffix}`;
 
     await vendorListPage.open();
     await vendorListPage.openNewVendor();
-    await vendorFormPage.fillRequired({ ...requiredVendorValues(suffix), vendorName: originalName });
+    await vendorFormPage.fillRequired({
+      ...requiredVendorValues(suffix),
+      vendorName: originalName,
+    });
     await vendorFormPage.create();
     await vendorFormPage.expectCreatedSuccessfully();
 
@@ -283,9 +293,10 @@ test.describe('Master Data - Vendor Master', () => {
     });
   });
 
-  test('TC:10 Verify duplicate Vendor Name handling', async ({ page }) => {
-    const vendorListPage = new VendorListPage(page);
-    const vendorFormPage = new VendorFormPage(page);
+  test('TC:10 Verify duplicate Vendor Name handling', async ({
+    vendorListPage,
+    vendorFormPage,
+  }) => {
     const suffix = uniqueSuffix();
 
     await test.step('Create a vendor to collide with', async () => {
@@ -314,9 +325,10 @@ test.describe('Master Data - Vendor Master', () => {
     });
   });
 
-  test('TC:11 Verify Status change flow — Approved to Inactive', async ({ page }) => {
-    const vendorListPage = new VendorListPage(page);
-    const vendorFormPage = new VendorFormPage(page);
+  test('TC:11 Verify Status change flow — Approved to Inactive', async ({
+    vendorListPage,
+    vendorFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const name = `PW MD Vendor Status ${suffix}`;
 
@@ -329,9 +341,11 @@ test.describe('Master Data - Vendor Master', () => {
     });
 
     await vendorListPage.search(name);
-    const code = (await vendorListPage.locators.row(name).getByRole('cell').nth(1).innerText()).trim();
+    const code = (
+      await vendorListPage.locators.row(name).getByRole('cell').nth(1).innerText()
+    ).trim();
 
-    await test.step('Change status to Inactive via the row\'s status chip', async () => {
+    await test.step("Change status to Inactive via the row's status chip", async () => {
       await vendorListPage.changeStatus(code, 'Change to Inactive', 'Set to Inactive');
     });
 
@@ -342,9 +356,10 @@ test.describe('Master Data - Vendor Master', () => {
     });
   });
 
-  test('TC:12 Verify Status change flow — Inactive back to Approved', async ({ page }) => {
-    const vendorListPage = new VendorListPage(page);
-    const vendorFormPage = new VendorFormPage(page);
+  test('TC:12 Verify Status change flow — Inactive back to Approved', async ({
+    vendorListPage,
+    vendorFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const name = `PW MD Vendor StatusRoundTrip ${suffix}`;
 
@@ -355,7 +370,9 @@ test.describe('Master Data - Vendor Master', () => {
     await vendorFormPage.expectCreatedSuccessfully();
 
     await vendorListPage.search(name);
-    const code = (await vendorListPage.locators.row(name).getByRole('cell').nth(1).innerText()).trim();
+    const code = (
+      await vendorListPage.locators.row(name).getByRole('cell').nth(1).innerText()
+    ).trim();
 
     await test.step('Deactivate it first', async () => {
       await vendorListPage.changeStatus(code, 'Change to Inactive', 'Set to Inactive');
@@ -374,9 +391,11 @@ test.describe('Master Data - Vendor Master', () => {
     });
   });
 
-  test('TC:13 Verify Email field format validation (native HTML5)', async ({ page }) => {
-    const vendorListPage = new VendorListPage(page);
-    const vendorFormPage = new VendorFormPage(page);
+  test('TC:13 Verify Email field format validation (native HTML5)', async ({
+    page,
+    vendorListPage,
+    vendorFormPage,
+  }) => {
     const suffix = uniqueSuffix();
 
     await vendorListPage.open();
@@ -404,9 +423,11 @@ test.describe('Master Data - Vendor Master', () => {
     });
   });
 
-  test('TC:14 Edge: very long Vendor Name produces a silent, unexplained block', async ({ page }) => {
-    const vendorListPage = new VendorListPage(page);
-    const vendorFormPage = new VendorFormPage(page);
+  test('TC:14 Edge: very long Vendor Name produces a silent, unexplained block', async ({
+    page,
+    vendorListPage,
+    vendorFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const longName = `PW MD Vendor Long ${suffix} ` + 'X'.repeat(250);
 
@@ -429,9 +450,10 @@ test.describe('Master Data - Vendor Master', () => {
     });
   });
 
-  test('TC:15 Edge: special characters in Vendor Name are accepted client-side', async ({ page }) => {
-    const vendorListPage = new VendorListPage(page);
-    const vendorFormPage = new VendorFormPage(page);
+  test('TC:15 Edge: special characters in Vendor Name are accepted client-side', async ({
+    vendorListPage,
+    vendorFormPage,
+  }) => {
     const specialName = `PW MD Vendor !@#$%^&*()_+<>?"'; DROP TABLE-- ${uniqueSuffix()}`;
 
     await vendorListPage.open();

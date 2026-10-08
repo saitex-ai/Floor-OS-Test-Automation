@@ -113,7 +113,9 @@ export class ColorPage extends BasePage {
       if (picked.toUpperCase().startsWith(text.toUpperCase())) return;
 
       if (attempt === 3) {
-        throw new Error(`pickItemCategory("${text}"): picked "${picked}" instead after ${attempt} attempts`);
+        throw new Error(
+          `pickItemCategory("${text}"): picked "${picked}" instead after ${attempt} attempts`,
+        );
       }
     }
   }
@@ -246,5 +248,26 @@ export class ColorPage extends BasePage {
   /** Reads the Status cell text for a given Color ID row, e.g. "Active"/"Inactive". */
   async rowStatus(colorId: string): Promise<string> {
     return (await this.locators.row(colorId).getByRole('cell').last().innerText()).trim();
+  }
+
+  /**
+   * Asserts a main-grid row containing `text` is visible — e.g. the
+   * uppercased Color Code right after creation, or an updated Description.
+   * Caller is expected to have already narrowed via search().
+   */
+  async expectRowWithTextVisible(text: string): Promise<void> {
+    await expect(this.locators.rowContainingText(text)).toBeVisible();
+  }
+
+  /** Opens the (first) main-grid row whose text contains `text` — e.g. a just-searched, uppercased Color Code. */
+  async openRowByText(text: string): Promise<void> {
+    await this.locators.rowContainingText(text).first().click();
+  }
+
+  /** Reads the Color ID (2nd gridcell) from the main-grid row matching `text` — call after search() has narrowed to exactly one match. */
+  async colorIdFromRowText(text: string): Promise<string> {
+    return (
+      await this.locators.rowContainingText(text).getByRole('cell').nth(1).innerText()
+    ).trim();
   }
 }
