@@ -29,14 +29,20 @@ export class EmployeeFormLocators {
   readonly cancelButton: Locator;
   readonly departmentDialog: Locator;
   readonly departmentSearchInput: Locator;
+  /** Only present on the read-only detail view (`/employees` list route, same page, before Edit is clicked). */
+  readonly editButton: Locator;
 
   constructor(private readonly page: Page) {
     this.employeeNumber = page.getByRole('textbox', { name: 'Employee Number' });
     this.fullName = page.getByRole('textbox', { name: 'Full Name', exact: false });
     this.department = page.getByRole('combobox', { name: 'Department', exact: true });
     this.reportsTo = page.getByRole('combobox', { name: 'Reports To', exact: true });
-    this.email = page.getByRole('textbox', { name: 'Email', exact: true });
-    this.phone = page.getByRole('textbox', { name: 'Phone', exact: true });
+    // Accessible names are "Work e-mail" / "Work telephone", not the plain
+    // "Email"/"Phone" the field's own short internal names would suggest —
+    // confirmed live 2026-10-07 (a plain 'Email'/'Phone' lookup hangs
+    // forever, 0 matches).
+    this.email = page.getByRole('textbox', { name: 'Work e-mail', exact: true });
+    this.phone = page.getByRole('textbox', { name: 'Work telephone', exact: true });
     this.maintainedBy = page.getByRole('combobox', { name: 'Maintained by', exact: true });
     this.activeSwitch = page.getByRole('switch', { name: 'Active' });
     this.createButton = page.getByRole('button', { name: 'Create employee' });
@@ -44,6 +50,7 @@ export class EmployeeFormLocators {
     this.cancelButton = page.getByRole('button', { name: 'Cancel' });
     this.departmentDialog = page.getByRole('dialog');
     this.departmentSearchInput = this.departmentDialog.getByRole('textbox', { name: 'Search' });
+    this.editButton = page.getByRole('button', { name: 'Edit employee' });
   }
 
   /** A department option button inside the open Department picker dialog. */

@@ -30,4 +30,18 @@ export class SitesListPage extends BasePage {
   async openNewSite(): Promise<void> {
     await this.locators.newSiteButton.click();
   }
+
+  async search(term: string): Promise<void> {
+    await this.locators.searchInput.fill(term);
+  }
+
+  /** Searches by code, then opens the single matching row's read-only detail view. */
+  async openSiteByCode(code: string): Promise<void> {
+    await this.search(code);
+    await this.locators.row(code).first().click();
+  }
+
+  async rowCountForCode(code: string): Promise<number> {
+    return this.locators.row(code).count();
+  }
 }
