@@ -100,7 +100,9 @@ export class CreateTechpackLocators {
     this.operationsSection = page.getByRole('heading', { name: 'Operations' });
     this.documentsSection = page.getByRole('heading', { name: 'Documents' });
 
-    this.descriptionTextarea = page.getByRole('textbox', { name: 'Description' });
+    // By placeholder: the Operations table's per-row "Description..." inputs
+    // share the accessible name "Description" with this textarea.
+    this.descriptionTextarea = page.getByPlaceholder('Add notes about this techpack...');
     this.operationsTable = page.getByRole('table');
 
     // Two file inputs on the page: index 0 is the required techpack
