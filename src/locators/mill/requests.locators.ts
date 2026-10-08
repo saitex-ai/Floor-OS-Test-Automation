@@ -46,7 +46,9 @@ export class RequestsLocators {
     this.newRequestDialog = page.getByRole('dialog');
 
     this.requestMaterialsCard = page.getByRole('heading', { name: /^Request materials for / });
-    this.requestingDepartmentCombobox = page.getByRole('combobox', { name: 'Requesting department' });
+    this.requestingDepartmentCombobox = page.getByRole('combobox', {
+      name: 'Requesting department',
+    });
     this.sourceRegions = page.getByRole('region', { name: /^From / });
     this.nothingToPull = page.getByText('Nothing to pull right now');
     this.valueAboveZeroHint = page.getByText('Enter a value above zero.');
