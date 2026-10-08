@@ -346,7 +346,8 @@ test.describe.serial('BOM - Lifecycle', () => {
 /**
  * TC:20/TC:21 — what an *older* revision still offers once a newer one is
  * Open. Kept out of the serial chain above so a failure here (both are
- * known-bad on uat, 2026-10-08: the refusals give misleading reasons)
+ * confirmed bugs on uat, 2026-10-08 — ClickUp z941aby8ec / z941aby8ed:
+ * the refusals give misleading reasons, expected to fail until fixed)
  * can't skip the rest of the lifecycle. Default mode: in order in one
  * worker, and a fresh worker rebuilds the same starting state — rev 0
  * Approved, rev 1 Open — if one of them fails.
@@ -380,6 +381,7 @@ test.describe('BOM - Lifecycle (older revisions)', () => {
   });
 
   test('TC:20 Verify reopening an older revision while a newer one is Open is refused with a clear reason', async () => {
+    await allure.tms('https://app.clickup.com/t/z941aby8ec', 'TC:20 bug (ClickUp)');
     await bomDetailPage.open(code, 0);
 
     const toasts = await test.step('Submit Reopen on rev 0', async () => {
@@ -401,6 +403,7 @@ test.describe('BOM - Lifecycle (older revisions)', () => {
   });
 
   test('TC:21 Verify creating another revision from an older revision is refused with a clear reason', async () => {
+    await allure.tms('https://app.clickup.com/t/z941aby8ed', 'TC:21 bug (ClickUp)');
     await bomDetailPage.open(code, 0);
 
     const toasts = await test.step('Submit Create Revision on rev 0', async () => {

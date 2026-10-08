@@ -310,6 +310,12 @@ test.describe('BOM - Items', () => {
   });
 
   test('TC:15 Verify a thread (THD) item cannot be destination-split', async () => {
+    await allure.tms('https://app.clickup.com/t/z941aby8eb', 'TC:15 bug (ClickUp)');
+    // Confirmed bug, ClickUp z941aby8eb (see test-case doc's own notes):
+    // on uat and dev (2026-10-08) ticking Destination split on a THD line
+    // saves silently — no "Not Allowed" alert, and it survives a refresh.
+    // Expected to fail until that's fixed; the finally block unticks it
+    // again so the rest of this file sees the line as seeded.
     const l = bomItemsPage.locators;
 
     await test.step('Its country cell shows "—" instead of "Pick country"', async () => {
