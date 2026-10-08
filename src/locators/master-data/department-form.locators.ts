@@ -24,6 +24,8 @@ export class DepartmentFormLocators {
   readonly saveChangesButton: Locator;
   readonly cancelButton: Locator;
   readonly listbox: Locator;
+  /** Only present on the read-only detail view (`/departments/<uuid>` before Edit is clicked). */
+  readonly editButton: Locator;
 
   constructor(private readonly page: Page) {
     this.departmentCode = page.getByRole('textbox', { name: 'Department code' });
@@ -46,6 +48,7 @@ export class DepartmentFormLocators {
     this.saveChangesButton = page.getByRole('button', { name: 'Save changes' });
     this.cancelButton = page.getByRole('button', { name: 'Cancel' });
     this.listbox = page.getByRole('listbox');
+    this.editButton = page.getByRole('button', { name: 'Edit department' });
   }
 
   /** The open dropdown's options, once a combobox trigger has been clicked. */

@@ -10,9 +10,19 @@ import { type Locator, type Page } from '@playwright/test';
 export class SitesListLocators {
   readonly heading: Locator;
   readonly newSiteButton: Locator;
+  /** Placeholder confirmed live: "Search sites…" — differs in wording from Departments'/Employees' own search boxes. */
+  readonly searchInput: Locator;
 
   constructor(private readonly page: Page) {
     this.heading = page.getByRole('heading', { name: 'Sites' });
     this.newSiteButton = page.getByRole('button', { name: 'New site' });
+    this.searchInput = page.getByPlaceholder(/search sites/i);
+  }
+
+  /** Anchored on the exact Code-column cell, same pattern as Departments' row(). */
+  row(code: string): Locator {
+    return this.page.getByRole('row').filter({
+      has: this.page.getByRole('cell').filter({ hasText: new RegExp(`^${code}$`) }),
+    });
   }
 }
