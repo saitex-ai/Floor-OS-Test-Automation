@@ -1,6 +1,5 @@
 import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/master-data.fixtures';
-import { GmtInseamPage } from '../../../src/pages/master-data/gmt-inseam.page';
 
 /**
  * Master Data — GMT Inseam Master.
@@ -9,11 +8,6 @@ import { GmtInseamPage } from '../../../src/pages/master-data/gmt-inseam.page';
  * No ClickUp test-case tasks exist for this story (first-ever coverage for
  * this screen). Storage state from auth.setup.ts is already applied via
  * the "master-data" project's dependency — no login needed here.
- *
- * `gmtInseamPage` is not registered on the shared master-data fixtures
- * yet (another agent owns that file) — constructed directly from the
- * `page` fixture here instead. See this session's report for the exact
- * fixture entry to add once that merge lands.
  *
  * Every TC in the source .md is exercisable live — unlike Vendor Master,
  * there is no status-change/deactivate flow documented for this screen at
@@ -33,9 +27,7 @@ test.describe('Master Data - GMT Inseam Master', () => {
     await allure.owner('Master Data QA');
   });
 
-  test('TC:1 Verify GMT Inseam Master list layout', async ({ page }) => {
-    const inseamPage = new GmtInseamPage(page);
-
+  test('TC:1 Verify GMT Inseam Master list layout', async ({ page, gmtInseamPage: inseamPage }) => {
     await test.step('Navigate to GMT Inseam Master', async () => {
       await inseamPage.open();
     });
@@ -51,8 +43,9 @@ test.describe('Master Data - GMT Inseam Master', () => {
     });
   });
 
-  test('TC:2 Verify successful inseam creation with both fields filled', async ({ page }) => {
-    const inseamPage = new GmtInseamPage(page);
+  test('TC:2 Verify successful inseam creation with both fields filled', async ({
+    gmtInseamPage: inseamPage,
+  }) => {
     const code = uniqueCode5();
     const description = `PW MD Inseam ${Date.now()}`;
 
@@ -72,8 +65,9 @@ test.describe('Master Data - GMT Inseam Master', () => {
     });
   });
 
-  test('TC:3 Verify validation when both fields are left blank', async ({ page }) => {
-    const inseamPage = new GmtInseamPage(page);
+  test('TC:3 Verify validation when both fields are left blank', async ({
+    gmtInseamPage: inseamPage,
+  }) => {
     await inseamPage.open();
     await inseamPage.openNew();
 
@@ -87,8 +81,7 @@ test.describe('Master Data - GMT Inseam Master', () => {
     });
   });
 
-  test('TC:4 Verify Inseam Code is required', async ({ page }) => {
-    const inseamPage = new GmtInseamPage(page);
+  test('TC:4 Verify Inseam Code is required', async ({ gmtInseamPage: inseamPage }) => {
     await inseamPage.open();
     await inseamPage.openNew();
 
@@ -102,8 +95,7 @@ test.describe('Master Data - GMT Inseam Master', () => {
     });
   });
 
-  test('TC:5 Verify Description is required', async ({ page }) => {
-    const inseamPage = new GmtInseamPage(page);
+  test('TC:5 Verify Description is required', async ({ gmtInseamPage: inseamPage }) => {
     await inseamPage.open();
     await inseamPage.openNew();
 
@@ -117,8 +109,7 @@ test.describe('Master Data - GMT Inseam Master', () => {
     });
   });
 
-  test('TC:6 Verify successful inseam edit', async ({ page }) => {
-    const inseamPage = new GmtInseamPage(page);
+  test('TC:6 Verify successful inseam edit', async ({ gmtInseamPage: inseamPage }) => {
     const code = uniqueCode5();
     const editedDescription = `PW MD Inseam Edited ${Date.now()}`;
 
@@ -144,8 +135,7 @@ test.describe('Master Data - GMT Inseam Master', () => {
     });
   });
 
-  test('TC:7 Verify Inseam Code is locked on edit', async ({ page }) => {
-    const inseamPage = new GmtInseamPage(page);
+  test('TC:7 Verify Inseam Code is locked on edit', async ({ gmtInseamPage: inseamPage }) => {
     const code = uniqueCode5();
 
     await inseamPage.open();
@@ -164,8 +154,7 @@ test.describe('Master Data - GMT Inseam Master', () => {
     });
   });
 
-  test('TC:8 Verify Cancel discards changes', async ({ page }) => {
-    const inseamPage = new GmtInseamPage(page);
+  test('TC:8 Verify Cancel discards changes', async ({ gmtInseamPage: inseamPage }) => {
     const code = uniqueCode5();
 
     await inseamPage.open();
@@ -183,8 +172,9 @@ test.describe('Master Data - GMT Inseam Master', () => {
     });
   });
 
-  test('TC:9 Verify duplicate Inseam Code is blocked with a specific message', async ({ page }) => {
-    const inseamPage = new GmtInseamPage(page);
+  test('TC:9 Verify duplicate Inseam Code is blocked with a specific message', async ({
+    gmtInseamPage: inseamPage,
+  }) => {
     const code = uniqueCode5();
 
     await test.step('Create an inseam to collide with', async () => {
@@ -207,8 +197,9 @@ test.describe('Master Data - GMT Inseam Master', () => {
     });
   });
 
-  test('TC:10 Edge: Inseam Code has a 5-character limit and accepts any text', async ({ page }) => {
-    const inseamPage = new GmtInseamPage(page);
+  test('TC:10 Edge: Inseam Code has a 5-character limit and accepts any text', async ({
+    gmtInseamPage: inseamPage,
+  }) => {
     // A fixed literal like "123456789" would truncate to the same "12345"
     // every run, colliding with the previous run's own leftover record
     // (there is no delete flow for this master — confirmed live, see the
@@ -221,7 +212,10 @@ test.describe('Master Data - GMT Inseam Master', () => {
     await inseamPage.openNew();
 
     await test.step('Enter a 9-character code', async () => {
-      await inseamPage.fillRequired({ code: longCode, description: `PW MD Inseam MaxCode ${Date.now()}` });
+      await inseamPage.fillRequired({
+        code: longCode,
+        description: `PW MD Inseam MaxCode ${Date.now()}`,
+      });
     });
 
     await test.step('Input is capped at 5 characters', async () => {
@@ -235,8 +229,9 @@ test.describe('Master Data - GMT Inseam Master', () => {
     });
   });
 
-  test('TC:11 Edge: Description has a 50-character limit', async ({ page }) => {
-    const inseamPage = new GmtInseamPage(page);
+  test('TC:11 Edge: Description has a 50-character limit', async ({
+    gmtInseamPage: inseamPage,
+  }) => {
     const longDescription = 'D'.repeat(60);
 
     await inseamPage.open();
@@ -257,8 +252,7 @@ test.describe('Master Data - GMT Inseam Master', () => {
     });
   });
 
-  test('TC:12 Verify list search by code or description', async ({ page }) => {
-    const inseamPage = new GmtInseamPage(page);
+  test('TC:12 Verify list search by code or description', async ({ gmtInseamPage: inseamPage }) => {
     const code = uniqueCode5();
     const description = `PW MD Inseam Search ${Date.now()}`;
 

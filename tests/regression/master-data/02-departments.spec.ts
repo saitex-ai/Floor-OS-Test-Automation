@@ -74,9 +74,7 @@ test.describe('Master Data - Departments', () => {
     await test.step('Created successfully with facility/links left at their defaults', async () => {
       await departmentFormPage.expectCreatedSuccessfully();
       await departmentsListPage.search(code);
-      await expect(departmentsListPage.locators.row(code)).toContainText(
-        'Not in any facility yet',
-      );
+      await expect(departmentsListPage.locators.row(code)).toContainText('Not in any facility yet');
     });
   });
 
@@ -214,7 +212,11 @@ test.describe('Master Data - Departments', () => {
     });
   });
 
-  test('TC:8 Verify Cancel discards changes', async ({ departmentsListPage, departmentFormPage, page }) => {
+  test('TC:8 Verify Cancel discards changes', async ({
+    departmentsListPage,
+    departmentFormPage,
+    page,
+  }) => {
     await departmentsListPage.open();
     await departmentsListPage.expectLoaded();
     await departmentsListPage.openNewDepartment();
@@ -323,7 +325,10 @@ test.describe('Master Data - Departments', () => {
     });
   });
 
-  test('TC:12 Verify adding a Facility row', async ({ departmentsListPage, departmentFormPage }) => {
+  test('TC:12 Verify adding a Facility row', async ({
+    departmentsListPage,
+    departmentFormPage,
+  }) => {
     const code = `PWMDD${Date.now().toString().slice(-7)}`;
     const name = `PW MD Dept Facility ${Date.now()}`;
 

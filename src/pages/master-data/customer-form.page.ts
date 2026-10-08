@@ -73,7 +73,8 @@ export class CustomerFormPage extends BasePage {
     if (values.stateProvince !== undefined) await l.stateProvinceInput.fill(values.stateProvince);
     if (values.postalCode !== undefined) await l.postalCodeInput.fill(values.postalCode);
     if (values.country !== undefined) await this.selectDropdown(l.countryCombobox, values.country);
-    if (values.currency !== undefined) await this.selectDropdown(l.currencyCombobox, values.currency);
+    if (values.currency !== undefined)
+      await this.selectDropdown(l.currencyCombobox, values.currency);
     if (values.paymentMethod !== undefined)
       await this.selectDropdown(l.paymentMethodCombobox, values.paymentMethod);
     if (values.creditTerms !== undefined)
@@ -197,7 +198,9 @@ export class CustomerFormPage extends BasePage {
    */
   async expectDeactivateButtonStillShows(): Promise<void> {
     await expect(this.locators.deactivateButton).toBeVisible();
-    await expect(this.page.getByRole('button', { name: 'Activate', exact: true })).not.toBeVisible();
+    await expect(
+      this.page.getByRole('button', { name: 'Activate', exact: true }),
+    ).not.toBeVisible();
   }
 
   /**
@@ -213,5 +216,10 @@ export class CustomerFormPage extends BasePage {
   async isEmailValid(): Promise<boolean> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- see getEmailValidationMessage() above.
     return this.locators.emailInput.evaluate((el: any) => el.validity.valid as boolean);
+  }
+
+  /** Confirms no create toast ever appeared — e.g. a blocked submit (TC:10's invalid email). */
+  async expectNotCreated(): Promise<void> {
+    await expect(this.page.getByText(/created\.$/)).not.toBeVisible();
   }
 }

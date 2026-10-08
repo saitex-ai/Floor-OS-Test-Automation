@@ -1,6 +1,5 @@
 import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/master-data.fixtures';
-import { GmtWaistPage } from '../../../src/pages/master-data/gmt-waist.page';
 
 /**
  * Master Data — GMT Waist Master.
@@ -9,11 +8,6 @@ import { GmtWaistPage } from '../../../src/pages/master-data/gmt-waist.page';
  * No ClickUp test-case tasks exist for this story (first-ever coverage for
  * this screen). Storage state from auth.setup.ts is already applied via
  * the "master-data" project's dependency — no login needed here.
- *
- * `gmtWaistPage` is not registered on the shared master-data fixtures yet
- * (another agent owns that file) — constructed directly from the `page`
- * fixture here instead. See this session's report for the exact fixture
- * entry to add once that merge lands.
  *
  * Mirrors GMT Inseam Master's shape (same list layout, same modal
  * Create/Edit dialog, same 5/50-char limits), but every behavior here was
@@ -37,9 +31,7 @@ test.describe('Master Data - GMT Waist Master', () => {
     await allure.owner('Master Data QA');
   });
 
-  test('TC:1 Verify GMT Waist Master list layout', async ({ page }) => {
-    const waistPage = new GmtWaistPage(page);
-
+  test('TC:1 Verify GMT Waist Master list layout', async ({ page, gmtWaistPage: waistPage }) => {
     await test.step('Navigate to GMT Waist Master', async () => {
       await waistPage.open();
     });
@@ -55,8 +47,9 @@ test.describe('Master Data - GMT Waist Master', () => {
     });
   });
 
-  test('TC:2 Verify successful waist creation with both fields filled', async ({ page }) => {
-    const waistPage = new GmtWaistPage(page);
+  test('TC:2 Verify successful waist creation with both fields filled', async ({
+    gmtWaistPage: waistPage,
+  }) => {
     const code = uniqueCode5();
     const description = `PW MD Waist ${Date.now()}`;
 
@@ -76,8 +69,9 @@ test.describe('Master Data - GMT Waist Master', () => {
     });
   });
 
-  test('TC:3 Verify validation when both fields are left blank', async ({ page }) => {
-    const waistPage = new GmtWaistPage(page);
+  test('TC:3 Verify validation when both fields are left blank', async ({
+    gmtWaistPage: waistPage,
+  }) => {
     await waistPage.open();
     await waistPage.openNew();
 
@@ -91,8 +85,7 @@ test.describe('Master Data - GMT Waist Master', () => {
     });
   });
 
-  test('TC:4 Verify Waist Code is required', async ({ page }) => {
-    const waistPage = new GmtWaistPage(page);
+  test('TC:4 Verify Waist Code is required', async ({ gmtWaistPage: waistPage }) => {
     await waistPage.open();
     await waistPage.openNew();
 
@@ -106,8 +99,7 @@ test.describe('Master Data - GMT Waist Master', () => {
     });
   });
 
-  test('TC:5 Verify Description is required', async ({ page }) => {
-    const waistPage = new GmtWaistPage(page);
+  test('TC:5 Verify Description is required', async ({ gmtWaistPage: waistPage }) => {
     await waistPage.open();
     await waistPage.openNew();
 
@@ -121,8 +113,7 @@ test.describe('Master Data - GMT Waist Master', () => {
     });
   });
 
-  test('TC:6 Verify successful waist edit', async ({ page }) => {
-    const waistPage = new GmtWaistPage(page);
+  test('TC:6 Verify successful waist edit', async ({ gmtWaistPage: waistPage }) => {
     const code = uniqueCode5();
     const editedDescription = `PW MD Waist Edited ${Date.now()}`;
 
@@ -148,8 +139,7 @@ test.describe('Master Data - GMT Waist Master', () => {
     });
   });
 
-  test('TC:7 Verify Waist Code is locked on edit', async ({ page }) => {
-    const waistPage = new GmtWaistPage(page);
+  test('TC:7 Verify Waist Code is locked on edit', async ({ gmtWaistPage: waistPage }) => {
     const code = uniqueCode5();
 
     await waistPage.open();
@@ -168,8 +158,7 @@ test.describe('Master Data - GMT Waist Master', () => {
     });
   });
 
-  test('TC:8 Verify Cancel discards changes', async ({ page }) => {
-    const waistPage = new GmtWaistPage(page);
+  test('TC:8 Verify Cancel discards changes', async ({ gmtWaistPage: waistPage }) => {
     const code = uniqueCode5();
 
     await waistPage.open();
@@ -187,8 +176,9 @@ test.describe('Master Data - GMT Waist Master', () => {
     });
   });
 
-  test('TC:9 Verify duplicate Waist Code is blocked with a specific message', async ({ page }) => {
-    const waistPage = new GmtWaistPage(page);
+  test('TC:9 Verify duplicate Waist Code is blocked with a specific message', async ({
+    gmtWaistPage: waistPage,
+  }) => {
     const code = uniqueCode5();
 
     await test.step('Create a waist to collide with', async () => {
@@ -211,8 +201,10 @@ test.describe('Master Data - GMT Waist Master', () => {
     });
   });
 
-  test('TC:10 Edge: negative number and zero accepted as Waist Code', async ({ page }) => {
-    const waistPage = new GmtWaistPage(page);
+  test('TC:10 Edge: negative number and zero accepted as Waist Code', async ({
+    page,
+    gmtWaistPage: waistPage,
+  }) => {
     // A fixed literal "-5" would collide with this same test's own
     // leftover record from a previous run (there is no delete flow for
     // this master — confirmed live), so the negative case uses a fresh
@@ -222,7 +214,10 @@ test.describe('Master Data - GMT Waist Master', () => {
     await test.step(`Create with a fresh negative Waist Code ("${negativeCode}")`, async () => {
       await waistPage.open();
       await waistPage.openNew();
-      await waistPage.fillRequired({ code: negativeCode, description: `PW MD Waist Negative ${Date.now()}` });
+      await waistPage.fillRequired({
+        code: negativeCode,
+        description: `PW MD Waist Negative ${Date.now()}`,
+      });
       await waistPage.create();
       await waistPage.expectCreatedSuccessfully();
     });
@@ -243,7 +238,9 @@ test.describe('Master Data - GMT Waist Master', () => {
       await waistPage.fillRequired({ code: '0', description: `PW MD Waist Zero ${Date.now()}` });
       await waistPage.create();
       const created = page.getByText('Waist created.');
-      const duplicate = page.getByText('A waist with this code already exists. Use a different code.');
+      const duplicate = page.getByText(
+        'A waist with this code already exists. Use a different code.',
+      );
       await expect(created.or(duplicate)).toBeVisible({ timeout: 15_000 });
 
       // On the duplicate path the dialog stays open (confirmed live — see
@@ -261,8 +258,7 @@ test.describe('Master Data - GMT Waist Master', () => {
     });
   });
 
-  test('TC:11 Edge: decimal value accepted as Waist Code', async ({ page }) => {
-    const waistPage = new GmtWaistPage(page);
+  test('TC:11 Edge: decimal value accepted as Waist Code', async ({ gmtWaistPage: waistPage }) => {
     // Fresh per run (same collision reasoning as TC:10's negative case).
     const ts = String(Date.now());
     const decimalCode = `${ts.slice(-3, -1)}.${ts.slice(-1)}`;
@@ -271,7 +267,10 @@ test.describe('Master Data - GMT Waist Master', () => {
     await waistPage.openNew();
 
     await test.step(`Create with a fresh decimal Waist Code ("${decimalCode}")`, async () => {
-      await waistPage.fillRequired({ code: decimalCode, description: `PW MD Waist Decimal ${Date.now()}` });
+      await waistPage.fillRequired({
+        code: decimalCode,
+        description: `PW MD Waist Decimal ${Date.now()}`,
+      });
       await waistPage.create();
     });
 
@@ -282,8 +281,9 @@ test.describe('Master Data - GMT Waist Master', () => {
     });
   });
 
-  test('TC:12 Edge: non-numeric text accepted as Waist Code', async ({ page }) => {
-    const waistPage = new GmtWaistPage(page);
+  test('TC:12 Edge: non-numeric text accepted as Waist Code', async ({
+    gmtWaistPage: waistPage,
+  }) => {
     // "PW<3 timestamp digits>" is fresh per run; "EXTRA" pushes it past 5
     // characters so the fill still exercises the maxlength truncation.
     const alphaCode = `PW${String(Date.now()).slice(-3)}EXTRA`;
@@ -292,7 +292,10 @@ test.describe('Master Data - GMT Waist Master', () => {
     await waistPage.openNew();
 
     await test.step(`Create with Waist Code "${alphaCode}" (5-char limit truncates it)`, async () => {
-      await waistPage.fillRequired({ code: alphaCode, description: `PW MD Waist Alpha ${Date.now()}` });
+      await waistPage.fillRequired({
+        code: alphaCode,
+        description: `PW MD Waist Alpha ${Date.now()}`,
+      });
     });
 
     await test.step('Input is capped at 5 characters before saving', async () => {
@@ -307,8 +310,7 @@ test.describe('Master Data - GMT Waist Master', () => {
     });
   });
 
-  test('TC:13 Edge: Waist Code has a 5-character limit', async ({ page }) => {
-    const waistPage = new GmtWaistPage(page);
+  test('TC:13 Edge: Waist Code has a 5-character limit', async ({ gmtWaistPage: waistPage }) => {
     // Keeping the unique part in the first 5 characters (then padding)
     // means the *stored, truncated* code is fresh every run, unlike a
     // fixed "123456789" literal which would always truncate the same way
@@ -319,7 +321,10 @@ test.describe('Master Data - GMT Waist Master', () => {
     await waistPage.openNew();
 
     await test.step('Enter a 9-character code', async () => {
-      await waistPage.fillRequired({ code: longCode, description: `PW MD Waist MaxCode ${Date.now()}` });
+      await waistPage.fillRequired({
+        code: longCode,
+        description: `PW MD Waist MaxCode ${Date.now()}`,
+      });
     });
 
     await test.step('Input is capped at 5 characters', async () => {
@@ -333,8 +338,7 @@ test.describe('Master Data - GMT Waist Master', () => {
     });
   });
 
-  test('TC:14 Verify list search by code or description', async ({ page }) => {
-    const waistPage = new GmtWaistPage(page);
+  test('TC:14 Verify list search by code or description', async ({ gmtWaistPage: waistPage }) => {
     const code = uniqueCode5();
     const description = `PW MD Waist Search ${Date.now()}`;
 

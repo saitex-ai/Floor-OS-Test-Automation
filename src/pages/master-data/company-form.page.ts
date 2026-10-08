@@ -41,6 +41,20 @@ export interface CompanyFieldValues {
 export class CompanyFormPage extends BasePage {
   readonly locators: CompanyFormLocators;
 
+  /** The confirmed-live option set shared by Primary Currency and Secondary Currency (TC:14). */
+  private static readonly CURRENCY_CODES = [
+    'CNY',
+    'EUR',
+    'GBP',
+    'HKD',
+    'INR',
+    'JPY',
+    'KRW',
+    'SGD',
+    'USD',
+    'VND',
+  ];
+
   constructor(page: Page) {
     super(page);
     this.locators = new CompanyFormLocators(page);
@@ -176,6 +190,27 @@ export class CompanyFormPage extends BasePage {
    */
   async expectDeactivateButtonStillShows(): Promise<void> {
     await expect(this.locators.deactivateButton).toBeVisible();
-    await expect(this.page.getByRole('button', { name: 'Activate', exact: true })).not.toBeVisible();
+    await expect(
+      this.page.getByRole('button', { name: 'Activate', exact: true }),
+    ).not.toBeVisible();
+  }
+
+  /**
+   * Opens a currency combobox (Primary or Secondary Currency — same
+   * confirmed-live option set either way, TC:14) and asserts every option
+   * renders as "<CODE> — <name>". Pass `checkListbox: true` once per test
+   * to also confirm the trigger opens a plain `listbox` popup.
+   */
+  async expectCurrencyOptionsVisible(
+    trigger: Locator,
+    { checkListbox = false }: { checkListbox?: boolean } = {},
+  ): Promise<void> {
+    await trigger.click();
+    if (checkListbox) {
+      await expect(this.locators.currencyListbox).toBeVisible();
+    }
+    for (const code of CompanyFormPage.CURRENCY_CODES) {
+      await expect(this.locators.option(new RegExp(`^${code} —`))).toBeVisible();
+    }
   }
 }

@@ -166,4 +166,14 @@ export class UomPage extends BasePage {
     await this.search(uomCode);
     await expect(this.locators.row(uomCode)).toHaveCount(0);
   }
+
+  /** Asserts a main-grid row containing `text` is visible — e.g. an updated Description. Caller is expected to have already narrowed via search(). */
+  async expectRowWithTextVisible(text: string): Promise<void> {
+    await expect(this.locators.rowContainingText(text)).toBeVisible();
+  }
+
+  /** Confirmed live: unlike Size/Color Master, this screen has no bulk "Upload" button (TC:1). */
+  async expectNoUploadButton(): Promise<void> {
+    await expect(this.locators.uploadButton()).toHaveCount(0);
+  }
 }

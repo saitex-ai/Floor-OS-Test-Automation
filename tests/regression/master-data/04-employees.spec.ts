@@ -196,30 +196,30 @@ test.describe('Master Data - Employees', () => {
     });
   });
 
-  test(
-    'TC:8 Verify "Maintained by" is required with no default — historical bug confirmed fixed/changed',
-    async ({ employeesListPage, employeeFormPage }) => {
-      const fullName = `PW MD Emp NoMaintainer ${Date.now()}`;
+  test('TC:8 Verify "Maintained by" is required with no default — historical bug confirmed fixed/changed', async ({
+    employeesListPage,
+    employeeFormPage,
+  }) => {
+    const fullName = `PW MD Emp NoMaintainer ${Date.now()}`;
 
-      await employeesListPage.open();
-      await employeesListPage.expectLoaded();
-      await employeesListPage.openNewEmployee();
+    await employeesListPage.open();
+    await employeesListPage.expectLoaded();
+    await employeesListPage.openNewEmployee();
 
-      await test.step('Fill Full Name + Department, leave Maintained by on "Select…"', async () => {
-        await expect(employeeFormPage.locators.maintainedBy).toHaveText('Select…');
-        await employeeFormPage.fillFullNameAndDepartmentOnly(fullName);
-        await employeeFormPage.create();
-      });
+    await test.step('Fill Full Name + Department, leave Maintained by on "Select…"', async () => {
+      await expect(employeeFormPage.locators.maintainedBy).toHaveText('Select…');
+      await employeeFormPage.fillFullNameAndDepartmentOnly(fullName);
+      await employeeFormPage.create();
+    });
 
-      // Confirmed live 2026-10-06: "Maintained by" has no default (not
-      // "IE-Assessed" as an older bug report claimed) and blocks save when
-      // left unset. Do not "fix" this assertion back to the old bug.
-      await test.step('Blocked with an inline "Required" error under Maintained by', async () => {
-        await expect(employeeFormPage.locators.createButton).toBeVisible();
-        await employeeFormPage.expectValidationError('Required');
-      });
-    },
-  );
+    // Confirmed live 2026-10-06: "Maintained by" has no default (not
+    // "IE-Assessed" as an older bug report claimed) and blocks save when
+    // left unset. Do not "fix" this assertion back to the old bug.
+    await test.step('Blocked with an inline "Required" error under Maintained by', async () => {
+      await expect(employeeFormPage.locators.createButton).toBeVisible();
+      await employeeFormPage.expectValidationError('Required');
+    });
+  });
 
   test('TC:9 Verify optional fields can be left blank', async ({
     employeesListPage,
@@ -300,26 +300,26 @@ test.describe('Master Data - Employees', () => {
     });
   });
 
-  test(
-    "TC:12 Verify Active switch's real default on create (on/Active) — differs from Departments/Sites",
-    async ({ employeesListPage, employeeFormPage }) => {
-      const fullName = `PW MD Emp ActiveDefault ${Date.now()}`;
+  test("TC:12 Verify Active switch's real default on create (on/Active) — differs from Departments/Sites", async ({
+    employeesListPage,
+    employeeFormPage,
+  }) => {
+    const fullName = `PW MD Emp ActiveDefault ${Date.now()}`;
 
-      await employeesListPage.open();
-      await employeesListPage.expectLoaded();
-      await employeesListPage.openNewEmployee();
+    await employeesListPage.open();
+    await employeesListPage.expectLoaded();
+    await employeesListPage.openNewEmployee();
 
-      await test.step('Default Active state before touching the switch is ON', async () => {
-        expect(await employeeFormPage.isActive()).toBe(true);
-      });
+    await test.step('Default Active state before touching the switch is ON', async () => {
+      expect(await employeeFormPage.isActive()).toBe(true);
+    });
 
-      await test.step('Save without touching Active — saved as Active', async () => {
-        await employeeFormPage.fillRequired({ fullName });
-        await employeeFormPage.create();
-        await employeeFormPage.expectCreatedSuccessfully();
-        await employeesListPage.search(fullName);
-        await expect(employeesListPage.locators.row(fullName)).toContainText('Active');
-      });
-    },
-  );
+    await test.step('Save without touching Active — saved as Active', async () => {
+      await employeeFormPage.fillRequired({ fullName });
+      await employeeFormPage.create();
+      await employeeFormPage.expectCreatedSuccessfully();
+      await employeesListPage.search(fullName);
+      await expect(employeesListPage.locators.row(fullName)).toContainText('Active');
+    });
+  });
 });

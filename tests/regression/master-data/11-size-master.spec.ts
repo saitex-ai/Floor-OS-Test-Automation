@@ -1,7 +1,5 @@
 import * as allure from 'allure-js-commons';
-import { type Page } from '@playwright/test';
 import { test, expect } from '../../../src/fixtures/master-data.fixtures';
-import { SizePage } from '../../../src/pages/master-data/size.page';
 
 /**
  * Master Data — Size Master.
@@ -11,12 +9,6 @@ import { SizePage } from '../../../src/pages/master-data/size.page';
  * story yet (brand-new coverage, no `allure.tms()` calls). Storage state
  * from auth.setup.ts is already applied via the "master-data" project's
  * dependency — no login needed here.
- *
- * `sizePage` is built directly from the `page` fixture rather than a
- * shared `master-data.fixtures.ts` entry — that file is being extended
- * concurrently for `sizePage`/`colorPage`/`uomPage` by another change; once
- * merged, this can switch to destructuring `sizePage` from the test
- * fixture like the other Master Data specs do.
  *
  * Test data strategy: a Size is *composed* from an existing Item
  * Category + Inseam + Waist (no free text at all, see size.locators.ts),
@@ -96,15 +88,10 @@ function comboText(inseam: string, waist: string): string {
 }
 
 test.describe('Master Data - Size Master', () => {
-  let sizePage: SizePage;
-  let page: Page;
-
-  test.beforeEach(async ({ page: pw }) => {
+  test.beforeEach(async ({ sizePage }) => {
     await allure.epic('Master Data');
     await allure.feature('Size Master');
     await allure.owner('Master Data QA');
-    page = pw;
-    sizePage = new SizePage(page);
     await sizePage.open();
     // Confirmed live (agent-notes/master-data-module.md): the dev OIDC
     // redirect can take 15-18s to client-side-route to the real target
@@ -114,7 +101,7 @@ test.describe('Master Data - Size Master', () => {
     await sizePage.expectLoaded();
   });
 
-  test('TC:1 Verify Size Master list screen layout', async () => {
+  test('TC:1 Verify Size Master list screen layout', async ({ sizePage }) => {
     await sizePage.expectLoaded();
     await expect(sizePage.locators.allTab).toBeVisible();
     await expect(sizePage.locators.draftTab).toBeVisible();
@@ -124,7 +111,7 @@ test.describe('Master Data - Size Master', () => {
     await expect(sizePage.locators.searchInput).toBeVisible();
   });
 
-  test('TC:2 Verify successful Size creation with all required fields', async () => {
+  test('TC:2 Verify successful Size creation with all required fields', async ({ sizePage }) => {
     const { inseam, waist } = freshCombo();
 
     await test.step('Create a Size from Item Category + Inseam + Waist', async () => {
@@ -139,11 +126,13 @@ test.describe('Master Data - Size Master', () => {
       await sizePage.search(combo);
       // A fresh Size always saves as "Approved" immediately — confirmed
       // live, no Draft/approval step despite those tabs existing.
-      await expect(page.getByRole('row').filter({ hasText: combo })).toBeVisible();
+      await sizePage.expectRowWithTextVisible(combo);
     });
   });
 
-  test('TC:3 Verify Description auto-fills from Inseam x Waist and cannot be typed into', async () => {
+  test('TC:3 Verify Description auto-fills from Inseam x Waist and cannot be typed into', async ({
+    sizePage,
+  }) => {
     await sizePage.openNewSize();
 
     await test.step('Pick Item Category, Inseam and Waist', async () => {
@@ -164,14 +153,18 @@ test.describe('Master Data - Size Master', () => {
     await sizePage.cancel();
   });
 
-  test("TC:4 Verify editing an existing Size's Inseam/Waist", async () => {
+  test("TC:4 Verify editing an existing Size's Inseam/Waist", async ({ sizePage }) => {
     const first = freshCombo();
     let second = freshCombo();
     while (second.waist === first.waist) second = freshCombo();
 
     await test.step('Create a Size to edit', async () => {
       await sizePage.openNewSize();
-      await sizePage.fillRequired({ itemCategory: ITEM_CATEGORY, inseam: first.inseam, waist: first.waist });
+      await sizePage.fillRequired({
+        itemCategory: ITEM_CATEGORY,
+        inseam: first.inseam,
+        waist: first.waist,
+      });
       await sizePage.create();
       await sizePage.expectCreatedSuccessfully();
     });
@@ -179,12 +172,14 @@ test.describe('Master Data - Size Master', () => {
     await test.step('Open it and change the Waist', async () => {
       const firstCombo = comboText(first.inseam, first.waist);
       await sizePage.search(firstCombo);
-      await page.getByRole('row').filter({ hasText: firstCombo }).first().click();
+      await sizePage.openRowByText(firstCombo);
       await sizePage.pickLookupValue('waist', second.waist);
     });
 
     await test.step('The Waist field itself updates and Item Category stays locked', async () => {
-      await expect(sizePage.locators.waistValueInput).toHaveValue(new RegExp(`^${second.waist}\\b`));
+      await expect(sizePage.locators.waistValueInput).toHaveValue(
+        new RegExp(`^${second.waist}\\b`),
+      );
       await expect(sizePage.locators.itemCategoryPickerButton).toBeDisabled();
     });
 
@@ -198,7 +193,9 @@ test.describe('Master Data - Size Master', () => {
     // asserting it stays stale here is asserting the REAL current
     // behavior, not a test bug.
     await test.step('BUG: Description does NOT re-derive on edit — it stays stale', async () => {
-      await expect(sizePage.locators.descriptionInput).toHaveValue(comboText(first.inseam, first.waist));
+      await expect(sizePage.locators.descriptionInput).toHaveValue(
+        comboText(first.inseam, first.waist),
+      );
     });
 
     await test.step('Save succeeds (and the saved record keeps the stale description)', async () => {
@@ -207,7 +204,7 @@ test.describe('Master Data - Size Master', () => {
     });
   });
 
-  test('TC:5 Verify searching the Size list by code', async () => {
+  test('TC:5 Verify searching the Size list by code', async ({ sizePage }) => {
     const { inseam, waist } = freshCombo();
 
     await test.step('Create a Size to search for', async () => {
@@ -221,11 +218,11 @@ test.describe('Master Data - Size Master', () => {
       // A bare Waist code is not safe to search by alone — see comboText()'s doc.
       const combo = comboText(inseam, waist);
       await sizePage.search(combo);
-      await expect(page.getByRole('row').filter({ hasText: combo })).toBeVisible();
+      await sizePage.expectRowWithTextVisible(combo);
     });
   });
 
-  test('TC:6 Verify Item Category is a genuinely required field', async () => {
+  test('TC:6 Verify Item Category is a genuinely required field', async ({ sizePage }) => {
     const { inseam, waist } = freshCombo();
     await sizePage.openNewSize();
     await sizePage.pickLookupValue('inseam', inseam);
@@ -237,7 +234,7 @@ test.describe('Master Data - Size Master', () => {
     await expect(sizePage.locators.itemCategoryPickerButton).toBeVisible();
   });
 
-  test('TC:7 Verify Inseam is a genuinely required field', async () => {
+  test('TC:7 Verify Inseam is a genuinely required field', async ({ sizePage }) => {
     const { waist } = freshCombo();
     await sizePage.openNewSize();
     await sizePage.pickLookupValue('itemCategory', ITEM_CATEGORY);
@@ -249,7 +246,7 @@ test.describe('Master Data - Size Master', () => {
     await expect(sizePage.locators.inseamPickerButton).toBeVisible();
   });
 
-  test('TC:8 Verify Waist is a genuinely required field', async () => {
+  test('TC:8 Verify Waist is a genuinely required field', async ({ sizePage }) => {
     const { inseam } = freshCombo();
     await sizePage.openNewSize();
     await sizePage.pickLookupValue('itemCategory', ITEM_CATEGORY);
@@ -261,7 +258,9 @@ test.describe('Master Data - Size Master', () => {
     await expect(sizePage.locators.waistPickerButton).toBeVisible();
   });
 
-  test('TC:9 Verify duplicate Inseam+Waist within the same Item Category is rejected', async () => {
+  test('TC:9 Verify duplicate Inseam+Waist within the same Item Category is rejected', async ({
+    sizePage,
+  }) => {
     const { inseam, waist } = freshCombo();
 
     await test.step('Create a Size (succeeds)', async () => {
@@ -287,7 +286,7 @@ test.describe('Master Data - Size Master', () => {
     await expect(sizePage.locators.formDialog).toBeVisible();
   });
 
-  test('TC:10 Verify Cancel on "New Size" discards all selections', async () => {
+  test('TC:10 Verify Cancel on "New Size" discards all selections', async ({ sizePage }) => {
     await sizePage.openNewSize();
     await sizePage.pickLookupValue('itemCategory', ITEM_CATEGORY);
 
@@ -299,7 +298,10 @@ test.describe('Master Data - Size Master', () => {
     await expect(sizePage.locators.itemCategoryPickerButton).not.toContainText('GMT');
   });
 
-  test("TC:11 Verify deactivating a Size (and the list's reaction to it)", async () => {
+  test("TC:11 Verify deactivating a Size (and the list's reaction to it)", async ({
+    sizePage,
+    page,
+  }) => {
     const { inseam, waist } = freshCombo();
     let sizeId = '';
 
@@ -311,8 +313,7 @@ test.describe('Master Data - Size Master', () => {
       // A bare Waist code is not safe to search/filter by alone — see comboText()'s doc.
       const combo = comboText(inseam, waist);
       await sizePage.search(combo);
-      const row = page.getByRole('row').filter({ hasText: combo });
-      sizeId = (await row.getByRole('cell').nth(1).innerText()).trim();
+      sizeId = await sizePage.sizeIdFromRowText(combo);
     });
 
     await test.step('Deactivate it — fires immediately, no confirmation step', async () => {
@@ -340,12 +341,14 @@ test.describe('Master Data - Size Master', () => {
     });
   });
 
-  test('TC:12 Verify the search box safely handles unusual/special-character input', async () => {
+  test('TC:12 Verify the search box safely handles unusual/special-character input', async ({
+    sizePage,
+  }) => {
     await sizePage.search('<script>alert(1)</script>');
 
     // No script executes (the page is still the Size Master list, not a
     // javascript: alert or a crashed render) and the grid shows zero rows.
     await expect(sizePage.locators.heading).toBeVisible();
-    await expect(page.getByRole('row')).toHaveCount(1); // header row only
+    await sizePage.expectGridRowCount(1); // header row only
   });
 });

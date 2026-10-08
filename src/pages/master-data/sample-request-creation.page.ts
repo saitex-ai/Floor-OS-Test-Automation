@@ -163,9 +163,9 @@ export class SampleRequestCreationPage extends BasePage {
 
   /** Real toast text confirmed live: "Sample request(s) deleted." — literal "(s)" even for one record. */
   async expectDeletedToast(): Promise<void> {
-    await expect(
-      this.page.getByText('Sample request(s) deleted.', { exact: true }),
-    ).toBeVisible({ timeout: 15_000 });
+    await expect(this.page.getByText('Sample request(s) deleted.', { exact: true })).toBeVisible({
+      timeout: 15_000,
+    });
   }
 
   /**
@@ -191,7 +191,9 @@ export class SampleRequestCreationPage extends BasePage {
   /** Posted state: Customer/Season/Company unlocked, confirmed via the Edit modal's own hint text. */
   async expectUnlockedForPosted(): Promise<void> {
     await expect(
-      this.locators.dialog.getByText(/This request is Posted — Customer, Season & Company can be changed\./),
+      this.locators.dialog.getByText(
+        /This request is Posted — Customer, Season & Company can be changed\./,
+      ),
     ).toBeVisible();
   }
 

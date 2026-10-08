@@ -108,4 +108,15 @@ export class ColorLocators {
   requiredError(): Locator {
     return this.formDialog.getByText('Required', { exact: true });
   }
+
+  /**
+   * A data row on the main (non-picker) list grid whose text contains
+   * `text` — e.g. the uppercased Color Code or an updated Description.
+   * Safe to filter by `hasText` here (unlike the Item Category picker's
+   * pickerDataRows() — see that method's doc): the codes/descriptions this
+   * is used with are specific enough not to collide with an unrelated row.
+   */
+  rowContainingText(text: string): Locator {
+    return this.page.getByRole('row').filter({ hasText: text });
+  }
 }

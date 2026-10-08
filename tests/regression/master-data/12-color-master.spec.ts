@@ -1,7 +1,5 @@
 import * as allure from 'allure-js-commons';
-import { type Page } from '@playwright/test';
 import { test, expect } from '../../../src/fixtures/master-data.fixtures';
-import { ColorPage } from '../../../src/pages/master-data/color.page';
 
 /**
  * Master Data — Color Master.
@@ -11,12 +9,6 @@ import { ColorPage } from '../../../src/pages/master-data/color.page';
  * story yet (brand-new coverage, no `allure.tms()` calls). Storage state
  * from auth.setup.ts is already applied via the "master-data" project's
  * dependency — no login needed here.
- *
- * `colorPage` is built directly from the `page` fixture rather than a
- * shared `master-data.fixtures.ts` entry — that file is being extended
- * concurrently for `sizePage`/`colorPage`/`uomPage` by another change;
- * once merged, this can switch to destructuring `colorPage` from the test
- * fixture like the other Master Data specs do.
  *
  * Unlike Size Master, Color Code/Description are genuine free text, so
  * every throwaway record here is prefixed `PW MD Color ` + a timestamp —
@@ -30,15 +22,10 @@ function uniqueCode(): string {
 const ITEM_CATEGORY = 'GMT';
 
 test.describe('Master Data - Color Master', () => {
-  let colorPage: ColorPage;
-  let page: Page;
-
-  test.beforeEach(async ({ page: pw }) => {
+  test.beforeEach(async ({ colorPage }) => {
     await allure.epic('Master Data');
     await allure.feature('Color Master');
     await allure.owner('Master Data QA');
-    page = pw;
-    colorPage = new ColorPage(page);
     await colorPage.open();
     // Confirmed live (agent-notes/master-data-module.md): the dev OIDC
     // redirect can take 15-18s to client-side-route to the real target
@@ -47,7 +34,7 @@ test.describe('Master Data - Color Master', () => {
     await colorPage.expectLoaded();
   });
 
-  test('TC:1 Verify Color Master list screen layout', async () => {
+  test('TC:1 Verify Color Master list screen layout', async ({ colorPage }) => {
     await colorPage.expectLoaded();
     await expect(colorPage.locators.allTab).toBeVisible();
     await expect(colorPage.locators.activeTab).toBeVisible();
@@ -55,12 +42,16 @@ test.describe('Master Data - Color Master', () => {
     await expect(colorPage.locators.searchInput).toBeVisible();
   });
 
-  test('TC:2 Verify successful Color creation with all required fields', async () => {
+  test('TC:2 Verify successful Color creation with all required fields', async ({ colorPage }) => {
     const code = uniqueCode();
 
     await test.step('Create a Color with Code, Description and Item Category', async () => {
       await colorPage.openNewColor();
-      await colorPage.fillRequired({ code, description: `${code} description`, itemCategory: ITEM_CATEGORY });
+      await colorPage.fillRequired({
+        code,
+        description: `${code} description`,
+        itemCategory: ITEM_CATEGORY,
+      });
       await colorPage.create();
     });
 
@@ -68,23 +59,27 @@ test.describe('Master Data - Color Master', () => {
       await colorPage.expectCreatedSuccessfully();
       await colorPage.search(code);
       // Confirmed live: the entered code is stored UPPERCASED server-side.
-      await expect(page.getByRole('row').filter({ hasText: code.toUpperCase() })).toBeVisible();
+      await colorPage.expectRowWithTextVisible(code.toUpperCase());
     });
   });
 
-  test("TC:3 Verify editing an existing Color's Description", async () => {
+  test("TC:3 Verify editing an existing Color's Description", async ({ colorPage }) => {
     const code = uniqueCode();
 
     await test.step('Create a Color to edit', async () => {
       await colorPage.openNewColor();
-      await colorPage.fillRequired({ code, description: `${code} original`, itemCategory: ITEM_CATEGORY });
+      await colorPage.fillRequired({
+        code,
+        description: `${code} original`,
+        itemCategory: ITEM_CATEGORY,
+      });
       await colorPage.create();
       await colorPage.expectCreatedSuccessfully();
     });
 
     await test.step('Change its Description and save', async () => {
       await colorPage.search(code);
-      await page.getByRole('row').filter({ hasText: code.toUpperCase() }).click();
+      await colorPage.openRowByText(code.toUpperCase());
       await colorPage.fillDescription(`${code} updated`);
       await colorPage.saveChanges();
     });
@@ -92,62 +87,76 @@ test.describe('Master Data - Color Master', () => {
     await test.step('Toast reads "Color updated." and the grid reflects the new text', async () => {
       await colorPage.expectUpdatedSuccessfully();
       await colorPage.search(code);
-      await expect(page.getByRole('row').filter({ hasText: `${code} updated` })).toBeVisible();
+      await colorPage.expectRowWithTextVisible(`${code} updated`);
     });
   });
 
-  test('TC:4 Verify Cancel on Edit discards unsaved changes', async () => {
+  test('TC:4 Verify Cancel on Edit discards unsaved changes', async ({ colorPage }) => {
     const code = uniqueCode();
 
     await test.step('Create a Color to edit', async () => {
       await colorPage.openNewColor();
-      await colorPage.fillRequired({ code, description: `${code} original`, itemCategory: ITEM_CATEGORY });
+      await colorPage.fillRequired({
+        code,
+        description: `${code} original`,
+        itemCategory: ITEM_CATEGORY,
+      });
       await colorPage.create();
       await colorPage.expectCreatedSuccessfully();
     });
 
     await test.step('Change Description then Cancel instead of saving', async () => {
       await colorPage.search(code);
-      await page.getByRole('row').filter({ hasText: code.toUpperCase() }).click();
+      await colorPage.openRowByText(code.toUpperCase());
       await colorPage.fillDescription(`${code} EDITED-NOT-SAVED`);
       await colorPage.cancel();
     });
 
     await test.step('Re-opening shows the original, unedited Description', async () => {
       await colorPage.search(code);
-      await page.getByRole('row').filter({ hasText: code.toUpperCase() }).click();
+      await colorPage.openRowByText(code.toUpperCase());
       await expect(colorPage.locators.descriptionInput).toHaveValue(`${code} original`);
     });
   });
 
-  test('TC:5 Verify searching the Color list by code', async () => {
+  test('TC:5 Verify searching the Color list by code', async ({ colorPage }) => {
     const code = uniqueCode();
 
     await test.step('Create a Color to search for', async () => {
       await colorPage.openNewColor();
-      await colorPage.fillRequired({ code, description: `${code} description`, itemCategory: ITEM_CATEGORY });
+      await colorPage.fillRequired({
+        code,
+        description: `${code} description`,
+        itemCategory: ITEM_CATEGORY,
+      });
       await colorPage.create();
       await colorPage.expectCreatedSuccessfully();
     });
 
     await test.step('Searching by its code narrows the grid to it', async () => {
       await colorPage.search(code);
-      await expect(page.getByRole('row').filter({ hasText: code.toUpperCase() })).toBeVisible();
+      await colorPage.expectRowWithTextVisible(code.toUpperCase());
     });
   });
 
-  test('TC:6 Verify deactivating a Color updates its status and the tab counts', async () => {
+  test('TC:6 Verify deactivating a Color updates its status and the tab counts', async ({
+    colorPage,
+    page,
+  }) => {
     const code = uniqueCode();
     let colorId = '';
 
     await test.step('Create a throwaway Color', async () => {
       await colorPage.openNewColor();
-      await colorPage.fillRequired({ code, description: `${code} description`, itemCategory: ITEM_CATEGORY });
+      await colorPage.fillRequired({
+        code,
+        description: `${code} description`,
+        itemCategory: ITEM_CATEGORY,
+      });
       await colorPage.create();
       await colorPage.expectCreatedSuccessfully();
       await colorPage.search(code);
-      const row = page.getByRole('row').filter({ hasText: code.toUpperCase() });
-      colorId = (await row.getByRole('cell').nth(1).innerText()).trim();
+      colorId = await colorPage.colorIdFromRowText(code.toUpperCase());
       expect(colorId).toMatch(/^CMC/);
     });
 
@@ -169,18 +178,21 @@ test.describe('Master Data - Color Master', () => {
     });
   });
 
-  test('TC:7 Verify reactivating a deactivated Color', async () => {
+  test('TC:7 Verify reactivating a deactivated Color', async ({ colorPage }) => {
     const code = uniqueCode();
     let colorId = '';
 
     await test.step('Create and deactivate a throwaway Color', async () => {
       await colorPage.openNewColor();
-      await colorPage.fillRequired({ code, description: `${code} description`, itemCategory: ITEM_CATEGORY });
+      await colorPage.fillRequired({
+        code,
+        description: `${code} description`,
+        itemCategory: ITEM_CATEGORY,
+      });
       await colorPage.create();
       await colorPage.expectCreatedSuccessfully();
       await colorPage.search(code);
-      const row = page.getByRole('row').filter({ hasText: code.toUpperCase() });
-      colorId = (await row.getByRole('cell').nth(1).innerText()).trim();
+      colorId = await colorPage.colorIdFromRowText(code.toUpperCase());
       await colorPage.openRow(colorId);
       await colorPage.deactivate();
       await colorPage.expectDeactivatedSuccessfully();
@@ -199,7 +211,7 @@ test.describe('Master Data - Color Master', () => {
     });
   });
 
-  test('TC:8 Verify Color Code is a genuinely required field', async () => {
+  test('TC:8 Verify Color Code is a genuinely required field', async ({ colorPage }) => {
     await colorPage.openNewColor();
     await colorPage.fillDescription('missing code');
     await colorPage.pickItemCategory(ITEM_CATEGORY);
@@ -210,7 +222,7 @@ test.describe('Master Data - Color Master', () => {
     await expect(colorPage.locators.colorCodeInput).toBeVisible();
   });
 
-  test('TC:9 Verify Description is a genuinely required field', async () => {
+  test('TC:9 Verify Description is a genuinely required field', async ({ colorPage }) => {
     await colorPage.openNewColor();
     await colorPage.locators.colorCodeInput.fill(uniqueCode());
     await colorPage.pickItemCategory(ITEM_CATEGORY);
@@ -221,7 +233,7 @@ test.describe('Master Data - Color Master', () => {
     await expect(colorPage.locators.descriptionInput).toBeVisible();
   });
 
-  test('TC:10 Verify Item Category is a genuinely required field', async () => {
+  test('TC:10 Verify Item Category is a genuinely required field', async ({ colorPage }) => {
     const code = uniqueCode();
     await colorPage.openNewColor();
     await colorPage.locators.colorCodeInput.fill(code);
@@ -233,19 +245,29 @@ test.describe('Master Data - Color Master', () => {
     await expect(colorPage.locators.itemCategoryPickerButton).toBeVisible();
   });
 
-  test('TC:11 Verify duplicate Color Code within the same Item Category is rejected', async () => {
+  test('TC:11 Verify duplicate Color Code within the same Item Category is rejected', async ({
+    colorPage,
+  }) => {
     const code = uniqueCode();
 
     await test.step('Create a Color (succeeds)', async () => {
       await colorPage.openNewColor();
-      await colorPage.fillRequired({ code, description: `${code} first`, itemCategory: ITEM_CATEGORY });
+      await colorPage.fillRequired({
+        code,
+        description: `${code} first`,
+        itemCategory: ITEM_CATEGORY,
+      });
       await colorPage.create();
       await colorPage.expectCreatedSuccessfully();
     });
 
     await test.step('Repeat the exact same Code + Item Category — blocked', async () => {
       await colorPage.openNewColor();
-      await colorPage.fillRequired({ code, description: `${code} duplicate attempt`, itemCategory: ITEM_CATEGORY });
+      await colorPage.fillRequired({
+        code,
+        description: `${code} duplicate attempt`,
+        itemCategory: ITEM_CATEGORY,
+      });
       await colorPage.create();
     });
 
@@ -257,7 +279,9 @@ test.describe('Master Data - Color Master', () => {
     await expect(colorPage.locators.formDialog).toBeVisible();
   });
 
-  test('TC:12 Verify Color Code and Description respect their max-length limits', async () => {
+  test('TC:12 Verify Color Code and Description respect their max-length limits', async ({
+    colorPage,
+  }) => {
     await colorPage.openNewColor();
 
     await expect(colorPage.locators.colorCodeInput).toHaveAttribute('maxlength', '50');

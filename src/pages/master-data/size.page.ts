@@ -85,8 +85,16 @@ export class SizePage extends BasePage {
         dialog: l.itemCategoryPickerDialog,
         valueInput: l.itemCategoryValueInput,
       },
-      inseam: { button: l.inseamPickerButton, dialog: l.inseamPickerDialog, valueInput: l.inseamValueInput },
-      waist: { button: l.waistPickerButton, dialog: l.waistPickerDialog, valueInput: l.waistValueInput },
+      inseam: {
+        button: l.inseamPickerButton,
+        dialog: l.inseamPickerDialog,
+        valueInput: l.inseamValueInput,
+      },
+      waist: {
+        button: l.waistPickerButton,
+        dialog: l.waistPickerDialog,
+        valueInput: l.waistValueInput,
+      },
     }[field];
   }
 
@@ -283,5 +291,31 @@ export class SizePage extends BasePage {
   /** Reads the Status cell text for a given Size ID row, e.g. "Approved". */
   async rowStatus(sizeId: string): Promise<string> {
     return (await this.locators.row(sizeId).getByRole('cell').last().innerText()).trim();
+  }
+
+  /**
+   * Asserts a main-grid row containing `text` (e.g. the auto-derived
+   * "<Inseam> - <Waist>" combo) is visible. Caller is expected to have
+   * already narrowed via search().
+   */
+  async expectRowWithTextVisible(text: string): Promise<void> {
+    await expect(this.locators.rowContainingText(text)).toBeVisible();
+  }
+
+  /** Opens the (first) main-grid row whose text contains `text` — e.g. a just-searched combo description. */
+  async openRowByText(text: string): Promise<void> {
+    await this.locators.rowContainingText(text).first().click();
+  }
+
+  /** Reads the Size ID (2nd gridcell) from the main-grid row matching `text` — call after search() has narrowed to exactly one match. */
+  async sizeIdFromRowText(text: string): Promise<string> {
+    return (
+      await this.locators.rowContainingText(text).getByRole('cell').nth(1).innerText()
+    ).trim();
+  }
+
+  /** Asserts the main grid has exactly `count` rows, header row included (e.g. 1 for "no results"). */
+  async expectGridRowCount(count: number): Promise<void> {
+    await expect(this.locators.allRows()).toHaveCount(count);
   }
 }

@@ -46,6 +46,7 @@ export class CompanyFormLocators {
   readonly saveChangesButton: Locator;
   readonly cancelButton: Locator;
   readonly deactivateButton: Locator;
+  readonly currencyListbox: Locator;
 
   constructor(private readonly page: Page) {
     this.companyCodeInput = page.getByRole('textbox', { name: 'Company Code *', exact: true });
@@ -85,6 +86,7 @@ export class CompanyFormLocators {
     this.saveChangesButton = page.getByRole('button', { name: 'Save changes' });
     this.cancelButton = page.getByRole('button', { name: 'Cancel', exact: true }).first();
     this.deactivateButton = page.getByRole('button', { name: 'Deactivate', exact: true });
+    this.currencyListbox = page.getByRole('listbox');
   }
 
   /** An option in an open Country of Operation / Primary Currency / Secondary Currency dropdown. */

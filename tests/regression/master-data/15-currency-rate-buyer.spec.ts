@@ -1,6 +1,5 @@
-import { test } from '../../../src/fixtures/master-data.fixtures';
-import { expect } from '@playwright/test';
-import { CurrencyRateBuyerPage } from '../../../src/pages/master-data/currency-rate-buyer.page';
+import * as allure from 'allure-js-commons';
+import { test, expect } from '../../../src/fixtures/master-data.fixtures';
 
 /**
  * Master Data — Currency Rate Buyer (System Management).
@@ -17,19 +16,18 @@ import { CurrencyRateBuyerPage } from '../../../src/pages/master-data/currency-r
  * seeded anywhere in dev. Customer "ACME Apparel" (`CTC0000002`) DOES
  * have 13 real seeded rows — used below for the positive Load path
  * (TC:6b), while a fresh/throwaway customer correctly has none (TC:6).
- *
- * `currencyRateBuyerPage` isn't a named fixture yet on
- * master-data.fixtures.ts (being edited centrally elsewhere) —
- * constructed directly from the standard `page` fixture per test
- * instead. Swap for a named fixture once added there.
  */
 const ACME_APPAREL = 'ACME Apparel';
 const THROWAWAY_CUSTOMER_SEARCH = 'AutoTest_Customer';
 
 test.describe('Master Data - Currency Rate Buyer', () => {
-  test('TC:1 Verify screen layout and both tabs load', async ({ page }) => {
-    const currencyRateBuyerPage = new CurrencyRateBuyerPage(page);
+  test.beforeEach(async () => {
+    await allure.epic('Master Data');
+    await allure.feature('Currency Rate Buyer');
+    await allure.owner('Master Data QA');
+  });
 
+  test('TC:1 Verify screen layout and both tabs load', async ({ currencyRateBuyerPage }) => {
     await test.step('Navigate to Currency Rate Buyer', async () => {
       await currencyRateBuyerPage.open();
     });
@@ -39,8 +37,10 @@ test.describe('Master Data - Currency Rate Buyer', () => {
     });
   });
 
-  test('TC:2 Verify no Create/New entry point exists for this role', async ({ page }) => {
-    const currencyRateBuyerPage = new CurrencyRateBuyerPage(page);
+  test('TC:2 Verify no Create/New entry point exists for this role', async ({
+    page,
+    currencyRateBuyerPage,
+  }) => {
     await currencyRateBuyerPage.open();
     await currencyRateBuyerPage.expectLoaded();
 
@@ -56,8 +56,9 @@ test.describe('Master Data - Currency Rate Buyer', () => {
     });
   });
 
-  test('TC:3 Verify "Rate Details" requires three fields, not two', async ({ page }) => {
-    const currencyRateBuyerPage = new CurrencyRateBuyerPage(page);
+  test('TC:3 Verify "Rate Details" requires three fields, not two', async ({
+    currencyRateBuyerPage,
+  }) => {
     await currencyRateBuyerPage.open();
     await currencyRateBuyerPage.expectLoaded();
     await currencyRateBuyerPage.openRateDetailsTab();
@@ -69,8 +70,9 @@ test.describe('Master Data - Currency Rate Buyer', () => {
     });
   });
 
-  test('TC:4 Verify Load stays disabled until Customer is also picked', async ({ page }) => {
-    const currencyRateBuyerPage = new CurrencyRateBuyerPage(page);
+  test('TC:4 Verify Load stays disabled until Customer is also picked', async ({
+    currencyRateBuyerPage,
+  }) => {
     await currencyRateBuyerPage.open();
     await currencyRateBuyerPage.expectLoaded();
     await currencyRateBuyerPage.openRateDetailsTab();
@@ -83,8 +85,8 @@ test.describe('Master Data - Currency Rate Buyer', () => {
 
   test('TC:5 Verify the Customer picker is the shared searchable "Select Customer" dialog', async ({
     page,
+    currencyRateBuyerPage,
   }) => {
-    const currencyRateBuyerPage = new CurrencyRateBuyerPage(page);
     await currencyRateBuyerPage.open();
     await currencyRateBuyerPage.expectLoaded();
     await currencyRateBuyerPage.openRateDetailsTab();
@@ -103,9 +105,8 @@ test.describe('Master Data - Currency Rate Buyer', () => {
   });
 
   test('TC:6 Verify Load for a customer with no seeded overrides shows the empty state', async ({
-    page,
+    currencyRateBuyerPage,
   }) => {
-    const currencyRateBuyerPage = new CurrencyRateBuyerPage(page);
     await currencyRateBuyerPage.open();
     await currencyRateBuyerPage.expectLoaded();
     await currencyRateBuyerPage.openRateDetailsTab();
@@ -123,9 +124,8 @@ test.describe('Master Data - Currency Rate Buyer', () => {
   });
 
   test('TC:6b Verify Load returns real rows for a customer with seeded overrides (ACME Apparel)', async ({
-    page,
+    currencyRateBuyerPage,
   }) => {
-    const currencyRateBuyerPage = new CurrencyRateBuyerPage(page);
     await currencyRateBuyerPage.open();
     await currencyRateBuyerPage.expectLoaded();
     await currencyRateBuyerPage.openRateDetailsTab();
@@ -143,9 +143,8 @@ test.describe('Master Data - Currency Rate Buyer', () => {
   });
 
   test('TC:7 Verify "Currency Rate List" is gated behind picking a Customer first', async ({
-    page,
+    currencyRateBuyerPage,
   }) => {
-    const currencyRateBuyerPage = new CurrencyRateBuyerPage(page);
     await currencyRateBuyerPage.open();
     await currencyRateBuyerPage.expectLoaded();
 
@@ -163,8 +162,9 @@ test.describe('Master Data - Currency Rate Buyer', () => {
     });
   });
 
-  test('TC:8 Verify grid toolbar is absent even once real data is loaded', async ({ page }) => {
-    const currencyRateBuyerPage = new CurrencyRateBuyerPage(page);
+  test('TC:8 Verify grid toolbar is absent even once real data is loaded', async ({
+    currencyRateBuyerPage,
+  }) => {
     await currencyRateBuyerPage.open();
     await currencyRateBuyerPage.expectLoaded();
     await currencyRateBuyerPage.openRateDetailsTab();
@@ -180,9 +180,8 @@ test.describe('Master Data - Currency Rate Buyer', () => {
   });
 
   test('TC:9 Verify "Currency Rate List" extra filters once a Customer is loaded', async ({
-    page,
+    currencyRateBuyerPage,
   }) => {
-    const currencyRateBuyerPage = new CurrencyRateBuyerPage(page);
     await currencyRateBuyerPage.open();
     await currencyRateBuyerPage.expectLoaded();
     await currencyRateBuyerPage.openRateDetailsTab();
@@ -196,30 +195,29 @@ test.describe('Master Data - Currency Rate Buyer', () => {
       // rendered text — getByText() never matches an input's value
       // (confirmed live: a getByText() version of this assertion found
       // nothing). toHaveValue() is the correct check.
-      await expect(currencyRateBuyerPage.locators.customerFilterField).toHaveValue(
-        /ACME Apparel/,
-      );
+      await expect(currencyRateBuyerPage.locators.customerFilterField).toHaveValue(/ACME Apparel/);
       await currencyRateBuyerPage.expectRateRowVisible('INR');
     });
   });
 
-  test('TC:10 Verify this screen\'s second tab is named differently from Currency Rate\'s', async ({
+  test("TC:10 Verify this screen's second tab is named differently from Currency Rate's", async ({
     page,
+    currencyRateBuyerPage,
   }) => {
-    const currencyRateBuyerPage = new CurrencyRateBuyerPage(page);
     await currencyRateBuyerPage.open();
     await currencyRateBuyerPage.expectLoaded();
 
     await test.step('Second tab reads "Currency Rate List", not "Currency Rate Details"', async () => {
       await expect(currencyRateBuyerPage.locators.currencyRateListTab).toBeVisible();
-      await expect(page.getByRole('tab', { name: 'Currency Rate Details', exact: true })).toHaveCount(
-        0,
-      );
+      await expect(
+        page.getByRole('tab', { name: 'Currency Rate Details', exact: true }),
+      ).toHaveCount(0);
     });
   });
 
-  test('TC:11 Verify Clear resets all three "Rate Details" filters', async ({ page }) => {
-    const currencyRateBuyerPage = new CurrencyRateBuyerPage(page);
+  test('TC:11 Verify Clear resets all three "Rate Details" filters', async ({
+    currencyRateBuyerPage,
+  }) => {
     await currencyRateBuyerPage.open();
     await currencyRateBuyerPage.expectLoaded();
     await currencyRateBuyerPage.openRateDetailsTab();
@@ -235,8 +233,9 @@ test.describe('Master Data - Currency Rate Buyer', () => {
     });
   });
 
-  test('TC:12 Verify Customer search inside the picker narrows results', async ({ page }) => {
-    const currencyRateBuyerPage = new CurrencyRateBuyerPage(page);
+  test('TC:12 Verify Customer search inside the picker narrows results', async ({
+    currencyRateBuyerPage,
+  }) => {
     await currencyRateBuyerPage.open();
     await currencyRateBuyerPage.expectLoaded();
     await currencyRateBuyerPage.openRateDetailsTab();
@@ -244,7 +243,9 @@ test.describe('Master Data - Currency Rate Buyer', () => {
     await test.step('Typing a name fragment filters the 1009-row picker', async () => {
       await currencyRateBuyerPage.locators.customerField.click();
       await currencyRateBuyerPage.locators.customerSearchInput.fill(ACME_APPAREL);
-      await expect(currencyRateBuyerPage.locators.customerPickerRow(ACME_APPAREL).first()).toBeVisible();
+      await expect(
+        currencyRateBuyerPage.locators.customerPickerRow(ACME_APPAREL).first(),
+      ).toBeVisible();
     });
   });
 });

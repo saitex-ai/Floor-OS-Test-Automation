@@ -38,7 +38,8 @@ export class CustomerSeasonFormPage extends BasePage {
   }
 
   async fillFields(values: SeasonFieldValues): Promise<void> {
-    if (values.seasonCode !== undefined) await this.locators.seasonCodeInput.fill(values.seasonCode);
+    if (values.seasonCode !== undefined)
+      await this.locators.seasonCodeInput.fill(values.seasonCode);
     if (values.description !== undefined)
       await this.locators.descriptionInput.fill(values.description);
   }

@@ -1,7 +1,6 @@
 import { test, expect } from '../../../src/fixtures/master-data.fixtures';
 import * as allure from 'allure-js-commons';
-import { CompanyListPage } from '../../../src/pages/master-data/company-list.page';
-import { CompanyFormPage, type CompanyFieldValues } from '../../../src/pages/master-data/company-form.page';
+import { type CompanyFieldValues } from '../../../src/pages/master-data/company-form.page';
 
 /**
  * Master Data — Company Master.
@@ -11,11 +10,6 @@ import { CompanyFormPage, type CompanyFieldValues } from '../../../src/pages/mas
  * ClickUp test-case tasks exist for this story (first-ever coverage for
  * this screen). Storage state from auth.setup.ts is already applied via
  * the "master-data" project's dependency — no login needed here.
- *
- * `companyListPage`/`companyFormPage` are not registered on the shared
- * master-data fixtures yet (another agent owns that file) — constructed
- * directly from the `page` fixture here instead. See this session's
- * report for the exact fixture entries to add once that merge lands.
  */
 const REQUIRED_PRIMARY_CURRENCY = /USD/;
 const REQUIRED_SECONDARY_CURRENCY = /VND/;
@@ -30,10 +24,17 @@ function randCode5(): string {
 }
 
 /** All 6 confirmed-required fields, each with a fresh unique Company Code/Prefix Code/Name per call. */
-function requiredCompanyValues(suffix: string): Required<
+function requiredCompanyValues(
+  suffix: string,
+): Required<
   Pick<
     CompanyFieldValues,
-    'companyCode' | 'prefixCode' | 'companyName' | 'address' | 'primaryCurrency' | 'secondaryCurrency'
+    | 'companyCode'
+    | 'prefixCode'
+    | 'companyName'
+    | 'address'
+    | 'primaryCurrency'
+    | 'secondaryCurrency'
   >
 > {
   return {
@@ -53,9 +54,10 @@ test.describe('Master Data - Company Master', () => {
     await allure.owner('Master Data QA');
   });
 
-  test('TC:1 Verify successful creation with all fields filled', async ({ page }) => {
-    const companyListPage = new CompanyListPage(page);
-    const companyFormPage = new CompanyFormPage(page);
+  test('TC:1 Verify successful creation with all fields filled', async ({
+    companyListPage,
+    companyFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const name = `PW MD Company All ${suffix}`;
 
@@ -90,9 +92,10 @@ test.describe('Master Data - Company Master', () => {
     });
   });
 
-  test('TC:2 Verify successful creation with only required fields', async ({ page }) => {
-    const companyListPage = new CompanyListPage(page);
-    const companyFormPage = new CompanyFormPage(page);
+  test('TC:2 Verify successful creation with only required fields', async ({
+    companyListPage,
+    companyFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const name = `PW MD Company RequiredOnly ${suffix}`;
 
@@ -111,9 +114,10 @@ test.describe('Master Data - Company Master', () => {
     });
   });
 
-  test('TC:3 Verify successful edit of an existing company', async ({ page }) => {
-    const companyListPage = new CompanyListPage(page);
-    const companyFormPage = new CompanyFormPage(page);
+  test('TC:3 Verify successful edit of an existing company', async ({
+    companyListPage,
+    companyFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const originalName = `PW MD Company Edit ${suffix}`;
     const editedName = `PW MD Company Edited ${suffix}`;
@@ -121,7 +125,10 @@ test.describe('Master Data - Company Master', () => {
     await test.step('Create a throwaway company to edit', async () => {
       await companyListPage.open();
       await companyListPage.openNewCompany();
-      await companyFormPage.fillRequired({ ...requiredCompanyValues(suffix), companyName: originalName });
+      await companyFormPage.fillRequired({
+        ...requiredCompanyValues(suffix),
+        companyName: originalName,
+      });
       await companyFormPage.create();
       await companyFormPage.expectCreatedSuccessfully();
     });
@@ -140,9 +147,10 @@ test.describe('Master Data - Company Master', () => {
     });
   });
 
-  test('TC:4 Verify list search by Company Code and by Company Name', async ({ page }) => {
-    const companyListPage = new CompanyListPage(page);
-    const companyFormPage = new CompanyFormPage(page);
+  test('TC:4 Verify list search by Company Code and by Company Name', async ({
+    companyListPage,
+    companyFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const name = `PW MD Company Search ${suffix}`;
     const values = { ...requiredCompanyValues(suffix), companyName: name };
@@ -164,8 +172,9 @@ test.describe('Master Data - Company Master', () => {
     });
   });
 
-  test('TC:5 Verify All / Active / Inactive tab filters on the list', async ({ page }) => {
-    const companyListPage = new CompanyListPage(page);
+  test('TC:5 Verify All / Active / Inactive tab filters on the list', async ({
+    companyListPage,
+  }) => {
     await companyListPage.open();
 
     await test.step('Active tab shows only Active companies', async () => {
@@ -184,9 +193,10 @@ test.describe('Master Data - Company Master', () => {
     });
   });
 
-  test('TC:6 Verify validation when all required fields are left blank', async ({ page }) => {
-    const companyListPage = new CompanyListPage(page);
-    const companyFormPage = new CompanyFormPage(page);
+  test('TC:6 Verify validation when all required fields are left blank', async ({
+    companyListPage,
+    companyFormPage,
+  }) => {
     const l = companyFormPage.locators;
 
     await companyListPage.open();
@@ -207,9 +217,10 @@ test.describe('Master Data - Company Master', () => {
     });
   });
 
-  test('TC:7 Verify Country of Operation and other optional fields are genuinely optional', async ({ page }) => {
-    const companyListPage = new CompanyListPage(page);
-    const companyFormPage = new CompanyFormPage(page);
+  test('TC:7 Verify Country of Operation and other optional fields are genuinely optional', async ({
+    companyListPage,
+    companyFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const name = `PW MD Company OptionalSkip ${suffix}`;
 
@@ -227,9 +238,10 @@ test.describe('Master Data - Company Master', () => {
     });
   });
 
-  test('TC:8 Verify duplicate Company Code handling', async ({ page }) => {
-    const companyListPage = new CompanyListPage(page);
-    const companyFormPage = new CompanyFormPage(page);
+  test('TC:8 Verify duplicate Company Code handling', async ({
+    companyListPage,
+    companyFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const sharedCode = randCode5();
 
@@ -261,17 +273,19 @@ test.describe('Master Data - Company Master', () => {
     });
   });
 
-  test('TC:9 Verify Cancel discards changes on create', async ({ page }) => {
-    const companyListPage = new CompanyListPage(page);
-    const companyFormPage = new CompanyFormPage(page);
-
+  test('TC:9 Verify Cancel discards changes on create', async ({
+    companyListPage,
+    companyFormPage,
+  }) => {
     await companyListPage.open();
     const countBefore = await companyListPage.getAllCount();
 
     await test.step('Open New Company, fill some fields, then Cancel', async () => {
       await companyListPage.openNewCompany();
       await companyFormPage.locators.companyCodeInput.fill(randCode5());
-      await companyFormPage.locators.companyNameInput.fill(`PW MD Company ShouldNotPersist ${uniqueSuffix()}`);
+      await companyFormPage.locators.companyNameInput.fill(
+        `PW MD Company ShouldNotPersist ${uniqueSuffix()}`,
+      );
       await companyFormPage.cancel();
     });
 
@@ -282,10 +296,10 @@ test.describe('Master Data - Company Master', () => {
     });
   });
 
-  test('TC:10 Edge: Company Code and Prefix Code max length', async ({ page }) => {
-    const companyListPage = new CompanyListPage(page);
-    const companyFormPage = new CompanyFormPage(page);
-
+  test('TC:10 Edge: Company Code and Prefix Code max length', async ({
+    companyListPage,
+    companyFormPage,
+  }) => {
     await companyListPage.open();
     await companyListPage.openNewCompany();
 
@@ -300,9 +314,10 @@ test.describe('Master Data - Company Master', () => {
     });
   });
 
-  test('TC:11 Edge: special/unicode characters in Company Name are accepted', async ({ page }) => {
-    const companyListPage = new CompanyListPage(page);
-    const companyFormPage = new CompanyFormPage(page);
+  test('TC:11 Edge: special/unicode characters in Company Name are accepted', async ({
+    companyListPage,
+    companyFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const specialName = `PW MD Company <b>tag</b> "quote" 日本語 ${suffix}`;
 
@@ -310,7 +325,10 @@ test.describe('Master Data - Company Master', () => {
     await companyListPage.openNewCompany();
 
     await test.step('Fill Company Name with special/unicode characters', async () => {
-      await companyFormPage.fillRequired({ ...requiredCompanyValues(suffix), companyName: specialName });
+      await companyFormPage.fillRequired({
+        ...requiredCompanyValues(suffix),
+        companyName: specialName,
+      });
     });
 
     await test.step('The textbox retains the full string with no stripping or truncation', async () => {
@@ -323,9 +341,10 @@ test.describe('Master Data - Company Master', () => {
     });
   });
 
-  test('TC:12 Verify Deactivate action and its real effect', async ({ page }) => {
-    const companyListPage = new CompanyListPage(page);
-    const companyFormPage = new CompanyFormPage(page);
+  test('TC:12 Verify Deactivate action and its real effect', async ({
+    companyListPage,
+    companyFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const name = `PW MD Company Deactivate ${suffix}`;
 
@@ -350,9 +369,10 @@ test.describe('Master Data - Company Master', () => {
     });
   });
 
-  test('TC:13 Verify reactivating a deactivated company — known trap, confirmed live', async ({ page }) => {
-    const companyListPage = new CompanyListPage(page);
-    const companyFormPage = new CompanyFormPage(page);
+  test('TC:13 Verify reactivating a deactivated company — known trap, confirmed live', async ({
+    companyListPage,
+    companyFormPage,
+  }) => {
     const suffix = uniqueSuffix();
     const name = `PW MD Company Reactivate ${suffix}`;
 
@@ -385,28 +405,28 @@ test.describe('Master Data - Company Master', () => {
     });
   });
 
-  test('TC:14 Verify Primary Currency / Secondary Currency dropdown options', async ({ page }) => {
-    const companyListPage = new CompanyListPage(page);
-    const companyFormPage = new CompanyFormPage(page);
-
+  test('TC:14 Verify Primary Currency / Secondary Currency dropdown options', async ({
+    page,
+    companyListPage,
+    companyFormPage,
+  }) => {
     await companyListPage.open();
     await companyListPage.openNewCompany();
 
     await test.step('Opening Primary Currency shows a plain listbox with the confirmed option set', async () => {
-      await companyFormPage.locators.primaryCurrencyCombobox.click();
-      const listbox = page.getByRole('listbox');
-      await expect(listbox).toBeVisible();
-      for (const code of ['CNY', 'EUR', 'GBP', 'HKD', 'INR', 'JPY', 'KRW', 'SGD', 'USD', 'VND']) {
-        await expect(page.getByRole('option', { name: new RegExp(`^${code} —`) })).toBeVisible();
-      }
+      await companyFormPage.expectCurrencyOptionsVisible(
+        companyFormPage.locators.primaryCurrencyCombobox,
+        {
+          checkListbox: true,
+        },
+      );
       await page.keyboard.press('Escape');
     });
 
     await test.step('Secondary Currency offers the same option set', async () => {
-      await companyFormPage.locators.secondaryCurrencyCombobox.click();
-      for (const code of ['CNY', 'EUR', 'GBP', 'HKD', 'INR', 'JPY', 'KRW', 'SGD', 'USD', 'VND']) {
-        await expect(page.getByRole('option', { name: new RegExp(`^${code} —`) })).toBeVisible();
-      }
+      await companyFormPage.expectCurrencyOptionsVisible(
+        companyFormPage.locators.secondaryCurrencyCombobox,
+      );
     });
   });
 });
