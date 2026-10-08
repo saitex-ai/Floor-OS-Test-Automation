@@ -21,9 +21,8 @@ export const MODULE_IDS = [
   'planning',
   'techpack',
   'bom',
+  'sample-development',
   'master-data',
-  'admin',
-  'copilot',
 ] as const;
 
 export type ModuleId = (typeof MODULE_IDS)[number];
@@ -55,12 +54,16 @@ export const MODULES: Record<ModuleId, ModuleConfig> = {
   // Served by app-techpack (its `./BomRoot` export), but the shell mounts it
   // at its own /bom route and it's tested/owned as a module of its own.
   bom: { id: 'bom', label: 'BOM', path: '/bom', envPrefix: 'BOM' },
+  'sample-development': {
+    id: 'sample-development',
+    label: 'Sample Development',
+    path: '/sample-development',
+    envPrefix: 'SAMPLE_DEVELOPMENT',
+  },
   'master-data': {
     id: 'master-data',
     label: 'Master Data',
     path: '/master-data',
     envPrefix: 'MASTER_DATA',
   },
-  admin: { id: 'admin', label: 'Admin', path: '/admin', envPrefix: 'ADMIN' },
-  copilot: { id: 'copilot', label: 'Copilot', path: '/copilot', envPrefix: 'COPILOT' },
 };

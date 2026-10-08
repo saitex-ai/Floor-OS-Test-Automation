@@ -90,7 +90,7 @@ pw-hybrid-framework/
     │   ├── mill/
     │   │   ├── auth.setup.ts
     │   │   └── mill.spec.ts
-    │   └── <module>/...            # costing, planning, techpack, master-data, admin, copilot
+    │   └── <module>/...            # costing, planning, techpack, master-data
     └── sanity/                     # a lighter smoke-test subset per module
         ├── crm/                    # reuses regression/crm's auth.setup.ts login
         └── <module>/...            # mill, costing, planning, techpack, master-data
@@ -202,8 +202,8 @@ npm run test:sanity:dev        # every module's sanity suite, dev
 Smoke is wired up for all 8 modules (see `smokeProjects` in
 `playwright.config.ts`). Sanity is currently wired up for `crm`, `mill`,
 `costing`, `planning`, `techpack`, and `master-data` (see
-`SANITY_MODULE_IDS` in `playwright.config.ts`) — add `admin`/`copilot`
-there too whenever those QAs want sanity coverage.
+`SANITY_MODULE_IDS` in `playwright.config.ts`) — add `bom` or
+`sample-development` there too whenever those QAs want sanity coverage.
 
 ## The local → dev workflow
 
