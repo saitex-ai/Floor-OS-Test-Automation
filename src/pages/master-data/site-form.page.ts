@@ -62,4 +62,50 @@ export class SiteFormPage extends BasePage {
   async expectCreatedSuccessfully(): Promise<void> {
     await expect(this.page.getByText('Site created.')).toBeVisible({ timeout: 15_000 });
   }
+
+  /**
+   * Real error confirmed live: "A site with this code already exists. Use
+   * a different code." Unlike Departments (whose duplicate codes are
+   * silently accepted — see DepartmentFormPage), Sites genuinely blocks
+   * this: the page stays on /sites/new, no second record is created.
+   */
+  async expectDuplicateCodeError(): Promise<void> {
+    await expect(
+      this.page.getByText('A site with this code already exists. Use a different code.'),
+    ).toBeVisible({ timeout: 15_000 });
+  }
+
+  /** True on the read-only detail view reached by clicking a Sites-list row (before "Edit site" is clicked). */
+  async expectOnDetailPage(): Promise<void> {
+    await expect(this.locators.editButton).toBeVisible({ timeout: 15_000 });
+  }
+
+  async clickEdit(): Promise<void> {
+    await this.locators.editButton.click();
+  }
+
+  async toggleActive(): Promise<void> {
+    await this.locators.activeSwitch.click();
+  }
+
+  async isActive(): Promise<boolean> {
+    return (await this.locators.activeSwitch.getAttribute('aria-checked')) === 'true';
+  }
+
+  async saveChanges(): Promise<void> {
+    await this.locators.saveChangesButton.click();
+  }
+
+  async cancel(): Promise<void> {
+    await this.locators.cancelButton.click();
+  }
+
+  /** Real toast text confirmed live: "Site updated." */
+  async expectUpdatedSuccessfully(): Promise<void> {
+    await expect(this.page.getByText('Site updated.')).toBeVisible({ timeout: 15_000 });
+  }
+
+  async expectValidationError(message: string | RegExp): Promise<void> {
+    await expect(this.page.getByText(message).first()).toBeVisible();
+  }
 }

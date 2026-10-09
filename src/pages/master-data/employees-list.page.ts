@@ -30,4 +30,18 @@ export class EmployeesListPage extends BasePage {
   async openNewEmployee(): Promise<void> {
     await this.locators.newEmployeeButton.click();
   }
+
+  async search(term: string): Promise<void> {
+    await this.locators.searchInput.fill(term);
+  }
+
+  /** Searches by full name, then opens the single matching row's read-only detail view. */
+  async openEmployeeByName(fullName: string): Promise<void> {
+    await this.search(fullName);
+    await this.locators.row(fullName).first().click();
+  }
+
+  async rowCountForText(text: string): Promise<number> {
+    return this.locators.row(text).count();
+  }
 }

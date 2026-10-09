@@ -6,6 +6,35 @@ import { EmployeesListPage } from '../pages/master-data/employees-list.page';
 import { EmployeeFormPage } from '../pages/master-data/employee-form.page';
 import { SitesListPage } from '../pages/master-data/sites-list.page';
 import { SiteFormPage } from '../pages/master-data/site-form.page';
+import { CompanyListPage } from '../pages/master-data/company-list.page';
+import { CompanyFormPage } from '../pages/master-data/company-form.page';
+import { CustomerListPage } from '../pages/master-data/customer-list.page';
+import { CustomerFormPage } from '../pages/master-data/customer-form.page';
+import { CustomerSeasonListPage } from '../pages/master-data/customer-season-list.page';
+import { CustomerSeasonFormPage } from '../pages/master-data/customer-season-form.page';
+import { VendorListPage } from '../pages/master-data/vendor-list.page';
+import { VendorFormPage } from '../pages/master-data/vendor-form.page';
+import { GmtInseamPage } from '../pages/master-data/gmt-inseam.page';
+import { GmtWaistPage } from '../pages/master-data/gmt-waist.page';
+import { SizePage } from '../pages/master-data/size.page';
+import { ColorPage } from '../pages/master-data/color.page';
+import { UomPage } from '../pages/master-data/uom.page';
+import { CurrencyRatePage } from '../pages/master-data/currency-rate.page';
+import { CurrencyRateBuyerPage } from '../pages/master-data/currency-rate-buyer.page';
+import { CustomerPercentagePage } from '../pages/master-data/customer-percentage.page';
+import { TechpackTypePage } from '../pages/master-data/techpack-type.page';
+import { SampleRequestCreationPage } from '../pages/master-data/sample-request-creation.page';
+import { UomConversionPage } from '../pages/master-data/uom-conversion.page';
+import { InventoryItemHistoryPage } from '../pages/master-data/inventory-item-history.page';
+import { AttributeMasterPage } from '../pages/master-data/attribute-master.page';
+import { AttributeValueMasterPage } from '../pages/master-data/attribute-value-master.page';
+import { ProductServiceMasterPage } from '../pages/master-data/product-service-master.page';
+import { ProductServiceValueMasterPage } from '../pages/master-data/product-service-value-master.page';
+import { ItemClassMasterPage } from '../pages/master-data/item-class-master.page';
+import { ItemMasterPage } from '../pages/master-data/item-master.page';
+import { PriceLibraryPage } from '../pages/master-data/price-library.page';
+import { AdditionalMasterPage } from '../pages/master-data/additional-master.page';
+import { ItemUnitPricePage } from '../pages/master-data/item-unit-price.page';
 
 interface MasterDataFixtures {
   masterDataPage: MasterDataPage;
@@ -15,6 +44,35 @@ interface MasterDataFixtures {
   employeeFormPage: EmployeeFormPage;
   sitesListPage: SitesListPage;
   siteFormPage: SiteFormPage;
+  companyListPage: CompanyListPage;
+  companyFormPage: CompanyFormPage;
+  customerListPage: CustomerListPage;
+  customerFormPage: CustomerFormPage;
+  customerSeasonListPage: CustomerSeasonListPage;
+  customerSeasonFormPage: CustomerSeasonFormPage;
+  vendorListPage: VendorListPage;
+  vendorFormPage: VendorFormPage;
+  gmtInseamPage: GmtInseamPage;
+  gmtWaistPage: GmtWaistPage;
+  sizePage: SizePage;
+  colorPage: ColorPage;
+  uomPage: UomPage;
+  currencyRatePage: CurrencyRatePage;
+  currencyRateBuyerPage: CurrencyRateBuyerPage;
+  customerPercentagePage: CustomerPercentagePage;
+  techpackTypePage: TechpackTypePage;
+  sampleRequestCreationPage: SampleRequestCreationPage;
+  uomConversionPage: UomConversionPage;
+  inventoryItemHistoryPage: InventoryItemHistoryPage;
+  attributeMasterPage: AttributeMasterPage;
+  attributeValueMasterPage: AttributeValueMasterPage;
+  productServiceMasterPage: ProductServiceMasterPage;
+  productServiceValueMasterPage: ProductServiceValueMasterPage;
+  itemClassMasterPage: ItemClassMasterPage;
+  itemMasterPage: ItemMasterPage;
+  priceLibraryPage: PriceLibraryPage;
+  additionalMasterPage: AdditionalMasterPage;
+  itemUnitPricePage: ItemUnitPricePage;
 }
 
 /**
@@ -49,6 +107,122 @@ export const test = base.extend<MasterDataFixtures>({
 
   siteFormPage: async ({ page }, use) => {
     await use(new SiteFormPage(page));
+  },
+
+  companyListPage: async ({ page }, use) => {
+    await use(new CompanyListPage(page));
+  },
+
+  companyFormPage: async ({ page }, use) => {
+    await use(new CompanyFormPage(page));
+  },
+
+  customerListPage: async ({ page }, use) => {
+    await use(new CustomerListPage(page));
+  },
+
+  customerFormPage: async ({ page }, use) => {
+    await use(new CustomerFormPage(page));
+  },
+
+  customerSeasonListPage: async ({ page }, use) => {
+    await use(new CustomerSeasonListPage(page));
+  },
+
+  customerSeasonFormPage: async ({ page }, use) => {
+    await use(new CustomerSeasonFormPage(page));
+  },
+
+  vendorListPage: async ({ page }, use) => {
+    await use(new VendorListPage(page));
+  },
+
+  vendorFormPage: async ({ page }, use) => {
+    await use(new VendorFormPage(page));
+  },
+
+  gmtInseamPage: async ({ page }, use) => {
+    await use(new GmtInseamPage(page));
+  },
+
+  gmtWaistPage: async ({ page }, use) => {
+    await use(new GmtWaistPage(page));
+  },
+
+  sizePage: async ({ page }, use) => {
+    await use(new SizePage(page));
+  },
+
+  colorPage: async ({ page }, use) => {
+    await use(new ColorPage(page));
+  },
+
+  uomPage: async ({ page }, use) => {
+    await use(new UomPage(page));
+  },
+
+  currencyRatePage: async ({ page }, use) => {
+    await use(new CurrencyRatePage(page));
+  },
+
+  currencyRateBuyerPage: async ({ page }, use) => {
+    await use(new CurrencyRateBuyerPage(page));
+  },
+
+  customerPercentagePage: async ({ page }, use) => {
+    await use(new CustomerPercentagePage(page));
+  },
+
+  techpackTypePage: async ({ page }, use) => {
+    await use(new TechpackTypePage(page));
+  },
+
+  sampleRequestCreationPage: async ({ page }, use) => {
+    await use(new SampleRequestCreationPage(page));
+  },
+
+  uomConversionPage: async ({ page }, use) => {
+    await use(new UomConversionPage(page));
+  },
+
+  inventoryItemHistoryPage: async ({ page }, use) => {
+    await use(new InventoryItemHistoryPage(page));
+  },
+
+  attributeMasterPage: async ({ page }, use) => {
+    await use(new AttributeMasterPage(page));
+  },
+
+  attributeValueMasterPage: async ({ page }, use) => {
+    await use(new AttributeValueMasterPage(page));
+  },
+
+  productServiceMasterPage: async ({ page }, use) => {
+    await use(new ProductServiceMasterPage(page));
+  },
+
+  productServiceValueMasterPage: async ({ page }, use) => {
+    await use(new ProductServiceValueMasterPage(page));
+  },
+
+  itemClassMasterPage: async ({ page }, use) => {
+    await use(new ItemClassMasterPage(page));
+  },
+
+  itemMasterPage: async ({ page }, use) => {
+    await use(new ItemMasterPage(page));
+  },
+
+  priceLibraryPage: async ({ page }, use) => {
+    await use(new PriceLibraryPage(page));
+  },
+
+  additionalMasterPage: async ({ page }, use) => {
+    await use(new AdditionalMasterPage(page));
+  },
+
+  itemUnitPricePage: async ({ page }, use) => {
+    await use(new ItemUnitPricePage(page));
   },
 });
 
