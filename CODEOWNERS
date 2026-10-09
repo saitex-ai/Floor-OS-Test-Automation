@@ -51,6 +51,13 @@
 /src/locators/bom/             @sathishnagarajanQAlead
 /src/fixtures/bom.fixtures.ts  @sathishnagarajanQAlead
 
+# Sample Development (no tests/sanity/sample-development/ yet — add a row here if that's built later)
+/tests/regression/sample-development/         @sathishnagarajanQAlead
+/tests/smoke/sample-development/              @sathishnagarajanQAlead
+/src/pages/sample-development/                @sathishnagarajanQAlead
+/src/locators/sample-development/             @sathishnagarajanQAlead
+/src/fixtures/sample-development.fixtures.ts  @sathishnagarajanQAlead
+
 # Master Data
 /tests/regression/master-data/         @sathishnagarajanQAlead
 /tests/sanity/master-data/             @sathishnagarajanQAlead
@@ -58,20 +65,6 @@
 /src/pages/master-data/                @sathishnagarajanQAlead
 /src/locators/master-data/             @sathishnagarajanQAlead
 /src/fixtures/master-data.fixtures.ts  @sathishnagarajanQAlead
-
-# Admin (no tests/sanity/admin/ yet — add a row here if that's built later)
-/tests/regression/admin/         @sathishnagarajanQAlead
-/tests/smoke/admin/              @sathishnagarajanQAlead
-/src/pages/admin/                @sathishnagarajanQAlead
-/src/locators/admin/             @sathishnagarajanQAlead
-/src/fixtures/admin.fixtures.ts  @sathishnagarajanQAlead
-
-# Copilot (no tests/sanity/copilot/ yet — add a row here if that's built later)
-/tests/regression/copilot/         @sathishnagarajanQAlead
-/tests/smoke/copilot/              @sathishnagarajanQAlead
-/src/pages/copilot/                @sathishnagarajanQAlead
-/src/locators/copilot/             @sathishnagarajanQAlead
-/src/fixtures/copilot.fixtures.ts  @sathishnagarajanQAlead
 
 # Shared framework internals (config, shell login, base classes, CI) —
 # changes here affect every module, so review as a team rather than
