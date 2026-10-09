@@ -30,11 +30,13 @@ export class RequestsPage extends MillScreenPage {
    * Only a raise-any user (e.g. a stores admin) sees "Requesting
    * department", and on dev it starts with nothing applied ("Request
    * materials for -") even though the picker shows Finishing — so pick
-   * one explicitly. Preparation pulls yarn from Spinning.
+   * one explicitly. Preparation pulls yarn from Spinning. The picker is
+   * a searchable combobox (cmdk popover), not a native <select>.
    */
   async chooseRequestingDepartment(department: string): Promise<void> {
-    if (await this.locators.requestingDepartmentSelect.isVisible()) {
-      await this.locators.requestingDepartmentSelect.selectOption({ label: department });
+    if (await this.locators.requestingDepartmentCombobox.isVisible()) {
+      await this.locators.requestingDepartmentCombobox.click();
+      await this.locators.comboboxOptions.filter({ hasText: department }).first().click();
     }
     await expect(this.locators.requestMaterialsCard).toHaveText(
       `Request materials for ${department}`,
@@ -62,7 +64,7 @@ export class RequestsPage extends MillScreenPage {
    */
   async enterFirstUnit(source: Locator, quantity: string): Promise<void> {
     await source.getByRole('combobox').first().click();
-    await this.locators.materialOptions.first().click();
+    await this.locators.comboboxOptions.first().click();
     await source.getByRole('textbox').first().fill(quantity);
   }
 
