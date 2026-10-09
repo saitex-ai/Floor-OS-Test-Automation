@@ -8,6 +8,14 @@ import { QualificationsListPage } from '../pages/planning/qualifications-list.pa
 import { QualificationFormPage } from '../pages/planning/qualification-form.page';
 import { MachinesListPage } from '../pages/planning/machines-list.page';
 import { MachineFormPage } from '../pages/planning/machine-form.page';
+import { ActivitiesListPage } from '../pages/planning/activities-list.page';
+import { ActivityFormPage } from '../pages/planning/activity-form.page';
+import { DifficultyGradeListPage } from '../pages/planning/difficulty-grade-list.page';
+import { DifficultyGradeFormPage } from '../pages/planning/difficulty-grade-form.page';
+import { RecipesListPage } from '../pages/planning/recipes-list.page';
+import { RecipeFormPage } from '../pages/planning/recipe-form.page';
+import { RecipeDetailPage } from '../pages/planning/recipe-detail.page';
+import { OperationFormPage } from '../pages/planning/operation-form.page';
 
 interface PlanningFixtures {
   planningPage: PlanningPage;
@@ -19,6 +27,14 @@ interface PlanningFixtures {
   qualificationFormPage: QualificationFormPage;
   machinesListPage: MachinesListPage;
   machineFormPage: MachineFormPage;
+  activitiesListPage: ActivitiesListPage;
+  activityFormPage: ActivityFormPage;
+  difficultyGradeListPage: DifficultyGradeListPage;
+  difficultyGradeFormPage: DifficultyGradeFormPage;
+  recipesListPage: RecipesListPage;
+  recipeFormPage: RecipeFormPage;
+  recipeDetailPage: RecipeDetailPage;
+  operationFormPage: OperationFormPage;
 }
 
 /**
@@ -61,6 +77,38 @@ export const test = base.extend<PlanningFixtures>({
 
   machineFormPage: async ({ page }, use) => {
     await use(new MachineFormPage(page));
+  },
+
+  activitiesListPage: async ({ page }, use) => {
+    await use(new ActivitiesListPage(page));
+  },
+
+  activityFormPage: async ({ page }, use) => {
+    await use(new ActivityFormPage(page));
+  },
+
+  difficultyGradeListPage: async ({ page }, use) => {
+    await use(new DifficultyGradeListPage(page));
+  },
+
+  difficultyGradeFormPage: async ({ page }, use) => {
+    await use(new DifficultyGradeFormPage(page));
+  },
+
+  recipesListPage: async ({ page }, use) => {
+    await use(new RecipesListPage(page));
+  },
+
+  recipeFormPage: async ({ page }, use) => {
+    await use(new RecipeFormPage(page));
+  },
+
+  recipeDetailPage: async ({ page }, use) => {
+    await use(new RecipeDetailPage(page));
+  },
+
+  operationFormPage: async ({ page }, use) => {
+    await use(new OperationFormPage(page));
   },
 });
 
