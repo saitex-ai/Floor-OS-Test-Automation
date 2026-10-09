@@ -14,6 +14,9 @@ branches for Planning/Techpack work done in parallel; don't assume they're prese
 those land too. Only list a file below once it's actually committed on whatever branch you're
 reading this from.
 
+- **`bom-module.md`** — how the BOM module (`/bom`) actually behaves: list/create/items/lifecycle
+  UI as confirmed live on uat, the API/permission/schema rules behind it, known bugs, and how the
+  BOM regression suite builds (and tags) its own test data. Only relevant if you're working on BOM.
 - **`master-data-module.md`** — real route/field confirmations for the top-level Master Data
   module (started 2026-09-24: Departments, Employees, Sites). Only relevant if you're working on
   Master Data.

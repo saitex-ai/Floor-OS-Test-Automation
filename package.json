@@ -26,6 +26,7 @@
     "test:techpack:uat": "TEST_ENV=uat playwright test --project=techpack",
     "test:bom": "playwright test --project=bom",
     "test:bom:dev": "TEST_ENV=dev playwright test --project=bom",
+    "test:bom:uat": "TEST_ENV=uat playwright test --project=bom",
     "test:master-data": "playwright test --project=master-data",
     "test:master-data:dev": "TEST_ENV=dev playwright test --project=master-data",
     "test:admin": "playwright test --project=admin",
