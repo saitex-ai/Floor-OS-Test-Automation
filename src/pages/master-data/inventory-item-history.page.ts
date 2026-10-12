@@ -175,10 +175,23 @@ export class InventoryItemHistoryPage extends BasePage {
     await this.locators.inventoryIdColumnHeader.click();
   }
 
+  /**
+   * Confirmed live: jumping between two equally-full pages leaves the row
+   * COUNT unchanged, so the count-only waitForRowsToSettle() used by
+   * search() returns immediately without the new page's content actually
+   * having loaded yet (real content swap takes ~3s). Captures the first
+   * row's own text before navigating and polls until it actually differs,
+   * rather than trusting a stable count.
+   */
   async jumpToPage(page: number): Promise<void> {
+    const before = await this.rowTextAt(1);
     await this.locators.jumpToPageInput.fill(String(page));
     await this.locators.jumpToPageInput.press('Enter');
-    await this.waitForRowsToSettle();
+    for (let i = 0; i < 40; i++) {
+      const current = await this.rowTextAt(1);
+      if (current !== before) return;
+      await this.page.waitForTimeout(250);
+    }
   }
 
   /** Total row count on the grid (header row included) — used to confirm a search genuinely narrowed the result set. */
