@@ -204,7 +204,6 @@ test.describe('Master Data - Item Class Master', () => {
 
   test('TC:7 Verify Stock Group carries a red * but is not actually enforced — surprising', async ({
     itemClassMasterPage,
-    page,
   }) => {
     await itemClassMasterPage.open();
     await itemClassMasterPage.expectLoaded();
@@ -216,7 +215,7 @@ test.describe('Master Data - Item Class Master', () => {
       // Stock Group carries the identical visual `*` but gets none of its
       // own — confirmed live it's a disabled, auto-derived display field,
       // not independently validated at all.
-      await expect(page.getByText('Required', { exact: true })).toHaveCount(2);
+      await itemClassMasterPage.expectRequiredErrorCount(2);
     });
   });
 
@@ -312,7 +311,6 @@ test.describe('Master Data - Item Class Master', () => {
 
   test('TC:13 Verify the floating AI launcher overlaps Create, and the keyboard workaround submits the real form', async ({
     itemClassMasterPage,
-    page,
   }) => {
     await itemClassMasterPage.open();
     await itemClassMasterPage.expectLoaded();
@@ -334,7 +332,7 @@ test.describe('Master Data - Item Class Master', () => {
       // the AI launcher's own dialog opening) is itself the proof the real
       // form was submitted via the keyboard workaround, not the launcher.
       await itemClassMasterPage.expectCreatedSuccessfully();
-      await expect(page.getByRole('dialog', { name: /Ask FloorOS/i })).toHaveCount(0);
+      await itemClassMasterPage.expectAiAssistantDialogClosed();
     });
   });
 });

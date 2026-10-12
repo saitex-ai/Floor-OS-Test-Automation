@@ -371,17 +371,31 @@ export class ItemMasterPage extends BasePage {
    * blocked, but surfaced via a misleading optimistic-concurrency message
    * instead of a duplicate-key message. See item-master-testcases.md
    * TC:10 — asserted as-is, not papered over.
+   *
+   * Since 2026-10-12 a second toast, "Failed to create inventory item.",
+   * fires alongside it. Sonner collapses the older toast behind the newer
+   * one, so visibility of the first is racy — this checks both are present
+   * in the toast region instead.
    */
   async expectDuplicateAlternateCodeError(): Promise<void> {
+    const toasts = this.page.locator('[data-sonner-toast]');
     await expect(
-      this.page.getByText('This record was updated by someone else. Reload and try again.', {
-        exact: true,
-      }),
-    ).toBeVisible({ timeout: 45_000 });
+      toasts.filter({ hasText: 'This record was updated by someone else. Reload and try again.' }),
+    ).toHaveCount(1, { timeout: 45_000 });
+    await expect(toasts.filter({ hasText: 'Failed to create inventory item.' })).toHaveCount(1);
   }
 
   async expectStillOnCreatePage(): Promise<void> {
     await expect(this.locators.createButton).toBeVisible();
+  }
+
+  /** Proof the keyboard-submit workaround hit the real form, not the overlapping AI launcher. */
+  async expectAiAssistantDialogClosed(): Promise<void> {
+    await expect(this.page.getByRole('dialog', { name: /Ask FloorOS/i })).toHaveCount(0);
+  }
+
+  async expectNoDialogOpen(): Promise<void> {
+    await expect(this.page.getByRole('dialog')).toHaveCount(0);
   }
 
   /**
@@ -418,9 +432,7 @@ export class ItemMasterPage extends BasePage {
     const y = box.y + box.height / 2;
     return this.page.evaluate(
       ({ x, y }) => {
-        // `document` via globalThis-as-any for the same "dom" lib reason as
-        // isActiveFlagCheckboxDisabled() above — this callback runs fine in
-        // the real browser context, only the Node-side type-check needs it.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- no "dom" lib in tsconfig; this callback runs in the real browser context.
         const doc = (globalThis as any).document;
         const el = doc.elementFromPoint(x, y);
         return !!el?.closest('[aria-label="Ask FloorOS AI"]');

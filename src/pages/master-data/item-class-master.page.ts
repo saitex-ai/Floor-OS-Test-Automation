@@ -229,6 +229,16 @@ export class ItemClassMasterPage extends BasePage {
     await expect(this.page.getByText(message).first()).toBeVisible();
   }
 
+  /** Exact-match count of inline "Required" errors after a blocked submit. */
+  async expectRequiredErrorCount(count: number): Promise<void> {
+    await expect(this.page.getByText('Required', { exact: true })).toHaveCount(count);
+  }
+
+  /** Proof the keyboard-submit workaround hit the real form, not the overlapping AI launcher. */
+  async expectAiAssistantDialogClosed(): Promise<void> {
+    await expect(this.page.getByRole('dialog', { name: /Ask FloorOS/i })).toHaveCount(0);
+  }
+
   async expectCategoryRequiredError(): Promise<void> {
     await expect(this.locators.selectAtLeastOneCategoryError).toBeVisible();
   }
@@ -290,9 +300,7 @@ export class ItemClassMasterPage extends BasePage {
     const y = box.y + box.height / 2;
     return this.page.evaluate(
       ({ x, y }) => {
-        // `document` via globalThis-as-any for the same "dom" lib reason as
-        // isActiveCheckboxDisabled() above — this callback runs fine in the
-        // real browser context, only the Node-side type-check needs the cast.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- no "dom" lib in tsconfig; this callback runs in the real browser context.
         const doc = (globalThis as any).document;
         const el = doc.elementFromPoint(x, y);
         return !!el?.closest('[aria-label="Ask FloorOS AI"]');

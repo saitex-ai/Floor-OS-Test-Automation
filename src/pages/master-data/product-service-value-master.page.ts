@@ -193,9 +193,7 @@ export class ProductServiceValueMasterPage extends BasePage {
     const y = box.y + box.height / 2;
     return this.page.evaluate(
       ({ x, y }) => {
-        // `document` via globalThis-as-any for the same "dom" lib reason as
-        // isActiveCheckboxDisabled() above — this callback runs fine in the
-        // real browser context, only the Node-side type-check needs the cast.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- no "dom" lib in tsconfig; this callback runs in the real browser context.
         const doc = (globalThis as any).document;
         const el = doc.elementFromPoint(x, y);
         return !!el?.closest('[aria-label="Ask FloorOS AI"]');

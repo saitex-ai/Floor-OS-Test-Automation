@@ -368,7 +368,6 @@ test.describe('Master Data - Item Master', () => {
 
   test('TC:12 Verify "Delete permanently" — real hard-delete with its own confirmation dialog', async ({
     itemMasterPage,
-    page,
   }) => {
     const alternateCode = `TC-Item-Delete-${Date.now()}`;
 
@@ -403,7 +402,7 @@ test.describe('Master Data - Item Master', () => {
       await itemMasterPage.expectRowNotVisible(itemId);
     });
 
-    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await itemMasterPage.expectNoDialogOpen();
   });
 
   test('TC:13 Verify the Active flag cannot actually be changed — confirmed bug', async ({
@@ -491,7 +490,6 @@ test.describe('Master Data - Item Master', () => {
 
   test('TC:17 Verify the floating AI launcher overlaps Create/Update, and the keyboard workaround submits the real form', async ({
     itemMasterPage,
-    page,
   }) => {
     const alternateCode = `TC-Item-AiTrap-${Date.now()}`;
     let itemId = '';
@@ -517,7 +515,7 @@ test.describe('Master Data - Item Master', () => {
         await itemMasterPage.create();
         itemId = await itemMasterPage.getCreatedItemId();
         expect(itemId).toBeTruthy();
-        await expect(page.getByRole('dialog', { name: /Ask FloorOS/i })).toHaveCount(0);
+        await itemMasterPage.expectAiAssistantDialogClosed();
       });
     } finally {
       if (itemId) {
