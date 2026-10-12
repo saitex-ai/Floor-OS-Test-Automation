@@ -12,14 +12,19 @@ import { test, expect } from '../../../src/fixtures/master-data.fixtures';
  *
  * Test data: UoM Code is confirmed live to allow only 5 characters — too
  * short for the usual `PW MD UoM ` prefix this repo's other specs use, so
- * throwaway codes here are `PW` + the last 3 digits of the clock (5 chars
+ * throwaway codes here are `PW` + a letter + 2 random base-36 chars (5 chars
  * total, still a recognizable Playwright-owned marker); the longer `PW MD
  * UoM <timestamp>` prefix is used on Description instead, which allows up
  * to 20 characters.
  */
 function uniqueCode(): string {
-  const digits = String(Date.now()).slice(-3);
-  return `PW${digits}`;
+  // A letter + 2 random base-36 chars (33,696 codes). The earlier
+  // last-3-clock-digits version only had 1,000 and ran out on dev
+  // (2026-10-12: creates came back "A unit of measure with the code PW###
+  // already exists."); leading with a letter keeps clear of those leftovers.
+  const letter = String.fromCharCode(65 + Math.floor(Math.random() * 26));
+  const rest = Math.random().toString(36).slice(2, 4).toUpperCase().padEnd(2, '0');
+  return `PW${letter}${rest}`;
 }
 
 function uniqueDescription(): string {
@@ -227,10 +232,10 @@ test.describe('Master Data - Unit of Measure', () => {
       await uomPage.create();
     });
 
-    // Known bug/gap, confirmed live (TC:10 in the .md): the API returns a
-    // specific 409 uom_conflict reason, but the UI only ever shows this
-    // generic toast. Asserting the REAL current behavior on purpose.
-    await uomPage.expectCreateFailed();
+    // Confirmed live (2026-10-12): the toast now usually names the duplicate
+    // code, but dev still intermittently returns the old generic "Failed to
+    // create UoM." — see expectDuplicateCodeError().
+    await uomPage.expectDuplicateCodeError(code);
     await expect(uomPage.locators.formDialog).toBeVisible();
   });
 

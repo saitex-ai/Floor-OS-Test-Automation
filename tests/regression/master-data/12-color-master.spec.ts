@@ -167,11 +167,9 @@ test.describe('Master Data - Color Master', () => {
 
     await test.step('Toast reads "Color deactivated." and the row/tab reflect Inactive', async () => {
       await colorPage.expectDeactivatedSuccessfully();
-      await colorPage.search(code);
-      expect(await colorPage.rowStatus(colorId)).toBe('Inactive');
+      await colorPage.expectRowStatus(colorId, code, 'Inactive');
 
-      // Confirmed live: unlike Size Master's equivalent action, this one
-      // survives a reload correctly.
+      // Confirmed live: the Inactive status survives a reload.
       await page.reload();
       await colorPage.search(code);
       expect(await colorPage.rowStatus(colorId)).toBe('Inactive');
@@ -198,7 +196,13 @@ test.describe('Master Data - Color Master', () => {
       await colorPage.expectDeactivatedSuccessfully();
     });
 
-    await test.step('Re-check Status and save — reactivates', async () => {
+    // Known intermittent bug, confirmed live (2026-10-12): right after a
+    // deactivate the list can still hold the old row version, and saving
+    // an edit opened from it is rejected with "This record was updated by
+    // someone else. Reload and try again." Reloading first avoids the race.
+    await test.step('After a reload, re-check Status and save — reactivates', async () => {
+      await colorPage.open();
+      await colorPage.expectLoaded();
       await colorPage.search(code);
       await colorPage.openRow(colorId);
       await colorPage.reactivate();
@@ -206,8 +210,7 @@ test.describe('Master Data - Color Master', () => {
 
     await test.step('Toast is the generic "Color updated." (no distinct "activated" message) and status flips back', async () => {
       await colorPage.expectUpdatedSuccessfully();
-      await colorPage.search(code);
-      expect(await colorPage.rowStatus(colorId)).toBe('Active');
+      await colorPage.expectRowStatus(colorId, code, 'Active');
     });
   });
 
@@ -271,11 +274,9 @@ test.describe('Master Data - Color Master', () => {
       await colorPage.create();
     });
 
-    // Known bug/gap, confirmed live (TC:11 in the .md): the API returns a
-    // specific 409 color_conflict reason (naming the exact code +
-    // category), but the UI only ever shows this generic toast. Asserting
-    // the REAL current behavior on purpose, not the ideal one.
-    await colorPage.expectCreateFailed();
+    // Confirmed live (2026-10-12): the toast now names the duplicate code.
+    // Until 2026-10-08 it was the generic "Failed to create color.".
+    await colorPage.expectDuplicateCodeError(code.toUpperCase());
     await expect(colorPage.locators.formDialog).toBeVisible();
   });
 

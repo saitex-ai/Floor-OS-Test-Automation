@@ -67,3 +67,12 @@ in TC:2 and immediately retry it with the same code.
 **Not covered / not yet verified**: Export CSV content, the Filters rule-builder panel, column
 configuration/resizing, and the three layout-mode toggles — same scope limit as the other two
 Master Data screens documented this session.
+
+## Update 2026-10-12 — rollout changes re-verified on dev
+
+- **TC:10 — duplicate UoM Code:** usually "A unit of measure with the code {CODE} already exists."
+  now, but within the same hour dev also still answered with the old generic "Failed to create UoM."
+  The automation accepts either wording (both mean the duplicate was blocked) and this inconsistency
+  is noted as an open issue.
+- Automation: throwaway codes were `PW` + 3 clock digits (only 1,000 values, now used up on dev). They
+  are now `PW` + a letter + 2 random characters.

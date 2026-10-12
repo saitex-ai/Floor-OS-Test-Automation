@@ -137,15 +137,21 @@ export class UomPage extends BasePage {
   }
 
   /**
-   * Real toast text confirmed live on a duplicate UoM Code submit: a
-   * generic "Failed to create UoM." — the backend's actual `409
-   * uom_conflict` reason is never surfaced to the user. Asserting this
-   * exact generic text on purpose (see TC:10's bug note).
+   * Toast on a duplicate UoM Code submit. Since dev 2026-10-12 the app
+   * returns "A unit of measure with the code {CODE} already exists." — but
+   * on that same day dev also intermittently still answered with the old
+   * generic "Failed to create UoM." (seen within the same hour), so either
+   * wording is accepted here; both mean the duplicate was blocked.
    */
-  async expectCreateFailed(): Promise<void> {
-    await expect(this.page.getByText('Failed to create UoM.', { exact: true })).toBeVisible({
-      timeout: 15_000,
-    });
+  async expectDuplicateCodeError(uomCode: string): Promise<void> {
+    const escaped = uomCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    await expect(
+      this.page.getByText(
+        new RegExp(
+          `^(A unit of measure with the code ${escaped} already exists\\.|Failed to create UoM\\.)$`,
+        ),
+      ),
+    ).toBeVisible({ timeout: 15_000 });
   }
 
   async expectFieldError(message: string | RegExp): Promise<void> {

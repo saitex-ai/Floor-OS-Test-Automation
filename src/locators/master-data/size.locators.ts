@@ -23,9 +23,9 @@ import { type Locator, type Page } from '@playwright/test';
  * Known bug, confirmed live (see test-cases/master-data/size-master/
  * size-master-testcases.md TC:11): deactivating a Size calls a real
  * `DELETE /api/sizes/{code}` (activeFlag -> false) but the list's Status
- * column and Inactive tab never reflect it, even after a reload. The
- * "Deactivate" button also has no confirmation step at all (fires on the
- * first click) — unlike Unit of Measure's "Delete", which does confirm.
+ * column and Inactive tab never reflect it, even after a reload. Since
+ * dev 2026-10-12 "Deactivate" opens a "Deactivate {code}?" confirmation
+ * alertdialog (before that it fired on the first click).
  */
 export class SizeLocators {
   readonly heading: Locator;
@@ -61,8 +61,10 @@ export class SizeLocators {
   readonly createButton: Locator;
   readonly saveChangesButton: Locator;
   readonly cancelButton: Locator;
-  /** Header action in the Edit dialog, e.g. "Deactivate SMC0007255". No confirm step (see class doc). */
+  /** Header action in the Edit dialog, e.g. "Deactivate SMC0007255". Opens a confirm alertdialog (see class doc). */
   readonly deactivateButton: Locator;
+  /** "Deactivate {code}?" confirmation alertdialog's confirm button (added on dev 2026-10-12). */
+  readonly deactivateConfirmButton: Locator;
 
   // The three lookup-picker dialogs opened by the buttons above.
   readonly itemCategoryPickerDialog: Locator;
@@ -98,6 +100,10 @@ export class SizeLocators {
     this.saveChangesButton = this.formDialog.getByRole('button', { name: 'Save changes' });
     this.cancelButton = this.formDialog.getByRole('button', { name: 'Cancel', exact: true });
     this.deactivateButton = this.formDialog.getByRole('button', { name: /^Deactivate/ });
+    this.deactivateConfirmButton = page
+      .getByRole('alertdialog')
+      .filter({ hasText: /moves to the Inactive tab/i })
+      .getByRole('button', { name: 'Deactivate', exact: true });
 
     this.itemCategoryPickerDialog = page.getByRole('dialog', { name: 'Select Item Category' });
     this.inseamPickerDialog = page.getByRole('dialog', { name: 'Select Inseam' });

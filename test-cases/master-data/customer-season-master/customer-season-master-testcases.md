@@ -114,3 +114,13 @@ automation in this repo before this file.
   re-verified for Seasons in this session), Filters rule-builder UI, Export
   CSV content, and the Active Flag tri-state filter button inside the
   Customer picker grid.
+
+## Update 2026-10-12 — rollout changes re-verified on dev
+
+Re-verified live while re-running this suite; the automation was updated to match:
+
+- **Deactivate now confirms first** via a "Deactivate {CODE}?" alertdialog (Cancel / Deactivate).
+- **Toast punctuation is now consistent:** "Season updated." and "Season deactivated." both end with a
+  period (TC:3/TC:11 previously asserted no trailing period).
+- New seasons are still created directly as **Approved**.
+- The list table gained a trailing (empty) actions column; Status is no longer the last cell.

@@ -143,9 +143,10 @@ export class CompanyFormPage extends BasePage {
     await this.locators.cancelButton.click();
   }
 
-  /** The top-of-form quick action — confirmed live to never relabel to "Activate" (see expectDeactivateButtonStillShows). */
+  /** The top-of-form quick action; confirms the "Deactivate {code}?" alertdialog (added 2026-10-12). */
   async deactivate(): Promise<void> {
     await this.locators.deactivateButton.click();
+    await this.locators.deactivateConfirmButton.click();
   }
 
   /** Real toast text confirmed live: "Company created." */
@@ -164,13 +165,18 @@ export class CompanyFormPage extends BasePage {
   }
 
   /**
-   * Real toast text confirmed live for a duplicate Company Code: "Failed
-   * to create company." — a generic failure message that does not pinpoint
-   * the real cause (confirmed UX gap, not a missing assertion here — see
-   * company-master-testcases.md's Notes).
+   * Real toast text confirmed live (2026-10-12) for a duplicate Company
+   * Code: "A company with the code {CODE} already exists. Choose a unique
+   * code." Until 2026-10-08 this was the generic "Failed to create
+   * company." — that UX gap is now fixed.
    */
-  async expectCreateFailed(): Promise<void> {
-    await expect(this.page.getByText('Failed to create company.')).toBeVisible({ timeout: 30_000 });
+  async expectDuplicateCodeError(companyCode: string): Promise<void> {
+    await expect(
+      this.page.getByText(
+        `A company with the code ${companyCode} already exists. Choose a unique code.`,
+        { exact: true },
+      ),
+    ).toBeVisible({ timeout: 30_000 });
   }
 
   async expectStillOnCreatePage(): Promise<void> {
@@ -182,17 +188,25 @@ export class CompanyFormPage extends BasePage {
   }
 
   /**
-   * Real bug confirmed live (2026-10-06): the "Deactivate" button never
-   * relabels to "Activate" once the company is already Inactive — this
-   * asserts that (still-buggy) current behavior rather than papering over
-   * it. The only confirmed way to reactivate is toggleActive() +
-   * save() (see company-master-testcases.md TC:13).
+   * Confirmed live (2026-10-12): once the company is Inactive the top-of-form
+   * action relabels to "Activate". Until 2026-10-08 it kept showing
+   * "Deactivate" and the only way back was the in-form Active checkbox.
    */
-  async expectDeactivateButtonStillShows(): Promise<void> {
-    await expect(this.locators.deactivateButton).toBeVisible();
-    await expect(
-      this.page.getByRole('button', { name: 'Activate', exact: true }),
-    ).not.toBeVisible();
+  async expectActivateButtonShows(): Promise<void> {
+    await expect(this.locators.activateButton).toBeVisible();
+    await expect(this.locators.deactivateButton).not.toBeVisible();
+  }
+
+  /** Top-of-form "Activate" on an Inactive record — no confirmation step, confirmed live. */
+  async activate(): Promise<void> {
+    await this.locators.activateButton.click();
+  }
+
+  /** Real toast text confirmed live (2026-10-12): just "Reactivated". */
+  async expectReactivatedSuccessfully(): Promise<void> {
+    await expect(this.page.getByText('Reactivated', { exact: true })).toBeVisible({
+      timeout: 30_000,
+    });
   }
 
   /**

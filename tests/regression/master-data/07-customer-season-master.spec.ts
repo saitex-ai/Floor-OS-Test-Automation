@@ -111,7 +111,7 @@ test.describe('Master Data - Customer Season Master', () => {
       await seasonFormPage.save();
     });
 
-    await test.step('Toast reads exactly "Season updated" (no trailing period) and the list reflects it', async () => {
+    await test.step('Toast reads exactly "Season updated." and the list reflects it', async () => {
       await seasonFormPage.expectUpdatedSuccessfully();
       await seasonListPage.search(editedDescription);
       await seasonListPage.expectRowVisible(editedDescription);
@@ -354,7 +354,7 @@ test.describe('Master Data - Customer Season Master', () => {
       await seasonFormPage.deactivate();
     });
 
-    await test.step('Toast reads exactly "Season deactivated" (no trailing period) and the row shows Inactive', async () => {
+    await test.step('Toast reads exactly "Season deactivated." and the row shows Inactive', async () => {
       await seasonFormPage.expectDeactivatedSuccessfully();
       await seasonListPage.search(seasonCode);
       await seasonListPage.expectRowStatus(seasonCode, 'Inactive');

@@ -54,6 +54,10 @@ export class CustomerFormLocators {
   readonly saveChangesButton: Locator;
   readonly cancelButton: Locator;
   readonly deactivateButton: Locator;
+  /** Replaces "Deactivate" once the record is Inactive (fixed on dev 2026-10-12). */
+  readonly activateButton: Locator;
+  /** "Deactivate {code}?" confirmation alertdialog's confirm button (added on dev 2026-10-12). */
+  readonly deactivateConfirmButton: Locator;
 
   constructor(private readonly page: Page) {
     this.customerCodeInput = page.getByRole('textbox', { name: 'Customer Code', exact: true });
@@ -87,6 +91,11 @@ export class CustomerFormLocators {
     this.saveChangesButton = page.getByRole('button', { name: 'Save changes' });
     this.cancelButton = page.getByRole('button', { name: 'Cancel', exact: true }).first();
     this.deactivateButton = page.getByRole('button', { name: 'Deactivate', exact: true });
+    this.activateButton = page.getByRole('button', { name: 'Activate', exact: true });
+    this.deactivateConfirmButton = page
+      .getByRole('alertdialog')
+      .filter({ hasText: /moves to the Inactive tab/i })
+      .getByRole('button', { name: 'Deactivate', exact: true });
   }
 
   /** An option in an open Country / Currency / Payment Method / Credit Terms dropdown. */

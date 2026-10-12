@@ -30,6 +30,15 @@ function requiredCustomerValues(
   };
 }
 
+/**
+ * Buyer Code must be unique across customers since dev 2026-10-12 ("Buyer
+ * Code X is already used by another customer.") and the field keeps only 3
+ * characters, so a fixed value collides on every run after the first.
+ */
+function randBuyerCode(): string {
+  return Math.random().toString(36).slice(2, 5).toUpperCase().padEnd(3, 'X');
+}
+
 test.describe('Master Data - Customer Master', () => {
   test.beforeEach(async () => {
     await allure.epic('Master Data');
@@ -54,7 +63,7 @@ test.describe('Master Data - Customer Master', () => {
         email: `pw-md-customer-${suffix}@example.com`,
         website: 'https://example.com',
         phone1: '+1 555 0100',
-        buyerCode: 'BUY01',
+        buyerCode: randBuyerCode(),
         fax: '+1 555 0101',
         addressLine1: '123 Test Street',
         addressLine2: 'Suite 2',
@@ -393,7 +402,7 @@ test.describe('Master Data - Customer Master', () => {
     });
   });
 
-  test('TC:13 Verify Deactivate action and the same reactivation trap as Company Master', async ({
+  test('TC:13 Verify Deactivate and Activate actions', async ({
     customerListPage,
     customerFormPage,
   }) => {
@@ -418,16 +427,15 @@ test.describe('Master Data - Customer Master', () => {
       await customerListPage.expectRowStatus(name, 'Inactive');
     });
 
-    await test.step('Confirmed app bug (same as Company Master): reopening still shows "Deactivate", never "Activate"', async () => {
+    await test.step('Reopening the Inactive customer shows "Activate" instead of "Deactivate"', async () => {
       await customerListPage.openEdit(name);
-      await customerFormPage.expectDeactivateButtonStillShows();
+      await customerFormPage.expectActivateButtonShows();
       await expect(customerFormPage.locators.activeCheckbox).not.toBeChecked();
     });
 
-    await test.step('The only confirmed way to reactivate: check the in-form "Active" checkbox and Save changes', async () => {
-      await customerFormPage.toggleActive();
-      await customerFormPage.save();
-      await customerFormPage.expectUpdatedSuccessfully();
+    await test.step('"Activate" reactivates it: toast "Customer status updated." and the row shows Approved', async () => {
+      await customerFormPage.activate();
+      await customerFormPage.expectReactivatedSuccessfully();
       await customerListPage.search(name);
       await customerListPage.expectRowStatus(name, 'Approved');
     });

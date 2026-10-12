@@ -175,9 +175,10 @@ export class ColorPage extends BasePage {
     await this.locators.cancelButton.click();
   }
 
-  /** Clicks "Deactivate <ColorID>" in the Edit dialog header. */
+  /** Clicks "Deactivate <ColorID>" in the Edit dialog header, then confirms the "Deactivate <ColorID>?" alertdialog (added 2026-10-12). */
   async deactivate(): Promise<void> {
     await this.locators.deactivateButton.click();
+    await this.locators.deactivateConfirmButton.click();
   }
 
   /** Re-checks the "Status" checkbox and saves — the only reactivation path (TC:7, reuses the generic edit-save toast). */
@@ -214,16 +215,17 @@ export class ColorPage extends BasePage {
   }
 
   /**
-   * Real toast text confirmed live on a duplicate Color Code submit: a
-   * generic "Failed to create color." — the backend's actual
-   * `409 color_conflict` reason (naming the exact code + category) is
-   * never surfaced to the user. Asserting this exact generic text on
-   * purpose (see TC:11's bug note).
+   * Real toast text confirmed live (2026-10-12) on a duplicate Color Code
+   * submit: "Color Code {CODE} is already used in this item category."
+   * Until 2026-10-08 this was the generic "Failed to create color." —
+   * that UX gap is now fixed.
    */
-  async expectCreateFailed(): Promise<void> {
-    await expect(this.page.getByText('Failed to create color.', { exact: true })).toBeVisible({
-      timeout: 15_000,
-    });
+  async expectDuplicateCodeError(colorCode: string): Promise<void> {
+    await expect(
+      this.page.getByText(`Color Code ${colorCode} is already used in this item category.`, {
+        exact: true,
+      }),
+    ).toBeVisible({ timeout: 15_000 });
   }
 
   async expectFieldError(message: string | RegExp): Promise<void> {
@@ -245,9 +247,34 @@ export class ColorPage extends BasePage {
     await expect(this.locators.row(colorId)).toHaveCount(0);
   }
 
+  /**
+   * Asserts the Status of the row for `colorId`, found by searching
+   * `searchText`. Since dev
+   * 2026-10-12 the list intermittently keeps serving the pre-change row for
+   * a few seconds after a successful mutation (the success toast is
+   * already shown), so this re-reads — reloading the page from the second
+   * attempt on — until it matches or 45s pass.
+   */
+  async expectRowStatus(colorId: string, searchText: string, status: string): Promise<void> {
+    let attempt = 0;
+    await expect(async () => {
+      if (attempt++ > 0) {
+        await this.open();
+        await this.expectLoaded();
+      }
+      await this.search(searchText);
+      expect(await this.rowStatus(colorId)).toBe(status);
+    }).toPass({ timeout: 45_000 });
+  }
+
   /** Reads the Status cell text for a given Color ID row, e.g. "Active"/"Inactive". */
   async rowStatus(colorId: string): Promise<string> {
-    return (await this.locators.row(colorId).getByRole('cell').last().innerText()).trim();
+    // Matched by value: a trailing (empty) actions column was added on dev 2026-10-12.
+    const cell = this.locators
+      .row(colorId)
+      .getByRole('cell')
+      .filter({ hasText: /^(Active|Draft|Approved|Inactive|Rejected)$/ });
+    return (await cell.innerText()).trim();
   }
 
   /**

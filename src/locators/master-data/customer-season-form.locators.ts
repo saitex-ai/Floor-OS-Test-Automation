@@ -40,6 +40,8 @@ export class CustomerSeasonFormLocators {
   readonly saveChangesButton: Locator;
   readonly closeButton: Locator;
   readonly deactivateButton: Locator;
+  /** "Deactivate {code}?" confirmation alertdialog's confirm button (added on dev 2026-10-12). */
+  readonly deactivateConfirmButton: Locator;
   readonly deleteButton: Locator;
 
   readonly deleteConfirmDialog: Locator;
@@ -60,6 +62,10 @@ export class CustomerSeasonFormLocators {
     this.closeButton = page.getByRole('button', { name: 'Close', exact: true }).first();
     // Dynamic names, e.g. "Deactivate TCS463781" / "Delete TCS463781".
     this.deactivateButton = page.getByRole('button', { name: /^Deactivate / });
+    this.deactivateConfirmButton = page
+      .getByRole('alertdialog')
+      .filter({ hasText: /moves to the Inactive tab/i })
+      .getByRole('button', { name: 'Deactivate', exact: true });
     this.deleteButton = page.getByRole('button', { name: /^Delete / });
 
     this.deleteConfirmDialog = page.getByRole('alertdialog', { name: /^Delete / });

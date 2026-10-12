@@ -78,3 +78,18 @@ independently confirmed against Size given the list-refresh bug above makes it h
 eye); bulk "Upload" import; Export CSV content; Filters rule-builder panel; column
 configuration/resizing; the three layout-mode toggles (No split / Vertical split / Horizontal
 split).
+
+## Update 2026-10-12 — rollout changes re-verified on dev
+
+Re-verified live while re-running this suite; the automation was updated to match:
+
+- **TC:4 — bug fixed:** changing Waist on an existing Size now re-derives Description
+  (e.g. "IN34 - W0238" -> "IN34 - W0239"). It used to stay frozen at the create-time combo.
+- **TC:9 — duplicate message is now specific:** "A size with the same inseam and waist, or the same
+  description, already exists in item category GMT." (was the generic "Failed to create size.").
+  Note the duplicate rule matches on Inseam+Waist **or** Description.
+- **TC:11 — bug fixed:** "Deactivate" now opens a "Deactivate {SIZE ID}?" confirmation, and the list
+  really reflects it — the row shows **Inactive** (also after a reload) and the Inactive tab counts it.
+- Search by Size ID does not filter the list; search by the Description combo does.
+- Automation: each create now draws a random Inseam/Waist pair and redraws on a duplicate, instead of
+  a clock-seeded pick that let parallel workers collide.

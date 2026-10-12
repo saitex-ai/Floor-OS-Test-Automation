@@ -43,6 +43,8 @@ export class ColorLocators {
   readonly cancelButton: Locator;
   /** Header action in the Edit dialog, e.g. "Deactivate CMC0000020". */
   readonly deactivateButton: Locator;
+  /** "Deactivate {code}?" confirmation alertdialog's confirm button (added on dev 2026-10-12). */
+  readonly deactivateConfirmButton: Locator;
 
   readonly itemCategoryPickerDialog: Locator;
 
@@ -73,6 +75,10 @@ export class ColorLocators {
     this.saveChangesButton = this.formDialog.getByRole('button', { name: 'Save changes' });
     this.cancelButton = this.formDialog.getByRole('button', { name: 'Cancel', exact: true });
     this.deactivateButton = this.formDialog.getByRole('button', { name: /^Deactivate/ });
+    this.deactivateConfirmButton = page
+      .getByRole('alertdialog')
+      .filter({ hasText: /moves to the Inactive tab/i })
+      .getByRole('button', { name: 'Deactivate', exact: true });
 
     this.itemCategoryPickerDialog = page.getByRole('dialog', { name: 'Select Item Category' });
   }

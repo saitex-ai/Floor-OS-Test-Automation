@@ -267,8 +267,8 @@ test.describe('Master Data - Company Master', () => {
       await companyFormPage.create();
     });
 
-    await test.step('Second save is blocked with the generic "Failed to create company." toast', async () => {
-      await companyFormPage.expectCreateFailed();
+    await test.step('Second save is blocked with a toast naming the duplicate Company Code', async () => {
+      await companyFormPage.expectDuplicateCodeError(sharedCode);
       await companyFormPage.expectStillOnCreatePage();
     });
   });
@@ -369,7 +369,7 @@ test.describe('Master Data - Company Master', () => {
     });
   });
 
-  test('TC:13 Verify reactivating a deactivated company — known trap, confirmed live', async ({
+  test('TC:13 Verify reactivating a deactivated company', async ({
     companyListPage,
     companyFormPage,
   }) => {
@@ -389,17 +389,16 @@ test.describe('Master Data - Company Master', () => {
       await companyFormPage.expectDeactivatedSuccessfully();
     });
 
-    await test.step('Confirmed app bug: reopening the Inactive company still shows "Deactivate", never "Activate"', async () => {
+    await test.step('Reopening the Inactive company shows "Activate" instead of "Deactivate"', async () => {
       await companyListPage.search(name);
       await companyListPage.openEdit(name);
-      await companyFormPage.expectDeactivateButtonStillShows();
+      await companyFormPage.expectActivateButtonShows();
       await expect(companyFormPage.locators.activeCheckbox).not.toBeChecked();
     });
 
-    await test.step('The only confirmed way to reactivate: check the in-form "Active" checkbox and Save changes', async () => {
-      await companyFormPage.toggleActive();
-      await companyFormPage.save();
-      await companyFormPage.expectUpdatedSuccessfully();
+    await test.step('"Activate" reactivates it: toast "Reactivated" and the row shows Active', async () => {
+      await companyFormPage.activate();
+      await companyFormPage.expectReactivatedSuccessfully();
       await companyListPage.search(name);
       await companyListPage.expectRowStatus(name, 'Active');
     });

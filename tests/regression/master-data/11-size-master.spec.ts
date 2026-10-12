@@ -1,5 +1,6 @@
 import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/master-data.fixtures';
+import type { SizePage } from '../../../src/pages/master-data/size.page';
 
 /**
  * Master Data — Size Master.
@@ -12,13 +13,15 @@ import { test, expect } from '../../../src/fixtures/master-data.fixtures';
  *
  * Test data strategy: a Size is *composed* from an existing Item
  * Category + Inseam + Waist (no free text at all, see size.locators.ts),
- * and this screen has no working hard-delete/working-deactivate to reset
- * state between runs (TC:11 is exactly that confirmed bug). So instead of
+ * and this screen has no hard delete to reset state between runs
+ * (deactivated Sizes still count as duplicates). So instead of
  * a fixed, hardcoded combo that a second run would collide with, each
  * "needs a fresh combo" test draws one from a real, confirmed-live pool of
- * GMT-category Inseam/Waist codes, indexed by a counter + the current
- * timestamp — comfortably more combinations (18 x 19 = 342) than this
- * suite burns through in any realistic run cadence.
+ * GMT-category Inseam/Waist codes, picked at random — comfortably more
+ * combinations (18 x 19 = 342) than this suite burns through in any
+ * realistic run cadence. createFreshSize() retries with a new draw when
+ * the app reports a duplicate, so leftovers from earlier runs never fail
+ * a test that only needs "some new Size".
  */
 const ITEM_CATEGORY = 'GMT';
 const INSEAM_POOL = [
@@ -63,15 +66,38 @@ const WAIST_POOL = [
   'W40',
 ];
 
-let comboCounter = 0;
+function pick<T>(pool: readonly T[]): T {
+  return pool[Math.floor(Math.random() * pool.length)]!;
+}
 
-/** Draws a not-yet-tried-this-run Inseam/Waist pair from the pools above (see file doc). */
+/**
+ * A random Inseam/Waist pair from the pools above. Random rather than
+ * clock-seeded: parallel workers calling this in the same millisecond used
+ * to draw the identical pair and collide on create. Use createFreshSize()
+ * when the test needs a saved Size.
+ */
 function freshCombo(): { inseam: string; waist: string } {
-  const seed = Date.now() + comboCounter++;
-  return {
-    inseam: INSEAM_POOL[seed % INSEAM_POOL.length] ?? 'IN28',
-    waist: WAIST_POOL[Math.floor(seed / 7) % WAIST_POOL.length] ?? 'W26',
-  };
+  return { inseam: pick(INSEAM_POOL), waist: pick(WAIST_POOL) };
+}
+
+/**
+ * Creates a Size from a random Inseam/Waist pair, redrawing whenever the
+ * app rejects it as a duplicate. A pre-check against the list isn't
+ * enough: duplicates are matched on Inseam+Waist too, and older rows carry
+ * free-text descriptions (e.g. "30 × 34") that a combo search won't find.
+ * Leaves the "Size created." toast on screen for the caller to assert.
+ */
+async function createFreshSize(sizePage: SizePage): Promise<{ inseam: string; waist: string }> {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const combo = freshCombo();
+    await sizePage.openNewSize();
+    await sizePage.fillRequired({ itemCategory: ITEM_CATEGORY, ...combo });
+    if (await sizePage.submitUnlessDuplicate('create')) return combo;
+    await sizePage.cancel();
+  }
+  throw new Error(
+    'Every Inseam/Waist draw was a duplicate in 10 attempts — the pools need more codes.',
+  );
 }
 
 /**
@@ -112,17 +138,15 @@ test.describe('Master Data - Size Master', () => {
   });
 
   test('TC:2 Verify successful Size creation with all required fields', async ({ sizePage }) => {
-    const { inseam, waist } = freshCombo();
+    let combo = '';
 
     await test.step('Create a Size from Item Category + Inseam + Waist', async () => {
-      await sizePage.openNewSize();
-      await sizePage.fillRequired({ itemCategory: ITEM_CATEGORY, inseam, waist });
-      await sizePage.create();
+      const { inseam, waist } = await createFreshSize(sizePage);
+      combo = comboText(inseam, waist);
     });
 
     await test.step('Toast reads "Size created." and the row appears Approved', async () => {
       await sizePage.expectCreatedSuccessfully();
-      const combo = comboText(inseam, waist);
       await sizePage.search(combo);
       // A fresh Size always saves as "Approved" immediately — confirmed
       // live, no Draft/approval step despite those tabs existing.
@@ -154,69 +178,50 @@ test.describe('Master Data - Size Master', () => {
   });
 
   test("TC:4 Verify editing an existing Size's Inseam/Waist", async ({ sizePage }) => {
-    const first = freshCombo();
-    let second = freshCombo();
-    while (second.waist === first.waist) second = freshCombo();
+    let first = { inseam: '', waist: '' };
 
     await test.step('Create a Size to edit', async () => {
-      await sizePage.openNewSize();
-      await sizePage.fillRequired({
-        itemCategory: ITEM_CATEGORY,
-        inseam: first.inseam,
-        waist: first.waist,
-      });
-      await sizePage.create();
+      first = await createFreshSize(sizePage);
       await sizePage.expectCreatedSuccessfully();
     });
 
-    await test.step('Open it and change the Waist', async () => {
+    await test.step('Open it', async () => {
       const firstCombo = comboText(first.inseam, first.waist);
       await sizePage.search(firstCombo);
       await sizePage.openRowByText(firstCombo);
-      await sizePage.pickLookupValue('waist', second.waist);
-    });
-
-    await test.step('The Waist field itself updates and Item Category stays locked', async () => {
-      await expect(sizePage.locators.waistValueInput).toHaveValue(
-        new RegExp(`^${second.waist}\\b`),
-      );
       await expect(sizePage.locators.itemCategoryPickerButton).toBeDisabled();
     });
 
-    // Real, confirmed-live bug (not in the original test-case doc — found
-    // while automating this case, confirmed via the actual PATCH response
-    // body): changing Waist on an existing Size updates `waistCode`
-    // correctly server-side, but does NOT recompute `description`/
-    // `sizeName` — both stay frozen at whatever they were when the Size
-    // was first created. The form's Description field reflects this real
-    // backend behavior (it does not re-derive on edit, only on create), so
-    // asserting it stays stale here is asserting the REAL current
-    // behavior, not a test bug.
-    await test.step('BUG: Description does NOT re-derive on edit — it stays stale', async () => {
-      await expect(sizePage.locators.descriptionInput).toHaveValue(
-        comboText(first.inseam, first.waist),
-      );
-    });
-
-    await test.step('Save succeeds (and the saved record keeps the stale description)', async () => {
-      await sizePage.saveChanges();
-      await expect(sizePage.locators.formDialog).toHaveCount(0);
+    // Confirmed live (2026-10-12): Description now re-derives from the new
+    // Inseam/Waist on edit. Until 2026-10-08 it stayed frozen at the
+    // create-time combo (backend never recomputed description/sizeName).
+    // Redraws the Waist if the new pair turns out to already exist.
+    await test.step('Change the Waist: the field and Description update, and Save succeeds', async () => {
+      for (let attempt = 0; attempt < 10; attempt++) {
+        let waist = freshCombo().waist;
+        while (waist === first.waist) waist = freshCombo().waist;
+        await sizePage.pickLookupValue('waist', waist);
+        await expect(sizePage.locators.waistValueInput).toHaveValue(new RegExp(`^${waist}\\b`));
+        await expect(sizePage.locators.descriptionInput).toHaveValue(
+          comboText(first.inseam, waist),
+        );
+        if (await sizePage.submitUnlessDuplicate('save')) return;
+      }
+      throw new Error('Every Waist draw was a duplicate in 10 attempts.');
     });
   });
 
   test('TC:5 Verify searching the Size list by code', async ({ sizePage }) => {
-    const { inseam, waist } = freshCombo();
+    let combo = '';
 
     await test.step('Create a Size to search for', async () => {
-      await sizePage.openNewSize();
-      await sizePage.fillRequired({ itemCategory: ITEM_CATEGORY, inseam, waist });
-      await sizePage.create();
+      const { inseam, waist } = await createFreshSize(sizePage);
       await sizePage.expectCreatedSuccessfully();
+      combo = comboText(inseam, waist);
     });
 
     await test.step('Searching by its full Inseam/Waist description narrows the grid to it', async () => {
       // A bare Waist code is not safe to search by alone — see comboText()'s doc.
-      const combo = comboText(inseam, waist);
       await sizePage.search(combo);
       await sizePage.expectRowWithTextVisible(combo);
     });
@@ -261,12 +266,11 @@ test.describe('Master Data - Size Master', () => {
   test('TC:9 Verify duplicate Inseam+Waist within the same Item Category is rejected', async ({
     sizePage,
   }) => {
-    const { inseam, waist } = freshCombo();
+    let inseam = '';
+    let waist = '';
 
     await test.step('Create a Size (succeeds)', async () => {
-      await sizePage.openNewSize();
-      await sizePage.fillRequired({ itemCategory: ITEM_CATEGORY, inseam, waist });
-      await sizePage.create();
+      ({ inseam, waist } = await createFreshSize(sizePage));
       await sizePage.expectCreatedSuccessfully();
     });
 
@@ -276,11 +280,9 @@ test.describe('Master Data - Size Master', () => {
       await sizePage.create();
     });
 
-    // Known bug/gap, confirmed live (TC:9 in the .md): the API returns a
-    // specific 409 size_conflict reason, but the UI only ever shows this
-    // generic toast — the real reason is never surfaced to the user.
-    // Asserting the REAL current behavior on purpose, not the ideal one.
-    await sizePage.expectCreateFailed();
+    // Confirmed live (2026-10-12): the toast now names the real reason and
+    // category. Until 2026-10-08 it was the generic "Failed to create size.".
+    await sizePage.expectDuplicateError(ITEM_CATEGORY);
     // The dialog stays open with the rejected values still in it, not
     // silently discarded — confirmed live.
     await expect(sizePage.locators.formDialog).toBeVisible();
@@ -302,42 +304,36 @@ test.describe('Master Data - Size Master', () => {
     sizePage,
     page,
   }) => {
-    const { inseam, waist } = freshCombo();
+    let combo = '';
     let sizeId = '';
 
     await test.step('Create a throwaway Size', async () => {
-      await sizePage.openNewSize();
-      await sizePage.fillRequired({ itemCategory: ITEM_CATEGORY, inseam, waist });
-      await sizePage.create();
+      const { inseam, waist } = await createFreshSize(sizePage);
       await sizePage.expectCreatedSuccessfully();
       // A bare Waist code is not safe to search/filter by alone — see comboText()'s doc.
-      const combo = comboText(inseam, waist);
+      combo = comboText(inseam, waist);
       await sizePage.search(combo);
       sizeId = await sizePage.sizeIdFromRowText(combo);
     });
 
-    await test.step('Deactivate it — fires immediately, no confirmation step', async () => {
+    await test.step('Deactivate it — confirmed via the "Deactivate {code}?" dialog', async () => {
       await sizePage.openRow(sizeId);
       await expect(sizePage.locators.deactivateButton).toBeVisible();
       await sizePage.deactivate();
       await expect(sizePage.locators.formDialog).toHaveCount(0);
     });
 
-    // Known, confirmed-live bug (TC:11 in the .md, cross-checked against
-    // Color Master where the equivalent action DOES work): the backend
-    // really does set activeFlag:false, but the list's Status column and
-    // Inactive tab never reflect it — the row keeps showing "Approved"
-    // even after a reload. Asserting the REAL (buggy) current behavior on
-    // purpose — do not "fix" this assertion to the ideal behavior without
-    // first confirming the app itself was fixed.
-    await test.step('BUG: the list still reports it as Approved, not Inactive', async () => {
-      await sizePage.search(waist);
+    // Confirmed live (2026-10-12): the list now reflects the deactivation
+    // (row shows Inactive, Inactive tab counts it), including after a
+    // reload. Until 2026-10-08 the row kept showing "Approved".
+    await test.step('The list reports it as Inactive, also after a reload', async () => {
+      await sizePage.search(combo);
       await expect(sizePage.locators.row(sizeId)).toBeVisible();
-      expect(await sizePage.rowStatus(sizeId)).toBe('Approved');
+      await expect.poll(() => sizePage.rowStatus(sizeId), { timeout: 15_000 }).toBe('Inactive');
 
       await page.reload();
-      await sizePage.search(waist);
-      expect(await sizePage.rowStatus(sizeId)).toBe('Approved');
+      await sizePage.search(combo);
+      expect(await sizePage.rowStatus(sizeId)).toBe('Inactive');
     });
   });
 

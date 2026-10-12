@@ -46,6 +46,10 @@ export class CompanyFormLocators {
   readonly saveChangesButton: Locator;
   readonly cancelButton: Locator;
   readonly deactivateButton: Locator;
+  /** Replaces "Deactivate" once the record is Inactive (fixed on dev 2026-10-12). */
+  readonly activateButton: Locator;
+  /** "Deactivate {code}?" confirmation alertdialog's confirm button (added on dev 2026-10-12). */
+  readonly deactivateConfirmButton: Locator;
   readonly currencyListbox: Locator;
 
   constructor(private readonly page: Page) {
@@ -86,6 +90,11 @@ export class CompanyFormLocators {
     this.saveChangesButton = page.getByRole('button', { name: 'Save changes' });
     this.cancelButton = page.getByRole('button', { name: 'Cancel', exact: true }).first();
     this.deactivateButton = page.getByRole('button', { name: 'Deactivate', exact: true });
+    this.activateButton = page.getByRole('button', { name: 'Activate', exact: true });
+    this.deactivateConfirmButton = page
+      .getByRole('alertdialog')
+      .filter({ hasText: /moves to the Inactive tab/i })
+      .getByRole('button', { name: 'Deactivate', exact: true });
     this.currencyListbox = page.getByRole('listbox');
   }
 

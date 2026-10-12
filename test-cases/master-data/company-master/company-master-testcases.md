@@ -118,3 +118,17 @@ existing documentation or automation in this repo before this file.
   (No split/Vertical/Horizontal), row-level checkboxes/bulk actions, and
   exhaustive validation of Scrap %'s numeric bounds or the Image/Document/
   FR/GPRO Path fields' format (if any).
+
+## Update 2026-10-12 — rollout changes re-verified on dev
+
+Re-verified live while re-running this suite; the automation was updated to match:
+
+- **Deactivate now confirms first:** clicking "Deactivate" opens a "Deactivate {CODE}?" alertdialog
+  ("{CODE} moves to the Inactive tab and can no longer be picked. It can be activated again later."
+  — Cancel / Deactivate). Toast after confirming is still "Company deactivated.".
+- **TC:8 — duplicate Company Code now gets a specific message:** "A company with the code {CODE}
+  already exists. Choose a unique code." (was the generic "Failed to create company."). UX gap fixed.
+- **TC:13 — reactivation bug fixed:** reopening an Inactive company now shows **"Activate"** instead
+  of "Deactivate". Clicking it reactivates immediately (no confirm), toast **"Reactivated"**, and the
+  row shows Active again. The earlier "Deactivate never relabels" finding no longer holds.
+- The list table gained a trailing (empty) actions column; Status is no longer the last cell.

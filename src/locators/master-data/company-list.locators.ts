@@ -43,6 +43,10 @@ export class CompanyListLocators {
 
   /** The row's Status cell — a plain badge, not a button (see class doc). */
   statusCell(exactCellText: string): Locator {
-    return this.row(exactCellText).getByRole('cell').last();
+    // Matched by value, not position: since dev 2026-10-12 the table has a
+    // trailing (empty) actions column, so the Status cell is no longer last.
+    return this.row(exactCellText)
+      .getByRole('cell')
+      .filter({ hasText: /^(Active|Draft|Approved|Inactive|Rejected)$/ });
   }
 }

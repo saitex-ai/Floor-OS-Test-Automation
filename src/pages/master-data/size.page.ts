@@ -230,12 +230,38 @@ export class SizePage extends BasePage {
   }
 
   /**
-   * Clicks "Deactivate <SizeID>" in the Edit dialog header. Confirmed live:
-   * fires immediately, no confirmation step (unlike Unit of Measure's
-   * "Delete") — see SizeLocators' class doc and TC:11's bug note.
+   * Submits the New/Edit dialog and reports whether it went through (true:
+   * the dialog closed) or was rejected as a duplicate Inseam+Waist (false:
+   * dialog stays open with the duplicate toast). Waits for that toast to
+   * clear before returning false, so a retry's own outcome isn't misread.
+   */
+  async submitUnlessDuplicate(action: 'create' | 'save'): Promise<boolean> {
+    const duplicateToast = this.page.getByText(/^A size with the same inseam and waist/);
+    await (action === 'create' ? this.create() : this.saveChanges());
+    await expect
+      .poll(
+        async () =>
+          (await duplicateToast.count()) > 0
+            ? 'duplicate'
+            : (await this.locators.formDialog.count()) === 0
+              ? 'done'
+              : 'pending',
+        { timeout: 15_000 },
+      )
+      .not.toBe('pending');
+    if ((await duplicateToast.count()) === 0) return true;
+    await expect(duplicateToast).toHaveCount(0, { timeout: 15_000 });
+    return false;
+  }
+
+  /**
+   * Clicks "Deactivate <SizeID>" in the Edit dialog header, then confirms
+   * the "Deactivate <SizeID>?" alertdialog. The confirm step was added on
+   * dev 2026-10-12 — before that the button fired immediately.
    */
   async deactivate(): Promise<void> {
     await this.locators.deactivateButton.click();
+    await this.locators.deactivateConfirmButton.click();
   }
 
   /** Real toast text confirmed live: "Size created." */
@@ -246,17 +272,19 @@ export class SizePage extends BasePage {
   }
 
   /**
-   * Real toast text confirmed live on a duplicate Inseam+Waist-in-category
-   * submit: a generic "Failed to create size." — the backend's actual
-   * `409 size_conflict` reason (naming the conflicting category) is never
-   * surfaced to the user. Asserting this exact generic text on purpose
-   * (see TC:9's bug note) rather than a more specific message that the app
-   * doesn't actually show.
+   * Real toast text confirmed live (2026-10-12) on a duplicate
+   * Inseam+Waist-in-category submit: "A size with the same inseam and
+   * waist, or the same description, already exists in item category
+   * {CATEGORY}." Until 2026-10-08 this was the generic "Failed to create
+   * size." — that UX gap is now fixed.
    */
-  async expectCreateFailed(): Promise<void> {
-    await expect(this.page.getByText('Failed to create size.', { exact: true })).toBeVisible({
-      timeout: 15_000,
-    });
+  async expectDuplicateError(itemCategory: string): Promise<void> {
+    await expect(
+      this.page.getByText(
+        `A size with the same inseam and waist, or the same description, already exists in item category ${itemCategory}.`,
+        { exact: true },
+      ),
+    ).toBeVisible({ timeout: 15_000 });
   }
 
   async expectFieldError(message: string | RegExp): Promise<void> {
@@ -290,7 +318,12 @@ export class SizePage extends BasePage {
 
   /** Reads the Status cell text for a given Size ID row, e.g. "Approved". */
   async rowStatus(sizeId: string): Promise<string> {
-    return (await this.locators.row(sizeId).getByRole('cell').last().innerText()).trim();
+    // Matched by value: a trailing (empty) actions column was added on dev 2026-10-12.
+    const cell = this.locators
+      .row(sizeId)
+      .getByRole('cell')
+      .filter({ hasText: /^(Active|Draft|Approved|Inactive|Rejected)$/ });
+    return (await cell.innerText()).trim();
   }
 
   /**

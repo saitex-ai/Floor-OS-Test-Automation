@@ -59,3 +59,17 @@ the same code + category).
 **Not covered / not yet verified**: bulk "Upload" import, Export CSV content, the Filters
 rule-builder panel, column configuration/resizing, and the three layout-mode toggles — same scope
 limit as the other two Master Data screens documented this session.
+
+## Update 2026-10-12 — rollout changes re-verified on dev
+
+Re-verified live while re-running this suite; the automation was updated to match:
+
+- **Deactivate now confirms first** via a "Deactivate {COLOR ID}?" alertdialog. Toast is still
+  "Color deactivated.".
+- **TC:11 — duplicate message is now specific:** "Color Code {CODE} is already used in this item
+  category." (the code is shown upper-cased). Was the generic "Failed to create color.".
+- **New intermittent bug (TC:6/TC:7):** right after a successful deactivate, the list can keep
+  serving the old row for a few seconds — it still shows Active, and opening that row and saving
+  fails with **"This record was updated by someone else. Reload and try again."** A reload fixes it.
+  Seen in some runs only. The automation reloads before re-editing and re-reads the status until it
+  updates (up to 45s) rather than asserting the first read.

@@ -142,9 +142,10 @@ export class CustomerFormPage extends BasePage {
     await this.locators.cancelButton.click();
   }
 
-  /** The top-of-form quick action — confirmed live to never relabel to "Activate" (see expectDeactivateButtonStillShows). */
+  /** The top-of-form quick action; confirms the "Deactivate {code}?" alertdialog (added 2026-10-12). */
   async deactivate(): Promise<void> {
     await this.locators.deactivateButton.click();
+    await this.locators.deactivateConfirmButton.click();
   }
 
   /**
@@ -190,17 +191,25 @@ export class CustomerFormPage extends BasePage {
   }
 
   /**
-   * Real bug confirmed live (2026-10-06, same pattern as Company Master):
-   * the "Deactivate" button never relabels to "Activate" once the
-   * customer is already Inactive. Asserts that (still-buggy) current
-   * behavior rather than papering over it — reactivation is only
-   * confirmed working via toggleActive() + save().
+   * Confirmed live (2026-10-12): once the customer is Inactive the top-of-form
+   * action relabels to "Activate". Until 2026-10-08 it kept showing
+   * "Deactivate" and the only way back was the in-form Active checkbox.
    */
-  async expectDeactivateButtonStillShows(): Promise<void> {
-    await expect(this.locators.deactivateButton).toBeVisible();
-    await expect(
-      this.page.getByRole('button', { name: 'Activate', exact: true }),
-    ).not.toBeVisible();
+  async expectActivateButtonShows(): Promise<void> {
+    await expect(this.locators.activateButton).toBeVisible();
+    await expect(this.locators.deactivateButton).not.toBeVisible();
+  }
+
+  /** Top-of-form "Activate" on an Inactive record — no confirmation step, confirmed live. */
+  async activate(): Promise<void> {
+    await this.locators.activateButton.click();
+  }
+
+  /** Real toast text confirmed live (2026-10-12): "Customer status updated." (Company's says "Reactivated"). */
+  async expectReactivatedSuccessfully(): Promise<void> {
+    await expect(this.page.getByText('Customer status updated.', { exact: true })).toBeVisible({
+      timeout: 30_000,
+    });
   }
 
   /**

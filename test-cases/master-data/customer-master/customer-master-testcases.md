@@ -105,3 +105,18 @@ created.` — don't match on a static string).
   field format validation (if any), Payment Method/Credit Terms dropdown
   option lists, Filters rule-builder UI, Export CSV content, and bulk
   row-selection actions.
+
+## Update 2026-10-12 — rollout changes re-verified on dev
+
+Re-verified live while re-running this suite; the automation was updated to match:
+
+- **Deactivate now confirms first** via a "Deactivate {CODE}?" alertdialog (Cancel / Deactivate).
+  Toast after confirming is still "Customer deactivated.".
+- **TC:13 — reactivation bug fixed:** an Inactive customer's edit page now shows **"Activate"**.
+  Clicking it reactivates immediately (no confirm), toast **"Customer status updated."** (Company
+  says "Reactivated" for the same action — inconsistent wording), row back to Approved.
+- **TC:1 — Buyer Code must now be unique:** a reused Buyer Code is rejected with "Buyer Code {X} is
+  already used by another customer. Enter a different Buyer Code." The field also keeps only 3
+  characters ("BUY01" is stored as "BUY"). The automation now uses a random 3-character code.
+- New customers are still created directly as **Approved** (no Draft step, unlike Vendor Master).
+- The list table gained a trailing (empty) actions column; Status is no longer the last cell.

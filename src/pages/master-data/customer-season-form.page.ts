@@ -130,6 +130,7 @@ export class CustomerSeasonFormPage extends BasePage {
 
   async deactivate(): Promise<void> {
     await this.locators.deactivateButton.click();
+    await this.locators.deactivateConfirmButton.click();
   }
 
   /** Opens the Delete confirmation `alertdialog` without confirming it yet. */
@@ -148,8 +149,7 @@ export class CustomerSeasonFormPage extends BasePage {
 
   /**
    * Real toast text confirmed live: "Season {CODE} created." (with a
-   * trailing period — contrast with the update/deactivate toasts below,
-   * which drop it; see customer-season-master-testcases.md's Notes).
+   * trailing period, like every Season toast since dev 2026-10-12).
    */
   async expectCreatedSuccessfully(): Promise<void> {
     // Confirmed live: this dev environment is shared/busy (multiple
@@ -169,33 +169,31 @@ export class CustomerSeasonFormPage extends BasePage {
   }
 
   /**
-   * Real toast text confirmed live: exactly "Season updated" — deliberately
-   * NO trailing period, unlike Create/Delete's own toasts. Asserted with
-   * an exact string (not a loose substring) so a future punctuation fix
-   * would be caught, not silently absorbed.
+   * Real toast text confirmed live (2026-10-12): exactly "Season updated."
+   * Until 2026-10-08 it had no trailing period, unlike Create/Delete's
+   * toasts — asserted exactly so punctuation drift stays visible.
    */
   async expectUpdatedSuccessfully(): Promise<void> {
-    await expect(this.page.getByText('Season updated', { exact: true })).toBeVisible({
+    await expect(this.page.getByText('Season updated.', { exact: true })).toBeVisible({
       timeout: 30_000,
     });
   }
 
-  /** Real toast text confirmed live: exactly "Season deactivated" — no trailing period. */
+  /** Real toast text confirmed live (2026-10-12): exactly "Season deactivated." (no trailing period until 2026-10-08). */
   async expectDeactivatedSuccessfully(): Promise<void> {
-    await expect(this.page.getByText('Season deactivated', { exact: true })).toBeVisible({
+    await expect(this.page.getByText('Season deactivated.', { exact: true })).toBeVisible({
       timeout: 30_000,
     });
   }
 
-  /** Real toast text confirmed live: "Season deleted." — trailing period, unlike update/deactivate. */
+  /** Real toast text confirmed live: "Season deleted." */
   async expectDeletedSuccessfully(): Promise<void> {
     await expect(this.page.getByText('Season deleted.')).toBeVisible({ timeout: 30_000 });
   }
 
   /**
    * Real, specific duplicate-prevention message confirmed live — scoped
-   * per-customer, not global (contrast with Company Master's generic
-   * "Failed to create company." for its own duplicate case).
+   * per-customer, not global.
    */
   async expectDuplicateSeasonCodeError(): Promise<void> {
     await expect(
