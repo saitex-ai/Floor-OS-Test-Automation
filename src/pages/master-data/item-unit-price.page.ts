@@ -121,8 +121,28 @@ export class ItemUnitPricePage extends BasePage {
     return found;
   }
 
+  /**
+   * The current Open revision's Rev No. If none is Open, opens a new one
+   * first via "New Revision" -> "Create revision" (carry-forward on, the
+   * default), which copies the last posted prices — additive only, nothing
+   * is posted or overwritten. Needed since 2026-10-12, when every revision
+   * on dev had been posted by someone else on the shared account, leaving
+   * these tests with no Open revision at all. If a concurrent run creates
+   * one first, the second create is simply blocked and the lookup still
+   * finds the single Open revision.
+   */
   async getOpenRevisionNumber(): Promise<number> {
-    return this.findRevisionNumberByStatus('Open');
+    try {
+      return await this.findRevisionNumberByStatus('Open');
+    } catch {
+      await this.locators.newRevisionButton.click();
+      await expect(this.locators.newRevisionDialog).toBeVisible({ timeout: 10_000 });
+      await this.locators.newRevisionCreateButton.click();
+      await expect(this.locators.newRevisionDialog).toBeHidden({ timeout: 15_000 });
+      await this.open();
+      await this.expectLoaded();
+      return this.findRevisionNumberByStatus('Open');
+    }
   }
 
   async getPostedRevisionNumber(): Promise<number> {

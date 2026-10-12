@@ -87,3 +87,16 @@ collapsed "Inventory Item Management" nav group.
   exhaustively tested), Filters rule-builder, Export CSV content, Configure
   columns/Best-fit columns, the 3 layout modes, and the "Where Used" section's
   real content/behavior.
+
+## Update 2026-10-12 — Price is now validated; seed pool exhausted
+
+- **New validation:** saving with the pre-filled price of 0 is blocked client-side with "Price must be
+  greater than 0" and the banner "Please fix the highlighted fields before saving." (no request
+  sent). Price is now effectively required; TC:2's "only required fields" create sets Price = 1.
+- One item can have several price rows, one per supplier (e.g. BUT0000011 under three suppliers),
+  so list rows are now identified by item **and** supplier.
+- **Test-data limitation:** (item, supplier) is unique forever and there is no delete. Only about a
+  third of the 47 items in the Item code picker have a mapped supplier ("No suppliers mapped to this
+  item — add it in Master Data."), and every such pair is now priced. The create-dependent tests
+  (TC:1/TC:2/TC:4/TC:7/TC:14) therefore **skip with an explicit reason** until new item–supplier
+  mappings exist. They still fail on any other error.

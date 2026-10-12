@@ -102,3 +102,10 @@ rather than expanding the collapsed "Inventory Item Management" nav group.
   internals (only confirmed they exist and are labeled "Pick customer" /
   "Pick item" / "Pick sub item" / "Pick currency" / "Pick supplier"), and
   the actual Post Revision confirmation flow/toast text (see TC:13).
+
+## Update 2026-10-12 — no Open revision left on dev
+
+- All revisions (1–4) were found **Posted** — Rev 3 and Rev 4 were posted on 2026-10-12 by the shared
+  `alice` account, not by this suite (TC:13 Post Revision is still never executed). The tests that need
+  an Open revision now open one when none exists ("New Revision" -> "Create revision", carry-forward
+  on). That only adds a revision; nothing is posted or overwritten.

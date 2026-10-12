@@ -123,3 +123,10 @@ Unit(83)`; its own search placeholder is `Search by code or name…`.
   Export CSV file content, Configure columns/Best-fit columns, the 3
   layout modes, and row-level checkboxes/bulk actions — same scope limit
   as other Master Data screens' own files.
+
+## Update 2026-10-12 — unused-pair lookup fixed
+
+- `pickUnusedPair()` read the grid before the search filter had applied and so reported existing
+  pairs (e.g. MM -> KGG) as unused, causing "A conversion already exists for this From/To UoM pair."
+  It now waits for the filter to apply. It also draws from all 380 ordered pairs in random order, not
+  a fixed 20-pair walk that was fully used up on dev.

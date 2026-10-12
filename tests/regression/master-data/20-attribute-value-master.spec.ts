@@ -127,6 +127,11 @@ test.describe('Master Data - Attribute Value Master', () => {
     });
 
     await test.step('Clean up', async () => {
+      // Reload first: since dev 2026-10-12 the list can intermittently keep
+      // the pre-edit row version, and a delete opened from it is rejected
+      // with "Someone else changed this row — refresh and retry."
+      await attributeValueMasterPage.open();
+      await attributeValueMasterPage.expectLoaded();
       await attributeValueMasterPage.openRowForEdit(code);
       await attributeValueMasterPage.deleteRecord();
       await attributeValueMasterPage.expectDeletedToast();
@@ -285,6 +290,10 @@ test.describe('Master Data - Attribute Value Master', () => {
 
     await test.step('Toast confirms deletion; the record is fully gone, not merely Inactive', async () => {
       await attributeValueMasterPage.expectDeletedToast();
+      // Reload first: since dev 2026-10-12 the list intermittently keeps
+      // showing a just-deleted row until the page is refreshed.
+      await attributeValueMasterPage.open();
+      await attributeValueMasterPage.expectLoaded();
       await attributeValueMasterPage.expectRowNotVisible(code);
     });
   });

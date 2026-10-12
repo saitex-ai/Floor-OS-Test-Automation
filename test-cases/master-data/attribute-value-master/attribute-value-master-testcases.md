@@ -137,3 +137,11 @@ value` (yet another distinct wording from Attribute Master's "Failed to
   data — see TC:7), Filters rule-builder, Export CSV content, Configure/
   Best-fit columns, the 3 layout modes, and whether a non-Draft value's Edit
   dialog can ever show a "Reject"/"Approve" pair (only confirmed for Draft).
+
+## Update 2026-10-12 — intermittent stale list after a mutation
+
+- **New intermittent bug (TC:3/TC:8/TC:9):** right after a successful edit, status change or delete,
+  the list can keep serving the pre-change row for a few seconds. Deleting a row opened from it then
+  fails with **"Someone else changed this row — refresh and retry."**, a just-deleted row stays
+  visible, and a status chip can still show the old status. A reload fixes it. Seen in some runs
+  only. The automation reloads before follow-up actions and re-reads status until it updates.

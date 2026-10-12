@@ -10,6 +10,20 @@ export interface PriceRowValues {
 }
 
 /**
+ * Thrown by createFreshPriceRecord() when every attempt failed purely on
+ * seed data — the item had no mapped supplier, or its (item, supplier) pair
+ * was already priced (409). That pair is unique forever and this module has
+ * no delete, so the picker's pool runs out over repeated runs; callers skip
+ * on this (an unmet data precondition) rather than fail.
+ */
+export class PriceLibraryPoolExhaustedError extends Error {
+  constructor(details: string) {
+    super(`No unpriced (item, supplier) pair left in the Item code picker ${details}`);
+    this.name = 'PriceLibraryPoolExhaustedError';
+  }
+}
+
+/**
  * The "Material Price Library" screen — list
  * (/master-data/price-library), create form (/master-data/price-library/new)
  * and per-(item, supplier) detail page
@@ -200,12 +214,17 @@ export class PriceLibraryPage extends BasePage {
    * doc). Returns nothing: createFreshPriceRecord() reads the item's name
    * back from the form's own disabled display afterward instead.
    */
-  private async pickRandomItemUnfiltered(): Promise<void> {
+  private async pickRandomItemUnfiltered(alreadyTried: Set<number>): Promise<void> {
     await this.locators.itemCodeTrigger.click();
     await expect(this.locators.firstCmdkOption()).toBeVisible({ timeout: 10_000 });
     const options = this.page.locator('[cmdk-item]');
     const count = await options.count();
-    await options.nth(Date.now() % count).click();
+    // Random and never the same option twice per createFreshPriceRecord()
+    // call, so its attempts actually cover the pool instead of re-drawing.
+    const untried = [...Array(count).keys()].filter((i) => !alreadyTried.has(i));
+    const index = untried[Math.floor(Math.random() * untried.length)] ?? 0;
+    alreadyTried.add(index);
+    await options.nth(index).click();
     // Same "did the pick actually register" self-check as pickRandomSupplier().
     const stillUnset = await this.locators.itemCodeTrigger
       .getByText('Search items...', { exact: false })
@@ -244,12 +263,18 @@ export class PriceLibraryPage extends BasePage {
    * writing a repeatable create test here at all. A 409/no-supplier result
    * is expected, routine retry fodder, not a test failure in its own right;
    * anything else is surfaced immediately rather than retried blindly.
+   *
+   * Price defaults to "1" when the caller doesn't pass one: since dev
+   * 2026-10-12 the form blocks a save at the pre-filled 0 price ("Price must
+   * be greater than 0", no request sent).
    */
   async createFreshPriceRecord(
     rowValues: PriceRowValues = {},
     maxAttempts = 25,
-  ): Promise<{ response: Response; itemName: string }> {
+  ): Promise<{ response: Response; itemName: string; supplierName: string }> {
     const failures: string[] = [];
+    const triedItems = new Set<number>();
+    let dataOnlyFailures = 0;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         if (attempt === 0) {
@@ -259,20 +284,24 @@ export class PriceLibraryPage extends BasePage {
           await this.openAddItemForm();
         }
 
-        await this.pickRandomItemUnfiltered();
+        await this.pickRandomItemUnfiltered(triedItems);
         const itemName = await this.waitForItemNameToLoad();
         await this.pickRandomSupplier();
-        if (Object.keys(rowValues).length > 0) await this.fillPriceRow(1, rowValues);
+        // The trigger shows just the supplier name — exactly the list's Supplier cell.
+        const supplierName = (await this.locators.supplierTrigger.innerText()).trim();
+        await this.fillPriceRow(1, { price: '1', ...rowValues });
         await this.setStartDateToday(1);
 
         const response = await this.confirmAndSave();
         const status = response?.status();
-        if (status === 201) return { response: response!, itemName };
+        if (status === 201) return { response: response!, itemName, supplierName };
         if (status !== 409) {
           throw new Error(`Unexpected Price Library create response: ${status ?? '(no response)'}`);
         }
         failures.push(`attempt ${attempt} (item "${itemName}"): 409 conflict`);
+        dataOnlyFailures++;
       } catch (error) {
+        if ((error as Error).message.startsWith('No supplier options')) dataOnlyFailures++;
         // Any failure on this attempt (409 conflict, an item with no mapped
         // supplier, a transient UI hiccup, ...) just means "try a different
         // (item, supplier) pick next" — not a reason to fail the whole
@@ -281,9 +310,17 @@ export class PriceLibraryPage extends BasePage {
         failures.push(`attempt ${attempt}: ${(error as Error).message}`);
       }
     }
-    throw new Error(
-      `Could not create a fresh Price Library record after ${maxAttempts} attempts:\n${failures.join('\n')}`,
+    const summary = `after ${maxAttempts} attempts:\n${failures.join('\n')}`;
+    // Exhausted = most attempts failed on data (no supplier / 409) and none
+    // got an unexpected API response. A few UI hiccups (e.g. the item name
+    // loading slowly) don't change that verdict; an unexpected status does.
+    const unexpectedResponse = failures.some((f) =>
+      f.includes('Unexpected Price Library create response: 5'),
     );
+    if (!unexpectedResponse && dataOnlyFailures >= maxAttempts * 0.8) {
+      throw new PriceLibraryPoolExhaustedError(summary);
+    }
+    throw new Error(`Could not create a fresh Price Library record ${summary}`);
   }
 
   /** Fills whichever of Price/Freight/Other/MOQ are given for price row `n`; all default to a pre-filled value, none are required (see TC:2). */
@@ -401,10 +438,15 @@ export class PriceLibraryPage extends BasePage {
   }
 
   /** Searches by itemCode first when it's a plain string (see search()'s doc) before checking visibility. */
-  async expectRowVisible(itemCode: string | RegExp): Promise<void> {
+  /**
+   * `supplier` narrows to one (item, supplier) row — needed since one item
+   * can carry several price rows, one per supplier (confirmed live
+   * 2026-10-12, e.g. BUT0000011 under three suppliers).
+   */
+  async expectRowVisible(itemCode: string | RegExp, supplier?: string): Promise<void> {
     await expect(async () => {
       if (typeof itemCode === 'string') await this.search(itemCode);
-      await expect(this.locators.row(itemCode)).toBeVisible({ timeout: 3_000 });
+      await expect(this.locators.row(itemCode, supplier)).toBeVisible({ timeout: 3_000 });
     }).toPass({ timeout: 20_000 });
   }
 
@@ -413,9 +455,13 @@ export class PriceLibraryPage extends BasePage {
     await expect(this.locators.row(itemCode)).toHaveCount(0);
   }
 
-  async expectRowStatus(itemCode: string | RegExp, status: string): Promise<void> {
+  async expectRowStatus(
+    itemCode: string | RegExp,
+    status: string,
+    supplier?: string,
+  ): Promise<void> {
     if (typeof itemCode === 'string') await this.search(itemCode);
-    await expect(this.locators.row(itemCode)).toContainText(status);
+    await expect(this.locators.row(itemCode, supplier)).toContainText(status);
   }
 
   /**
@@ -426,9 +472,9 @@ export class PriceLibraryPage extends BasePage {
    * live these can differ (the picker shows an Alternate-Code-style value,
    * the list's Item Code column shows a different base code).
    */
-  async getRowCellTexts(itemCodeOrName: string | RegExp): Promise<string[]> {
+  async getRowCellTexts(itemCodeOrName: string | RegExp, supplier?: string): Promise<string[]> {
     if (typeof itemCodeOrName === 'string') await this.search(itemCodeOrName);
-    return this.locators.row(itemCodeOrName).getByRole('cell').allTextContents();
+    return this.locators.row(itemCodeOrName, supplier).getByRole('cell').allTextContents();
   }
 }
 

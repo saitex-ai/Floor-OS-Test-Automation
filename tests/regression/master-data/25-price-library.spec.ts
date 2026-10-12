@@ -1,5 +1,9 @@
 import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/master-data.fixtures';
+import {
+  type PriceLibraryPage,
+  PriceLibraryPoolExhaustedError,
+} from '../../../src/pages/master-data/price-library.page';
 
 /**
  * Master Data — Price Library ("Material Price Library" screen,
@@ -42,6 +46,23 @@ import { test, expect } from '../../../src/fixtures/master-data.fixtures';
  * unconfirmed submission mechanism would be inventing behavior, not
  * automating it.
  */
+/**
+ * createFreshPriceRecord(), but skips (rather than fails) the calling test
+ * when the seed data has no unpriced (item, supplier) pair left — an unmet
+ * data precondition, not an app defect. Any other error still fails.
+ */
+async function createFreshOrSkip(
+  priceLibraryPage: PriceLibraryPage,
+  rowValues?: Parameters<PriceLibraryPage['createFreshPriceRecord']>[0],
+): ReturnType<PriceLibraryPage['createFreshPriceRecord']> {
+  try {
+    return await priceLibraryPage.createFreshPriceRecord(rowValues);
+  } catch (error) {
+    if (error instanceof PriceLibraryPoolExhaustedError) test.skip(true, error.message);
+    throw error;
+  }
+}
+
 test.describe('Master Data - Price Library', () => {
   test.beforeEach(async () => {
     await allure.epic('Master Data');
@@ -56,6 +77,7 @@ test.describe('Master Data - Price Library', () => {
     // dev project's default 60s test timeout comfortably allows.
     test.setTimeout(200_000);
     let itemName = '';
+    let supplierName = '';
 
     await test.step('Open the list', async () => {
       await priceLibraryPage.open();
@@ -63,14 +85,14 @@ test.describe('Master Data - Price Library', () => {
     });
 
     await test.step('Create a record with Price/Freight/Other/MOQ/Start date all filled', async () => {
-      const result = await priceLibraryPage.createFreshPriceRecord({
+      const result = await createFreshOrSkip(priceLibraryPage, {
         price: '12.50',
         freightCharges: '1.00',
         otherCharges: '0.50',
         moq: '250',
       });
       expect(result.response.status()).toBe(201);
-      itemName = result.itemName;
+      ({ itemName, supplierName } = result);
     });
 
     await test.step('Silent redirect to the list (no toast — see TC:14)', async () => {
@@ -78,7 +100,7 @@ test.describe('Master Data - Price Library', () => {
     });
 
     await test.step('The new (item, supplier) record appears Active on the list', async () => {
-      await priceLibraryPage.expectRowStatus(itemName, 'Active');
+      await priceLibraryPage.expectRowStatus(itemName, 'Active', supplierName);
     });
   });
 
@@ -87,16 +109,17 @@ test.describe('Master Data - Price Library', () => {
   }) => {
     test.setTimeout(200_000); // see TC:1's comment on createFreshPriceRecord()'s retries
     let itemName = '';
+    let supplierName = '';
 
     await test.step('Open the list', async () => {
       await priceLibraryPage.open();
       await priceLibraryPage.expectLoaded();
     });
 
-    await test.step('Create a record leaving Price/Freight/Other/Currency/MOQ/Customer/End date at their defaults — only Item code/Supplier/Start date touched', async () => {
-      const result = await priceLibraryPage.createFreshPriceRecord();
+    await test.step('Create a record leaving Freight/Other/Currency/MOQ/Customer/End date at their defaults — only Item code/Supplier/Start date/Price touched (Price must be > 0 since 2026-10-12)', async () => {
+      const result = await createFreshOrSkip(priceLibraryPage);
       expect(result.response.status()).toBe(201);
-      itemName = result.itemName;
+      ({ itemName, supplierName } = result);
     });
 
     await test.step('Saves successfully — confirms every other field is genuinely optional', async () => {
@@ -104,7 +127,7 @@ test.describe('Master Data - Price Library', () => {
     });
 
     await test.step('Appears on the list as Active', async () => {
-      await priceLibraryPage.expectRowStatus(itemName, 'Active');
+      await priceLibraryPage.expectRowStatus(itemName, 'Active', supplierName);
     });
   });
 
@@ -127,15 +150,16 @@ test.describe('Master Data - Price Library', () => {
   }) => {
     test.setTimeout(200_000); // see TC:1's comment on createFreshPriceRecord()'s retries
     let itemName = '';
+    let supplierName = '';
     let realItemCode = '';
     let realSupplierName = '';
 
     await test.step('Create a fresh record to search for', async () => {
       await priceLibraryPage.open();
       await priceLibraryPage.expectLoaded();
-      const result = await priceLibraryPage.createFreshPriceRecord();
+      const result = await createFreshOrSkip(priceLibraryPage);
       expect(result.response.status()).toBe(201);
-      itemName = result.itemName;
+      ({ itemName, supplierName } = result);
       await priceLibraryPage.expectSavedAndRedirectedToList();
     });
 
@@ -145,7 +169,7 @@ test.describe('Master Data - Price Library', () => {
       // file's Notes) that the picker shows an Alternate-Code-style value
       // (e.g. "ALTTHR000003") while the list's own Item Code column shows a
       // different, base code (e.g. "THR000003").
-      const cells = await priceLibraryPage.getRowCellTexts(itemName);
+      const cells = await priceLibraryPage.getRowCellTexts(itemName, supplierName);
       // Columns: [checkbox, Item Code, Item, Category, Supplier, Prices, Price Range, Status]
       realItemCode = cells[1] ?? '';
       realSupplierName = cells[4] ?? '';
@@ -154,16 +178,16 @@ test.describe('Master Data - Price Library', () => {
     });
 
     await test.step('Search by Item Code narrows to the matching row', async () => {
-      await priceLibraryPage.expectRowVisible(realItemCode);
+      await priceLibraryPage.expectRowVisible(realItemCode, realSupplierName);
     });
 
     await test.step('Search by description (item name) also narrows to the matching row', async () => {
-      await priceLibraryPage.expectRowVisible(itemName);
+      await priceLibraryPage.expectRowVisible(itemName, realSupplierName);
     });
 
     await test.step('Search by Supplier also narrows to the matching row', async () => {
       await priceLibraryPage.search(realSupplierName);
-      await expect(priceLibraryPage.locators.row(realItemCode)).toBeVisible();
+      await expect(priceLibraryPage.locators.row(realItemCode, realSupplierName)).toBeVisible();
     });
   });
 
@@ -206,7 +230,7 @@ test.describe('Master Data - Price Library', () => {
     await test.step('Create the first record for a given (item, supplier) pair', async () => {
       await priceLibraryPage.open();
       await priceLibraryPage.expectLoaded();
-      const result = await priceLibraryPage.createFreshPriceRecord();
+      const result = await createFreshOrSkip(priceLibraryPage);
       expect(result.response.status()).toBe(201);
       itemName = result.itemName;
       await priceLibraryPage.expectSavedAndRedirectedToList();
@@ -220,6 +244,7 @@ test.describe('Master Data - Price Library', () => {
       await priceLibraryPage.openAddItemForm();
       await priceLibraryPage.pickItem(itemName, itemName);
       await priceLibraryPage.pickSupplier();
+      await priceLibraryPage.fillPriceRow(1, { price: '1' });
       await priceLibraryPage.setStartDateToday(1);
     });
 
@@ -327,7 +352,7 @@ test.describe('Master Data - Price Library', () => {
     await priceLibraryPage.open();
     await priceLibraryPage.expectLoaded();
 
-    const result = await priceLibraryPage.createFreshPriceRecord();
+    const result = await createFreshOrSkip(priceLibraryPage);
     expect(result.response.status()).toBe(201);
 
     // Confirmed live: no toast of any kind appears on success — only the

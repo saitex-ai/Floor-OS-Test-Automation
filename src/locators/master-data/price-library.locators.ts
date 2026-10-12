@@ -104,11 +104,17 @@ export class PriceLibraryLocators {
   }
 
   /** A list row anchored on its exact Item Code cell. */
-  row(itemCode: string | RegExp): Locator {
+  row(itemCode: string | RegExp, supplier?: string): Locator {
     const matcher =
       typeof itemCode === 'string' ? new RegExp(`^${escapeRegExp(itemCode)}$`) : itemCode;
-    return this.page.getByRole('row').filter({
+    const rows = this.page.getByRole('row').filter({
       has: this.page.getByRole('cell').filter({ hasText: matcher }),
+    });
+    if (supplier === undefined) return rows;
+    return rows.filter({
+      has: this.page
+        .getByRole('cell')
+        .filter({ hasText: new RegExp(`^${escapeRegExp(supplier)}$`) }),
     });
   }
 

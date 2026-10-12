@@ -249,35 +249,50 @@ export class UomConversionPage extends BasePage {
     await expect(this.locators.row(fromUnit, toUnit)).toContainText(text);
   }
 
-  /** True/false read of whether this From/To pair already has a conversion on the list — used by pickUnusedPair(). */
+  /**
+   * True/false read of whether this From/To pair already has a conversion
+   * on the list — used by pickUnusedPair(). Waits until every visible data
+   * row actually mentions `toUnit` (i.e. the search filter has applied)
+   * before reading: confirmed live (2026-10-12) that the row-count settle
+   * check alone can pass on the still-unfiltered first page, which then
+   * reported an existing pair (MM -> KGG) as unused.
+   */
   async pairExists(fromUnit: string, toUnit: string): Promise<boolean> {
     await this.search(toUnit);
+    await expect
+      .poll(
+        async () => {
+          const dataRows = (await this.page.getByRole('row').allInnerTexts()).slice(1);
+          // An empty result may render as a single "No ..." placeholder row.
+          return dataRows.every((text) => text.includes(toUnit) || /^\s*No\b/.test(text));
+        },
+        { timeout: 10_000 },
+      )
+      .toBe(true);
     return (await this.locators.row(fromUnit, toUnit).count()) > 0;
   }
 
   /**
-   * Walks a deterministic-but-rotating pair of indices into UNIT_POOL
-   * (seeded off Date.now(), so different runs tend to land on different
-   * candidates) and returns the first From/To pair confirmed NOT to
-   * already exist on the live list. Throws if the entire pool is
-   * exhausted (every candidate pair already used) — at that point the
-   * pool genuinely needs extending, not a retry.
+   * Returns a random From/To pair from UNIT_POOL confirmed NOT to already
+   * exist on the live list. Draws from every ordered pair (20 units -> 380
+   * candidates) in random order — the earlier fixed "+7 offset" walk only
+   * ever tried 20 of them, and dev used all of those up (2026-10-12). Throws
+   * after `maxChecks` existing pairs in a row: at that point the pool
+   * genuinely needs extending, not a retry.
    */
-  async pickUnusedPair(): Promise<[string, string]> {
+  async pickUnusedPair(maxChecks = 40): Promise<[string, string]> {
     const pool = UomConversionPage.UNIT_POOL;
-    const seed = Date.now();
-    for (let offset = 0; offset < pool.length; offset++) {
-      const fromIdx = (seed + offset) % pool.length;
-      const toIdx = (seed + offset + 7) % pool.length;
-      if (fromIdx === toIdx) continue;
-      const fromUnit = pool[fromIdx] as string;
-      const toUnit = pool[toIdx] as string;
-      if (!(await this.pairExists(fromUnit, toUnit))) {
-        return [fromUnit, toUnit];
-      }
+    const candidates: [string, string][] = [];
+    for (const from of pool) for (const to of pool) if (from !== to) candidates.push([from, to]);
+    for (let i = candidates.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [candidates[i], candidates[j]] = [candidates[j]!, candidates[i]!];
+    }
+    for (const [fromUnit, toUnit] of candidates.slice(0, maxChecks)) {
+      if (!(await this.pairExists(fromUnit, toUnit))) return [fromUnit, toUnit];
     }
     throw new Error(
-      'No unused From/To UoM pair found in UomConversionPage.UNIT_POOL — extend the pool.',
+      `No unused From/To UoM pair among ${maxChecks} random UNIT_POOL candidates — extend the pool.`,
     );
   }
 

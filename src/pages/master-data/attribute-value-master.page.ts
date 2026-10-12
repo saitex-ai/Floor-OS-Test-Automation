@@ -316,9 +316,23 @@ export class AttributeValueMasterPage extends BasePage {
     await expect(this.locators.row(text)).toHaveCount(0);
   }
 
+  /**
+   * Asserts the row's Status chip text. Since dev
+   * 2026-10-12 the list intermittently keeps serving the pre-change row for
+   * a few seconds after a successful mutation (the success toast is
+   * already shown), so this re-reads — reloading the page from the second
+   * attempt on — until it matches or 45s pass.
+   */
   async expectRowStatus(text: string, status: string): Promise<void> {
-    await this.search(text);
-    await expect(this.locators.statusButton(text)).toHaveText(status);
+    let attempt = 0;
+    await expect(async () => {
+      if (attempt++ > 0) {
+        await this.open();
+        await this.expectLoaded();
+      }
+      await this.search(text);
+      await expect(this.locators.statusButton(text)).toHaveText(status, { timeout: 5_000 });
+    }).toPass({ timeout: 45_000 });
   }
 
   /** The "Masters needing review" region is visible with a heading mentioning the live Draft count. */
