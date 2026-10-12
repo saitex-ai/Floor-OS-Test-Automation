@@ -1,7 +1,12 @@
-import { type Browser, type Page, expect } from '@playwright/test';
+import { type Browser, type Page, expect, test } from '@playwright/test';
 import { authFile } from '../../../../src/fixtures/auth-setup';
-import { loginAsUser } from '../../../../src/fixtures/multi-user';
-import { env } from '../../../../src/config/env';
+import { track } from './created';
+import {
+  type Persona,
+  type PersonaSessions,
+  personaCredentials,
+  personaSkipReason,
+} from '../../../../src/fixtures/planning-personas';
 import { ActivitiesListPage } from '../../../../src/pages/planning/activities-list.page';
 import {
   ActivityFormPage,
@@ -43,53 +48,49 @@ export function taggedName(code: string): string {
 const RUN = `${Date.now().toString(36).toUpperCase().slice(-4)}${process.env.TEST_WORKER_INDEX ?? '0'}`;
 let counter = 0;
 
-/** A code unique to this run: `<prefix><run id><n>`, upper case (grade codes display upper case). */
+/**
+ * A code unique to this run: `<prefix><run id><n>`, upper case (grade codes
+ * display upper case). Recorded against the calling spec file so its
+ * afterAll can clean the record up (support/cleanup.ts).
+ */
 export function uniqueCode(prefix: string): string {
   counter += 1;
-  return `${prefix}${RUN}${counter.toString(36).toUpperCase()}`;
+  const code = `${prefix}${RUN}${counter.toString(36).toUpperCase()}`;
+  track(prefix, code);
+  return code;
 }
+
+/** The part of every code this worker hands out for `prefix` — one search finds them all. */
+export function runPrefix(prefix: string): string {
+  return `${prefix}${RUN}`;
+}
+
+export { personaCredentials, personaSkipReason, type Persona };
 
 /**
- * The two extra logins the permission cases need, read from
- * `PLANNING_<PERSONA>_USER_<ENV>` / `PLANNING_<PERSONA>_PASSWORD_<ENV>`:
- * - READONLY: can read the Planning masters but not write them (e.g. a
- *   user holding only job.pln-viewer).
- * - NOACCESS: can't open the Planning masters at all.
- * Cases skip with `personaSkipReason()` when the login isn't set.
+ * Marks the running case as an expected failure for an open ClickUp bug:
+ * `test.fail()` keeps the run green while the bug exists, and once it's
+ * fixed the case shows up as an unexpected pass — the cue to remove this
+ * call. Adds the bug as an "issue" annotation for the report. Call it after
+ * any `test.skip()` so a missing login still skips.
  */
-export type Persona = 'READONLY' | 'NOACCESS';
-
-export function personaCredentials(
-  persona: Persona,
-): { username: string; password: string } | undefined {
-  const suffix = env.testEnv.toUpperCase();
-  const username = process.env[`PLANNING_${persona}_USER_${suffix}`]?.trim();
-  const password = process.env[`PLANNING_${persona}_PASSWORD_${suffix}`]?.trim();
-  return username && password ? { username, password } : undefined;
+export function knownBug(clickUpId: string): void {
+  const url = `https://app.clickup.com/t/${clickUpId}`;
+  test.info().annotations.push({ type: 'issue', description: url });
+  test.fail(true, `Known bug, ClickUp ${clickUpId} — expected to fail until fixed`);
 }
 
-export function personaSkipReason(persona: Persona): string {
-  const suffix = env.testEnv.toUpperCase();
-  const who =
-    persona === 'READONLY'
-      ? 'a read-only Planning user (e.g. only job.pln-viewer)'
-      : 'a user without Planning master-data access';
-  return `Needs ${who}: set PLANNING_${persona}_USER_${suffix} / PLANNING_${persona}_PASSWORD_${suffix}`;
-}
-
-/** Runs `fn` on a fresh page logged in as `persona` (a clean context, not alice's session). */
+/** Runs `fn` on a fresh page as `persona`, in that persona's per-worker logged-in context. */
 export async function asPersona(
-  browser: Browser,
+  personas: PersonaSessions,
   persona: Persona,
   fn: (page: Page) => Promise<void>,
 ): Promise<void> {
-  const creds = personaCredentials(persona);
-  if (!creds) throw new Error(personaSkipReason(persona));
-  const { page, close } = await loginAsUser(browser, creds.username, creds.password);
+  const page = await personas.newPage(persona);
   try {
     await fn(page);
   } finally {
-    await close();
+    await page.close();
   }
 }
 

@@ -22,4 +22,10 @@ export const WAIT = {
   SERVER: 15_000,
   /** Client-side validation messages ("Required", …) shown after submit. */
   VALIDATION: 10_000,
+  /**
+   * How long a permission-gated control is watched before it counts as
+   * absent or disabled: write controls render once the user's permissions
+   * load, which can be a few seconds after the heading.
+   */
+  PERMISSION_SETTLE: 5_000,
 } as const;

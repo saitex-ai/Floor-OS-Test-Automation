@@ -118,9 +118,13 @@ export class ActivityFormPage extends BasePage {
   async selectDepartment(name: string): Promise<void> {
     await this.locators.owningDepartment.click();
     const option = this.page.getByRole('option', { name: new RegExp(`^${name}\\b`) }).first();
-    // The dropdown opens with options already listed; 2 s is only a check
-    // for "is it in the first page?" before falling back to typing.
-    if (!(await option.isVisible({ timeout: 2_000 }).catch(() => false))) {
+    // The dropdown opens with options already listed; allow 2 s for the
+    // option to show in that first page before falling back to typing.
+    const listed = await option
+      .waitFor({ state: 'visible', timeout: 2_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!listed) {
       await this.page.keyboard.type(name);
     }
     await option.click();

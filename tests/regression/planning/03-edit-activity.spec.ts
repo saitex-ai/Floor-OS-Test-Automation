@@ -5,6 +5,7 @@ import { test, expect } from '../../../src/fixtures/planning.fixtures';
 import {
   asPersona,
   createActivityDraft,
+  knownBug,
   openActivity,
   personaCredentials,
   personaSkipReason,
@@ -12,6 +13,7 @@ import {
   taggedName,
   uniqueCode,
 } from './support/test-data';
+import { cleanUpAfterAll } from './support/cleanup';
 
 /**
  * Planning — Edit Activity (detail page → "Edit activity" → "Save draft").
@@ -24,7 +26,20 @@ import {
  */
 const cu = (id: string) => `https://app.clickup.com/t/${id}`;
 
+/**
+ * The cycle cases need activities that can be picked as predecessors, and
+ * only approved activities are offered — dev has no approval policy for
+ * activities yet, so drafts never are. Checked against the existing QA
+ * draft CUT-QA-CYCLE-A before anything is created, so a skipped run leaves
+ * no orphan draft behind.
+ */
+const CYCLE_PROBE = 'CUT-QA-CYCLE-A';
+const CYCLE_SKIP = `${CYCLE_PROBE} isn't offered as a predecessor — a cycle needs two approved activities, and dev has no approval policy for activities yet (Control Center › Approvals), so none can be published.`;
+
 test.describe('Planning - Edit Activity', () => {
+  // Deletes / retires this file's QA-AUTO records once its cases are done.
+  cleanUpAfterAll();
+
   let code = '';
 
   test.beforeAll(async ({ browser }) => {
@@ -106,17 +121,21 @@ test.describe('Planning - Edit Activity', () => {
     await allure.tms(cu('z941abu4ac'), 'TC-EA-06 bug (ClickUp)');
     // Confirmed bug, ClickUp z941abu4ac (2026-09-09): A created, B created
     // following A, then A edited to follow B — the save is accepted and
-    // closes a real cycle. Expected to fail until fixed.
+    // closes a real cycle. Marked with knownBug() until fixed.
+    await activitiesListPage.open();
+    await activitiesListPage.expectLoaded();
+    await activitiesListPage.openNew();
+    await activityFormPage.expectOnCreatePage();
+    const probe = await activityFormPage.predecessorOptions(CYCLE_PROBE);
+    test.skip(!probe.some((o) => o.startsWith(CYCLE_PROBE)), CYCLE_SKIP);
+    knownBug('z941abu4ac');
     const a = await createActivityDraft(page);
     const b = uniqueCode('CUT-QA');
     await activitiesListPage.open();
     await activitiesListPage.expectLoaded();
     await activitiesListPage.openNew();
     const offered = await activityFormPage.predecessorOptions(a);
-    test.skip(
-      !offered.some((o) => o.startsWith(a)),
-      `Draft ${a} isn't offered as a predecessor — a cycle needs two approved activities, and dev has no approval policy for activities yet (Control Center › Approvals), so none can be published.`,
-    );
+    test.skip(!offered.some((o) => o.startsWith(a)), `Draft ${a} isn't offered as a predecessor.`);
     await activityFormPage.fillAllRequired(b, taggedName(b));
     await activityFormPage.addPredecessorRule(a);
     expect(await activityFormPage.create()).toBe('submitted');
@@ -143,11 +162,11 @@ test.describe('Planning - Edit Activity', () => {
     await activityFormPage.expectNameValue(before);
   });
 
-  test('TC-EA-08 Only a user with write permission can save edits', async ({ browser }) => {
+  test('TC-EA-08 Only a user with write permission can save edits', async ({ personas }) => {
     await allure.tms(cu('z941abtduy'), 'TC-EA-08 (ClickUp)');
     test.skip(!personaCredentials('READONLY'), personaSkipReason('READONLY'));
     // Read-only: the seeded published activity CUT-BUFFER is only viewed.
-    await asPersona(browser, 'READONLY', async (page) => {
+    await asPersona(personas, 'READONLY', async (page) => {
       const list = new ActivitiesListPage(page);
       await list.findRow('CUT-BUFFER');
       await list.openRow('CUT-BUFFER');

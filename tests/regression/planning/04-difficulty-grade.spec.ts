@@ -18,6 +18,7 @@ import {
   TEST_DATA_TAG,
   uniqueCode,
 } from './support/test-data';
+import { cleanUpAfterAll } from './support/cleanup';
 
 /**
  * Planning — Difficulty Grade (Create / Edit / List).
@@ -37,6 +38,9 @@ const label = (code: string) => `QA-AUTO ${code}`;
 const OPERATION = 'QA-AUTO graded op';
 
 test.describe('Planning - Difficulty Grade', () => {
+  // Deletes / retires this file's QA-AUTO records once its cases are done.
+  cleanUpAfterAll();
+
   let grade = '';
   let unused = '';
   let sortEarly = '';
@@ -196,10 +200,10 @@ test.describe('Planning - Difficulty Grade', () => {
     await difficultyGradeListPage.expectNoMatchState();
   });
 
-  test('TC-CG-10 Only a user with write permission can create a grade', async ({ browser }) => {
+  test('TC-CG-10 Only a user with write permission can create a grade', async ({ personas }) => {
     await allure.tms(cu('z941abu3rx'), 'TC-CG-10 (ClickUp)');
     test.skip(!personaCredentials('READONLY'), personaSkipReason('READONLY'));
-    await asPersona(browser, 'READONLY', async (page) => {
+    await asPersona(personas, 'READONLY', async (page) => {
       const list = new DifficultyGradeListPage(page);
       await list.open();
       await list.expectNewUnavailable();
@@ -386,10 +390,10 @@ test.describe('Planning - Difficulty Grade', () => {
     await difficultyGradeFormPage.expectFieldValue('label', before);
   });
 
-  test('TC-EG-11 Only a user with write permission can save edits', async ({ browser }) => {
+  test('TC-EG-11 Only a user with write permission can save edits', async ({ personas }) => {
     await allure.tms(cu('z941abu3tb'), 'TC-EG-11 (ClickUp)');
     test.skip(!personaCredentials('READONLY'), personaSkipReason('READONLY'));
-    await asPersona(browser, 'READONLY', async (page) => {
+    await asPersona(personas, 'READONLY', async (page) => {
       const list = new DifficultyGradeListPage(page);
       await list.findRow(grade);
       await list.openRow(grade);
@@ -520,10 +524,16 @@ test.describe('Planning - Difficulty Grade', () => {
     expect(new Set(offMachine)).toEqual(
       new Set(offMachine.filter((v) => ['Yes', 'No'].includes(v))),
     );
-    expect(offMachine).toContain('Yes');
     expect(new Set(status)).toEqual(
       new Set(status.filter((v) => ['Active', 'Retired'].includes(v))),
     );
+    // QA grades from earlier runs can fill the first page, so the one
+    // off-machine seed grade (M — manual) is searched for to see a "Yes".
+    await test.step('The off-machine seed grade M reads "Yes"', async () => {
+      await difficultyGradeListPage.search('manual');
+      await difficultyGradeListPage.expectRowVisible('M');
+      expect(await difficultyGradeListPage.cellValue('M', 'Off-machine')).toBe('Yes');
+    });
   });
 
   test('TC-LG-09 Pagination controls', async ({ difficultyGradeListPage }) => {
@@ -544,10 +554,10 @@ test.describe('Planning - Difficulty Grade', () => {
     await difficultyGradeListPage.expectOnPage(1);
   });
 
-  test('TC-LG-11 List access requires read permission', async ({ browser }) => {
+  test('TC-LG-11 List access requires read permission', async ({ personas }) => {
     await allure.tms(cu('z941abu3tt'), 'TC-LG-11 (ClickUp)');
     test.skip(!personaCredentials('NOACCESS'), personaSkipReason('NOACCESS'));
-    await asPersona(browser, 'NOACCESS', async (page) => {
+    await asPersona(personas, 'NOACCESS', async (page) => {
       const list = new DifficultyGradeListPage(page);
       await list.open();
       await list.expectAccessRestricted();

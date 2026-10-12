@@ -15,8 +15,12 @@ export async function submitForm(button: Locator): Promise<SubmitResult> {
   await expect(button).toBeVisible();
   if (await button.isDisabled()) return 'blocked-disabled';
   // Short click timeout: the button can start unmounting mid-click on a fast
-  // submit; the outcome is decided by the hidden-wait below, not the click.
-  await button.click({ timeout: 5_000 }).catch(() => {});
+  // submit. That's the only click failure tolerated — if the button is still
+  // on screen, the click itself failed (overlay, detached node) and nothing
+  // was submitted, so rethrow rather than report it as "blocked".
+  await button.click({ timeout: 5_000 }).catch(async (error: unknown) => {
+    if (await button.isVisible().catch(() => false)) throw error;
+  });
   const disappeared = await button
     .waitFor({ state: 'hidden', timeout: WAIT.SERVER })
     .then(() => true)

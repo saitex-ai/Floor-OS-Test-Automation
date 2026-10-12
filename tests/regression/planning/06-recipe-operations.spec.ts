@@ -6,12 +6,14 @@ import {
   addOperation,
   asPersona,
   createRecipe,
+  knownBug,
   openRecipe,
   personaCredentials,
   personaSkipReason,
   setupPage,
   washRecipe,
 } from './support/test-data';
+import { cleanUpAfterAll } from './support/cleanup';
 
 /**
  * Planning — Recipes & Operations: Create / Edit Recipe Operation.
@@ -28,6 +30,9 @@ const OP_A = 'QA-AUTO wash op A';
 const OP_B = 'QA-AUTO tumble op B';
 
 test.describe('Planning - Recipe Operations', () => {
+  // Deletes / retires this file's QA-AUTO records once its cases are done.
+  cleanUpAfterAll();
+
   let recipe = '';
 
   test.beforeAll(async ({ browser }) => {
@@ -231,15 +236,16 @@ test.describe('Planning - Recipe Operations', () => {
     await recipeDetailPage.expectNoOperationRow('QA-AUTO unsaved op');
   });
 
-  test('TC-CO-12 Only a user with write permission can add an operation', async ({ browser }) => {
+  test('TC-CO-12 Only a user with write permission can add an operation', async ({ personas }) => {
     await allure.tms(cu('z941abu5fw'), 'TC-CO-12 (ClickUp)');
     await allure.tms(cu('z941abybge'), 'TC-CO-12 bug (ClickUp)');
     // Confirmed bug, ClickUp z941abybge (2026-10-09): read-only users are
     // offered write controls on some Planning screens (enabled, then refused
     // with "Access restricted" / 403) while others hide or disable them.
-    // Expected to fail until fixed.
+    // Marked with knownBug() until fixed.
     test.skip(!personaCredentials('READONLY'), personaSkipReason('READONLY'));
-    await asPersona(browser, 'READONLY', async (page) => {
+    knownBug('z941abybge');
+    await asPersona(personas, 'READONLY', async (page) => {
       const list = new RecipesListPage(page);
       await list.findRow(recipe);
       await list.openRow(recipe);
@@ -406,15 +412,16 @@ test.describe('Planning - Recipe Operations', () => {
     await recipeDetailPage.expectNoOperationRow('QA-AUTO SHOULD NOT PERSIST');
   });
 
-  test('TC-EO-10 Only a user with write permission can edit an operation', async ({ browser }) => {
+  test('TC-EO-10 Only a user with write permission can edit an operation', async ({ personas }) => {
     await allure.tms(cu('z941abu5g8'), 'TC-EO-10 (ClickUp)');
     await allure.tms(cu('z941abybge'), 'TC-EO-10 bug (ClickUp)');
     // Confirmed bug, ClickUp z941abybge (2026-10-09): read-only users are
     // offered write controls on some Planning screens (enabled, then refused
     // with "Access restricted" / 403) while others hide or disable them.
-    // Expected to fail until fixed.
+    // Marked with knownBug() until fixed.
     test.skip(!personaCredentials('READONLY'), personaSkipReason('READONLY'));
-    await asPersona(browser, 'READONLY', async (page) => {
+    knownBug('z941abybge');
+    await asPersona(personas, 'READONLY', async (page) => {
       const list = new RecipesListPage(page);
       await list.findRow(recipe);
       await list.openRow(recipe);

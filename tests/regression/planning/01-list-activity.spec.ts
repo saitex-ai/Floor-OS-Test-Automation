@@ -5,11 +5,13 @@ import { test, expect } from '../../../src/fixtures/planning.fixtures';
 import {
   asPersona,
   createActivityDraft,
+  knownBug,
   personaCredentials,
   personaSkipReason,
   setupPage,
   taggedName,
 } from './support/test-data';
+import { cleanUpAfterAll } from './support/cleanup';
 
 /**
  * Planning — List Activity (Planning > Master Data > Activities).
@@ -25,6 +27,9 @@ import {
 const cu = (id: string) => `https://app.clickup.com/t/${id}`;
 
 test.describe('Planning - List Activity', () => {
+  // Deletes / retires this file's QA-AUTO records once its cases are done.
+  cleanUpAfterAll();
+
   let code = '';
 
   test.beforeAll(async ({ browser }) => {
@@ -123,6 +128,10 @@ test.describe('Planning - List Activity', () => {
     // contain them (e.g. "Cutting" returns FIN-ACCESSORY, 2026-10-09) — the
     // search covers more than the shown columns, so this checks our own
     // Cutting / Production row is found rather than that every row matches.
+    // Every run adds Cutting / Production drafts, so a Code filter narrows the
+    // grid to this run's row first; the search then has to keep it.
+    await activitiesListPage.openFilters();
+    await activitiesListPage.addFilterRule('Code', code);
     await test.step('By department', async () => {
       await activitiesListPage.search('Cutting');
       await activitiesListPage.expectRowVisible(code);
@@ -130,6 +139,10 @@ test.describe('Planning - List Activity', () => {
     await test.step('By activity type', async () => {
       await activitiesListPage.search('Production');
       await activitiesListPage.expectRowVisible(code);
+    });
+    await test.step('A term the row lacks hides it', async () => {
+      await activitiesListPage.search('Embroidery');
+      await activitiesListPage.expectNoRow(code);
     });
   });
 
@@ -152,7 +165,8 @@ test.describe('Planning - List Activity', () => {
     // Confirmed bug, ClickUp z941abyb0t (2026-10-09): the "All" badge is the
     // sum of the activity-type tabs, so activities with no Activity type
     // (e.g. WASH-TINT, code-and-name drafts) are listed but not counted —
-    // All 141 vs 145 rows. Expected to fail until fixed.
+    // All 141 vs 145 rows. Marked with knownBug() until fixed.
+    knownBug('z941abyb0t');
     await activitiesListPage.open();
     await activitiesListPage.expectLoaded();
     for (const tab of ['All', 'Production']) {
@@ -209,10 +223,10 @@ test.describe('Planning - List Activity', () => {
     await activitiesListPage.expectNoMatchState();
   });
 
-  test('TC-LA-11 List access requires read permission', async ({ browser }) => {
+  test('TC-LA-11 List access requires read permission', async ({ personas }) => {
     await allure.tms(cu('z941abtdvf'), 'TC-LA-11 (ClickUp)');
     test.skip(!personaCredentials('NOACCESS'), personaSkipReason('NOACCESS'));
-    await asPersona(browser, 'NOACCESS', async (page) => {
+    await asPersona(personas, 'NOACCESS', async (page) => {
       const list = new ActivitiesListPage(page);
       await list.open();
       await list.expectAccessRestricted();
@@ -238,12 +252,12 @@ test.describe('Planning - List Activity', () => {
   });
 
   test('TC-LA-13 Read-only users cannot use the inline Edit action from the list', async ({
-    browser,
+    personas,
   }) => {
     await allure.tms(cu('z941abtdvj'), 'TC-LA-13 (ClickUp)');
     test.skip(!personaCredentials('READONLY'), personaSkipReason('READONLY'));
     // Read-only: the seeded published activity CUT-BUFFER is only viewed.
-    await asPersona(browser, 'READONLY', async (page) => {
+    await asPersona(personas, 'READONLY', async (page) => {
       const list = new ActivitiesListPage(page);
       await list.findRow('CUT-BUFFER');
       await list.expectNoRowAction('CUT-BUFFER', 'Edit');

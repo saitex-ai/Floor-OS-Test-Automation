@@ -4,12 +4,14 @@ import { test, expect } from '../../../src/fixtures/planning.fixtures';
 import {
   asPersona,
   createActivityDraft,
+  knownBug,
   openActivity,
   personaCredentials,
   personaSkipReason,
   taggedName,
   uniqueCode,
 } from './support/test-data';
+import { cleanUpAfterAll } from './support/cleanup';
 
 /**
  * Planning — Create Activity ("New activity" → "Create draft").
@@ -22,9 +24,22 @@ import {
  * before anything is saved; everything that saves is a QA-AUTO draft.
  */
 const cu = (id: string) => `https://app.clickup.com/t/${id}`;
+
+/**
+ * The cycle cases need activities that can be picked as predecessors, and
+ * only approved activities are offered — dev has no approval policy for
+ * activities yet, so drafts never are. Checked against the existing QA
+ * draft CUT-QA-CYCLE-A before anything is created, so a skipped run leaves
+ * no orphan draft behind.
+ */
+const CYCLE_PROBE = 'CUT-QA-CYCLE-A';
+const CYCLE_SKIP = `${CYCLE_PROBE} isn't offered as a predecessor — a cycle needs two approved activities, and dev has no approval policy for activities yet (Control Center › Approvals), so none can be published.`;
 const SEED_ACTIVE_CODE = 'CUT-BUFFER';
 
 test.describe('Planning - Create Activity', () => {
+  // Deletes / retires this file's QA-AUTO records once its cases are done.
+  cleanUpAfterAll();
+
   test.beforeEach(async () => {
     // Cases create their own QA-AUTO records through the UI (~10–20 s per create on dev).
     test.setTimeout(180_000);
@@ -171,7 +186,14 @@ test.describe('Planning - Create Activity', () => {
     // Confirmed bug, ClickUp z941abu4ac (2026-09-09): a two-activity cycle
     // (B follows A, then A edited to follow B) is accepted instead of
     // rejected. A cycle can only be closed by editing, so this create-side
-    // case runs the same steps as TC-EA-06. Expected to fail until fixed.
+    // case runs the same steps as TC-EA-06. Marked with knownBug() until fixed.
+    await activitiesListPage.open();
+    await activitiesListPage.expectLoaded();
+    await activitiesListPage.openNew();
+    await activityFormPage.expectOnCreatePage();
+    const probe = await activityFormPage.predecessorOptions(CYCLE_PROBE);
+    test.skip(!probe.some((o) => o.startsWith(CYCLE_PROBE)), CYCLE_SKIP);
+    knownBug('z941abu4ac');
     const a = await createActivityDraft(page);
     const b = uniqueCode('CUT-QA');
     await activitiesListPage.open();
@@ -179,10 +201,7 @@ test.describe('Planning - Create Activity', () => {
     await activitiesListPage.openNew();
     await activityFormPage.expectOnCreatePage();
     const offered = await activityFormPage.predecessorOptions(a);
-    test.skip(
-      !offered.some((o) => o.startsWith(a)),
-      `Draft ${a} isn't offered as a predecessor — a cycle needs two approved activities, and dev has no approval policy for activities yet (Control Center › Approvals), so none can be published.`,
-    );
+    test.skip(!offered.some((o) => o.startsWith(a)), `Draft ${a} isn't offered as a predecessor.`);
     await activityFormPage.fillAllRequired(b, taggedName(b));
     await activityFormPage.addPredecessorRule(a);
     expect(await activityFormPage.create()).toBe('submitted');
@@ -212,15 +231,18 @@ test.describe('Planning - Create Activity', () => {
     await activitiesListPage.expectNoRow(code);
   });
 
-  test('TC-CA-10 Only a user with write permission can create an activity', async ({ browser }) => {
+  test('TC-CA-10 Only a user with write permission can create an activity', async ({
+    personas,
+  }) => {
     await allure.tms(cu('z941abtduf'), 'TC-CA-10 (ClickUp)');
     await allure.tms(cu('z941abybge'), 'TC-CA-10 bug (ClickUp)');
     // Confirmed bug, ClickUp z941abybge (2026-10-09): read-only users are
     // offered write controls on some Planning screens (enabled, then refused
     // with "Access restricted" / 403) while others hide or disable them.
-    // Expected to fail until fixed.
+    // Marked with knownBug() until fixed.
     test.skip(!personaCredentials('READONLY'), personaSkipReason('READONLY'));
-    await asPersona(browser, 'READONLY', async (page) => {
+    knownBug('z941abybge');
+    await asPersona(personas, 'READONLY', async (page) => {
       const list = new ActivitiesListPage(page);
       await list.open();
       await list.expectNewUnavailable();

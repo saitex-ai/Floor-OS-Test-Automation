@@ -13,9 +13,30 @@ import { WAIT } from './waits';
  * (ActivitiesListPage, DifficultyGradeListPage, RecipesListPage) adds its
  * own route, heading and "New ..." button on top.
  */
-/** Passes when `button` isn't rendered at all, or is rendered disabled. */
+/**
+ * Whether `button` is (or becomes) present and enabled within
+ * WAIT.PERMISSION_SETTLE. It's watched for the whole window, not read once:
+ * write controls render after the user's permissions load, so a single read
+ * right after the heading appears could miss one that shows up later.
+ */
+export async function becomesUsable(button: Locator): Promise<boolean> {
+  const deadline = Date.now() + WAIT.PERMISSION_SETTLE;
+  let usable = false;
+  await expect
+    .poll(
+      async () => {
+        usable = (await button.count()) > 0 && (await button.first().isEnabled());
+        return usable || Date.now() >= deadline;
+      },
+      { intervals: [250], timeout: WAIT.PERMISSION_SETTLE + WAIT.SERVER },
+    )
+    .toBe(true);
+  return usable;
+}
+
+/** Passes when `button` stays absent, or disabled, for WAIT.PERMISSION_SETTLE. */
 export async function expectAbsentOrDisabled(button: Locator): Promise<void> {
-  if ((await button.count()) > 0) await expect(button.first()).toBeDisabled();
+  expect(await becomesUsable(button), 'control should be absent or disabled').toBe(false);
 }
 
 export abstract class MasterDataListPage extends BasePage {
@@ -124,6 +145,31 @@ export abstract class MasterDataListPage extends BasePage {
         { message: `every row should match "${term}"`, timeout: WAIT.SERVER },
       )
       .toEqual([]);
+  }
+
+  /**
+   * Searches `term` and returns each of `codes` that has a row, with that
+   * row's text. The search applies after a debounce, so this first waits
+   * until every visible row contains `term` (or the grid is empty) — a read
+   * before that would still see the unfiltered first page.
+   */
+  async rowTexts(term: string, codes: string[]): Promise<Map<string, string>> {
+    await this.search(term);
+    const rows = this.grid.bodyRows();
+    await expect
+      .poll(
+        async () =>
+          (await rows.allInnerTexts()).every((t) => t.toLowerCase().includes(term.toLowerCase())),
+        { message: `rows should all match "${term}"`, timeout: WAIT.SERVER },
+      )
+      .toBe(true);
+    if (codes.length > 25) await this.setRowsPerPage(100);
+    const found = new Map<string, string>();
+    for (const code of codes) {
+      const row = this.grid.row(code).first();
+      if ((await row.count()) > 0) found.set(code, await row.innerText());
+    }
+    return found;
   }
 
   async visibleRowCount(): Promise<number> {

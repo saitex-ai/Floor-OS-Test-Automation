@@ -6,6 +6,7 @@ import {
   addOperation,
   asPersona,
   createRecipe,
+  knownBug,
   openRecipe,
   personaCredentials,
   personaSkipReason,
@@ -14,6 +15,7 @@ import {
   uniqueCode,
   washRecipe,
 } from './support/test-data';
+import { cleanUpAfterAll } from './support/cleanup';
 
 /**
  * Planning — Recipes & Operations: List / Create / Edit Recipe.
@@ -27,6 +29,9 @@ import {
 const cu = (id: string) => `https://app.clickup.com/t/${id}`;
 
 test.describe('Planning - Recipes', () => {
+  // Deletes / retires this file's QA-AUTO records once its cases are done.
+  cleanUpAfterAll();
+
   let recipe = '';
 
   test.beforeAll(async ({ browser }) => {
@@ -193,10 +198,10 @@ test.describe('Planning - Recipes', () => {
     await recipesListPage.expectNoMatchState();
   });
 
-  test('TC-LR-12 List access requires read permission', async ({ browser }) => {
+  test('TC-LR-12 List access requires read permission', async ({ personas }) => {
     await allure.tms(cu('z941abu5fg'), 'TC-LR-12 (ClickUp)');
     test.skip(!personaCredentials('NOACCESS'), personaSkipReason('NOACCESS'));
-    await asPersona(browser, 'NOACCESS', async (page) => {
+    await asPersona(personas, 'NOACCESS', async (page) => {
       const list = new RecipesListPage(page);
       await list.open();
       await list.expectAccessRestricted();
@@ -431,15 +436,16 @@ test.describe('Planning - Recipes', () => {
     await recipesListPage.expectNoMatchState();
   });
 
-  test('TC-CR-15 Only a user with write permission can create a recipe', async ({ browser }) => {
+  test('TC-CR-15 Only a user with write permission can create a recipe', async ({ personas }) => {
     await allure.tms(cu('z941abu5ep'), 'TC-CR-15 (ClickUp)');
     await allure.tms(cu('z941abybge'), 'TC-CR-15 bug (ClickUp)');
     // Confirmed bug, ClickUp z941abybge (2026-10-09): read-only users are
     // offered write controls on some Planning screens (enabled, then refused
     // with "Access restricted" / 403) while others hide or disable them.
-    // Expected to fail until fixed.
+    // Marked with knownBug() until fixed.
     test.skip(!personaCredentials('READONLY'), personaSkipReason('READONLY'));
-    await asPersona(browser, 'READONLY', async (page) => {
+    knownBug('z941abybge');
+    await asPersona(personas, 'READONLY', async (page) => {
       const list = new RecipesListPage(page);
       await list.open();
       await list.expectNewUnavailable();
@@ -584,12 +590,12 @@ test.describe('Planning - Recipes', () => {
     await recipeDetailPage.expectSummaryLacks('SHOULD NOT PERSIST');
   });
 
-  test('TC-ER-10 Only a user with write permission can save edits', async ({ browser }) => {
+  test('TC-ER-10 Only a user with write permission can save edits', async ({ personas }) => {
     await allure.tms(cu('z941abu5f2'), 'TC-ER-10 (ClickUp)');
     test.skip(!personaCredentials('READONLY'), personaSkipReason('READONLY'));
     // The owning-department half ("only the owning department can promote")
     // was verified manually by the user in Sept.
-    await asPersona(browser, 'READONLY', async (page) => {
+    await asPersona(personas, 'READONLY', async (page) => {
       const list = new RecipesListPage(page);
       await list.findRow(recipe);
       await list.openRow(recipe);
