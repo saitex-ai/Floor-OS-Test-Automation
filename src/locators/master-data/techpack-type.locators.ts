@@ -67,6 +67,12 @@ export class TechpackTypeLocators {
   readonly deleteConfirmButton: Locator;
   readonly deleteConfirmCancelButton: Locator;
 
+  // Nested "Deactivate <code>?" confirmation dialog (added on dev 2026-10-12)
+  readonly deactivateConfirmButton: Locator;
+
+  // List status chip -> "Change to X" menu -> "Change record status?" confirmation
+  readonly statusConfirmDialog: Locator;
+
   readonly toast: Locator;
 
   constructor(private readonly page: Page) {
@@ -111,7 +117,9 @@ export class TechpackTypeLocators {
     // Confirmed live: this confirmation renders as role="alertdialog", not
     // "dialog" (same pattern already found on Customer Percentage's own
     // delete confirmation — see that locators file).
-    this.deleteConfirmDialog = page.getByRole('alertdialog').filter({ hasText: /permanently deletes/i });
+    this.deleteConfirmDialog = page
+      .getByRole('alertdialog')
+      .filter({ hasText: /permanently deletes/i });
     this.deleteConfirmButton = this.deleteConfirmDialog.getByRole('button', {
       name: 'Delete',
       exact: true,
@@ -119,6 +127,15 @@ export class TechpackTypeLocators {
     this.deleteConfirmCancelButton = this.deleteConfirmDialog.getByRole('button', {
       name: 'Cancel',
     });
+
+    this.deactivateConfirmButton = page
+      .getByRole('alertdialog')
+      .filter({ hasText: /moves to the Inactive tab/i })
+      .getByRole('button', { name: 'Deactivate', exact: true });
+
+    this.statusConfirmDialog = page
+      .getByRole('alertdialog')
+      .filter({ hasText: 'Change record status?' });
 
     // sonner can stack more than one toast — .first() avoids a strict-mode
     // failure when just checking "a toast is visible" (same convention as
@@ -146,9 +163,30 @@ export class TechpackTypeLocators {
     });
   }
 
-  /** The Status-column cell of a given row (last cell). */
+  /**
+   * The Status-column cell of a given row. Matched by its value rather than
+   * position: dev added a trailing actions column on 2026-10-12, so the
+   * previous `.last()` started reading an empty cell instead.
+   */
   statusCell(codeOrName: string | RegExp): Locator {
-    return this.row(codeOrName).getByRole('cell').last();
+    return this.row(codeOrName)
+      .getByRole('cell')
+      .filter({ hasText: /^(Draft|Approved|Inactive|Rejected)$/ });
+  }
+
+  /** The row's clickable Status chip (opens a "Change to X" menu). */
+  statusChip(codeOrName: string | RegExp): Locator {
+    return this.row(codeOrName).getByRole('button', {
+      name: /^(Draft|Approved|Inactive|Rejected)$/,
+    });
+  }
+
+  statusMenuItem(action: string): Locator {
+    return this.page.getByRole('menuitem', { name: action });
+  }
+
+  statusConfirmButton(label: string): Locator {
+    return this.statusConfirmDialog.getByRole('button', { name: label, exact: true });
   }
 }
 

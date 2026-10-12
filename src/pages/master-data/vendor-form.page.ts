@@ -143,9 +143,16 @@ export class VendorFormPage extends BasePage {
     await expect(this.locators.requiredErrorFor(fieldAnchor)).toHaveText(/required/i);
   }
 
-  /** Real toast text confirmed live: "Vendor {CODE} created." — the vendor code is interpolated in. */
+  /**
+   * Real toast text confirmed live (2026-10-12): "Vendor {CODE} created —
+   * submitted for approval." New vendors now land in Draft and appear in
+   * the "Masters needing review" panel; until 2026-10-08 they went straight
+   * to Approved with "Vendor {CODE} created.".
+   */
   async expectCreatedSuccessfully(): Promise<void> {
-    await expect(this.page.getByText(/^Vendor .+ created\.$/)).toBeVisible({ timeout: 15_000 });
+    await expect(
+      this.page.getByText(/^Vendor \S+ created — submitted for approval\.$/),
+    ).toBeVisible({ timeout: 15_000 });
   }
 
   /** Real toast text confirmed live: "Vendor updated." */
@@ -154,16 +161,30 @@ export class VendorFormPage extends BasePage {
   }
 
   /**
-   * Real toast text confirmed live for a duplicate Vendor Name: "Failed to
-   * create vendor." — a generic failure message that does not explain the
-   * real cause (see vendor-master-testcases.md's Notes — a confirmed UX
-   * gap, not a missing assertion here).
+   * Real toast text confirmed live (2026-10-12) for a duplicate Vendor Name:
+   * "A vendor named {NAME} already exists. Use a unique name." Until
+   * 2026-10-08 this was the generic "Failed to create vendor." with no
+   * reason given — that UX gap is now fixed.
    */
-  async expectCreateFailed(): Promise<void> {
-    await expect(this.page.getByText('Failed to create vendor.')).toBeVisible({ timeout: 15_000 });
+  async expectDuplicateNameError(vendorName: string): Promise<void> {
+    await expect(
+      this.page.getByText(`A vendor named ${vendorName} already exists. Use a unique name.`, {
+        exact: true,
+      }),
+    ).toBeVisible({ timeout: 15_000 });
   }
 
   async expectStillOnCreatePage(): Promise<void> {
     await expect(this.locators.createButton).toBeVisible();
+  }
+
+  /** Matches any create-success wording (old or current), so a silent create can't slip past this check. */
+  async expectNoCreatedToast(): Promise<void> {
+    await expect(this.page.getByText(/^Vendor \S+ created/)).not.toBeVisible();
+  }
+
+  /** No toast of any kind — success or error — is on screen. */
+  async expectNoToast(): Promise<void> {
+    await expect(this.page.locator('[data-sonner-toast]')).toHaveCount(0);
   }
 }

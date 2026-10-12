@@ -247,7 +247,6 @@ test.describe('Master Data - Customer Percentage', () => {
   });
 
   test('TC:8 Verify search works by Customer code but not by Customer name', async ({
-    page,
     customerPercentagePage,
   }) => {
     await customerPercentagePage.open();
@@ -264,9 +263,7 @@ test.describe('Master Data - Customer Percentage', () => {
     await test.step('Searching by full Customer name finds nothing', async () => {
       await customerPercentagePage.open();
       await customerPercentagePage.search(TEST_CUSTOMER_FULL_NAME);
-      await expect(
-        page.getByText('No customer percentage rows yet.', { exact: true }),
-      ).toBeVisible();
+      await customerPercentagePage.expectEmptyState();
     });
 
     await test.step('Searching by Customer code finds the row', async () => {
@@ -425,7 +422,7 @@ test.describe('Master Data - Customer Percentage', () => {
     });
 
     await test.step('Only RM-scoped categories are listed (5 of 5)', async () => {
-      await expect(page.getByText('scoped to the picked Item Type')).toBeVisible();
+      await customerPercentagePage.expectCategoryPickerScopedHintVisible();
       // pickerRow('Fabric') (a plain string) does a case-INSENSITIVE
       // substring match (Playwright's hasText behavior for strings),
       // which also matches the unrelated "ZFA — FABRIC" row — confirmed
@@ -433,7 +430,7 @@ test.describe('Master Data - Customer Percentage', () => {
       // (no /i/ flag) disambiguates "Fabric" from "FABRIC".
       await expect(customerPercentagePage.locators.pickerRow(/Fabric/)).toBeVisible();
       await expect(customerPercentagePage.locators.pickerRow('Pocketing')).toBeVisible();
-      await expect(page.getByText('Showing 1-5 of 5')).toBeVisible();
+      await customerPercentagePage.expectPickerSummary('Showing 1-5 of 5');
     });
 
     await page.keyboard.press('Escape');

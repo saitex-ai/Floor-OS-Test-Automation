@@ -22,10 +22,9 @@ export interface SampleRequestFieldValues {
  * test-cases/master-data/sample-request-creation/sample-request-creation-testcases.md
  * for the full narrative this page object is built from, including one
  * real app bug baked into the assertions below rather than papered over:
- * the list's own Status column renders a permanently blank badge on every
- * row, including a freshly created one (see expectStatusColumnBlank()).
- * The underlying Draft/Posted status is real — it just isn't rendered in
- * the list, only in the Edit modal's lock-state hint text.
+ * the list's Status column doesn't show a Draft request's real status (see
+ * expectDraftStatusShownAsPlaceholder()). The underlying Draft status is
+ * real — it's only visible in the Edit modal's lock-state hint text.
  */
 export class SampleRequestCreationPage extends BasePage {
   readonly locators: SampleRequestCreationLocators;
@@ -42,6 +41,28 @@ export class SampleRequestCreationPage extends BasePage {
   async expectLoaded(): Promise<void> {
     await expect(this.locators.heading).toBeVisible({ timeout: 60_000 });
     await expect(this.locators.createNewButton).toBeVisible();
+  }
+
+  async expectColumnHeadersVisible(names: readonly string[]): Promise<void> {
+    for (const name of names) {
+      await expect(this.page.getByRole('columnheader', { name })).toBeVisible();
+    }
+  }
+
+  /**
+   * Picks a Customer in the open New dialog, opens Season, and returns the
+   * Season options offered for that Customer. The option list populates
+   * asynchronously after the picker opens — waits for at least one real
+   * option before reading (confirmed live: an immediate read can see 0).
+   * Leaves the Season popover open; the caller closes it if needed.
+   */
+  async readSeasonOptionsForCustomer(customer: string | RegExp): Promise<string[]> {
+    await this.locators.pickerTrigger('customer').click();
+    await this.locators.pickerOption(customer).first().click();
+    await this.locators.pickerTrigger('season').click();
+    const options = this.page.getByRole('option');
+    await expect(options.first()).toBeVisible();
+    return options.allTextContents();
   }
 
   /**
@@ -214,14 +235,12 @@ export class SampleRequestCreationPage extends BasePage {
   }
 
   /**
-   * KNOWN APP BUG (confirmed live 2026-10-06, re-checked after a 10s+
-   * wait to rule out a slow load): the Status column renders a visually
-   * blank pill for every row, including one created moments earlier in
-   * the same test — never any text. Asserting the bug's current, real
-   * behavior on purpose rather than papering over it; flip this
-   * assertion (to a real status string) once the app fixes it.
+   * KNOWN APP BUG: a Draft request's Status cell doesn't say "Draft". Until
+   * 2026-10-08 it rendered a blank pill; since 2026-10-12 it renders "—".
+   * Asserting the current, real behavior on purpose; flip this to "Draft"
+   * once the app fixes it.
    */
-  async expectStatusColumnBlank(text: string | RegExp): Promise<void> {
-    await expect(this.locators.statusCell(text)).toHaveText('');
+  async expectDraftStatusShownAsPlaceholder(text: string | RegExp): Promise<void> {
+    await expect(this.locators.statusCell(text)).toHaveText('—');
   }
 }

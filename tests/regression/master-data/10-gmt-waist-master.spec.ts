@@ -31,18 +31,14 @@ test.describe('Master Data - GMT Waist Master', () => {
     await allure.owner('Master Data QA');
   });
 
-  test('TC:1 Verify GMT Waist Master list layout', async ({ page, gmtWaistPage: waistPage }) => {
+  test('TC:1 Verify GMT Waist Master list layout', async ({ gmtWaistPage: waistPage }) => {
     await test.step('Navigate to GMT Waist Master', async () => {
       await waistPage.open();
     });
 
     await test.step('Heading, status tabs, search, and "New Waist" are visible', async () => {
       await waistPage.expectLoaded();
-      await expect(page.getByRole('button', { name: /^All \d+$/ })).toBeVisible();
-      await expect(page.getByRole('button', { name: /^Draft \d+$/ })).toBeVisible();
-      await expect(page.getByRole('button', { name: /^Approved \d+$/ })).toBeVisible();
-      await expect(page.getByRole('button', { name: /^Inactive \d+$/ })).toBeVisible();
-      await expect(page.getByRole('button', { name: /^Rejected \d+$/ })).toBeVisible();
+      await waistPage.expectStatusTabsVisible();
       await expect(waistPage.locators.searchInput).toBeVisible();
     });
   });
@@ -202,7 +198,6 @@ test.describe('Master Data - GMT Waist Master', () => {
   });
 
   test('TC:10 Edge: negative number and zero accepted as Waist Code', async ({
-    page,
     gmtWaistPage: waistPage,
   }) => {
     // A fixed literal "-5" would collide with this same test's own
@@ -237,11 +232,7 @@ test.describe('Master Data - GMT Waist Master', () => {
       await waistPage.openNew();
       await waistPage.fillRequired({ code: '0', description: `PW MD Waist Zero ${Date.now()}` });
       await waistPage.create();
-      const created = page.getByText('Waist created.');
-      const duplicate = page.getByText(
-        'A waist with this code already exists. Use a different code.',
-      );
-      await expect(created.or(duplicate)).toBeVisible({ timeout: 15_000 });
+      await waistPage.expectCreatedOrDuplicateCode();
 
       // On the duplicate path the dialog stays open (confirmed live — see
       // TC:9) so the user can correct the code; it must be closed here or

@@ -28,6 +28,15 @@ export class VendorListPage extends BasePage {
     await expect(this.locators.newVendorButton).toBeVisible();
   }
 
+  /** All five status tabs render, each with its live count in the accessible name (e.g. "All 142"). */
+  async expectStatusTabsVisible(): Promise<void> {
+    for (const tab of ['All', 'Draft', 'Approved', 'Inactive', 'Rejected']) {
+      await expect(
+        this.page.getByRole('button', { name: new RegExp(`^${tab} \\d+$`) }),
+      ).toBeVisible();
+    }
+  }
+
   async openNewVendor(): Promise<void> {
     await this.locators.newVendorButton.click();
   }
@@ -39,6 +48,11 @@ export class VendorListPage extends BasePage {
 
   async search(term: string): Promise<void> {
     await this.locators.searchInput.fill(term);
+  }
+
+  /** The auto-generated Vendor Code of the row with this exact Vendor Name. */
+  async codeForVendorName(name: string): Promise<string> {
+    return (await this.locators.row(name).getByRole('cell').nth(1).innerText()).trim();
   }
 
   /**
@@ -87,7 +101,31 @@ export class VendorListPage extends BasePage {
     await this.locators.statusButton(code).click();
     await this.locators.statusMenuItem(menuItem).click();
     await expect(this.locators.statusConfirmDialog).toBeVisible();
-    await this.locators.statusConfirmButton(confirmButtonLabel).click();
+    // Confirmed live (2026-10-12): the confirm click occasionally doesn't
+    // register, leaving the dialog open — and a still-visible toast from a
+    // previous transition can then mask that. Retry until it really closes.
+    await expect(async () => {
+      if (await this.locators.statusConfirmDialog.isVisible()) {
+        await this.locators.statusConfirmButton(confirmButtonLabel).click();
+      }
+      await expect(this.locators.statusConfirmDialog).toBeHidden({ timeout: 3_000 });
+    }).toPass({ timeout: 15_000 });
+  }
+
+  /**
+   * Approves a Draft vendor (new vendors land in Draft since 2026-10-12).
+   * From Draft, the chip's "Change to Approved" opens a "Draft review" side
+   * drawer (details, optional note, Approve / Remap) rather than the
+   * "Change record status?" confirm used for other transitions. Toast on
+   * success is the same "Vendor status updated.".
+   */
+  async approveDraft(code: string): Promise<void> {
+    await this.locators.statusButton(code).click();
+    await this.locators.statusMenuItem('Change to Approved').click();
+    const drawer = this.page.getByRole('dialog').filter({ hasText: /Draft review/i });
+    await expect(drawer).toBeVisible();
+    await drawer.getByRole('button', { name: /^Approve\b/ }).click();
+    await expect(drawer).toBeHidden({ timeout: 15_000 });
   }
 
   /** Real toast text confirmed live: "Vendor status updated." */

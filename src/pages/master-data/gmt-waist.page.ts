@@ -48,6 +48,15 @@ export class GmtWaistPage extends BasePage {
     await expect(this.locators.newWaistButton).toBeVisible();
   }
 
+  /** All five status tabs render, each with its live count in the accessible name (e.g. "All 31"). */
+  async expectStatusTabsVisible(): Promise<void> {
+    for (const tab of ['All', 'Draft', 'Approved', 'Inactive', 'Rejected']) {
+      await expect(
+        this.page.getByRole('button', { name: new RegExp(`^${tab} \\d+$`) }),
+      ).toBeVisible();
+    }
+  }
+
   async openNew(): Promise<void> {
     await this.locators.newWaistButton.click();
     await expect(this.locators.dialog).toBeVisible();
@@ -108,6 +117,15 @@ export class GmtWaistPage extends BasePage {
     await expect(
       this.page.getByText('A waist with this code already exists. Use a different code.'),
     ).toBeVisible({ timeout: 15_000 });
+  }
+
+  /** Either outcome proves the code passed format validation — used for values that can't be made unique per run (e.g. "0"). */
+  async expectCreatedOrDuplicateCode(): Promise<void> {
+    const created = this.page.getByText('Waist created.');
+    const duplicate = this.page.getByText(
+      'A waist with this code already exists. Use a different code.',
+    );
+    await expect(created.or(duplicate)).toBeVisible({ timeout: 15_000 });
   }
 
   async expectRowVisible(code: string): Promise<void> {

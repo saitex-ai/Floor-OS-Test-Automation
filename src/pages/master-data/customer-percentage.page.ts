@@ -166,6 +166,23 @@ export class CustomerPercentagePage extends BasePage {
     });
   }
 
+  /** The grid's own empty state, e.g. after a search that matches nothing. */
+  async expectEmptyState(): Promise<void> {
+    await expect(
+      this.page.getByText('No customer percentage rows yet.', { exact: true }),
+    ).toBeVisible();
+  }
+
+  /** Item Category picker's hint that its rows are filtered by the already-picked Item Type. */
+  async expectCategoryPickerScopedHintVisible(): Promise<void> {
+    await expect(this.page.getByText('scoped to the picked Item Type')).toBeVisible();
+  }
+
+  /** The open picker's own pagination summary, e.g. "Showing 1-5 of 5". */
+  async expectPickerSummary(summary: string): Promise<void> {
+    await expect(this.page.getByText(summary)).toBeVisible();
+  }
+
   /**
    * Works around the stale-UI-after-mutation quirk documented on this
    * class: re-opens the screen fresh (not just re-searches in the same

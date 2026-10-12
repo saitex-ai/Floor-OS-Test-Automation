@@ -56,18 +56,14 @@ test.describe('Master Data - Vendor Master', () => {
     await allure.owner('Master Data QA');
   });
 
-  test('TC:1 Verify Vendor Master list layout', async ({ page, vendorListPage }) => {
+  test('TC:1 Verify Vendor Master list layout', async ({ vendorListPage }) => {
     await test.step('Navigate to Vendor Master', async () => {
       await vendorListPage.open();
     });
 
     await test.step('Heading, status tabs, search, and "New Vendor" are visible', async () => {
       await vendorListPage.expectLoaded();
-      await expect(page.getByRole('button', { name: /^All \d+$/ })).toBeVisible();
-      await expect(page.getByRole('button', { name: /^Draft \d+$/ })).toBeVisible();
-      await expect(page.getByRole('button', { name: /^Approved \d+$/ })).toBeVisible();
-      await expect(page.getByRole('button', { name: /^Inactive \d+$/ })).toBeVisible();
-      await expect(page.getByRole('button', { name: /^Rejected \d+$/ })).toBeVisible();
+      await vendorListPage.expectStatusTabsVisible();
       await expect(vendorListPage.locators.searchInput).toBeVisible();
     });
   });
@@ -92,10 +88,12 @@ test.describe('Master Data - Vendor Master', () => {
       await vendorFormPage.create();
     });
 
-    await test.step('Toast reads "Vendor {CODE} created." and the row appears on the list', async () => {
+    await test.step('Toast reads "Vendor {CODE} created — submitted for approval."; row lands in Draft', async () => {
       await vendorFormPage.expectCreatedSuccessfully();
       await vendorListPage.search(name);
       await vendorListPage.expectRowVisible(name);
+      const code = await vendorListPage.codeForVendorName(name);
+      await vendorListPage.expectRowStatus(code, 'Draft');
     });
   });
 
@@ -319,8 +317,8 @@ test.describe('Master Data - Vendor Master', () => {
       await vendorFormPage.create();
     });
 
-    await test.step('Save is blocked with the generic "Failed to create vendor." toast', async () => {
-      await vendorFormPage.expectCreateFailed();
+    await test.step('Save is blocked with a specific "already exists" message', async () => {
+      await vendorFormPage.expectDuplicateNameError(`PW MD Vendor Dup Source ${suffix}`);
       await vendorFormPage.expectStillOnCreatePage();
     });
   });
@@ -332,7 +330,7 @@ test.describe('Master Data - Vendor Master', () => {
     const suffix = uniqueSuffix();
     const name = `PW MD Vendor Status ${suffix}`;
 
-    await test.step('Create a throwaway vendor (lands directly in Approved)', async () => {
+    await test.step('Create a throwaway vendor (lands in Draft — approval is enforced)', async () => {
       await vendorListPage.open();
       await vendorListPage.openNewVendor();
       await vendorFormPage.fillRequired({ ...requiredVendorValues(suffix), vendorName: name });
@@ -341,9 +339,14 @@ test.describe('Master Data - Vendor Master', () => {
     });
 
     await vendorListPage.search(name);
-    const code = (
-      await vendorListPage.locators.row(name).getByRole('cell').nth(1).innerText()
-    ).trim();
+    const code = await vendorListPage.codeForVendorName(name);
+
+    await test.step('Approve it from Draft via the status chip', async () => {
+      await vendorListPage.approveDraft(code);
+      await vendorListPage.expectStatusUpdatedToast();
+      await vendorListPage.search(name);
+      await vendorListPage.expectRowStatus(code, 'Approved');
+    });
 
     await test.step("Change status to Inactive via the row's status chip", async () => {
       await vendorListPage.changeStatus(code, 'Change to Inactive', 'Set to Inactive');
@@ -370,13 +373,20 @@ test.describe('Master Data - Vendor Master', () => {
     await vendorFormPage.expectCreatedSuccessfully();
 
     await vendorListPage.search(name);
-    const code = (
-      await vendorListPage.locators.row(name).getByRole('cell').nth(1).innerText()
-    ).trim();
+    const code = await vendorListPage.codeForVendorName(name);
 
-    await test.step('Deactivate it first', async () => {
+    await test.step('Approve it from Draft first (new vendors land in Draft)', async () => {
+      await vendorListPage.approveDraft(code);
+      await vendorListPage.expectStatusUpdatedToast();
+      await vendorListPage.search(name);
+      await vendorListPage.expectRowStatus(code, 'Approved');
+    });
+
+    await test.step('Deactivate it', async () => {
       await vendorListPage.changeStatus(code, 'Change to Inactive', 'Set to Inactive');
       await vendorListPage.expectStatusUpdatedToast();
+      await vendorListPage.search(name);
+      await vendorListPage.expectRowStatus(code, 'Inactive');
     });
 
     await test.step('Then reactivate it — only "Change to Approved" is offered from Inactive', async () => {
@@ -392,7 +402,6 @@ test.describe('Master Data - Vendor Master', () => {
   });
 
   test('TC:13 Verify Email field format validation (native HTML5)', async ({
-    page,
     vendorListPage,
     vendorFormPage,
   }) => {
@@ -419,7 +428,7 @@ test.describe('Master Data - Vendor Master', () => {
       expect(validity.valid).toBe(false);
       expect(validity.typeMismatch).toBe(true);
       await vendorFormPage.expectStillOnCreatePage();
-      await expect(page.getByText(/created\.$/)).not.toBeVisible();
+      await vendorFormPage.expectNoCreatedToast();
     });
   });
 
@@ -444,8 +453,7 @@ test.describe('Master Data - Vendor Master', () => {
       // not slow, so a short window is enough to tell the difference
       // between "nothing happens" and "a delayed success/failure toast".
       await page.waitForTimeout(5_000);
-      await expect(page.getByText(/created\.$/)).not.toBeVisible();
-      await expect(page.getByText('Failed to create vendor.')).not.toBeVisible();
+      await vendorFormPage.expectNoToast();
       await vendorFormPage.expectStillOnCreatePage();
     });
   });

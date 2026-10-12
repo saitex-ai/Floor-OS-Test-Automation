@@ -24,9 +24,11 @@ export interface TechpackTypeFieldValues {
  * 1. A brand-new record created through "New Techpack Type" saves
  *    directly as **Approved**, bypassing the Draft/Review workflow this
  *    screen otherwise shows for its seeded data entirely.
- * 2. There is no confirmed way to reactivate an Inactive record — the
- *    Edit modal's icon button is always labeled/behaves as "Deactivate
- *    <code>", even when the record is already Inactive.
+ * 2. The Edit modal's icon button is always "Deactivate <code>", even on an
+ *    Inactive record. Until 2026-10-08 that left no way to reactivate at
+ *    all; since 2026-10-12 the list row's Status chip offers "Change to
+ *    Approved" on an Inactive record, so reactivation works from the list
+ *    (see changeStatus()).
  */
 export class TechpackTypePage extends BasePage {
   readonly locators: TechpackTypeLocators;
@@ -108,12 +110,33 @@ export class TechpackTypePage extends BasePage {
   }
 
   /**
-   * Clicks the Edit modal's "Deactivate <code>" icon button. No
-   * confirmation dialog — the status flips immediately (confirmed live).
-   * Must be called with the record's own Edit modal already open.
+   * Clicks the Edit modal's "Deactivate <code>" icon button and confirms the
+   * "Deactivate <code>? … moves to the Inactive tab … can be activated again
+   * later." dialog (added on dev 2026-10-12 — previously it flipped with no
+   * confirmation). Must be called with the record's own Edit modal open.
    */
   async deactivate(): Promise<void> {
     await this.locators.deactivateIconButton.click();
+    await this.locators.deactivateConfirmButton.click();
+  }
+
+  /**
+   * List-row status change: click the row's Status chip, pick the menu item
+   * (e.g. "Change to Approved"), confirm in "Change record status?".
+   */
+  async changeStatus(code: string, menuItem: string, confirmLabel: string): Promise<void> {
+    await this.search(code);
+    await this.locators.statusChip(code).click();
+    await this.locators.statusMenuItem(menuItem).click();
+    await expect(this.locators.statusConfirmDialog).toBeVisible();
+    await this.locators.statusConfirmButton(confirmLabel).click();
+  }
+
+  /** Real toast text confirmed live (2026-10-12): "Techpack type status updated." */
+  async expectStatusUpdatedToast(): Promise<void> {
+    await expect(this.page.getByText('Techpack type status updated.', { exact: true })).toBeVisible(
+      { timeout: 15_000 },
+    );
   }
 
   /** Clicks "Delete <code>" then confirms on the nested "Delete <code>? ... cannot be undone." dialog. */
@@ -162,6 +185,12 @@ export class TechpackTypePage extends BasePage {
 
   async expectRequiredError(): Promise<void> {
     await expect(this.locators.requiredError.first()).toBeVisible();
+  }
+
+  async expectColumnHeadersVisible(names: readonly string[]): Promise<void> {
+    for (const name of names) {
+      await expect(this.page.getByRole('columnheader', { name })).toBeVisible();
+    }
   }
 
   /**

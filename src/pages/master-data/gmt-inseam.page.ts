@@ -44,6 +44,15 @@ export class GmtInseamPage extends BasePage {
     await expect(this.locators.newInseamButton).toBeVisible();
   }
 
+  /** All five status tabs render, each with its live count in the accessible name (e.g. "All 29"). */
+  async expectStatusTabsVisible(): Promise<void> {
+    for (const tab of ['All', 'Draft', 'Approved', 'Inactive', 'Rejected']) {
+      await expect(
+        this.page.getByRole('button', { name: new RegExp(`^${tab} \\d+$`) }),
+      ).toBeVisible();
+    }
+  }
+
   async openNew(): Promise<void> {
     await this.locators.newInseamButton.click();
     await expect(this.locators.dialog).toBeVisible();

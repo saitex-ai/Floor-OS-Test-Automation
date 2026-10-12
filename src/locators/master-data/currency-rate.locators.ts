@@ -107,11 +107,7 @@ export class CurrencyRateLocators {
 
   /** Day-of-month cell inside the open calendar popover, scoped to avoid matching page-wide "1"/"2"/... text (pagination, etc). */
   calendarDay(day: number): Locator {
-    return this.page
-      .locator('table')
-      .last()
-      .getByText(String(day), { exact: true })
-      .first();
+    return this.page.locator('table').last().getByText(String(day), { exact: true }).first();
   }
 
   /** A data row in the "Currency Rate Details" grid, matched by any visible cell text (e.g. a From Currency code). */

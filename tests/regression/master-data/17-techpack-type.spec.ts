@@ -23,10 +23,7 @@ test.describe('Master Data - Techpack Type', () => {
     await techpackTypePage.expectLoaded();
   });
 
-  test('TC:1 Verify Techpack Type list layout and tab counts', async ({
-    page,
-    techpackTypePage,
-  }) => {
+  test('TC:1 Verify Techpack Type list layout and tab counts', async ({ techpackTypePage }) => {
     await test.step('Tabs, search and table are present', async () => {
       await expect(techpackTypePage.locators.tab('All')).toBeVisible();
       await expect(techpackTypePage.locators.tab('Draft')).toBeVisible();
@@ -34,10 +31,12 @@ test.describe('Master Data - Techpack Type', () => {
       await expect(techpackTypePage.locators.tab('Inactive')).toBeVisible();
       await expect(techpackTypePage.locators.tab('Rejected')).toBeVisible();
       await expect(techpackTypePage.locators.searchInput).toBeVisible();
-      await expect(page.getByRole('columnheader', { name: 'Code' })).toBeVisible();
-      await expect(page.getByRole('columnheader', { name: 'Name' })).toBeVisible();
-      await expect(page.getByRole('columnheader', { name: 'No Demand Validation' })).toBeVisible();
-      await expect(page.getByRole('columnheader', { name: 'Status' })).toBeVisible();
+      await techpackTypePage.expectColumnHeadersVisible([
+        'Code',
+        'Name',
+        'No Demand Validation',
+        'Status',
+      ]);
     });
   });
 
@@ -276,34 +275,41 @@ test.describe('Master Data - Techpack Type', () => {
     await techpackTypePage.expectRowVisible(specialName);
   });
 
-  test('Known bug: an Inactive Techpack Type has no confirmed reactivation path', async ({
+  test('An Inactive Techpack Type can be reactivated from the list Status chip', async ({
     techpackTypePage,
   }) => {
     const code = `TCTT${Date.now()}`;
-    const name = `PW MD TechpackType ${Date.now()} NoReactivate`;
+    const name = `PW MD TechpackType ${Date.now()} Reactivate`;
 
     await techpackTypePage.openCreateModal();
     await techpackTypePage.fillForm({ code, name });
     await techpackTypePage.create();
     await techpackTypePage.expectCreatedToast();
 
-    await techpackTypePage.openRowForEdit(code);
-    await techpackTypePage.deactivate();
-    await techpackTypePage.expectDeactivatedToast();
-    await techpackTypePage.expectRowStatus(code, 'Inactive');
+    await test.step('Deactivate it (now behind a confirmation dialog)', async () => {
+      await techpackTypePage.openRowForEdit(code);
+      await techpackTypePage.deactivate();
+      await techpackTypePage.expectDeactivatedToast();
+      await techpackTypePage.expectRowStatus(code, 'Inactive');
+    });
 
-    // KNOWN APP BUG (confirmed live): the Edit modal's icon button is
-    // always labeled/behaves as "Deactivate <code>", even once the record
-    // is already Inactive — clicking it again just re-fires the same
-    // deactivate action/toast instead of reactivating. Asserting that
-    // real, current (broken) behavior on purpose: the record stays
-    // Inactive and the icon's accessible name never flips to "Activate".
-    await techpackTypePage.openRowForEdit(code);
-    await expect(techpackTypePage.locators.deactivateIconButton).toHaveAccessibleName(
-      `Deactivate ${code}`,
-    );
-    await techpackTypePage.deactivate();
-    await techpackTypePage.expectDeactivatedToast();
-    await techpackTypePage.expectRowStatus(code, 'Inactive');
+    // Remaining inconsistency (current behavior, asserted on purpose): the
+    // Edit modal still only offers "Deactivate <code>" on an Inactive
+    // record — reactivation lives on the list's Status chip instead.
+    await test.step('Edit modal still offers only "Deactivate" on an Inactive record', async () => {
+      await techpackTypePage.openRowForEdit(code);
+      await expect(techpackTypePage.locators.deactivateIconButton).toHaveAccessibleName(
+        `Deactivate ${code}`,
+      );
+      await techpackTypePage.closeDialog();
+    });
+
+    // FIXED on dev 2026-10-12: until 2026-10-08 there was no reactivation
+    // path anywhere in the UI.
+    await test.step('Status chip "Change to Approved" reactivates it', async () => {
+      await techpackTypePage.changeStatus(code, 'Change to Approved', 'Set to Approved');
+      await techpackTypePage.expectStatusUpdatedToast();
+      await techpackTypePage.expectRowStatus(code, 'Approved');
+    });
   });
 });

@@ -95,11 +95,7 @@ export class CurrencyRateBuyerLocators {
   }
 
   calendarDay(day: number): Locator {
-    return this.page
-      .locator('table')
-      .last()
-      .getByText(String(day), { exact: true })
-      .first();
+    return this.page.locator('table').last().getByText(String(day), { exact: true }).first();
   }
 
   /** A customer row inside the open "Select Customer" dialog. */

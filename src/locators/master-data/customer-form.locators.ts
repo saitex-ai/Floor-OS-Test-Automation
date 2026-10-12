@@ -72,7 +72,10 @@ export class CustomerFormLocators {
     this.postalCodeInput = page.getByRole('textbox', { name: 'Postal Code', exact: true });
     this.countryCombobox = page.getByRole('combobox', { name: 'Country *', exact: true });
     this.currencyCombobox = page.getByRole('combobox', { name: 'Currency *', exact: true });
-    this.paymentMethodCombobox = page.getByRole('combobox', { name: 'Payment Method', exact: true });
+    this.paymentMethodCombobox = page.getByRole('combobox', {
+      name: 'Payment Method',
+      exact: true,
+    });
     this.creditTermsCombobox = page.getByRole('combobox', { name: 'Credit Terms', exact: true });
     this.activeCheckbox = page.getByRole('checkbox', { name: 'Active', exact: true });
 

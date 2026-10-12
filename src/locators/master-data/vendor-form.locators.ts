@@ -74,10 +74,15 @@ export class VendorFormLocators {
     this.imageTab = page.getByRole('tab', { name: 'Image' });
 
     this.registeredNameInput = page.getByRole('textbox', { name: 'Registered Name' });
-    this.accountReferenceNumberInput = page.getByRole('textbox', { name: 'Account Reference Number' });
+    this.accountReferenceNumberInput = page.getByRole('textbox', {
+      name: 'Account Reference Number',
+    });
     this.vendorClassIdInput = page.getByRole('textbox', { name: 'Vendor Class ID' });
     this.creditTermsCombobox = page.getByRole('combobox', { name: 'Credit Terms', exact: false });
-    this.paymentMethodCombobox = page.getByRole('combobox', { name: 'Payment Method', exact: false });
+    this.paymentMethodCombobox = page.getByRole('combobox', {
+      name: 'Payment Method',
+      exact: false,
+    });
     this.addressLine1Input = page.getByRole('textbox', { name: 'Address Line 1', exact: false });
     this.addressLine2Input = page.getByRole('textbox', { name: 'Address Line 2' });
     this.cityInput = page.getByRole('textbox', { name: 'City', exact: false });

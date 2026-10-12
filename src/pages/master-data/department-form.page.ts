@@ -101,4 +101,9 @@ export class DepartmentFormPage extends BasePage {
   async expectValidationError(message: string | RegExp): Promise<void> {
     await expect(this.page.getByText(message).first()).toBeVisible();
   }
+
+  /** Number of inline "Required" errors on the form after a blocked submit. */
+  async expectRequiredErrorCount(count: number): Promise<void> {
+    await expect(this.page.getByText('Required')).toHaveCount(count);
+  }
 }

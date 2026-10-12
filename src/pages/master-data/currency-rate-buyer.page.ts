@@ -112,6 +112,27 @@ export class CurrencyRateBuyerPage extends BasePage {
     await expect(this.page.getByRole('button', { name: 'Configure columns' })).toHaveCount(0);
   }
 
+  /** Read-only for this role: no "New"/"Add" entry point on whichever tab is currently open. */
+  async expectNoCreateEntryPoint(): Promise<void> {
+    await expect(this.page.getByRole('button', { name: /^(New|Add)\b/i })).toHaveCount(0);
+  }
+
+  /**
+   * Two elements carry "Select Customer": an sr-only dialog title and the
+   * visible heading with a live count suffix ("Select Customer(1013)") —
+   * .first() avoids the strict-mode violation since only presence matters.
+   */
+  async expectCustomerPickerTitleVisible(): Promise<void> {
+    await expect(this.page.getByText('Select Customer').first()).toBeVisible();
+  }
+
+  /** This screen's second tab is "Currency Rate List" — unlike Currency Rate's "Currency Rate Details". */
+  async expectNoCurrencyRateDetailsTab(): Promise<void> {
+    await expect(
+      this.page.getByRole('tab', { name: 'Currency Rate Details', exact: true }),
+    ).toHaveCount(0);
+  }
+
   async gotoNewRouteDirectly(): Promise<void> {
     await this.gotoAuthenticated('/master-data/system-management/currency-rate-buyer/new');
   }

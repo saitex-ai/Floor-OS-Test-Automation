@@ -41,15 +41,16 @@ test.describe('Master Data - Sample Request Creation', () => {
   }
 
   test('TC:1 Verify Sample Request Creation list layout', async ({
-    page,
     sampleRequestCreationPage: sampleRequestPage,
   }) => {
-    await expect(page.getByRole('columnheader', { name: 'SR Code' })).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Sample Request Name' })).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Customer' })).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Season' })).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Company' })).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Status' })).toBeVisible();
+    await sampleRequestPage.expectColumnHeadersVisible([
+      'SR Code',
+      'Sample Request Name',
+      'Customer',
+      'Season',
+      'Company',
+      'Status',
+    ]);
     await expect(sampleRequestPage.locators.searchInput).toBeVisible();
   });
 
@@ -96,33 +97,14 @@ test.describe('Master Data - Sample Request Creation', () => {
 
     const seasonsForAcme =
       await test.step('Select ACME Apparel, read its Season options', async () => {
-        await sampleRequestPage.locators.pickerTrigger('customer').click();
-        await sampleRequestPage.locators
-          .pickerOption(/ACME Apparel/)
-          .first()
-          .click();
-        await sampleRequestPage.locators.pickerTrigger('season').click();
-        // The option list populates asynchronously after the picker opens —
-        // wait for at least one real option before reading, rather than
-        // racing the fetch (confirmed live: an immediate read can see 0).
-        await expect(page.getByRole('option').first()).toBeVisible();
-        const options = await page.getByRole('option').allTextContents();
+        const options = await sampleRequestPage.readSeasonOptionsForCustomer(/ACME Apparel/);
         await page.keyboard.press('Escape');
         return options;
       });
 
     const seasonsForAcmeTextiles =
-      await test.step('Switch Customer to Acme Textiles, read its Season options', async () => {
-        await sampleRequestPage.locators.pickerTrigger('customer').click();
-        await sampleRequestPage.locators
-          .pickerOption(/Acme Textiles/)
-          .first()
-          .click();
-        await sampleRequestPage.locators.pickerTrigger('season').click();
-        await expect(page.getByRole('option').first()).toBeVisible();
-        const options = await page.getByRole('option').allTextContents();
-        return options;
-      });
+      await test.step('Switch Customer to Acme Textiles, read its Season options', async () =>
+        sampleRequestPage.readSeasonOptionsForCustomer(/Acme Textiles/));
 
     expect(seasonsForAcme.length).toBeGreaterThan(0);
     expect(seasonsForAcmeTextiles.length).toBeGreaterThan(0);
@@ -346,22 +328,19 @@ test.describe('Master Data - Sample Request Creation', () => {
     await sampleRequestPage.expectRowVisible(specialName);
   });
 
-  test('Known bug: the list Status column is always blank, even for a request created moments earlier', async ({
+  test('Known bug: the list Status column does not show "Draft" for a newly created request', async ({
     sampleRequestCreationPage: sampleRequestPage,
   }) => {
-    const name = `PW MD SampleReq ${Date.now()} BlankStatus`;
+    const name = `PW MD SampleReq ${Date.now()} DraftStatus`;
 
     await fillMinimalValidRequest(sampleRequestPage, name);
     await sampleRequestPage.save();
     await sampleRequestPage.expectCreatedToast();
 
     await sampleRequestPage.search(name);
-    // KNOWN APP BUG (confirmed live, re-checked after a 10s+ wait to rule
-    // out a slow load): the Status column renders a visually blank pill
-    // for every row, including this one just created. The underlying
-    // Draft status is real (see TC:7's lock-state hint text) — only the
-    // list's own rendering of it is broken. Asserting the real, current
-    // (broken) behavior on purpose rather than papering over it.
-    await sampleRequestPage.expectStatusColumnBlank(name);
+    // KNOWN APP BUG: the request really is Draft (see TC:7's lock-state
+    // hint text), but the list renders "—" (was a blank pill until
+    // 2026-10-08). Asserting the real, current behavior on purpose.
+    await sampleRequestPage.expectDraftStatusShownAsPlaceholder(name);
   });
 });

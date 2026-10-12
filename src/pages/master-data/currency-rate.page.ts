@@ -102,6 +102,21 @@ export class CurrencyRatePage extends BasePage {
     await expect(this.locators.row(fromCurrency).first()).toBeVisible();
   }
 
+  /** At least one result cell shows this effective date (e.g. the seeded "5/1/2026"). */
+  async expectEffectiveDateVisible(date: string): Promise<void> {
+    await expect(this.page.getByText(date).first()).toBeVisible();
+  }
+
+  /** Read-only for this role: no "New"/"Add" entry point on whichever tab is currently open. */
+  async expectNoCreateEntryPoint(): Promise<void> {
+    await expect(this.page.getByRole('button', { name: /^(New|Add)\b/i })).toHaveCount(0);
+  }
+
+  /** Locator-trap demonstration: a substring tab-name query matches both "Rate Details" and "Currency Rate Details". */
+  async expectTabCountMatchingSubstring(name: string, count: number): Promise<void> {
+    await expect(this.page.getByRole('tab', { name })).toHaveCount(count);
+  }
+
   async clickExportCsv(): Promise<void> {
     await this.locators.exportCsvButton.click();
   }

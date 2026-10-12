@@ -137,7 +137,6 @@ test.describe('Master Data - Sites', () => {
   test('TC:5 Verify validation when all required fields are left blank', async ({
     sitesListPage,
     siteFormPage,
-    page,
   }) => {
     await sitesListPage.open();
     await sitesListPage.expectLoaded();
@@ -150,7 +149,7 @@ test.describe('Master Data - Sites', () => {
 
     await test.step('Blocked with "Required" under all four fields', async () => {
       await expect(siteFormPage.locators.createButton).toBeVisible();
-      await expect(page.getByText('Required')).toHaveCount(4); // code, name, country, timezone
+      await siteFormPage.expectRequiredErrorCount(4); // code, name, country, timezone
     });
   });
 

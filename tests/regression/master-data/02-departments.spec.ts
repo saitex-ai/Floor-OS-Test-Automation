@@ -172,7 +172,6 @@ test.describe('Master Data - Departments', () => {
   test('TC:6 Verify validation when all required fields are left blank', async ({
     departmentsListPage,
     departmentFormPage,
-    page,
   }) => {
     await departmentsListPage.open();
     await departmentsListPage.expectLoaded();
@@ -185,7 +184,7 @@ test.describe('Master Data - Departments', () => {
 
     await test.step('Save is blocked; still on the create form', async () => {
       await expect(departmentFormPage.locators.createButton).toBeVisible();
-      await expect(page.getByText('Required')).toHaveCount(3); // code, name, calendar
+      await departmentFormPage.expectRequiredErrorCount(3); // code, name, calendar
     });
   });
 

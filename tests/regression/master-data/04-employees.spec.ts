@@ -156,7 +156,6 @@ test.describe('Master Data - Employees', () => {
   test('TC:6 Verify validation when all required fields are left blank', async ({
     employeesListPage,
     employeeFormPage,
-    page,
   }) => {
     await employeesListPage.open();
     await employeesListPage.expectLoaded();
@@ -169,7 +168,7 @@ test.describe('Master Data - Employees', () => {
 
     await test.step('Blocked with "Required" under Full Name, Department, Maintained by', async () => {
       await expect(employeeFormPage.locators.createButton).toBeVisible();
-      await expect(page.getByText('Required')).toHaveCount(3);
+      await employeeFormPage.expectRequiredErrorCount(3);
       await expect(employeeFormPage.locators.employeeNumber).toBeDisabled();
     });
   });

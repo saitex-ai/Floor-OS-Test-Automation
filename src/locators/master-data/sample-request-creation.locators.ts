@@ -100,7 +100,9 @@ export class SampleRequestCreationLocators {
     // Confirmed live: this confirmation renders as role="alertdialog", not
     // "dialog" (same pattern already found on Customer Percentage's own
     // delete confirmation — see that locators file).
-    this.deleteConfirmDialog = page.getByRole('alertdialog').filter({ hasText: /permanently deletes/i });
+    this.deleteConfirmDialog = page
+      .getByRole('alertdialog')
+      .filter({ hasText: /permanently deletes/i });
     this.deleteConfirmButton = this.deleteConfirmDialog.getByRole('button', {
       name: 'Delete',
       exact: true,

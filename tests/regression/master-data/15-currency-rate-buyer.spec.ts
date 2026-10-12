@@ -38,16 +38,15 @@ test.describe('Master Data - Currency Rate Buyer', () => {
   });
 
   test('TC:2 Verify no Create/New entry point exists for this role', async ({
-    page,
     currencyRateBuyerPage,
   }) => {
     await currencyRateBuyerPage.open();
     await currencyRateBuyerPage.expectLoaded();
 
     await test.step('No "New"/"Add" button exists on either tab', async () => {
-      await expect(page.getByRole('button', { name: /^(New|Add)\b/i })).toHaveCount(0);
+      await currencyRateBuyerPage.expectNoCreateEntryPoint();
       await currencyRateBuyerPage.openCurrencyRateListTab();
-      await expect(page.getByRole('button', { name: /^(New|Add)\b/i })).toHaveCount(0);
+      await currencyRateBuyerPage.expectNoCreateEntryPoint();
     });
 
     await test.step('Direct navigation to the /new route 404s', async () => {
@@ -84,7 +83,6 @@ test.describe('Master Data - Currency Rate Buyer', () => {
   });
 
   test('TC:5 Verify the Customer picker is the shared searchable "Select Customer" dialog', async ({
-    page,
     currencyRateBuyerPage,
   }) => {
     await currencyRateBuyerPage.open();
@@ -99,7 +97,7 @@ test.describe('Master Data - Currency Rate Buyer', () => {
       // strict-mode violation on a plain getByText(), confirmed live.
       // .first() is enough here since both only need to exist, not be
       // individually distinguished.
-      await expect(page.getByText('Select Customer').first()).toBeVisible();
+      await currencyRateBuyerPage.expectCustomerPickerTitleVisible();
       await expect(currencyRateBuyerPage.locators.customerSearchInput).toBeVisible();
     });
   });
@@ -201,7 +199,6 @@ test.describe('Master Data - Currency Rate Buyer', () => {
   });
 
   test("TC:10 Verify this screen's second tab is named differently from Currency Rate's", async ({
-    page,
     currencyRateBuyerPage,
   }) => {
     await currencyRateBuyerPage.open();
@@ -209,9 +206,7 @@ test.describe('Master Data - Currency Rate Buyer', () => {
 
     await test.step('Second tab reads "Currency Rate List", not "Currency Rate Details"', async () => {
       await expect(currencyRateBuyerPage.locators.currencyRateListTab).toBeVisible();
-      await expect(
-        page.getByRole('tab', { name: 'Currency Rate Details', exact: true }),
-      ).toHaveCount(0);
+      await currencyRateBuyerPage.expectNoCurrencyRateDetailsTab();
     });
   });
 

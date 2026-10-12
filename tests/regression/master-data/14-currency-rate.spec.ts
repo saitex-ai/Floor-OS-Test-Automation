@@ -32,16 +32,15 @@ test.describe('Master Data - Currency Rate', () => {
   });
 
   test('TC:2 Verify no Create/New entry point exists for this role', async ({
-    page,
     currencyRatePage,
   }) => {
     await currencyRatePage.open();
     await currencyRatePage.expectLoaded();
 
     await test.step('No "New"/"Add" button exists on either tab', async () => {
-      await expect(page.getByRole('button', { name: /^(New|Add)\b/i })).toHaveCount(0);
+      await currencyRatePage.expectNoCreateEntryPoint();
       await currencyRatePage.openCurrencyRateDetailsTab();
-      await expect(page.getByRole('button', { name: /^(New|Add)\b/i })).toHaveCount(0);
+      await currencyRatePage.expectNoCreateEntryPoint();
     });
 
     await test.step('Direct navigation to the /new route 404s', async () => {
@@ -63,7 +62,6 @@ test.describe('Master Data - Currency Rate', () => {
   });
 
   test('TC:4 Verify Load returns the latest rate on/before the picked Effective Date ("as of" lookup)', async ({
-    page,
     currencyRatePage,
   }) => {
     await currencyRatePage.open();
@@ -80,7 +78,7 @@ test.describe('Master Data - Currency Rate', () => {
       await currencyRatePage.expectRateRowVisible('CNY');
       await currencyRatePage.expectRateRowVisible('EUR');
       await currencyRatePage.expectRateRowVisible('GBP');
-      await expect(page.getByText('5/1/2026').first()).toBeVisible();
+      await currencyRatePage.expectEffectiveDateVisible('5/1/2026');
     });
   });
 
@@ -203,12 +201,12 @@ test.describe('Master Data - Currency Rate', () => {
     });
   });
 
-  test('TC:11 Verify tab accessible-name locator trap', async ({ page, currencyRatePage }) => {
+  test('TC:11 Verify tab accessible-name locator trap', async ({ currencyRatePage }) => {
     await currencyRatePage.open();
     await currencyRatePage.expectLoaded();
 
     await test.step('A substring-matching query resolves to both tabs', async () => {
-      await expect(page.getByRole('tab', { name: 'Rate Details' })).toHaveCount(2);
+      await currencyRatePage.expectTabCountMatchingSubstring('Rate Details', 2);
     });
 
     await test.step('exact: true disambiguates to exactly one tab each', async () => {

@@ -27,18 +27,14 @@ test.describe('Master Data - GMT Inseam Master', () => {
     await allure.owner('Master Data QA');
   });
 
-  test('TC:1 Verify GMT Inseam Master list layout', async ({ page, gmtInseamPage: inseamPage }) => {
+  test('TC:1 Verify GMT Inseam Master list layout', async ({ gmtInseamPage: inseamPage }) => {
     await test.step('Navigate to GMT Inseam Master', async () => {
       await inseamPage.open();
     });
 
     await test.step('Heading, status tabs, search, and "New Inseam" are visible', async () => {
       await inseamPage.expectLoaded();
-      await expect(page.getByRole('button', { name: /^All \d+$/ })).toBeVisible();
-      await expect(page.getByRole('button', { name: /^Draft \d+$/ })).toBeVisible();
-      await expect(page.getByRole('button', { name: /^Approved \d+$/ })).toBeVisible();
-      await expect(page.getByRole('button', { name: /^Inactive \d+$/ })).toBeVisible();
-      await expect(page.getByRole('button', { name: /^Rejected \d+$/ })).toBeVisible();
+      await inseamPage.expectStatusTabsVisible();
       await expect(inseamPage.locators.searchInput).toBeVisible();
     });
   });
