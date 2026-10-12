@@ -17,6 +17,13 @@ import { RecipesListPage } from '../pages/planning/recipes-list.page';
 import { RecipeFormPage } from '../pages/planning/recipe-form.page';
 import { RecipeDetailPage } from '../pages/planning/recipe-detail.page';
 import { OperationFormPage } from '../pages/planning/operation-form.page';
+import { OperationsListPage } from '../pages/planning/operations-list.page';
+import { OperationMasterFormPage } from '../pages/planning/operation-master-form.page';
+import { OperationDetailPage } from '../pages/planning/operation-detail.page';
+import { AllowanceFormPage } from '../pages/planning/allowance-form.page';
+import { WorkCentreDetailPage } from '../pages/planning/work-centre-detail.page';
+import { MachineDetailPage } from '../pages/planning/machine-detail.page';
+import { MaintenanceWindowFormPage } from '../pages/planning/maintenance-window-form.page';
 
 interface PlanningFixtures {
   planningPage: PlanningPage;
@@ -36,6 +43,13 @@ interface PlanningFixtures {
   recipeFormPage: RecipeFormPage;
   recipeDetailPage: RecipeDetailPage;
   operationFormPage: OperationFormPage;
+  operationsListPage: OperationsListPage;
+  operationMasterFormPage: OperationMasterFormPage;
+  operationDetailPage: OperationDetailPage;
+  allowanceFormPage: AllowanceFormPage;
+  workCentreDetailPage: WorkCentreDetailPage;
+  machineDetailPage: MachineDetailPage;
+  maintenanceWindowFormPage: MaintenanceWindowFormPage;
 }
 
 interface PlanningWorkerFixtures {
@@ -124,6 +138,34 @@ export const test = base.extend<PlanningFixtures, PlanningWorkerFixtures>({
 
   operationFormPage: async ({ page }, use) => {
     await use(new OperationFormPage(page));
+  },
+
+  operationsListPage: async ({ page }, use) => {
+    await use(new OperationsListPage(page));
+  },
+
+  operationMasterFormPage: async ({ page }, use) => {
+    await use(new OperationMasterFormPage(page));
+  },
+
+  operationDetailPage: async ({ page }, use) => {
+    await use(new OperationDetailPage(page));
+  },
+
+  allowanceFormPage: async ({ page }, use) => {
+    await use(new AllowanceFormPage(page));
+  },
+
+  workCentreDetailPage: async ({ page }, use) => {
+    await use(new WorkCentreDetailPage(page));
+  },
+
+  machineDetailPage: async ({ page }, use) => {
+    await use(new MachineDetailPage(page));
+  },
+
+  maintenanceWindowFormPage: async ({ page }, use) => {
+    await use(new MaintenanceWindowFormPage(page));
   },
 });
 
