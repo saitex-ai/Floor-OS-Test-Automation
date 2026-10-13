@@ -100,3 +100,20 @@ collapsed "Inventory Item Management" nav group.
   item — add it in Master Data."), and every such pair is now priced. The create-dependent tests
   (TC:1/TC:2/TC:4/TC:7/TC:14) therefore **skip with an explicit reason** until new item–supplier
   mappings exist. They still fail on any other error.
+
+## Update 2026-10-13 — create tests now make their own (item, supplier) pair
+
+The skip-on-exhausted-pool approach from 2026-10-12 is replaced. Every create test (TC:1/TC:2/TC:4/TC:7/TC:14) now provisions a brand-new pair first:
+
+1. Item Master: pick a random Approved item that has **no supplier yet**.
+2. Supplier tab → **Add supplier** → pick a random **Approved** vendor from "Select Vendor" → fill Per Unit Price → **Save changes**.
+3. Price Library: create the price record for exactly that item (matched by Alternate Code + description) and vendor (matched by Vendor Code).
+
+Confirmed live while building this (2026-10-13):
+
+- Price Library's Item code picker searches by **Alternate Code**, not Item ID or description. Alternate Codes are **not unique** (e.g. GSM406EW26030 is on two items), so the description is matched too.
+- Price Library's Supplier picker offers only the item's **default** supplier. A vendor added to an item that already has suppliers is not offered, which is why only supplier-less items are used. This also leaves other items' supplier setup untouched.
+- In the Supplier tab, Save changes stays disabled until the new row's Per Unit Price is filled, and the value only commits on blur. Saving sends `PUT` or `POST /api/inventory-items/{id}/suppliers`.
+- Draft vendors can be linked but aren't offered in Price Library. A non-Approved pick is discarded by reopening the item, never saved. "Remove" on an unsaved row only strikes it through.
+
+Each run therefore leaves one new item–supplier mapping and one price record per create test on dev. A cleanup option for test-created price records (raised with the backend team) would let runs tidy up after themselves.

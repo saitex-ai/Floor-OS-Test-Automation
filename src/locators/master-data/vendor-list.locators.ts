@@ -18,6 +18,7 @@ export class VendorListLocators {
   readonly newVendorButton: Locator;
   readonly searchInput: Locator;
   readonly allTab: Locator;
+  readonly approvedTab: Locator;
   readonly statusConfirmDialog: Locator;
 
   constructor(private readonly page: Page) {
@@ -27,8 +28,14 @@ export class VendorListLocators {
     // Carries the live "All" count, e.g. "All 118" — used to confirm a
     // Cancel/failed-create didn't change the total record count.
     this.allTab = page.getByRole('button', { name: /^All \d+$/ });
+    this.approvedTab = page.getByRole('button', { name: /^Approved \d+$/ });
     // The "Change record status?" confirmation dialog raised after picking a status menu item.
     this.statusConfirmDialog = page.getByRole('alertdialog', { name: 'Change record status?' });
+  }
+
+  /** Data rows of the list (header row excluded). */
+  dataRows(): Locator {
+    return this.page.getByRole('row').filter({ hasNot: this.page.getByRole('columnheader') });
   }
 
   /**

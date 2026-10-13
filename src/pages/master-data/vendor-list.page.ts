@@ -37,6 +37,25 @@ export class VendorListPage extends BasePage {
     }
   }
 
+  /**
+   * Code + name of the Approved vendors on the Approved tab's first page.
+   * Columns, confirmed live (2026-10-13): [select, Vendor Code, Vendor
+   * Name, City, Country, Currency, Status, actions].
+   */
+  async approvedVendors(): Promise<{ code: string; name: string }[]> {
+    await this.locators.approvedTab.click();
+    const rows = this.locators.dataRows();
+    await expect(rows.first().getByRole('cell').nth(6)).toHaveText('Approved', { timeout: 15_000 });
+    const vendors: { code: string; name: string }[] = [];
+    for (const row of await rows.all()) {
+      const [, code, name, , , , status] = (await row.getByRole('cell').allInnerTexts()).map((t) =>
+        t.trim(),
+      );
+      if (code && name && status === 'Approved') vendors.push({ code, name });
+    }
+    return vendors;
+  }
+
   async openNewVendor(): Promise<void> {
     await this.locators.newVendorButton.click();
   }
