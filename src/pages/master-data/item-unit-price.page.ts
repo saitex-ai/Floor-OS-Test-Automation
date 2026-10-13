@@ -3,6 +3,18 @@ import { BasePage } from '../base.page';
 import { ItemUnitPriceLocators } from '../../locators/master-data/item-unit-price.locators';
 
 /**
+ * Thrown by findRevisionNumberByStatus() only when the revision list fully
+ * loaded and every row showed a definite status, none of them the one
+ * asked for — i.e. that revision genuinely doesn't exist right now.
+ */
+export class NoRevisionWithStatusError extends Error {
+  constructor(status: 'Open' | 'Posted', dataRowCount: number) {
+    super(`No ${status} revision among the ${dataRowCount} listed revisions`);
+    this.name = 'NoRevisionWithStatusError';
+  }
+}
+
+/**
  * The "Item Unit Price (THD Master)" screen — revision list
  * (/master-data/inventory-item-management/item-unit-price) and a revision's
  * own detail/edit page. Reached via a nav group ("Inventory Item
@@ -103,20 +115,36 @@ export class ItemUnitPricePage extends BasePage {
     // root cause after the data was visibly fully loaded (via a failure
     // screenshot) yet every lookup still reported nothing found.
     let found: number | undefined;
-    await expect(async () => {
-      const dataRowCount = (await this.page.getByRole('row').count()) - 1; // minus the header row
-      expect(dataRowCount).toBeGreaterThan(0);
-      for (let revNo = 1; revNo <= dataRowCount; revNo++) {
-        const row = this.locators.row(revNo);
-        if ((await row.count()) === 0) continue;
-        const statusText = (await this.locators.statusCell(revNo).textContent())?.trim();
-        if (statusText === status) {
-          found = revNo;
-          return;
+    // Whether the last scan was conclusive: the grid had rows and every one
+    // of them showed a definite Open/Posted status. Only then does "not
+    // found" mean the revision really doesn't exist (vs. still loading).
+    let lastScan = { dataRowCount: 0, conclusive: false };
+    try {
+      await expect(async () => {
+        const dataRowCount = (await this.page.getByRole('row').count()) - 1; // minus the header row
+        lastScan = { dataRowCount, conclusive: false };
+        expect(dataRowCount).toBeGreaterThan(0);
+        let everyStatusRead = true;
+        for (let revNo = 1; revNo <= dataRowCount; revNo++) {
+          const row = this.locators.row(revNo);
+          if ((await row.count()) === 0) {
+            everyStatusRead = false;
+            continue;
+          }
+          const statusText = (await this.locators.statusCell(revNo).textContent())?.trim();
+          if (statusText === status) {
+            found = revNo;
+            return;
+          }
+          if (statusText !== 'Open' && statusText !== 'Posted') everyStatusRead = false;
         }
-      }
-      throw new Error(`No ${status} revision found yet among Rev No 1..${dataRowCount}`);
-    }).toPass({ timeout: 20_000, intervals: [300, 500, 1_000] });
+        lastScan = { dataRowCount, conclusive: everyStatusRead };
+        throw new Error(`No ${status} revision found yet among Rev No 1..${dataRowCount}`);
+      }).toPass({ timeout: 20_000, intervals: [300, 500, 1_000] });
+    } catch (error) {
+      if (lastScan.conclusive) throw new NoRevisionWithStatusError(status, lastScan.dataRowCount);
+      throw error;
+    }
     if (found === undefined) throw new Error(`No ${status} revision found on the list`);
     return found;
   }
@@ -127,14 +155,18 @@ export class ItemUnitPricePage extends BasePage {
    * default), which copies the last posted prices — additive only, nothing
    * is posted or overwritten. Needed since 2026-10-12, when every revision
    * on dev had been posted by someone else on the shared account, leaving
-   * these tests with no Open revision at all. If a concurrent run creates
+   * these tests with no Open revision at all. Only a conclusive "no Open
+   * revision" (NoRevisionWithStatusError) triggers the create; any other
+   * failure, such as the grid not having loaded, is rethrown so a test
+   * never creates a revision it didn't need. If a concurrent run creates
    * one first, the second create is simply blocked and the lookup still
    * finds the single Open revision.
    */
   async getOpenRevisionNumber(): Promise<number> {
     try {
       return await this.findRevisionNumberByStatus('Open');
-    } catch {
+    } catch (error) {
+      if (!(error instanceof NoRevisionWithStatusError)) throw error;
       await this.locators.newRevisionButton.click();
       await expect(this.locators.newRevisionDialog).toBeVisible({ timeout: 10_000 });
       await this.locators.newRevisionCreateButton.click();
