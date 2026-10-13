@@ -89,6 +89,15 @@ export class ItemMasterLocators {
   readonly productServicesGatedMessage: Locator;
   readonly supplierGatedMessage: Locator;
 
+  // Supplier tab of a saved item (Add supplier -> "Select Vendor" picker -> Save changes)
+  readonly supplierPanel: Locator;
+  readonly supplierPanelLoading: Locator;
+  readonly addSupplierButton: Locator;
+  readonly saveSupplierChangesButton: Locator;
+  /** The last row's "Per Unit Price" input — required before Save changes enables. */
+  readonly lastSupplierPriceInput: Locator;
+  readonly selectVendorDialog: Locator;
+
   readonly requiredFieldsToast: Locator;
 
   constructor(private readonly page: Page) {
@@ -165,6 +174,15 @@ export class ItemMasterLocators {
     );
     this.supplierGatedMessage = page.getByText('Save the item first to manage suppliers.');
 
+    this.supplierPanel = page.getByRole('tabpanel', { name: 'Supplier' });
+    this.supplierPanelLoading = this.supplierPanel.getByText('Loading…');
+    this.addSupplierButton = this.supplierPanel.getByRole('button', { name: 'Add supplier' });
+    this.saveSupplierChangesButton = this.supplierPanel.getByRole('button', {
+      name: 'Save changes',
+    });
+    this.lastSupplierPriceInput = this.supplierPanel.getByRole('spinbutton').last();
+    this.selectVendorDialog = page.getByRole('dialog', { name: 'Select Vendor' });
+
     this.requiredFieldsToast = page.getByText('Please fix the highlighted fields:');
   }
 
@@ -187,6 +205,18 @@ export class ItemMasterLocators {
    */
   statusCell(exactCellText: string): Locator {
     return this.row(exactCellText).getByRole('cell').nth(-2);
+  }
+
+  /** Data rows of the main Item list (header row excluded). */
+  listDataRows(): Locator {
+    return this.page.getByRole('row').filter({ hasNot: this.page.getByRole('columnheader') });
+  }
+
+  /** Data rows of the Supplier tab's linked-suppliers table. */
+  supplierDataRows(): Locator {
+    return this.supplierPanel
+      .getByRole('row')
+      .filter({ hasNot: this.page.getByRole('columnheader') });
   }
 
   /** Real data rows only in any of the 5 picker dialogs — the header row's cells are `columnheader`, not `cell`. */
