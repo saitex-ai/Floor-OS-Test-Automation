@@ -157,9 +157,9 @@ test.describe('CRM - Contact Detail', () => {
     await createLinkedContact(createCustomerPage, createContactPage, page);
 
     await test.step('Edit Email to an invalid format and try to save', async () => {
-      await contactDetailPage.openFieldEdit('Email');
+      await contactDetailPage.openFieldEdit();
       await contactDetailPage.fillFieldEdit('Email', 'not-an-email');
-      await contactDetailPage.saveFieldEdit('Email');
+      await contactDetailPage.saveFieldEdit();
     });
 
     await test.step('Update is blocked with an inline error, section stays in edit mode', async () => {

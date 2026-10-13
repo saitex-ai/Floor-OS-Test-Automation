@@ -42,11 +42,10 @@ export class ContactDetailPage extends BasePage {
   /**
    * Corrected (2026-10-01, dev): the Contact Profile section edits as a
    * whole — one "Edit Contact Profile" button opens every field at once,
-   * with one Save/Cancel pair for the section. `label` is accepted only
-   * to keep this method's shape consistent with other pages' per-field
-   * edit flows; it isn't used to target a specific button anymore.
+   * with one Save/Cancel pair for the section. So opening, saving and
+   * cancelling take no field label; only fillFieldEdit() targets a field.
    */
-  async openFieldEdit(_label: string): Promise<void> {
+  async openFieldEdit(): Promise<void> {
     await this.locators.editProfileButton.click();
   }
 
@@ -54,19 +53,19 @@ export class ContactDetailPage extends BasePage {
     await this.locators.fieldInput(label).fill(value);
   }
 
-  async saveFieldEdit(_label: string): Promise<void> {
+  async saveFieldEdit(): Promise<void> {
     await this.locators.saveProfileButton.click();
   }
 
-  async cancelFieldEdit(_label: string): Promise<void> {
+  async cancelFieldEdit(): Promise<void> {
     await this.locators.cancelProfileButton.click();
   }
 
-  /** Opens a field's inline editor, sets a value, and saves in one step. */
+  /** Opens the Contact Profile editor, sets one field, and saves in one step. */
   async editField(label: string, value: string): Promise<void> {
-    await this.openFieldEdit(label);
+    await this.openFieldEdit();
     await this.fillFieldEdit(label, value);
-    await this.saveFieldEdit(label);
+    await this.saveFieldEdit();
   }
 
   async expectFieldEditError(message: string | RegExp): Promise<void> {
