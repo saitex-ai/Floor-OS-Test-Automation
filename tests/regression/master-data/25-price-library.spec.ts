@@ -1,9 +1,14 @@
 import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/master-data.fixtures';
-import {
-  type PriceLibraryPage,
-  PriceLibraryPoolExhaustedError,
+import type {
+  PriceLibraryPage,
+  PriceRowValues,
 } from '../../../src/pages/master-data/price-library.page';
+import {
+  type ItemMasterPage,
+  ItemAlreadyHasSuppliersError,
+} from '../../../src/pages/master-data/item-master.page';
+import type { VendorListPage } from '../../../src/pages/master-data/vendor-list.page';
 
 /**
  * Master Data — Price Library ("Material Price Library" screen,
@@ -19,18 +24,14 @@ import {
  * Test-data strategy, worth knowing before touching this file: this
  * module's backend enforces a **permanent** uniqueness constraint on
  * (item, supplier) — confirmed live, a real 409 (TC:7) — and there is no
- * delete anywhere in this module. A hardcoded item code would permanently
- * stop working the first time a create test actually succeeds against it,
- * and confirmed live this isn't hypothetical: the item picker caps results
- * at 5 per search term, and this session's own earlier manual exploration
- * had already primed most of one 5-item family against the single seeded
- * Supplier. Every create-flow test therefore goes through
- * `priceLibraryPage.createFreshPriceRecord()`, which cycles across several
- * distinct, broad search terms and retries on a 409 (or on an item with no
- * mapped supplier) until it finds a pick that actually saves. This is a
- * reasonable engineering trade-off against a real app constraint, not a
- * guarantee against ever exhausting every pool over a very large number of
- * CI reruns — flagged honestly here rather than assumed to be bulletproof.
+ * delete anywhere in this module. The seeded pairs ran out on dev on
+ * 2026-10-12, so every create-flow test now makes its own fresh pair
+ * first: createFreshPriceRecord() below picks a random Approved item in
+ * Item Master that has no supplier yet, links one Approved vendor to it
+ * (Supplier tab), and then prices exactly that pair. Price Library's Supplier picker
+ * only offers an item's default supplier, which is why items that already
+ * have suppliers are skipped rather than given a second one. Each run therefore leaves one extra
+ * item–supplier mapping and one price record on dev.
  *
  * Two real, confirmed app gaps are deliberately asserted as-is (not worked
  * around) per this repo's established discipline:
@@ -47,20 +48,66 @@ import {
  * automating it.
  */
 /**
- * createFreshPriceRecord(), but skips (rather than fails) the calling test
- * when the seed data has no unpriced (item, supplier) pair left — an unmet
- * data precondition, not an app defect. Any other error still fails.
+ * Creates a price record for a brand-new (item, supplier) pair: links one
+ * Approved vendor (from Vendor Master's Approved tab) to a random Approved
+ * item in Item Master that has no supplier yet, then prices exactly that
+ * pair in Price Library (ending on the create form's save). Each attempt
+ * adds exactly one item–supplier link; up to 3 attempts, since this runs
+ * against busy shared dev data.
  */
-async function createFreshOrSkip(
+async function createFreshPriceRecord(
   priceLibraryPage: PriceLibraryPage,
-  rowValues?: Parameters<PriceLibraryPage['createFreshPriceRecord']>[0],
-): ReturnType<PriceLibraryPage['createFreshPriceRecord']> {
-  try {
-    return await priceLibraryPage.createFreshPriceRecord(rowValues);
-  } catch (error) {
-    if (error instanceof PriceLibraryPoolExhaustedError) test.skip(true, error.message);
-    throw error;
+  itemMasterPage: ItemMasterPage,
+  vendorListPage: VendorListPage,
+  rowValues: PriceRowValues = {},
+): Promise<{
+  status: number | undefined;
+  itemName: string;
+  supplierName: string;
+  item: { itemId: string; description: string; alternateCode: string };
+  vendorCode: string;
+}> {
+  await vendorListPage.open();
+  await vendorListPage.expectLoaded();
+  const vendors = await vendorListPage.approvedVendors();
+  if (vendors.length === 0) throw new Error('No Approved vendor on Vendor Master');
+
+  const failures: string[] = [];
+  let skippedItems = 0;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const vendor = vendors[Math.floor(Math.random() * vendors.length)]!;
+    try {
+      const item = await itemMasterPage.pickRandomApprovedItem();
+      try {
+        await itemMasterPage.linkSupplier(item.itemId, vendor);
+      } catch (error) {
+        // Items that already have suppliers are skipped untouched, without
+        // using up an attempt.
+        if (error instanceof ItemAlreadyHasSuppliersError && skippedItems++ < 30) {
+          attempt--;
+          continue;
+        }
+        throw error;
+      }
+      await priceLibraryPage.open();
+      await priceLibraryPage.expectLoaded();
+      const { response, itemName } = await priceLibraryPage.createPriceRecordFor(
+        item,
+        vendor.code,
+        rowValues,
+      );
+      const status = response?.status();
+      if (status === 201) {
+        return { status, itemName, supplierName: vendor.name, item, vendorCode: vendor.code };
+      }
+      failures.push(
+        `attempt ${attempt} (${item.itemId} + ${vendor.code}): HTTP ${status ?? 'no response'}`,
+      );
+    } catch (error) {
+      failures.push(`attempt ${attempt}: ${(error as Error).message.split('\n')[0]}`);
+    }
   }
+  throw new Error(`Could not create a fresh Price Library record:\n${failures.join('\n')}`);
 }
 
 test.describe('Master Data - Price Library', () => {
@@ -70,12 +117,15 @@ test.describe('Master Data - Price Library', () => {
     await allure.owner('Master Data QA');
   });
 
-  test('TC:1 Verify successful creation with all fields filled', async ({ priceLibraryPage }) => {
-    // createFreshPriceRecord() can need several retries against this seed
-    // data (most items have no mapped Supplier at all, and the ones that do
-    // are quickly used up — see that method's own doc) — longer than the
-    // dev project's default 60s test timeout comfortably allows.
-    test.setTimeout(200_000);
+  test('TC:1 Verify successful creation with all fields filled', async ({
+    priceLibraryPage,
+    itemMasterPage,
+    vendorListPage,
+  }) => {
+    // createFreshPriceRecord() first links a new supplier in Item Master,
+    // then creates the price record, with up to 3 attempts — longer than
+    // the dev project's default 60s test timeout comfortably allows.
+    test.setTimeout(300_000);
     let itemName = '';
     let supplierName = '';
 
@@ -85,13 +135,18 @@ test.describe('Master Data - Price Library', () => {
     });
 
     await test.step('Create a record with Price/Freight/Other/MOQ/Start date all filled', async () => {
-      const result = await createFreshOrSkip(priceLibraryPage, {
-        price: '12.50',
-        freightCharges: '1.00',
-        otherCharges: '0.50',
-        moq: '250',
-      });
-      expect(result.response.status()).toBe(201);
+      const result = await createFreshPriceRecord(
+        priceLibraryPage,
+        itemMasterPage,
+        vendorListPage,
+        {
+          price: '12.50',
+          freightCharges: '1.00',
+          otherCharges: '0.50',
+          moq: '250',
+        },
+      );
+      expect(result.status).toBe(201);
       ({ itemName, supplierName } = result);
     });
 
@@ -106,8 +161,10 @@ test.describe('Master Data - Price Library', () => {
 
   test('TC:2 Verify successful creation with only required fields', async ({
     priceLibraryPage,
+    itemMasterPage,
+    vendorListPage,
   }) => {
-    test.setTimeout(200_000); // see TC:1's comment on createFreshPriceRecord()'s retries
+    test.setTimeout(300_000); // see TC:1's comment on createFreshPriceRecord()
     let itemName = '';
     let supplierName = '';
 
@@ -117,8 +174,8 @@ test.describe('Master Data - Price Library', () => {
     });
 
     await test.step('Create a record leaving Freight/Other/Currency/MOQ/Customer/End date at their defaults — only Item code/Supplier/Start date/Price touched (Price must be > 0 since 2026-10-12)', async () => {
-      const result = await createFreshOrSkip(priceLibraryPage);
-      expect(result.response.status()).toBe(201);
+      const result = await createFreshPriceRecord(priceLibraryPage, itemMasterPage, vendorListPage);
+      expect(result.status).toBe(201);
       ({ itemName, supplierName } = result);
     });
 
@@ -147,8 +204,10 @@ test.describe('Master Data - Price Library', () => {
 
   test('TC:4 Verify list search by code, description, and supplier', async ({
     priceLibraryPage,
+    itemMasterPage,
+    vendorListPage,
   }) => {
-    test.setTimeout(200_000); // see TC:1's comment on createFreshPriceRecord()'s retries
+    test.setTimeout(300_000); // see TC:1's comment on createFreshPriceRecord()
     let itemName = '';
     let supplierName = '';
     let realItemCode = '';
@@ -157,8 +216,8 @@ test.describe('Master Data - Price Library', () => {
     await test.step('Create a fresh record to search for', async () => {
       await priceLibraryPage.open();
       await priceLibraryPage.expectLoaded();
-      const result = await createFreshOrSkip(priceLibraryPage);
-      expect(result.response.status()).toBe(201);
+      const result = await createFreshPriceRecord(priceLibraryPage, itemMasterPage, vendorListPage);
+      expect(result.status).toBe(201);
       ({ itemName, supplierName } = result);
       await priceLibraryPage.expectSavedAndRedirectedToList();
     });
@@ -169,6 +228,7 @@ test.describe('Master Data - Price Library', () => {
       // file's Notes) that the picker shows an Alternate-Code-style value
       // (e.g. "ALTTHR000003") while the list's own Item Code column shows a
       // different, base code (e.g. "THR000003").
+      await priceLibraryPage.expectRowVisible(itemName, supplierName);
       const cells = await priceLibraryPage.getRowCellTexts(itemName, supplierName);
       // Columns: [checkbox, Item Code, Item, Category, Supplier, Prices, Price Range, Status]
       realItemCode = cells[1] ?? '';
@@ -223,27 +283,28 @@ test.describe('Master Data - Price Library', () => {
 
   test('TC:7 Verify duplicate (Item, Supplier) handling — real bug, zero UI feedback', async ({
     priceLibraryPage,
+    itemMasterPage,
+    vendorListPage,
   }) => {
-    test.setTimeout(200_000); // see TC:1's comment on createFreshPriceRecord()'s retries
-    let itemName = '';
+    test.setTimeout(300_000); // see TC:1's comment on createFreshPriceRecord()
+    let item = { itemId: '', description: '', alternateCode: '' };
+    let vendorCode = '';
 
     await test.step('Create the first record for a given (item, supplier) pair', async () => {
       await priceLibraryPage.open();
       await priceLibraryPage.expectLoaded();
-      const result = await createFreshOrSkip(priceLibraryPage);
-      expect(result.response.status()).toBe(201);
-      itemName = result.itemName;
+      const result = await createFreshPriceRecord(priceLibraryPage, itemMasterPage, vendorListPage);
+      expect(result.status).toBe(201);
+      ({ item, vendorCode } = result);
       await priceLibraryPage.expectSavedAndRedirectedToList();
     });
 
     await test.step('Attempt a second, brand-new record for the exact same pair', async () => {
-      // Re-selecting by the exact item description (not a broad term) finds
-      // the same item just created; seed data confirmed live to map each
-      // item to exactly one Supplier, so the default/first pick reproduces
-      // the same pair deterministically.
+      // Same item (by Alternate Code) and same supplier (by Vendor Code) as
+      // the record just created.
       await priceLibraryPage.openAddItemForm();
-      await priceLibraryPage.pickItem(itemName, itemName);
-      await priceLibraryPage.pickSupplier();
+      await priceLibraryPage.pickItemByCode(item.alternateCode, item.description);
+      await priceLibraryPage.pickSupplierByCode(vendorCode);
       await priceLibraryPage.fillPriceRow(1, { price: '1' });
       await priceLibraryPage.setStartDateToday(1);
     });
@@ -347,13 +408,15 @@ test.describe('Master Data - Price Library', () => {
 
   test('TC:14 Verify there is no success toast on a successful creation either (edge)', async ({
     priceLibraryPage,
+    itemMasterPage,
+    vendorListPage,
   }) => {
-    test.setTimeout(200_000); // see TC:1's comment on createFreshPriceRecord()'s retries
+    test.setTimeout(300_000); // see TC:1's comment on createFreshPriceRecord()
     await priceLibraryPage.open();
     await priceLibraryPage.expectLoaded();
 
-    const result = await createFreshOrSkip(priceLibraryPage);
-    expect(result.response.status()).toBe(201);
+    const result = await createFreshPriceRecord(priceLibraryPage, itemMasterPage, vendorListPage);
+    expect(result.status).toBe(201);
 
     // Confirmed live: no toast of any kind appears on success — only the
     // silent redirect already asserted by expectSavedAndRedirectedToList()

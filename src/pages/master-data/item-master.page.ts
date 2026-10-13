@@ -4,6 +4,14 @@ import { ItemMasterLocators } from '../../locators/master-data/item-master.locat
 
 const ITEM_MASTER_PATH = '/master-data/inventory-item-management/item-master';
 
+/** Thrown by ItemMasterPage.linkSupplier() for an item that already has suppliers; nothing is changed. */
+export class ItemAlreadyHasSuppliersError extends Error {
+  constructor(itemId: string, supplierCount: number) {
+    super(`${itemId} already has ${supplierCount} supplier(s)`);
+    this.name = 'ItemAlreadyHasSuppliersError';
+  }
+}
+
 /**
  * Item Master list + "New Item"/Edit full-page form
  * (/master-data/inventory-item-management/item-master), under the
@@ -69,6 +77,86 @@ export class ItemMasterPage extends BasePage {
     await this.search(itemId);
     await this.locators.row(itemId).first().click();
     await expect(this.locators.updateButton).toBeVisible({ timeout: 45_000 });
+  }
+
+  /**
+   * A random Approved item from the list's first page that has an
+   * Alternate Code. List columns, confirmed live: [select, Item ID,
+   * Description, Alternate Code, Item Category, Stock Type, Base Unit,
+   * Status, actions]. The Alternate Code matters because Price Library's
+   * item picker searches by it, not by Item ID or description.
+   */
+  async pickRandomApprovedItem(): Promise<{
+    itemId: string;
+    description: string;
+    alternateCode: string;
+  }> {
+    await this.open();
+    await this.expectLoaded();
+    const rows = this.locators.listDataRows();
+    // The grid first renders empty placeholder rows; wait for a real Item ID.
+    await expect(rows.first().getByRole('cell').nth(1)).not.toHaveText('', { timeout: 30_000 });
+    const candidates: { itemId: string; description: string; alternateCode: string }[] = [];
+    for (const row of await rows.all()) {
+      const cells = (await row.getByRole('cell').allInnerTexts()).map((t) => t.trim());
+      const [, itemId, description, alternateCode] = cells;
+      if (itemId && description && alternateCode && cells.at(-2) === 'Approved') {
+        candidates.push({ itemId, description, alternateCode });
+      }
+    }
+    if (candidates.length === 0)
+      throw new Error('No Approved item with an Alternate Code on the list');
+    return candidates[Math.floor(Math.random() * candidates.length)]!;
+  }
+
+  /**
+   * Links `vendor` to an item that has no supplier yet, via the Supplier
+   * tab, and saves. Confirmed live (2026-10-13):
+   * - Picking a vendor in "Add supplier" -> "Select Vendor" can persist the
+   *   link straight away, before Save changes — so this adds exactly one
+   *   vendor, already known to be Approved, and never "tries" others.
+   * - Save changes stays disabled until the row's Per Unit Price is filled
+   *   (it commits on blur); saving sends PUT or POST .../suppliers.
+   * - Price Library's Supplier picker offers only an item's default
+   *   supplier, so only supplier-less items are used: the vendor becomes
+   *   their default, and nobody else's item setup is touched.
+   * Throws ItemAlreadyHasSuppliersError, before changing anything, for an
+   * item that already has suppliers.
+   */
+  async linkSupplier(itemId: string, vendor: { code: string; name: string }): Promise<void> {
+    await this.openEditById(itemId);
+    await this.selectTab('Supplier');
+    await expect(this.locators.addSupplierButton).toBeVisible();
+    await expect(this.locators.supplierPanelLoading).toHaveCount(0, { timeout: 15_000 });
+    const existing = (await this.locators.supplierDataRows().allInnerTexts()).filter((t) =>
+      t.trim(),
+    );
+    if (existing.length > 0) throw new ItemAlreadyHasSuppliersError(itemId, existing.length);
+
+    await this.locators.addSupplierButton.click({ timeout: 15_000 });
+    const dialog = this.locators.selectVendorDialog;
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('textbox', { name: 'Search' }).fill(vendor.code);
+    const vendorRow = this.locators
+      .pickerDataRows(dialog)
+      .filter({ has: this.page.getByRole('gridcell', { name: vendor.code, exact: true }) });
+    await vendorRow.click({ timeout: 15_000 });
+    await expect(dialog).toBeHidden();
+
+    await this.locators.lastSupplierPriceInput.fill('1');
+    await this.locators.lastSupplierPriceInput.blur();
+    await expect(this.locators.saveSupplierChangesButton).toBeEnabled();
+    const saved = this.page.waitForResponse(
+      (r) =>
+        r.url().includes(`/api/inventory-items/${itemId}/suppliers`) &&
+        ['PUT', 'POST'].includes(r.request().method()),
+      { timeout: 30_000 },
+    );
+    await this.locators.saveSupplierChangesButton.click({ timeout: 15_000 });
+    const response = await saved;
+    if (!response.ok()) {
+      throw new Error(`Linking ${vendor.code} to ${itemId} failed: HTTP ${response.status()}`);
+    }
   }
 
   async expectOnCreatePage(): Promise<void> {
