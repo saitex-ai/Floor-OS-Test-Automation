@@ -1,17 +1,26 @@
-import type { Browser, Page } from '@playwright/test';
+import type { Browser, BrowserContext, Page } from '@playwright/test';
 import { ShellLoginPage } from '../pages/shell/shell-login.page';
 import { env, type ModuleCredentials } from '../config/env';
 
 /**
+ * A module's optional extra login, read from `<PREFIX>_<ROLE>_USER_<ENV>` /
+ * `<PREFIX>_<ROLE>_PASSWORD_<ENV>` (e.g. PLANNING_READONLY_USER_DEV).
+ * Returns undefined when either is unset, so callers can skip instead of
+ * failing.
+ */
+export function userCredentials(envPrefix: string, role: string): ModuleCredentials | undefined {
+  const suffix = env.testEnv.toUpperCase();
+  const username = process.env[`${envPrefix}_${role}_USER_${suffix}`]?.trim();
+  const password = process.env[`${envPrefix}_${role}_PASSWORD_${suffix}`]?.trim();
+  return username && password ? { username, password } : undefined;
+}
+
+/**
  * A module's optional second login for multi-user cases, read from
- * `<PREFIX>_SECOND_USER_<ENV>` / `<PREFIX>_SECOND_PASSWORD_<ENV>`. Returns
- * undefined when either is unset, so callers can skip instead of failing.
+ * `<PREFIX>_SECOND_USER_<ENV>` / `<PREFIX>_SECOND_PASSWORD_<ENV>`.
  */
 export function secondUserCredentials(envPrefix: string): ModuleCredentials | undefined {
-  const suffix = env.testEnv.toUpperCase();
-  const username = process.env[`${envPrefix}_SECOND_USER_${suffix}`]?.trim();
-  const password = process.env[`${envPrefix}_SECOND_PASSWORD_${suffix}`]?.trim();
-  return username && password ? { username, password } : undefined;
+  return userCredentials(envPrefix, 'SECOND');
 }
 
 /**
@@ -39,12 +48,12 @@ export async function loginAsUser(
   browser: Browser,
   username: string,
   password: string,
-): Promise<{ page: Page; close: () => Promise<void> }> {
+): Promise<{ page: Page; context: BrowserContext; close: () => Promise<void> }> {
   const context = await browser.newContext({ storageState: undefined });
   const page = await context.newPage();
   const login = new ShellLoginPage(page);
   await login.goto('/');
   await login.locators.signInButton.waitFor({ state: 'visible', timeout: 30_000 });
   await login.login(username, password);
-  return { page, close: () => context.close() };
+  return { page, context, close: () => context.close() };
 }
