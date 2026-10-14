@@ -39,23 +39,30 @@ test.describe('CRM - Alert Detail Screen', () => {
     page: import('@playwright/test').Page,
   ): Promise<void> {
     await alertsPage.openList();
-    await expect(alertsPage.locators.pageHeading).toBeVisible();
+    await expect(alertsPage.locators.pageHeading).toBeVisible({ timeout: 20_000 });
     const rows = page.getByRole('row').filter({ hasNot: page.getByRole('columnheader') });
     const hasRows = await rows
       .first()
-      .waitFor({ state: 'visible', timeout: 10_000 })
+      .waitFor({ state: 'visible', timeout: 20_000 })
       .then(() => true)
       .catch(() => false);
     test.skip(!hasRows, 'No seeded Alerts in this environment.');
-    await rows.first().click();
-    // Wait for the detail page to actually mount before handing back
-    // control — confirmed against the running app: checking
-    // checkButton/uncheckButton visibility immediately after the click
-    // races the navigation (detail page still loading), so an
-    // isVisible().catch(() => false) read right after this can silently
-    // see neither button and misread the alert's real Checked/Unchecked
-    // state.
-    await expect(alertsPage.locators.checkButton.or(alertsPage.locators.uncheckButton)).toBeVisible();
+    // Confirmed directly against the running app (2026-10-05): the row is
+    // Playwright-"visible" and clickable before the table's row-click
+    // handler finishes attaching on a cold first load of this page in the
+    // run (table hydration race, not a slow backend) — the very first
+    // click of the run can silently land on a dead element and never
+    // navigate at all, leaving the list page exactly as it was, while a
+    // second click moments later always works. Retrying the click itself
+    // (not just widening a timeout on its result) is the correct fix for
+    // a race like this.
+    await expect(async () => {
+      if (page.url().includes('/crm/alerts/')) return;
+      await rows.first().click();
+      await expect(alertsPage.locators.checkButton.or(alertsPage.locators.uncheckButton)).toBeVisible({
+        timeout: 3_000,
+      });
+    }).toPass({ timeout: 30_000 });
   }
 
   test('TC:2 Verify "Uncheck" functionality', async ({ alertsPage, page }) => {

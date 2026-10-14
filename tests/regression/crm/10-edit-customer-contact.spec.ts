@@ -81,7 +81,7 @@ test.describe('CRM - Edit Customer / Contact', () => {
 
     await test.step('Open edit mode on City, modify the text, then Cancel', async () => {
       await customerDetailPage.openFieldEdit('City');
-      await customerDetailPage.fillFieldEdit('Should Not Persist');
+      await customerDetailPage.fillFieldEdit('City', 'Should Not Persist');
       await customerDetailPage.cancelFieldEdit();
     });
 
@@ -102,7 +102,7 @@ test.describe('CRM - Edit Customer / Contact', () => {
 
     await test.step('Edit Email to an invalid format and try to save', async () => {
       await customerDetailPage.openFieldEdit('Email');
-      await customerDetailPage.fillFieldEdit('not-an-email');
+      await customerDetailPage.fillFieldEdit('Email', 'not-an-email');
       await customerDetailPage.saveFieldEdit();
     });
 

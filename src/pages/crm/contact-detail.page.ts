@@ -39,27 +39,33 @@ export class ContactDetailPage extends BasePage {
     await expect(this.locators.editButton(label)).toHaveCount(0);
   }
 
-  async openFieldEdit(label: string): Promise<void> {
-    await this.locators.editButton(label).click();
+  /**
+   * Corrected (2026-10-01, dev): the Contact Profile section edits as a
+   * whole — one "Edit Contact Profile" button opens every field at once,
+   * with one Save/Cancel pair for the section. So opening, saving and
+   * cancelling take no field label; only fillFieldEdit() targets a field.
+   */
+  async openFieldEdit(): Promise<void> {
+    await this.locators.editProfileButton.click();
   }
 
   async fillFieldEdit(label: string, value: string): Promise<void> {
-    await this.locators.fieldContainer(label).getByRole('textbox').fill(value);
+    await this.locators.fieldInput(label).fill(value);
   }
 
-  async saveFieldEdit(label: string): Promise<void> {
-    await this.locators.saveButton(label).click();
+  async saveFieldEdit(): Promise<void> {
+    await this.locators.saveProfileButton.click();
   }
 
-  async cancelFieldEdit(label: string): Promise<void> {
-    await this.locators.cancelButton(label).click();
+  async cancelFieldEdit(): Promise<void> {
+    await this.locators.cancelProfileButton.click();
   }
 
-  /** Opens a field's inline editor, sets a value, and saves in one step. */
+  /** Opens the Contact Profile editor, sets one field, and saves in one step. */
   async editField(label: string, value: string): Promise<void> {
-    await this.openFieldEdit(label);
+    await this.openFieldEdit();
     await this.fillFieldEdit(label, value);
-    await this.saveFieldEdit(label);
+    await this.saveFieldEdit();
   }
 
   async expectFieldEditError(message: string | RegExp): Promise<void> {

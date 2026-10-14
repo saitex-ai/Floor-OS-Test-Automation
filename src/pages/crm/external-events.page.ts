@@ -92,6 +92,24 @@ export class ExternalEventsPage extends BasePage {
 
   async openList(): Promise<void> {
     await this.gotoAuthenticated(EXTERNAL_EVENTS_LIST_PATH);
+    await this.waitForCountsLoaded();
+  }
+
+  /**
+   * Confirmed directly (2026-10-05): the status tab badges render "0" as
+   * a brief placeholder before the real counts load, same idea as every
+   * other debounce-race already found in this suite, just on a slower
+   * clock — dev was observed taking up to ~8s under today's load. Reading
+   * counts during that window (e.g. TC:6's tally) produces a real but
+   * stale "0", not a locator problem. Polls for the "All" tab to show a
+   * genuinely positive count instead of a fixed sleep, so this stays fast
+   * when dev is fast and patient when it isn't.
+   */
+  async waitForCountsLoaded(): Promise<void> {
+    await expect(async () => {
+      const text = await this.locators.statusTab('All').innerText();
+      expect(Number(text.replace(/\D/g, ''))).toBeGreaterThan(0);
+    }).toPass({ timeout: 20_000 });
   }
 
   async expectListLoaded(): Promise<void> {

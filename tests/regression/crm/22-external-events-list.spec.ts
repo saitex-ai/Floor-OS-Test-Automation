@@ -63,20 +63,38 @@ test.describe('CRM - External Events List screen', () => {
 
     await externalEventsPage.openList();
 
-    await test.step('Select the To Attend tab and search a venue keyword', async () => {
+    // Corrected (2026-10-05): a hardcoded venue keyword ("Amsterdam",
+    // confirmed real on local's seed data) doesn't hold on dev — its
+    // "To Attend" seed data is entirely different (e.g. a Milan event).
+    // Reading a real keyword from whichever seed data is actually present
+    // makes this test environment-agnostic instead of tied to one
+    // environment's specific seed content.
+    const rows = page.getByRole('row').filter({ hasNot: page.getByRole('columnheader') });
+    let keyword = '';
+
+    await test.step('Select the To Attend tab and pick a real venue keyword from its own seed data', async () => {
       await externalEventsPage.selectStatusTab('To Attend');
-      // Confirmed against the running app: real seed data has a Kingpins
-      // Amsterdam event at "Westergasfabriek, Amsterdam" — not "Paris" as
-      // ClickUp's own example guessed; using a real, present keyword.
-      await externalEventsPage.search('Amsterdam');
+      const hasAny = await externalEventsPage.hasAnyRows();
+      test.skip(!hasAny, 'No "To Attend" events in this environment to search within.');
+      const firstRowText = await rows.first().innerText();
+      // The venue/date cell is "{Date} · {City}" or "{Date} · {Venue},
+      // {City}" — inconsistent between rows (confirmed directly: some
+      // carry a venue name, some don't), so isolate everything after the
+      // LAST " · " first (clears the date, which can itself contain a
+      // comma, e.g. "Oct 21–22, 2026"), then take whatever's after the
+      // last remaining comma, if any — giving just the city either way.
+      const afterLastDot = firstRowText.split(' · ').pop() ?? '';
+      const afterLastComma = afterLastDot.split(',').pop() ?? afterLastDot;
+      keyword = afterLastComma.trim();
+      expect(keyword.length, 'expected a real city/venue keyword to extract from the first row').toBeGreaterThan(0);
+      await externalEventsPage.search(keyword);
     });
 
     await test.step('The grid shows only rows matching both the tab and the keyword', async () => {
-      const rows = page.getByRole('row').filter({ hasNot: page.getByRole('columnheader') });
       await expect(rows.first()).toBeVisible();
       const count = await rows.count();
       for (let i = 0; i < count; i++) {
-        await expect(rows.nth(i)).toContainText('Amsterdam');
+        await expect(rows.nth(i)).toContainText(keyword);
       }
     });
   });

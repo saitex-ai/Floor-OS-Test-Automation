@@ -33,13 +33,18 @@ import { type Locator, type Page } from '@playwright/test';
  *   group's own subtitle says exactly this: "The contact will be
  *   linked to this customer on save").
  * - The Save button reads "Save customer & contact", not "Save".
- * - Save does NOT open a "created successfully" modal — it redirects
- *   straight to the new Customer's own Details screen, with an in-app
- *   toast reading "{Customer} + {Contact} created from scan".
+ * - CORRECTED (2026-10-05, dev): Save DOES open a real confirmation
+ *   dialog now — `alertdialog "Contact and Customer created
+ *   successfully!"` with "Cancel"/"View Customer" buttons — a reversal
+ *   of the save-UX pattern previously confirmed here (toast only, no
+ *   modal). No `[data-sonner-toast]` appears at all on this screen
+ *   anymore; "View Customer" is the real way to reach the new Customer's
+ *   own Details screen.
  * - There is NO "Creation Method" system field on the resulting Customer
  *   (its System section is the same Customer Code/Created On/Created
  *   By/Updated On/Updated By shape every other Customer has) — the
- *   toast text above is the closest real analog to FR-9's intent.
+ *   confirmation dialog's own text is the closest real analog to FR-9's
+ *   intent now.
  * - A failed/timed-out scan renders a distinct "Scan failed" state
  *   (heading + message + "Choose another file"/"Enter the details
  *   manually"/"Try again" buttons), not a silent empty form.
@@ -81,6 +86,10 @@ export class ScanCreateLocators {
   readonly contactCountryCombobox: Locator;
   readonly customerCountryCombobox: Locator;
 
+  // Confirmed directly (2026-10-05): a dev-only required "Company"
+  // combobox, same as CreateCustomerLocators — see that file's class doc.
+  readonly customerCompanyCombobox: Locator;
+
   // Customer Management dropdowns — exactly these four exist (FR-4's
   // Owner/Business Process/Assignee/Referred By do not — see class doc).
   readonly crmStageCombobox: Locator;
@@ -100,6 +109,10 @@ export class ScanCreateLocators {
   readonly cancelToReviewButton: Locator;
 
   readonly toast: Locator;
+
+  // Post-save confirmation dialog — see class doc's 2026-10-05 correction.
+  readonly savedConfirmDialog: Locator;
+  readonly viewCustomerButton: Locator;
 
   // In-app notifications panel (shell-level, shared across every module —
   // same button BasePage.gotoAuthenticated() and
@@ -142,6 +155,7 @@ export class ScanCreateLocators {
     // Exact match: each combobox's accessible name is the bare label (no
     // asterisk) — confirmed against the running app — so "Origin" and
     // "Origin Type" don't collide.
+    this.customerCompanyCombobox = page.getByRole('combobox', { name: 'Company', exact: true });
     this.crmStageCombobox = page.getByRole('combobox', { name: 'CRM Stage', exact: true });
     this.originTypeCombobox = page.getByRole('combobox', { name: 'Origin Type', exact: true });
     this.originCombobox = page.getByRole('combobox', { name: 'Origin', exact: true });
@@ -164,6 +178,12 @@ export class ScanCreateLocators {
     });
 
     this.toast = page.locator('[data-sonner-toast]').first();
+
+    this.savedConfirmDialog = page
+      .getByRole('dialog')
+      .or(page.getByRole('alertdialog'))
+      .filter({ hasText: 'Contact and Customer created successfully!' });
+    this.viewCustomerButton = this.savedConfirmDialog.getByRole('button', { name: 'View Customer' });
 
     // Scoped to the shell's top banner — same disambiguation
     // BasePage.gotoAuthenticated() documents (an unscoped "Notifications"

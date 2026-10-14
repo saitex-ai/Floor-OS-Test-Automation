@@ -173,6 +173,21 @@ export class ScanCreatePage extends BasePage {
       await this.selectComboboxOption(l.contactCountryCombobox, details.country);
   }
 
+  /**
+   * Confirmed directly (2026-10-05): the vision model's own confidence
+   * check can leave EITHER Contact Email or Customer Email blank
+   * ("1 value was read but could not be trusted, so it was left out") —
+   * which one varies run to run, not reliably always the same field. A
+   * test that only backfills Customer Email assumes Contact Email always
+   * extracts cleanly, which isn't guaranteed. Fills whichever (or both)
+   * came back empty, leaving an already-scanned value untouched.
+   */
+  async fillContactEmailIfMissing(email: string): Promise<void> {
+    if (!(await this.locators.contactEmailInput.inputValue())) {
+      await this.locators.contactEmailInput.fill(email);
+    }
+  }
+
   /** TC:3/TC:4 — edits post-scan-populated Customer Profile fields (FR-5). */
   async fillCustomerProfile(details: CustomerProfileScanDetails): Promise<void> {
     const l = this.locators;
@@ -213,7 +228,31 @@ export class ScanCreatePage extends BasePage {
     return text;
   }
 
+  /**
+   * Confirmed directly (2026-10-05): dev-only required "Company"
+   * combobox — same as CreateCustomerPage.fillProfile()'s handling.
+   * Defensive rather than unconditional so this doesn't change behavior
+   * on an environment where it's genuinely absent. Also confirmed
+   * directly (2026-10-05): this combobox toggles/clears on a second
+   * click rather than re-confirming the same choice (the same quirk
+   * already known elsewhere in this app, e.g.
+   * CustomerDetailPage.clearLastRowAssignee()) — since save() calls this
+   * on every attempt and a TC like TC:5 saves twice (once to trigger
+   * validation, once after correcting), only acting when it's still
+   * showing its "Select" placeholder avoids clearing an already-made
+   * choice out from under a later save.
+   */
+  private async fillCompanyIfPresent(): Promise<void> {
+    const combo = this.locators.customerCompanyCombobox;
+    const isEmpty = (await combo.innerText().catch(() => '')).trim() === 'Select';
+    if (isEmpty) {
+      await combo.click();
+      await this.page.getByRole('option').first().click();
+    }
+  }
+
   async save(): Promise<void> {
+    await this.fillCompanyIfPresent();
     await this.locators.saveButton.click();
   }
 
@@ -231,14 +270,15 @@ export class ScanCreatePage extends BasePage {
   }
 
   /**
-   * Confirmed against the running app: Save does NOT open a "created
-   * successfully" modal — it redirects straight to the new Customer's own
-   * Details screen with a toast reading "{Customer} + {Contact} created
-   * from scan". Checked via the toast (the modal this originally assumed
-   * doesn't exist).
+   * CORRECTED (2026-10-05, dev): Save DOES open a real confirmation
+   * dialog now ("Contact and Customer created successfully!") — no
+   * `[data-sonner-toast]` appears at all. The page doesn't navigate to
+   * the new Customer's own Details screen until "View Customer" is
+   * clicked from that dialog.
    */
   async expectSavedSuccessfully(): Promise<void> {
-    await expect(this.locators.toast).toBeVisible();
+    await expect(this.locators.savedConfirmDialog).toBeVisible();
+    await this.locators.viewCustomerButton.click();
     await expect(this.page).toHaveURL(/\/crm\/customers\/[0-9a-f-]+$/);
   }
 

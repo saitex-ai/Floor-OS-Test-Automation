@@ -107,7 +107,7 @@ test.describe('CRM - Customer List', () => {
     });
   });
 
-  test('TC:6 Verify duplicate detection cancel action', async ({ createCustomerPage }) => {
+  test('TC:6 Verify duplicate detection cancel action', async ({ createCustomerPage, page }) => {
     await allure.tms('https://app.clickup.com/t/z941abt50y', 'TC:6 (ClickUp)');
     await createCustomerPage.openFromCrmHome();
     await createCustomerPage.fillProfile({
@@ -122,15 +122,20 @@ test.describe('CRM - Customer List', () => {
       crmStage: 'Lead',
     });
 
-    await test.step('Trigger the duplicate warning, then cancel to review', async () => {
+    await test.step('Trigger the duplicate warning, then cancel', async () => {
       await createCustomerPage.save();
       await createCustomerPage.expectDuplicateWarningVisible();
       await createCustomerPage.locators.cancelToReviewButton.click();
     });
 
-    await test.step('Modal closes, form remains editable, nothing saved', async () => {
+    await test.step('The duplicate is not created and the user returns to the Customers list', async () => {
+      // Corrected from the original premise — see 01-create-customer.spec.ts
+      // TC:6's class-doc comment for the full confirmed explanation: an
+      // exact Customer Name match is a hard block with no "Save anyway"
+      // override, and Cancel abandons the attempt entirely rather than
+      // just dismissing the modal.
       await expect(createCustomerPage.locators.duplicateWarningModal).toBeHidden();
-      await expect(createCustomerPage.locators.saveButton).toBeVisible();
+      await expect(page).toHaveURL(/\/crm\/customers$/);
     });
   });
 
