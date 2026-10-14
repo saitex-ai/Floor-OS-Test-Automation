@@ -38,15 +38,25 @@ export function detailValue(page: Page, label: string): Locator {
  */
 export class DatePickerLocators {
   readonly dialog: Locator;
+  readonly grid: Locator;
+  readonly previousMonth: Locator;
+  readonly nextMonth: Locator;
   readonly today: Locator;
   readonly timeGroup: Locator;
   readonly doneButton: Locator;
 
   constructor(page: Page) {
     this.dialog = page.getByRole('dialog').last();
+    this.grid = this.dialog.getByRole('grid');
+    this.previousMonth = this.dialog.getByRole('button', { name: 'Go to the Previous Month' });
+    this.nextMonth = this.dialog.getByRole('button', { name: 'Go to the Next Month' });
     this.today = this.dialog.getByRole('button', { name: /^Today, / });
     this.timeGroup = this.dialog.getByRole('group', { name: 'Pick time' });
     this.doneButton = this.dialog.getByRole('button', { name: 'Done', exact: true });
+  }
+
+  day(name: RegExp): Locator {
+    return this.grid.getByRole('button', { name });
   }
 
   /**
@@ -82,4 +92,22 @@ export function dateTriggers(page: Page, withTime: boolean): Locator {
 /** The "Clear date[ and time]" button inside a set date field's trigger. */
 export function dateClearButton(trigger: Locator): Locator {
   return trigger.getByRole('button', { name: /^Clear date/ });
+}
+
+/** A toast in the shell's notifications region. */
+export function toast(page: Page, text: string | RegExp): Locator {
+  return page.getByRole('region', { name: /Notifications/ }).getByText(text);
+}
+
+/**
+ * A time field's trigger: "Pick time" while empty; once set, its value plus
+ * the nested clear button's label ("07:30 AM Clear time"). The popover is a
+ * "Pick time" group: hours 00–23, then minutes in 5-minute steps (see
+ * DatePickerLocators.hour / minute).
+ */
+export function timeTriggers(page: Page): Locator {
+  return page
+    .getByRole('main')
+    .last()
+    .getByRole('button', { name: /^(Pick time|\d\d:\d\d( [AP]M)?( Clear time)?)$/ });
 }

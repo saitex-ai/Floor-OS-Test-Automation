@@ -18,6 +18,16 @@ import { OperationsListPage } from '../../../../src/pages/planning/operations-li
 import { OperationDetailPage } from '../../../../src/pages/planning/operation-detail.page';
 import { OperationMasterFormPage } from '../../../../src/pages/planning/operation-master-form.page';
 import { WAIT } from '../../../../src/pages/planning/waits';
+import { CodeListValuesPage } from '../../../../src/pages/planning/code-lists.page';
+import { CodeListValueDialogPage } from '../../../../src/pages/planning/code-list-value-dialog.page';
+import { CalendarsListPage } from '../../../../src/pages/planning/calendars-list.page';
+import { CalendarFormPage } from '../../../../src/pages/planning/calendar-form.page';
+import { EmployeesListPage } from '../../../../src/pages/master-data/employees-list.page';
+import { EmployeeFormPage } from '../../../../src/pages/master-data/employee-form.page';
+import { ShiftKindsPage } from '../../../../src/pages/planning/shift-kinds.page';
+import { ShiftFormPage, ShiftsListPage } from '../../../../src/pages/planning/shifts.page';
+import { DepartmentsListPage } from '../../../../src/pages/master-data/departments-list.page';
+import { DepartmentFormPage } from '../../../../src/pages/master-data/department-form.page';
 import { currentSpecFile, takeCodes } from './created';
 import {
   openActivity,
@@ -26,6 +36,8 @@ import {
   openOperation,
   openRecipe,
   openWorkCentre,
+  CODE_LIST_A,
+  CODE_LIST_B,
   runPrefix,
   setupPage,
 } from './test-data';
@@ -38,16 +50,85 @@ import {
  * Best effort — a record that can't be cleaned is logged,
  * never a test failure (the QA-AUTO tag still marks it for the backend).
  */
-interface Cleaner {
+interface Cleaner<L extends MasterDataListPage = MasterDataListPage> {
   prefix: string;
-  /** A list page whose search finds the records by code. */
-  list: (page: Page) => MasterDataListPage;
+  /** The list page(s) whose search finds the records by code. */
+  lists(page: Page): L[];
+  /** How the app stores a generated code (e.g. code-list values are lower case). */
+  normalize?: (code: string) => string;
   /** Already clean (e.g. the row reads "Retired"), so nothing to do. */
   done?: (rowText: string) => boolean;
-  clean: (page: Page, code: string) => Promise<void>;
+  // Method signatures (bivariant), so a Cleaner<CodeListValuesPage> fits in Cleaner[].
+  clean(page: Page, code: string, list: L): Promise<void>;
 }
 
 const retired = (row: string) => /\bRetired\b/.test(row);
+
+async function deactivateEmployee(page: Page, name: string): Promise<void> {
+  const employees = new EmployeesListPage(page);
+  const employee = new EmployeeFormPage(page);
+  await employees.open();
+  await employees.expectLoaded();
+  await employees.expectRowsLoaded();
+  await employees.openEmployeeByName(name);
+  await employee.expectOnDetailPage();
+  await employee.clickEdit();
+  if (await employee.isActive()) await employee.toggleActive();
+  await employee.saveChanges();
+  await employee.expectUpdatedSuccessfully();
+}
+
+async function retireMachine(page: Page, code: string): Promise<void> {
+  await openMachine(page, code);
+  const detail = new MachineDetailPage(page);
+  // Windows have no code of their own: switch off (soft-delete) the
+  // machine's still-active ones before the machine is retired.
+  for (const why of await detail.activeWindowWhys()) {
+    await detail.openWindowEdit(why);
+    const windowForm = new MaintenanceWindowFormPage(page);
+    await windowForm.expectOpenForEdit(code);
+    await windowForm.fill({ active: false });
+    expect(await windowForm.saveChanges(), `deactivate window "${why}"`).toBe('submitted');
+    await expect(windowForm.locators.saveButton).toBeHidden({ timeout: WAIT.NAVIGATION });
+  }
+  await detail.startEditing();
+  const form = new MachineFormPage(page);
+  await form.expectOnEditPage();
+  await form.setStatus('Retired');
+  await form.saveChanges();
+}
+
+async function retireWorkCentre(page: Page, code: string): Promise<void> {
+  await openWorkCentre(page, code);
+  await new WorkCentreDetailPage(page).startEditing();
+  const form = new WorkCentreFormPage(page);
+  await form.expectOnEditPage();
+  await form.setStatus('Retired');
+  await form.saveChanges();
+}
+
+async function deleteActivityDraft(page: Page, code: string): Promise<void> {
+  await openActivity(page, code);
+  await new ActivityFormPage(page).deleteDraft();
+}
+
+async function deleteRecipeDraft(page: Page, code: string): Promise<void> {
+  await openRecipe(page, code);
+  await new RecipeDetailPage(page).deleteDraft();
+}
+
+async function deactivateDepartment(page: Page, code: string): Promise<void> {
+  const list = new DepartmentsListPage(page);
+  const form = new DepartmentFormPage(page);
+  await list.open();
+  await list.expectLoaded();
+  await list.openDepartmentByCode(code);
+  await form.expectOnDetailPage();
+  await form.clickEdit();
+  if (await form.isActive()) await form.toggleActive();
+  await form.saveChanges();
+  await form.expectUpdatedSuccessfully();
+}
 
 /**
  * In order: records that use others are cleaned first (machines before
@@ -55,45 +136,73 @@ const retired = (row: string) => /\bRetired\b/.test(row);
  */
 export const CLEANERS: Cleaner[] = [
   {
-    prefix: 'QA-M',
-    list: (page) => new MachinesListPage(page),
+    // A shift can't be deleted; Active off retires it (its breaks go with it).
+    prefix: 'QA_SH',
+    lists: (page) => [new ShiftsListPage(page)],
     done: retired,
     clean: async (page, code) => {
-      await openMachine(page, code);
-      const detail = new MachineDetailPage(page);
-      // Windows have no code of their own: switch off (soft-delete) the
-      // machine's still-active ones before the machine is retired.
-      for (const why of await detail.activeWindowWhys()) {
-        await detail.openWindowEdit(why);
-        const windowForm = new MaintenanceWindowFormPage(page);
-        await windowForm.expectOpenForEdit(code);
-        await windowForm.fill({ active: false });
-        expect(await windowForm.saveChanges(), `deactivate window "${why}"`).toBe('submitted');
-        await expect(windowForm.locators.saveButton).toBeHidden({ timeout: WAIT.NAVIGATION });
-      }
-      await detail.startEditing();
-      const form = new MachineFormPage(page);
-      await form.expectOnEditPage();
-      await form.setStatus('Retired');
+      const form = new ShiftFormPage(page);
+      await form.openEdit(code);
+      await form.fill({ active: false });
       await form.saveChanges();
     },
+  },
+  {
+    // Shift kinds: Active off in the edit dialog retires them.
+    prefix: 'qa_auto_k',
+    lists: (page) => [new ShiftKindsPage(page)],
+    normalize: (code) => code.toLowerCase(),
+    done: retired,
+    clean: async (page, code, kinds: ShiftKindsPage) => {
+      await kinds.openRow(code);
+      await kinds.startEditing();
+      await kinds.fill({ active: false });
+      await kinds.saveChanges();
+      await kinds.closeDialog();
+    },
+  } satisfies Cleaner<ShiftKindsPage>,
+  {
+    // A calendar can't be deleted; Active off retires it (its lines and entries go with it).
+    prefix: 'QA-CAL',
+    lists: (page) => [new CalendarsListPage(page)],
+    done: retired,
+    clean: async (page, code) => {
+      const form = new CalendarFormPage(page);
+      await form.openEdit(code);
+      await form.fill({ active: false });
+      await form.saveChanges();
+    },
+  },
+  {
+    // Code-list values can't be deleted: "In use" off retires them.
+    prefix: 'qa_auto_',
+    lists: (page) => [CODE_LIST_A, CODE_LIST_B].map((t) => new CodeListValuesPage(page, t)),
+    normalize: (code) => code.toLowerCase(),
+    done: (row) => /\bNo\s*$/.test(row),
+    clean: async (page, code, list: CodeListValuesPage) => {
+      const dialog = new CodeListValueDialogPage(page);
+      await list.openRow(code);
+      await dialog.startEditing();
+      await dialog.setInUse(false);
+      await dialog.saveChanges();
+      await dialog.close();
+    },
+  } satisfies Cleaner<CodeListValuesPage>,
+  {
+    prefix: 'QA-M',
+    lists: (page) => [new MachinesListPage(page)],
+    done: retired,
+    clean: retireMachine,
   },
   {
     prefix: 'QA-WC',
-    list: (page) => new WorkCentresListPage(page),
+    lists: (page) => [new WorkCentresListPage(page)],
     done: retired,
-    clean: async (page, code) => {
-      await openWorkCentre(page, code);
-      await new WorkCentreDetailPage(page).startEditing();
-      const form = new WorkCentreFormPage(page);
-      await form.expectOnEditPage();
-      await form.setStatus('Retired');
-      await form.saveChanges();
-    },
+    clean: retireWorkCentre,
   },
   {
     prefix: 'QA-OP',
-    list: (page) => new OperationsListPage(page),
+    lists: (page) => [new OperationsListPage(page)],
     done: retired,
     clean: async (page, code) => {
       await openOperation(page, code);
@@ -106,23 +215,17 @@ export const CLEANERS: Cleaner[] = [
   },
   {
     prefix: 'CUT-QA',
-    list: (page) => new ActivitiesListPage(page),
-    clean: async (page, code) => {
-      await openActivity(page, code);
-      await new ActivityFormPage(page).deleteDraft();
-    },
+    lists: (page) => [new ActivitiesListPage(page)],
+    clean: deleteActivityDraft,
   },
   {
     prefix: 'QAR-',
-    list: (page) => new RecipesListPage(page),
-    clean: async (page, code) => {
-      await openRecipe(page, code);
-      await new RecipeDetailPage(page).deleteDraft();
-    },
+    lists: (page) => [new RecipesListPage(page)],
+    clean: deleteRecipeDraft,
   },
   {
     prefix: 'QG',
-    list: (page) => new DifficultyGradeListPage(page),
+    lists: (page) => [new DifficultyGradeListPage(page)],
     done: (row) => /Retired/.test(row),
     clean: async (page, code) => {
       await openGrade(page, code);
@@ -141,23 +244,30 @@ export async function cleanUpCreated(
 ): Promise<void> {
   const file = currentSpecFile();
   const page = await setupPage(browser);
+  // No action timeout is configured, so a click on a row that never appears
+  // would wait out the whole hook; fail that record instead and move on.
+  page.setDefaultTimeout(30_000);
   const cleaned: string[] = [];
   try {
     for (const cleaner of cleaners) {
-      const codes = takeCodes(file, cleaner.prefix);
+      const norm = cleaner.normalize ?? ((c: string) => c);
+      const codes = takeCodes(file, cleaner.prefix).map(norm);
       if (!codes.length) continue;
-      const list = cleaner.list(page);
-      await list.open();
-      await list.expectLoaded();
-      // Codes that were generated but never saved (blocked/cancel cases) have no row.
-      const rows = await list.rowTexts(runPrefix(cleaner.prefix), codes);
-      for (const [code, rowText] of rows) {
-        if (cleaner.done?.(rowText)) continue;
-        try {
-          await cleaner.clean(page, code);
-          cleaned.push(code);
-        } catch (error) {
-          console.warn(`QA-AUTO cleanup: could not clean ${code}: ${String(error).split('\n')[0]}`);
+      for (const list of cleaner.lists(page)) {
+        await list.open();
+        await list.expectLoaded();
+        // Codes that were generated but never saved (blocked/cancel cases) have no row.
+        const rows = await list.rowTexts(norm(runPrefix(cleaner.prefix)), codes);
+        for (const [code, rowText] of rows) {
+          if (cleaner.done?.(rowText)) continue;
+          try {
+            await cleaner.clean(page, code, list);
+            cleaned.push(code);
+          } catch (error) {
+            console.warn(
+              `QA-AUTO cleanup: could not clean ${code}: ${String(error).split('\n')[0]}`,
+            );
+          }
         }
       }
     }
@@ -175,4 +285,46 @@ export function cleanUpAfterAll(cleaners?: Cleaner[]): void {
     test.setTimeout(900_000);
     await cleanUpCreated(browser, cleaners);
   });
+}
+
+/**
+ * afterAll for the Set up my department wizard. `created` lists what the
+ * spec submitted, in order: departments (`QAD…`), their `-A1` / `-R1` drafts
+ * (deleted), `-WC1` / `-M1` (retired) and "QA-AUTO <dept> operator"
+ * (deactivated). Cleaned newest first, so machines go before their centre and
+ * each department goes last. A record that can't be cleaned is logged, not failed.
+ */
+export async function cleanUpWizardDepartments(browser: Browser, created: string[]): Promise<void> {
+  if (!created.length) return;
+  const page = await setupPage(browser);
+  // No action timeout is configured, so a click on a row that never appears
+  // would wait out the whole hook; fail that record instead and move on.
+  page.setDefaultTimeout(30_000);
+  const cleaned: string[] = [];
+  const cleanerFor = (label: string): ((page: Page, code: string) => Promise<void>) => {
+    if (label.endsWith('-M1')) return retireMachine;
+    if (label.endsWith('-WC1')) return retireWorkCentre;
+    if (label.endsWith('-R1')) return deleteRecipeDraft;
+    if (label.endsWith('-A1')) return deleteActivityDraft;
+    if (label.endsWith(' operator'))
+      return async (p, name) => {
+        // Its Step 6 qualification (TC-DW-TEAM-04) has no profile on Operators &
+        // Qualifications to retire it from; it stays on the deactivated employee.
+        await deactivateEmployee(p, name);
+      };
+    return deactivateDepartment;
+  };
+  try {
+    for (const label of [...created].reverse()) {
+      try {
+        await cleanerFor(label)(page, label);
+        cleaned.push(label);
+      } catch (error) {
+        console.warn(`QA-AUTO cleanup: could not clean ${label}: ${String(error).split('\n')[0]}`);
+      }
+    }
+  } finally {
+    await page.close();
+    if (cleaned.length) console.log(`QA-AUTO cleanup (setup-department): ${cleaned.join(', ')}`);
+  }
 }
