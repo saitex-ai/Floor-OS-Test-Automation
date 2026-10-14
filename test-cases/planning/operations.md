@@ -46,3 +46,4 @@ The screen is "Operation Master" at `/planning/master-data/operations`; a detail
 - A blocked save shows "Fill the N highlighted field(s) before saving." for a few seconds only: `submitExpectingBlocked()` checks it straight after the click.
 - "Last studied on" is a date picker ("Pick date" → today); its label reads "Last studied on *" while the switch is on.
 - Operations can't be deleted, only retired.
+- Seed data: the Sewing department, the off-machine difficulty grade (`M — manual`), skill grades S2 / S3, and the seed operation "5-thread safety overlock" (TC-LO-02's search).

@@ -265,7 +265,8 @@ test.describe('Planning - Work Centres', () => {
     await workCentreFormPage.setOwningDepartment('Cutting');
     await workCentreFormPage.setBaselineOperators('14');
     await workCentreFormPage.setTargetEfficiency('85');
-    await workCentreFormPage.setWorkingCalendar('Factory 2026-27');
+    // Any calendar other than the current one: the seed calendars are year-bound ("Factory 2026-27").
+    const calendar = await workCentreFormPage.pickAnotherWorkingCalendar();
     expect(await workCentreFormPage.saveChanges()).toBe('submitted');
     await openWorkCentre(page, code);
     for (const [label, value] of [
@@ -273,7 +274,7 @@ test.describe('Planning - Work Centres', () => {
       ['Owning department', /^CUT/],
       ['Baseline operators', '14'],
       ['Target efficiency', '85%'],
-      ['Working calendar', 'Factory 2026-27'],
+      ['Working calendar', calendar],
     ] as const)
       await test.step(`${label} persisted`, async () => {
         await workCentreDetailPage.expectValue(label, value);
@@ -412,18 +413,17 @@ test.describe('Planning - Work Centres', () => {
     // A pool's tab only appears once a centre uses it; `sample` makes sure Sample exists.
     await workCentresListPage.open();
     await workCentresListPage.expectLoaded();
-    const all = await workCentresListPage.tabCount('All');
-    let sum = 0;
+    // Counts are re-read together until they agree (records can change mid-read under parallel workers).
+    await test.step('Bulk + Sample = All', async () => {
+      await workCentresListPage.expectTabCountsAddUp(['Bulk', 'Sample']);
+    });
     for (const tab of ['Bulk', 'Sample']) {
       await test.step(`"${tab}" tab count matches its rows`, async () => {
         await workCentresListPage.selectTab(tab);
-        const badge = await workCentresListPage.tabCount(tab);
-        await expect.poll(async () => (await workCentresListPage.showing()).total).toBe(badge);
+        await workCentresListPage.expectTabCountMatchesRows(tab);
         await workCentresListPage.expectEveryRowMatches(tab);
-        sum += badge;
       });
     }
-    expect(sum, 'Bulk + Sample = All').toBe(all);
   });
 
   test('TC-LWC-04 Filters panel applies and clears a rule', async ({ workCentresListPage }) => {

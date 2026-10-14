@@ -5,6 +5,7 @@ import { fieldAlert } from '../../locators/planning/form-field.locators';
 import { submitForm, type SubmitResult } from './form-submit';
 import { WAIT } from './waits';
 import { ensureRoute } from './navigation';
+import { expectAbsentOrDisabled } from './master-data-list.page';
 
 export interface WorkCentreFieldValues {
   code: string;
@@ -200,6 +201,23 @@ export class WorkCentreFormPage extends BasePage {
     await this.pick(this.locators.workingCalendar, calendar);
   }
 
+  /**
+   * Picks the first working calendar that isn't the current one and returns
+   * its name, so a case doesn't depend on one year-bound seed calendar.
+   */
+  async pickAnotherWorkingCalendar(): Promise<string> {
+    const current = (await this.locators.workingCalendar.innerText()).trim();
+    await this.locators.workingCalendar.click();
+    await expect(this.locators.options().first()).toBeVisible({ timeout: WAIT.SERVER });
+    const names = (await this.locators.options().allInnerTexts())
+      .map((t) => (t.split('\n')[0] ?? '').trim())
+      .filter((t) => t && t !== current && !/^(none|select)/i.test(t));
+    const [picked] = names;
+    if (!picked) throw new Error(`No working calendar other than "${current}" to pick`);
+    await this.locators.option(picked).click();
+    return picked;
+  }
+
   /** Smoke: just clicks Create — see expectCreatedSuccessfully(). */
   async create(): Promise<void> {
     await this.locators.createButton.click();
@@ -260,7 +278,6 @@ export class WorkCentreFormPage extends BasePage {
 
   /** Capacity per day is never typed on the form (BA decision) — no editable input for it. */
   async expectNoCapacityPerDayInput(): Promise<void> {
-    const input = this.locators.capacityPerDay;
-    if ((await input.count()) > 0) await expect(input).toBeDisabled();
+    await expectAbsentOrDisabled(this.locators.capacityPerDay);
   }
 }

@@ -32,4 +32,6 @@ Allowances live on an operation's detail page: "New allowance" and a row's "Edit
 - Lists are the shared Master Data grid (`MasterDataListPage`): `expectLoaded()` waits past the skeleton rows; search / filters apply after a debounce, so assert with `expect.poll` / `expectEveryRowMatches()`.
 - Permission cases run as the optional `PLANNING_READONLY_*` / `PLANNING_NOACCESS_*` logins (see `.env.example`), each logged in once per worker (`personas` fixture), and skip without them. Where a read-only user is still offered an enabled control (ClickUp z941abybge), the case drives it and checks the write is refused.
 - A row's icon-only "Edit" needs `dispatchEvent('click')` — its `<td>` intercepts a normal click.
-- The heading reads "Allowances (0)" until the rows load: use `expectAllowanceCount()`, never a one-off read.
+- The heading reads "Allowances (0)" until the rows load: use `expectAllowanceCount()`, never a one-off read. For the same reason a count of 0 can't prove nothing was saved: the cancel / blocked cases (TC-COA-02, TC-COA-06) add an anchor row first, then check the count is 1 and the cancelled type has no row.
+- Allowances can't be deleted or switched off in the UI (the edit form has no Active switch or delete, checked 2026-10-14), so they stay on their QA-AUTO operation, which cleanup retires.
+- Seed data: TC-COA-05 relies on an off-machine operation being offered exactly two allowance types, "Human motion fatigue" and "Material handling" (no "Machine interruption").

@@ -41,5 +41,6 @@ Work centres are at `/planning/master-data/work-centres`; detail and edit pages 
 
 - Lists are the shared Master Data grid (`MasterDataListPage`): `expectLoaded()` waits past the skeleton rows; search / filters apply after a debounce, so assert with `expect.poll` / `expectEveryRowMatches()`.
 - Permission cases run as the optional `PLANNING_READONLY_*` / `PLANNING_NOACCESS_*` logins (see `.env.example`), each logged in once per worker (`personas` fixture), and skip without them. Where a read-only user is still offered an enabled control (ClickUp z941abybge), the case drives it and checks the write is refused.
-- The list tabs are the capacity pools ("What it is used for"); a tab only appears once a centre uses that pool.
+- The list tabs are the capacity pools ("What it is used for"); a tab only appears once a centre uses that pool. Tab counts are re-read together until they agree (`expectTabCountsAddUp()`), since another worker can create or retire centres mid-read.
+- Seed data: the `SEW-MAIN` activity (capability rows) and the Sewing / Cutting departments. TC-EWC-02 picks any working calendar other than the current one, so it doesn't depend on a year-bound seed calendar like "Factory 2026-27".
 - The smoke test still uses `fillRequired()` / `create()` / `expectCreatedSuccessfully()`; the regression suite uses `submitCreate()`.

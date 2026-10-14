@@ -111,6 +111,21 @@ export class MachineDetailPage extends BasePage {
     if (values.end) await expect(cells.nth(2)).toHaveText(values.end);
   }
 
+  /** The Why of every window still Active (cleanup switches them off). */
+  async activeWindowWhys(): Promise<string[]> {
+    await expect(this.locators.windowsHeading).toBeVisible({ timeout: WAIT.PAGE_LOAD });
+    if ((await this.windowCount()) === 0) return [];
+    const rows = this.locators.windowDataRows();
+    await expect(rows.first()).toBeVisible({ timeout: WAIT.SERVER });
+    const whys: string[] = [];
+    // Columns: Kind | Window start | Window end | Why | Anomaly | Active | (Edit)
+    for (const row of await rows.all()) {
+      const cells = (await row.getByRole('cell').allInnerTexts()).map((c) => c.trim());
+      if (cells[5] === 'Yes' && cells[3]) whys.push(cells[3]);
+    }
+    return whys;
+  }
+
   async expectNoWindowRow(why: string): Promise<void> {
     await expect(this.locators.windowRow(why)).toHaveCount(0);
   }

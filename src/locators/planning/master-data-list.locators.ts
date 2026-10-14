@@ -64,6 +64,11 @@ export class MasterDataListLocators {
     this.accessRestricted = page.getByText(/Access restricted/i);
   }
 
+  /** A form's submit button by name ("Create …" / "Save changes"). */
+  submitButton(name: string | RegExp): Locator {
+    return this.page.getByRole('button', { name });
+  }
+
   /** Status/department tabs above the grid, e.g. "All 101", "Production 58". */
   tab(name: string): Locator {
     return this.page.getByRole('button', { name: new RegExp(`^${name}\\b`) });

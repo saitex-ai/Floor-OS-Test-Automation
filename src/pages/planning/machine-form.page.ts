@@ -54,7 +54,7 @@ export class MachineFormPage extends BasePage {
   async expectDedicatedCreatePage(): Promise<void> {
     await expect(this.page).toHaveURL(/\/machines\/new$/, { timeout: WAIT.NAVIGATION });
     await expect(this.locators.newHeading).toBeVisible({ timeout: WAIT.PAGE_LOAD });
-    await expect(this.page.getByRole('dialog')).toHaveCount(0);
+    await expect(this.locators.dialog).toHaveCount(0);
     await this.expectOnCreatePage();
   }
 

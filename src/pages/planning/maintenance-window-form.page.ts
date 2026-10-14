@@ -13,6 +13,8 @@ export interface WindowValues {
   /** Today at "hh:mm"; omit to leave the window open. */
   end?: string;
   why?: string;
+  /** The "Active" switch — the window's soft-delete flag. */
+  active?: boolean;
 }
 
 /**
@@ -75,6 +77,8 @@ export class MaintenanceWindowFormPage extends BasePage {
     if (values.start) await this.pickAt('start', values.start);
     if (values.end) await this.pickAt('end', values.end);
     if (values.why !== undefined) await this.locators.why.fill(values.why);
+    if (values.active !== undefined && (await this.locators.active.isChecked()) !== values.active)
+      await this.locators.active.click();
   }
 
   async clearWindowStart(): Promise<void> {

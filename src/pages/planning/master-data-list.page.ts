@@ -52,11 +52,10 @@ export async function expectActionBlocked(
   submitName: string | RegExp,
 ): Promise<void> {
   if (!(await becomesUsable(button))) return;
+  const grid = new MasterDataListLocators(page);
   await button.first().click();
-  await expect(page.getByText(/Access restricted/i).first()).toBeVisible({
-    timeout: WAIT.PAGE_LOAD,
-  });
-  await expect(page.getByRole('button', { name: submitName })).toHaveCount(0);
+  await expect(grid.accessRestricted.first()).toBeVisible({ timeout: WAIT.PAGE_LOAD });
+  await expect(grid.submitButton(submitName)).toHaveCount(0);
 }
 
 export abstract class MasterDataListPage extends BasePage {
@@ -214,6 +213,30 @@ export abstract class MasterDataListPage extends BasePage {
 
   async selectTab(name: string): Promise<void> {
     await this.grid.tab(name).click();
+  }
+
+  /**
+   * The `parts` tab counts add up to `total`'s. Every count is re-read on each
+   * attempt: another worker (or another file's afterAll cleanup) can create
+   * or retire records between two reads, so one stale read mustn't decide it.
+   */
+  async expectTabCountsAddUp(parts: string[], total = 'All'): Promise<void> {
+    await expect(async () => {
+      const counts = await Promise.all([total, ...parts].map((t) => this.tabCount(t)));
+      const [all, ...rest] = counts;
+      expect(
+        rest.reduce((a, b) => a + b, 0),
+        `${parts.join(' + ')} = ${total}`,
+      ).toBe(all);
+    }).toPass({ timeout: WAIT.SERVER });
+  }
+
+  /** The selected tab's count matches the grid's "of N" total, both re-read together until they agree. */
+  async expectTabCountMatchesRows(name: string): Promise<void> {
+    await expect(async () => {
+      const badge = await this.tabCount(name);
+      expect((await this.showing()).total, `"${name}" tab count = rows shown`).toBe(badge);
+    }).toPass({ timeout: WAIT.SERVER });
   }
 
   async expectColumnHeaders(names: string[]): Promise<void> {

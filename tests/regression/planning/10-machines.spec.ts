@@ -357,13 +357,11 @@ test.describe('Planning - Machines', () => {
     // is left to the user.
     await machinesListPage.open();
     await machinesListPage.expectLoaded();
-    const all = await machinesListPage.tabCount('All');
-    const active = await machinesListPage.tabCount('Active');
-    const attention = await machinesListPage.tabCount('Needs attention');
-    expect(active + attention, 'Active + Needs attention = All').toBe(all);
+    // Counts are re-read together until they agree (records can change mid-read under parallel workers).
+    await machinesListPage.expectTabCountsAddUp(['Active', 'Needs attention']);
     await test.step('Active shows only Active machines', async () => {
       await machinesListPage.selectTab('Active');
-      await expect.poll(async () => (await machinesListPage.showing()).total).toBe(active);
+      await machinesListPage.expectTabCountMatchesRows('Active');
       await machinesListPage.setRowsPerPage(100);
       await expect
         .poll(async () => [...new Set(await machinesListPage.columnValues('Status'))])
@@ -371,7 +369,7 @@ test.describe('Planning - Machines', () => {
     });
     await test.step('Needs attention shows Down / In maintenance / Retired', async () => {
       await machinesListPage.selectTab('Needs attention');
-      await expect.poll(async () => (await machinesListPage.showing()).total).toBe(attention);
+      await machinesListPage.expectTabCountMatchesRows('Needs attention');
       const statuses = new Set(await machinesListPage.columnValues('Status'));
       expect(
         [...statuses].filter((s) => !['Down', 'In maintenance', 'Retired'].includes(s)),

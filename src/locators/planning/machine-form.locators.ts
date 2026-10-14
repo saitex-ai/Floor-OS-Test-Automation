@@ -21,6 +21,8 @@ export class MachineFormLocators {
   readonly createButton: Locator;
   readonly saveButton: Locator;
   readonly cancelButton: Locator;
+  /** Any open dialog — the create form is a page of its own, not a dialog (TC-CM-01). */
+  readonly dialog: Locator;
   /** "Saving rewrites this machine." / a "saves as a new version" notice on edit. */
   readonly saveNotice: Locator;
   readonly codeTaken: Locator;
@@ -41,6 +43,7 @@ export class MachineFormLocators {
     this.createButton = page.getByRole('button', { name: 'Create machine' });
     this.saveButton = page.getByRole('button', { name: 'Save changes' });
     this.cancelButton = page.getByRole('button', { name: 'Cancel' });
+    this.dialog = page.getByRole('dialog');
     this.saveNotice = page.getByText(/^(Saving|Saves)\b/);
     this.codeTaken = page.getByText(/already taken|already used by/i);
     this.requiredMessages = page.getByRole('alert').filter({ hasText: /^Required$/ });

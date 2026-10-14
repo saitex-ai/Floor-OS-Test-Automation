@@ -31,3 +31,4 @@ Windows live on a machine's detail page: "New maintenance window" and a row's "E
 - Permission cases run as the optional `PLANNING_READONLY_*` / `PLANNING_NOACCESS_*` logins (see `.env.example`), each logged in once per worker (`personas` fixture), and skip without them. Where a read-only user is still offered an enabled control (ClickUp z941abybge), the case drives it and checks the write is refused.
 - Window start / end are date-time pickers: today, then the hour and minute buttons (hours 00–23 then minutes 00–59 in one "Pick time" group), then Done. A set field's trigger reads "<value> Clear date and time".
 - A row's icon-only "Edit" needs `dispatchEvent('click')`, as on allowances.
+- Windows have no code, so cleanup handles them through their machine: before retiring a QA-AUTO machine it switches each still-active window's "Active" off (the form calls it the soft-delete flag).

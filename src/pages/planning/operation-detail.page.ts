@@ -133,6 +133,15 @@ export class OperationDetailPage extends BasePage {
     if (values.why) await expect(cells.nth(4)).toHaveText(values.why);
   }
 
+  /**
+   * No row for `type`. Only meaningful once the grid has rows to show: call it
+   * after expectAllowanceRow() on an anchor row, or an empty, still-loading
+   * grid would pass it.
+   */
+  async expectNoAllowanceRow(type: string): Promise<void> {
+    await expect(this.locators.allowanceRow(type)).toHaveCount(0);
+  }
+
   async allowancePercentage(type: string): Promise<string> {
     return (await this.locators.allowanceRow(type).getByRole('cell').nth(1).innerText()).trim();
   }

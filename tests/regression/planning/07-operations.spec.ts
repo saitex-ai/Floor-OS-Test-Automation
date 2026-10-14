@@ -166,13 +166,16 @@ test.describe('Planning - Operations', () => {
     });
     await test.step('The message names the colliding operation (prototype)', async () => {
       await operationMasterFormPage.open();
-      await operationMasterFormPage.fill({ code: op.toLowerCase(), name: 'x' });
+      await operationMasterFormPage.fill({
+        code: op.toLowerCase(),
+        name: taggedName(op.toLowerCase()),
+      });
       await operationMasterFormPage.fill({
         department: /^Sewing$/,
         grade: OFF_MACHINE_GRADE,
         skillGrade: /^S3/,
       });
-      await operationMasterFormPage.create();
+      expect(await operationMasterFormPage.create()).not.toBe('submitted');
       await operationMasterFormPage.expectCodeTakenNaming(taggedName(op));
     });
   });

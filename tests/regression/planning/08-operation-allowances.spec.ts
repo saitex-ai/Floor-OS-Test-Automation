@@ -88,21 +88,28 @@ test.describe('Planning - Operation Allowances', () => {
     await allure.tms(cu('z941abv8p2'), 'TC-COA-02 (ClickUp)');
     // Sept: a blank percentage fell back to the type default. On 2026-10-12
     // dev blocks it with "Required", as this case expects.
+    // An anchor row first: "Allowances (0)" also shows while the rows load,
+    // so a count of 0 couldn't catch a row that was saved by mistake.
     const fresh = await createOperation(page);
     await openOperation(page, fresh);
+    await addAllowance(page, { type: FATIGUE });
     await operationDetailPage.openNewAllowance();
     await test.step('No Allowance type blocks Create', async () => {
       expect(await allowanceFormPage.create()).not.toBe('submitted');
       await allowanceFormPage.expectFieldFlagged('type');
     });
     await test.step('A type with a blank percentage blocks Create', async () => {
-      await allowanceFormPage.pickType(FATIGUE);
+      await allowanceFormPage.pickType(HANDLING);
       await allowanceFormPage.setPercentage('');
       expect(await allowanceFormPage.create()).not.toBe('submitted');
       await allowanceFormPage.expectFieldFlagged('percentage');
     });
     await allowanceFormPage.cancel();
-    await operationDetailPage.expectAllowanceCount(0);
+    await page.reload();
+    await operationDetailPage.expectLoaded(fresh);
+    await operationDetailPage.expectAllowanceRow(FATIGUE);
+    await operationDetailPage.expectAllowanceCount(1);
+    await operationDetailPage.expectNoAllowanceRow(HANDLING);
   });
 
   test('TC-COA-03 Percentage applied keeps four-decimal precision', async ({
@@ -174,15 +181,20 @@ test.describe('Planning - Operation Allowances', () => {
     allowanceFormPage,
   }) => {
     await allure.tms(cu('z941abv8p8'), 'TC-COA-06 (ClickUp)');
+    // An anchor row first, as in TC-COA-02: a count of 0 can't tell "nothing
+    // saved" from "rows not loaded yet".
     const fresh = await createOperation(page);
     await openOperation(page, fresh);
+    await addAllowance(page, { type: FATIGUE });
     await operationDetailPage.openNewAllowance();
     await allowanceFormPage.pickType(HANDLING);
     await allowanceFormPage.setPercentage('7');
     await allowanceFormPage.cancel();
     await page.reload();
     await operationDetailPage.expectLoaded(fresh);
-    await operationDetailPage.expectAllowanceCount(0);
+    await operationDetailPage.expectAllowanceRow(FATIGUE);
+    await operationDetailPage.expectAllowanceCount(1);
+    await operationDetailPage.expectNoAllowanceRow(HANDLING);
   });
 
   test('TC-COA-07 Only a user with write permission can create an allowance', async ({

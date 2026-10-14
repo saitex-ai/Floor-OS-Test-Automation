@@ -44,6 +44,15 @@ export class MachineDetailLocators {
     });
   }
 
+  /** The windows grid's data rows (not the header, not the loading skeleton). */
+  windowDataRows(): Locator {
+    return this.windowsTable
+      .getByRole('rowgroup')
+      .nth(1)
+      .getByRole('row')
+      .filter({ hasText: /\S/ });
+  }
+
   windowEditButton(why: string): Locator {
     return this.windowRow(why).getByRole('button', { name: 'Edit', exact: true });
   }

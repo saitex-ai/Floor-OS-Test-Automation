@@ -1,5 +1,6 @@
-import { type Locator, type Page } from '@playwright/test';
+import { type Locator, type Page, expect } from '@playwright/test';
 import { DatePickerLocators } from '../../locators/planning/form-field.locators';
+import { WAIT } from './waits';
 
 /** Opens a date field's picker and picks today. */
 export async function pickToday(page: Page, trigger: Locator): Promise<void> {
@@ -7,7 +8,11 @@ export async function pickToday(page: Page, trigger: Locator): Promise<void> {
   await trigger.click();
   await picker.today.click();
   // A date-only picker closes on the day click; a date-time one waits for Done.
-  if (await picker.doneButton.isVisible().catch(() => false)) await picker.doneButton.click();
+  // Retried until it's closed, so a Done that renders a moment late still gets clicked.
+  await expect(async () => {
+    if (await picker.doneButton.isVisible()) await picker.doneButton.click();
+    await expect(picker.dialog).toBeHidden({ timeout: 1_000 });
+  }).toPass({ timeout: WAIT.NAVIGATION });
 }
 
 /** Opens a date-time field's picker and picks today at hh:mm. */

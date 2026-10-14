@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { type Browser, type Page, test } from '@playwright/test';
+import { type Browser, type Page, expect, test } from '@playwright/test';
 import { type MasterDataListPage } from '../../../../src/pages/planning/master-data-list.page';
 import { ActivitiesListPage } from '../../../../src/pages/planning/activities-list.page';
 import { ActivityFormPage } from '../../../../src/pages/planning/activity-form.page';
@@ -10,12 +10,14 @@ import { RecipeDetailPage } from '../../../../src/pages/planning/recipe-detail.p
 import { MachinesListPage } from '../../../../src/pages/planning/machines-list.page';
 import { MachineDetailPage } from '../../../../src/pages/planning/machine-detail.page';
 import { MachineFormPage } from '../../../../src/pages/planning/machine-form.page';
+import { MaintenanceWindowFormPage } from '../../../../src/pages/planning/maintenance-window-form.page';
 import { WorkCentresListPage } from '../../../../src/pages/planning/work-centres-list.page';
 import { WorkCentreDetailPage } from '../../../../src/pages/planning/work-centre-detail.page';
 import { WorkCentreFormPage } from '../../../../src/pages/planning/work-centre-form.page';
 import { OperationsListPage } from '../../../../src/pages/planning/operations-list.page';
 import { OperationDetailPage } from '../../../../src/pages/planning/operation-detail.page';
 import { OperationMasterFormPage } from '../../../../src/pages/planning/operation-master-form.page';
+import { WAIT } from '../../../../src/pages/planning/waits';
 import { currentSpecFile, takeCodes } from './created';
 import {
   openActivity,
@@ -58,7 +60,18 @@ export const CLEANERS: Cleaner[] = [
     done: retired,
     clean: async (page, code) => {
       await openMachine(page, code);
-      await new MachineDetailPage(page).startEditing();
+      const detail = new MachineDetailPage(page);
+      // Windows have no code of their own: switch off (soft-delete) the
+      // machine's still-active ones before the machine is retired.
+      for (const why of await detail.activeWindowWhys()) {
+        await detail.openWindowEdit(why);
+        const windowForm = new MaintenanceWindowFormPage(page);
+        await windowForm.expectOpenForEdit(code);
+        await windowForm.fill({ active: false });
+        expect(await windowForm.saveChanges(), `deactivate window "${why}"`).toBe('submitted');
+        await expect(windowForm.locators.saveButton).toBeHidden({ timeout: WAIT.NAVIGATION });
+      }
+      await detail.startEditing();
       const form = new MachineFormPage(page);
       await form.expectOnEditPage();
       await form.setStatus('Retired');
