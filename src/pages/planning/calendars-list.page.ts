@@ -1,31 +1,32 @@
-import { type Page, expect } from '@playwright/test';
-import { BasePage } from '../base.page';
+import { type Locator, type Page, expect } from '@playwright/test';
+import { MasterDataListPage } from './master-data-list.page';
 import { CalendarsListLocators } from '../../locators/planning/calendars-list.locators';
+import { WAIT } from './waits';
 
 /**
  * Planning > Master Data > Calendars list. Owned by the Planning QA. Real
- * route: /planning/master-data/calendars. Element locators live in
- * CalendarsListLocators (`this.locators`) — this class only holds
- * flows/actions/assertions built on top of them.
+ * route: /planning/master-data/calendars. Tabs: All / Active / Draft /
+ * Retired. A row click opens the calendar's detail page
+ * (/calendars/<CODE>) — see CalendarDetailPage.
  */
-export class CalendarsListPage extends BasePage {
+export class CalendarsListPage extends MasterDataListPage {
   readonly locators: CalendarsListLocators;
+  protected readonly route = '/planning/master-data/calendars';
+  protected readonly heading: Locator;
+  protected readonly newButton: Locator;
 
   constructor(page: Page) {
     super(page);
     this.locators = new CalendarsListLocators(page);
-  }
-
-  async open(): Promise<void> {
-    await this.gotoAuthenticated('/planning/master-data/calendars');
-  }
-
-  async expectLoaded(): Promise<void> {
-    await expect(this.locators.heading).toBeVisible({ timeout: 60_000 });
-    await expect(this.locators.newCalendarButton).toBeVisible();
+    this.heading = this.locators.heading;
+    this.newButton = this.locators.newCalendarButton;
   }
 
   async openNewCalendar(): Promise<void> {
-    await this.locators.newCalendarButton.click();
+    await this.openNew();
+  }
+
+  async expectNoMatchState(): Promise<void> {
+    await expect(this.locators.noMatchState.first()).toBeVisible({ timeout: WAIT.SERVER });
   }
 }

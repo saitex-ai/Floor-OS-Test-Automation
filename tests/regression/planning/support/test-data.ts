@@ -33,6 +33,26 @@ import {
 } from '../../../../src/pages/planning/operation-master-form.page';
 import { OperationDetailPage } from '../../../../src/pages/planning/operation-detail.page';
 import { AllowanceFormPage } from '../../../../src/pages/planning/allowance-form.page';
+import { CodeListValuesPage } from '../../../../src/pages/planning/code-lists.page';
+import {
+  CodeListValueDialogPage,
+  type CodeListValueFields,
+} from '../../../../src/pages/planning/code-list-value-dialog.page';
+import {
+  CalendarFormPage,
+  type CalendarOptions,
+} from '../../../../src/pages/planning/calendar-form.page';
+import { CalendarDetailPage } from '../../../../src/pages/planning/calendar-detail.page';
+import {
+  ShiftKindsPage,
+  type ShiftKindValues,
+} from '../../../../src/pages/planning/shift-kinds.page';
+import {
+  ShiftDetailPage,
+  ShiftFormPage,
+  type BreakValues,
+  type ShiftValues,
+} from '../../../../src/pages/planning/shifts.page';
 import { WorkCentresListPage } from '../../../../src/pages/planning/work-centres-list.page';
 import {
   WorkCentreFormPage,
@@ -358,4 +378,120 @@ export async function addWindow(page: Page, values: WindowValues & { why: string
   await form.fill({ kind: 'Planned', start: '06:00', ...values });
   expect(await form.create(), `create maintenance window ${values.why}`).toBe('submitted');
   await detail.expectWindowRow(values.why);
+}
+
+// ── Sprint 3: Code lists, Calendars, Shifts, Set up my department ──
+
+/**
+ * The two code lists the suite adds values to: low-traffic lists, so the
+ * QA-AUTO values (retired by each spec's afterAll) stay out of busy pickers
+ * such as Activity type.
+ */
+export const CODE_LIST_A = 'delay_owner';
+export const CODE_LIST_B = 'severity';
+
+/** A code-list value code: lower snake case, unique to this run (tracked for cleanup). */
+export function uniqueValueCode(): string {
+  return uniqueCode('qa_auto_').toLowerCase();
+}
+
+/** Opens `table`'s page, adds one value through "New value" and returns its code. */
+export async function createCodeListValue(
+  page: Page,
+  table: string,
+  overrides: CodeListValueFields = {},
+): Promise<string> {
+  const code = overrides.value ?? uniqueValueCode();
+  const list = new CodeListValuesPage(page, table);
+  const dialog = new CodeListValueDialogPage(page);
+  await list.open();
+  await list.expectLoaded();
+  await list.openNew();
+  await dialog.expectNewOpen();
+  await dialog.fill({
+    value: code,
+    shownAs: `QA-AUTO ${code}`,
+    whatItMeans: TEST_DATA_TAG,
+    displayOrder: '990',
+    ...overrides,
+  });
+  expect(await dialog.create(), `create ${table} value ${code}`).toBe('submitted');
+  return code;
+}
+
+/** Opens a value's read-only view dialog from its list's page. */
+export async function openCodeListValue(page: Page, table: string, code: string): Promise<void> {
+  const list = new CodeListValuesPage(page, table);
+  await list.findRow(code);
+  // Read before opening: the modal hides the grid from the accessibility tree.
+  const label = await list.cellValue(code, 'Shown as');
+  await list.openRow(code);
+  await new CodeListValueDialogPage(page).expectViewOpen(label);
+}
+
+/**
+ * Creates a calendar (default: Department scope, top level, Asia/Ho_Chi_Minh)
+ * and returns its code; lands on its detail page.
+ */
+export async function createCalendar(page: Page, options: CalendarOptions = {}): Promise<string> {
+  const code = uniqueCode('QA-CAL');
+  const form = new CalendarFormPage(page);
+  await form.open();
+  await form.fill({ code, name: `QA-AUTO ${code} — Planning regression test data`, ...options });
+  expect(await form.submitCreate(), `create calendar ${code}`).toBe('submitted');
+  await new CalendarDetailPage(page).expectLoaded(code);
+  return code;
+}
+
+/** Opens a calendar's detail page (its URL carries the code). */
+export async function openCalendar(page: Page, code: string): Promise<void> {
+  await new CalendarDetailPage(page).open(code);
+}
+
+/** A shift-kind lookup code: lower snake case, unique to this run (tracked for cleanup). */
+export function uniqueKindCode(): string {
+  return uniqueCode('qa_auto_k').toLowerCase();
+}
+
+/** Adds a shift kind through the "New shift kind" dialog and returns its code. */
+export async function createShiftKind(page: Page, values: ShiftKindValues = {}): Promise<string> {
+  const code = values.code ?? uniqueKindCode();
+  const kinds = new ShiftKindsPage(page);
+  await kinds.open();
+  await kinds.expectLoaded();
+  await kinds.openNew();
+  await kinds.expectNewOpen();
+  await kinds.fill({ code, label: `QA-AUTO ${code}`, description: TEST_DATA_TAG, ...values });
+  expect(await kinds.create(), `create shift kind ${code}`).toBe('submitted');
+  return code;
+}
+
+/**
+ * Creates a shift (default: Standard, 07:30 → 16:30, same day) and returns
+ * its code; leaves the page on the shift's detail.
+ */
+export async function createShift(page: Page, values: ShiftValues = {}): Promise<string> {
+  const code = values.code ?? uniqueCode('QA_SH');
+  const form = new ShiftFormPage(page);
+  await form.open();
+  await form.fill({
+    code,
+    name: `QA-AUTO ${code}`,
+    kind: 'Standard',
+    starts: '07:30',
+    ends: '16:30',
+    ...values,
+  });
+  expect(await form.create(), `create shift ${code}`).toBe('submitted');
+  await new ShiftDetailPage(page).open(code);
+  return code;
+}
+
+/** On a shift's detail page: adds one break (default 12:00 → 12:30, unpaid). */
+export async function addBreak(page: Page, values: BreakValues & { name: string }): Promise<void> {
+  const detail = new ShiftDetailPage(page);
+  await detail.openNewBreak();
+  await detail.fillBreak({ starts: '12:00', ends: '12:30', ...values });
+  expect(await detail.createBreak(), `create break ${values.name}`).toBe('submitted');
+  await detail.expectBreakRow(values.name);
 }
