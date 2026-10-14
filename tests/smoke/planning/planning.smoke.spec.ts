@@ -54,16 +54,22 @@ test.describe('Planning module', () => {
     await workCentreFormPage.expectCreatedSuccessfully();
   });
 
-  test('Create Qualification: successful creation for a random operator/task pair', async ({
-    qualificationsListPage,
-    qualificationFormPage,
+  // Qualifications moved into operator profiles on the 2026-10-14 dev deploy
+  // (the old Qualifications screen is gone). Read-only on purpose: adding a
+  // row would edit a seed profile the suite doesn't own, so this checks the
+  // add-a-qualification path is there and cancels without saving.
+  test('Operators & Qualifications: a profile shows its qualifications and the add row', async ({
+    operatorsListPage,
+    operatorProfilePage,
   }) => {
-    await qualificationsListPage.open();
-    await qualificationsListPage.expectLoaded();
-    await qualificationsListPage.openNewQualification();
-    await qualificationFormPage.expectOnCreatePage();
+    await operatorsListPage.open();
+    await operatorsListPage.expectLoaded();
+    await operatorsListPage.openFirstProfile();
+    await operatorProfilePage.expectLoaded();
 
-    await qualificationFormPage.createRandomQualification();
+    await operatorProfilePage.startEditing();
+    await operatorProfilePage.expectAddQualificationRow();
+    await operatorProfilePage.cancelEditing();
   });
 
   test('Create Machine: successful creation with a work centre assigned', async ({
@@ -77,7 +83,6 @@ test.describe('Planning module', () => {
 
     await machineFormPage.fillRequired({
       code: `PWM${Date.now().toString().slice(-6)}`,
-      machineClass: `PW-CLASS-${Date.now().toString().slice(-4)}`,
     });
     await machineFormPage.create();
     await machineFormPage.expectCreatedSuccessfully();

@@ -28,4 +28,10 @@ export const WAIT = {
    * load, which can be a few seconds after the heading.
    */
   PERMISSION_SETTLE: 5_000,
+  /**
+   * One attempt inside an `expect(...).toPass()` retry loop, e.g. a picker
+   * whose click opened nothing because the form was still loading. Short on
+   * purpose: the loop (bounded by its own WAIT) retries the action.
+   */
+  RETRY_STEP: 2_000,
 } as const;
