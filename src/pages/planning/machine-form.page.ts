@@ -11,7 +11,8 @@ export type MachineStatus = 'Active' | 'Down' | 'In maintenance' | 'Retired';
 
 export interface MachineFieldValues {
   code: string;
-  machineClass: string;
+  /** A Machine type option, e.g. /^BTK · / — the first one offered if omitted. */
+  machineType?: string | RegExp;
   /** Which real work centre to assign — defaults to the first available if omitted. */
   workCentre?: string | RegExp;
   /** Defaults to "Active". */
@@ -19,7 +20,7 @@ export interface MachineFieldValues {
 }
 
 /** The fields an empty create flags as "Required". */
-export const MACHINE_REQUIRED = ['code', 'machineClass', 'workCentre', 'status'] as const;
+export const MACHINE_REQUIRED = ['code', 'machineType', 'workCentre', 'status'] as const;
 export type MachineRequiredField = (typeof MACHINE_REQUIRED)[number];
 
 /**
@@ -69,7 +70,7 @@ export class MachineFormPage extends BasePage {
     const l = this.locators;
     for (const field of [
       l.assetCode,
-      l.machineClass,
+      l.machineType,
       l.workCentre,
       l.status,
       l.inServiceSinceLabel,
@@ -83,19 +84,32 @@ export class MachineFormPage extends BasePage {
     const l = this.locators;
     return {
       code: l.assetCode,
-      machineClass: l.machineClass,
+      machineType: l.machineType,
       workCentre: l.workCentre,
       status: l.status,
     }[field];
   }
 
+  /**
+   * Opens `combo` until `shown` is visible. A click while the form is still
+   * loading opens nothing (seen on Machine type, whose options are live), so
+   * the click is retried.
+   */
+  private async openPicker(combo: Locator, shown: Locator): Promise<void> {
+    await expect(async () => {
+      if (!(await shown.isVisible())) await combo.click();
+      await expect(shown).toBeVisible({ timeout: WAIT.RETRY_STEP });
+    }).toPass({ timeout: WAIT.SERVER });
+  }
+
   private async pick(combo: Locator, option: string | RegExp): Promise<void> {
-    await combo.click();
-    await this.locators.option(option).first().click();
+    const target = this.locators.option(option).first();
+    await this.openPicker(combo, target);
+    await target.click();
   }
 
   /**
-   * Asset code + Machine class + Work centre + Status are the 4 fields
+   * Asset code + Machine type + Work centre + Status are the 4 fields
    * confirmed live to actually block save ("In service since" / class
    * properties / system links are all genuinely optional). Status
    * defaults to "Active" — a freshly created machine being immediately
@@ -103,13 +117,27 @@ export class MachineFormPage extends BasePage {
    */
   async fillRequired(values: MachineFieldValues): Promise<void> {
     await this.locators.assetCode.fill(values.code);
-    await this.locators.machineClass.fill(values.machineClass);
+    await this.setMachineType(values.machineType ?? /.+/);
     await this.setWorkCentre(values.workCentre ?? /.+/);
     await this.setStatus(values.status ?? 'Active');
   }
 
-  async setMachineClass(value: string): Promise<void> {
-    await this.locators.machineClass.fill(value);
+  async setMachineType(type: string | RegExp): Promise<void> {
+    await this.pick(this.locators.machineType, type);
+  }
+
+  /**
+   * Machine type offers no empty choice, so a set type can't be cleared:
+   * every option has a type code and name ("BTK · Bartack").
+   */
+  async expectNoEmptyMachineType(): Promise<void> {
+    await this.openPicker(this.locators.machineType, this.locators.options().first());
+    const options = (await this.locators.options().allInnerTexts()).map((o) => o.trim());
+    await this.page.keyboard.press('Escape');
+    expect(
+      options.filter((o) => !/^\S+ · \S/.test(o)),
+      'options without a type code · name',
+    ).toEqual([]);
   }
 
   async setWorkCentre(workCentre: string | RegExp): Promise<void> {
@@ -138,6 +166,13 @@ export class MachineFormPage extends BasePage {
     await this.locators.propertyValues.last().fill(value);
   }
 
+  /** A row under "Asset register & telemetry identifiers". */
+  async addSystemLink(system: string, identifier: string): Promise<void> {
+    await this.locators.addSystemLinkButton.click();
+    await this.locators.systemInputs.last().fill(system);
+    await this.locators.identifierInputs.last().fill(identifier);
+  }
+
   /** Overwrites the first property row's value. */
   async setFirstPropertyValue(value: string): Promise<void> {
     await this.locators.propertyValues.first().fill(value);
@@ -147,10 +182,6 @@ export class MachineFormPage extends BasePage {
   async expectPropertiesAsRows(count: number): Promise<void> {
     await expect(this.locators.propertyKeys).toHaveCount(count);
     await expect(this.locators.jsonTextarea()).toHaveCount(0);
-  }
-
-  async clearMachineClass(): Promise<void> {
-    await this.locators.machineClass.fill('');
   }
 
   /** Smoke: just clicks Create — see expectCreatedSuccessfully(). */
@@ -201,7 +232,7 @@ export class MachineFormPage extends BasePage {
     return (await this.locators.saveNotice.innerText()).trim();
   }
 
-  async machineClassValue(): Promise<string> {
-    return this.locators.machineClass.inputValue();
+  async machineTypeValue(): Promise<string> {
+    return (await this.locators.machineType.innerText()).trim();
   }
 }

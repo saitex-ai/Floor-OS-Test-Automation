@@ -11,7 +11,7 @@ export async function pickToday(page: Page, trigger: Locator): Promise<void> {
   // Retried until it's closed, so a Done that renders a moment late still gets clicked.
   await expect(async () => {
     if (await picker.doneButton.isVisible()) await picker.doneButton.click();
-    await expect(picker.dialog).toBeHidden({ timeout: 1_000 });
+    await expect(picker.dialog).toBeHidden({ timeout: WAIT.RETRY_STEP });
   }).toPass({ timeout: WAIT.NAVIGATION });
 }
 

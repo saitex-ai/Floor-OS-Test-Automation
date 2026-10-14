@@ -10,7 +10,7 @@ export class MachineFormLocators {
   readonly newHeading: Locator;
   readonly assetCode: Locator;
   readonly codeFixedHelp: Locator;
-  readonly machineClass: Locator;
+  readonly machineType: Locator;
   readonly workCentre: Locator;
   readonly status: Locator;
   readonly inServiceSinceLabel: Locator;
@@ -18,6 +18,8 @@ export class MachineFormLocators {
   readonly propertyKeys: Locator;
   readonly propertyValues: Locator;
   readonly addSystemLinkButton: Locator;
+  readonly systemInputs: Locator;
+  readonly identifierInputs: Locator;
   readonly createButton: Locator;
   readonly saveButton: Locator;
   readonly cancelButton: Locator;
@@ -32,7 +34,9 @@ export class MachineFormLocators {
     this.newHeading = page.getByRole('heading', { name: 'New machine', level: 1 });
     this.assetCode = page.getByRole('textbox', { name: 'Asset code' });
     this.codeFixedHelp = page.getByText(/The code is fixed once the record exists/);
-    this.machineClass = page.getByRole('textbox', { name: 'Machine class' });
+    // Was a free-text "Machine class" textbox until the 2026-10-14 dev deploy; now a
+    // combobox of the Machine type master ("BTK · Bartack", …) with no empty choice.
+    this.machineType = page.getByRole('combobox', { name: 'Machine type', exact: true });
     this.workCentre = page.getByRole('combobox', { name: 'Work centre', exact: true });
     this.status = page.getByRole('combobox', { name: 'Status', exact: true });
     this.inServiceSinceLabel = page.getByText('In service since', { exact: true });
@@ -40,6 +44,8 @@ export class MachineFormLocators {
     this.propertyKeys = page.getByRole('textbox', { name: 'Property', exact: true });
     this.propertyValues = page.getByRole('textbox', { name: 'Value', exact: true });
     this.addSystemLinkButton = page.getByRole('button', { name: 'Add system link' });
+    this.systemInputs = page.getByRole('textbox', { name: 'System', exact: true });
+    this.identifierInputs = page.getByRole('textbox', { name: 'Identifier there', exact: true });
     this.createButton = page.getByRole('button', { name: 'Create machine' });
     this.saveButton = page.getByRole('button', { name: 'Save changes' });
     this.cancelButton = page.getByRole('button', { name: 'Cancel' });

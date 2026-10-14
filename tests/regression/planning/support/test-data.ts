@@ -304,9 +304,21 @@ export async function openWorkCentre(page: Page, code: string): Promise<void> {
   await new WorkCentreDetailPage(page).expectLoaded(code);
 }
 
-/** The QA-AUTO marker a machine carries — machines have no name, so it's in the class. */
-export function machineClassFor(code: string): string {
-  return `QA-AUTO-${code}`;
+/**
+ * Machine type of every machine the suite creates: "BTK · Bartack", which no
+ * seed machine uses (checked 2026-10-14), so a search by type finds only QA rows.
+ */
+export const QA_MACHINE_TYPE = /^BTK · /;
+/** The type TC-EM-02 / TC-EM-05 switch to. */
+export const OTHER_MACHINE_TYPE = /^OL-3T · /;
+
+/**
+ * The QA-AUTO marker a machine carries. A machine has no name, and since the
+ * 2026-10-14 deploy its type is a picker, so the marker is a system link
+ * (System "QA-AUTO", Identifier "<code> — …"), shown on the list and detail.
+ */
+export function machineTagFor(code: string): string {
+  return `${code} — Planning regression test data (pw-hybrid-framework). Safe to delete.`;
 }
 
 /** Creates a machine on `workCentre` and returns its asset code. */
@@ -320,11 +332,12 @@ export async function createMachine(
   await form.open();
   await form.fillRequired({
     code,
-    machineClass: machineClassFor(code),
+    machineType: QA_MACHINE_TYPE,
     workCentre,
     status: options.status,
   });
   if (options.property) await form.addProperty(...options.property);
+  await form.addSystemLink('QA-AUTO', machineTagFor(code));
   expect(await form.submitCreate(), `create machine ${code}`).toBe('submitted');
   return code;
 }

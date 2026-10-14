@@ -11,7 +11,8 @@ import {
   asPersona,
   createMachine,
   createWorkCentre,
-  machineClassFor,
+  OTHER_MACHINE_TYPE,
+  QA_MACHINE_TYPE,
   openMachine,
   personaCredentials,
   personaSkipReason,
@@ -27,8 +28,14 @@ import { cleanUpAfterAll } from './support/cleanup';
  * Source of truth for these cases: test-cases/planning/machines.md
  * (ClickUp "Planning -Sprint-2 - Machine and maintenance"). Machines are
  * only ever created by this file, on a QA-AUTO work centre it creates;
- * a machine has no name field, so its Machine class carries the QA-AUTO
- * marker. Seed machines (WA-M1, DY-M1, …) are only read.
+ * a machine has no name field, so a "QA-AUTO" system link carries the
+ * marker, and every QA machine is a "BTK · Bartack" (a type no seed machine
+ * uses). Seed machines (WA-M1, DY-M1, …) are only read.
+ *
+ * The 2026-10-14 dev deploy replaced the free-text "Machine class" with a
+ * "Machine type" picker (the Machine type master). Cases that changed,
+ * cleared or searched the class now use the type; see the "Adjusted for
+ * today's app" column in test-cases/planning/machines.md.
  *
  * beforeAll builds the QA work centre `centre`, a second one `other`, and
  * the Active machine `machine` (property capacity_kg = 350).
@@ -93,7 +100,7 @@ test.describe('Planning - Machines', () => {
     await machineFormPage.open();
     await machineFormPage.fillRequired({
       code: machine.toLowerCase(),
-      machineClass: machineClassFor(machine),
+      machineType: QA_MACHINE_TYPE,
       workCentre: centre,
     });
     expect(await machineFormPage.submitCreate()).not.toBe('submitted');
@@ -150,7 +157,7 @@ test.describe('Planning - Machines', () => {
     await machineFormPage.open();
     await machineFormPage.fillRequired({
       code,
-      machineClass: machineClassFor(code),
+      machineType: QA_MACHINE_TYPE,
       workCentre: centre,
     });
     await machineFormPage.cancel();
@@ -202,7 +209,6 @@ test.describe('Planning - Machines', () => {
   }) => {
     await allure.tms(cu('z941abv8qb'), 'TC-EM-02 (ClickUp)');
     const code = await createMachine(page, centre, { property: ['capacity_kg', '350'] });
-    const newClass = `${machineClassFor(code)}-B`;
     await openMachine(page, code);
     await machineDetailPage.startEditing();
     await machineFormPage.expectOnEditPage();
@@ -213,7 +219,7 @@ test.describe('Planning - Machines', () => {
       await allure.link(DEMO_FEEDBACK, 'Demo Feedback z941abwdad (ClickUp)');
       await machineFormPage.expectSaveNotice('Saving rewrites this machine.');
     });
-    await machineFormPage.setMachineClass(newClass);
+    await machineFormPage.setMachineType(OTHER_MACHINE_TYPE);
     await machineFormPage.setWorkCentre(other);
     await machineFormPage.setStatus('Down');
     await machineFormPage.pickInServiceSinceToday();
@@ -221,7 +227,7 @@ test.describe('Planning - Machines', () => {
     expect(await machineFormPage.saveChanges()).toBe('submitted');
     await openMachine(page, code);
     for (const [label, value] of [
-      ['Machine class', newClass],
+      ['Machine type', /^OL-3T\b/],
       ['Work centre', other],
       ['Status', 'Down'],
       ['In service since', /^\d{4}-\d{2}-\d{2}$/],
@@ -238,13 +244,15 @@ test.describe('Planning - Machines', () => {
     machineFormPage,
   }) => {
     await allure.tms(cu('z941abv8qc'), 'TC-EM-03 (ClickUp)');
-    // Work centre and Status are selects with no empty option once set.
+    // Until the 2026-10-14 deploy this cleared the free-text Machine class
+    // and expected Save to be blocked. Now no required field can be emptied
+    // on edit: Asset code is locked, and Machine type, Work centre and Status
+    // are pickers with no empty choice — so that is what this checks.
     await openMachine(page, machine);
     await machineDetailPage.startEditing();
     await machineFormPage.expectOnEditPage();
-    await machineFormPage.clearMachineClass();
-    expect(await machineFormPage.saveChanges()).not.toBe('submitted');
-    await machineFormPage.expectFieldFlagged('machineClass');
+    await machineFormPage.expectCodeLocked(machine);
+    await machineFormPage.expectNoEmptyMachineType();
   });
 
   test('TC-EM-04 Saving the machine keeps its maintenance windows', async ({
@@ -286,11 +294,11 @@ test.describe('Planning - Machines', () => {
     await openMachine(page, machine);
     await machineDetailPage.startEditing();
     await machineFormPage.expectOnEditPage();
-    await machineFormPage.setMachineClass(`${machineClassFor(machine)}-CANCELLED`);
+    await machineFormPage.setMachineType(OTHER_MACHINE_TYPE);
     await machineFormPage.setStatus('Down');
     await machineFormPage.cancel();
     await openMachine(page, machine);
-    await machineDetailPage.expectValue('Machine class', machineClassFor(machine));
+    await machineDetailPage.expectValue('Machine type', /^BTK\b/);
     await machineDetailPage.expectValue('Status', 'Active');
   });
 
@@ -328,7 +336,7 @@ test.describe('Planning - Machines', () => {
     await machineFormPage.expectDedicatedCreatePage();
   });
 
-  test('TC-LM-02 Search filters by asset code, machine class or work centre', async ({
+  test('TC-LM-02 Search filters by asset code, machine type or work centre', async ({
     machinesListPage,
   }) => {
     await allure.tms(cu('z941abv8qh'), 'TC-LM-02 (ClickUp)');
@@ -336,7 +344,8 @@ test.describe('Planning - Machines', () => {
     await machinesListPage.expectLoaded();
     for (const [by, term] of [
       ['asset code', machine],
-      ['machine class', machineClassFor(machine)],
+      // Was the free-text class before the 2026-10-14 deploy; BTK is only on QA machines.
+      ['machine type', 'BTK'],
       ['work centre', centre],
     ] as const) {
       await test.step(`By ${by}`, async () => {
@@ -434,7 +443,7 @@ test.describe('Planning - Machines', () => {
     await machineDetailPage.expectReadOnlyView();
     await machineDetailPage.expectFields([
       'Asset code',
-      'Machine class',
+      'Machine type',
       'Work centre',
       'Status',
       'In service since',
