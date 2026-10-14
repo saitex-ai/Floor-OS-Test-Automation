@@ -58,6 +58,22 @@ const AVOID_PATTERNS = [
 export class CreateSampleRequestPage extends BasePage {
   readonly locators: CreateSampleRequestLocators;
 
+  /**
+   * Each wizard step's own heading, confirmed live (2026-10-14). The wizard
+   * stays on one URL, so these are what proves a "Continue" actually
+   * advanced (see continueTo()).
+   */
+  static readonly STEPS = {
+    techpack: 'Start from the techpack',
+    styleDetails: 'Describe the style',
+    fabric: 'Pick the main fabrics',
+    sizes: 'Build the size breakdown',
+    legTube: 'Is a leg tube required?',
+    additionalInfo: 'Anything else from the buyer',
+    view3d: 'Do you need a 3D view?',
+    costing: 'Does this style need costing?',
+  } as const;
+
   constructor(page: Page) {
     super(page);
     this.locators = new CreateSampleRequestLocators(page);
@@ -66,6 +82,18 @@ export class CreateSampleRequestPage extends BasePage {
   async open(): Promise<void> {
     await this.gotoAuthenticated(`${MODULES['sample-development'].path}/sample-requests/new`);
     await expect(this.locators.heading).toBeVisible({ timeout: 45_000 });
+    await expect(this.locators.stepHeading(CreateSampleRequestPage.STEPS.techpack)).toBeVisible();
+  }
+
+  /**
+   * Clicks "Continue" and waits for the next step's heading, so a click
+   * that didn't advance (lost click, or validation blocking the step)
+   * fails here, naming the step, instead of surfacing later as an
+   * unrelated timeout.
+   */
+  private async continueTo(step: string): Promise<void> {
+    await this.locators.continueButton.click();
+    await expect(this.locators.stepHeading(step)).toBeVisible({ timeout: 15_000 });
   }
 
   /**
@@ -90,6 +118,7 @@ export class CreateSampleRequestPage extends BasePage {
    */
   private async pick(combo: Locator, value?: string | RegExp): Promise<string> {
     const attempts = 3;
+    let lastSeen = '';
     for (let attempt = 1; attempt <= attempts; attempt++) {
       await combo.click();
       await this.page.waitForTimeout(500);
@@ -103,17 +132,13 @@ export class CreateSampleRequestPage extends BasePage {
       } else {
         const options = this.page.getByRole('option');
         await options.first().waitFor({ state: 'visible' });
-        const count = await options.count();
-        let matchIndex = 0;
-        picked = (await options.first().innerText()).trim();
-        for (let i = 0; i < count; i++) {
-          const text = (await options.nth(i).innerText()).trim();
-          if (text && !AVOID_PATTERNS.some((p) => p.test(text))) {
-            matchIndex = i;
-            picked = text;
-            break;
-          }
-        }
+        // One round trip for every option's text, not one per option.
+        const texts = (await options.allInnerTexts()).map((t) => t.trim());
+        const matchIndex = Math.max(
+          0,
+          texts.findIndex((t) => t && !AVOID_PATTERNS.some((p) => p.test(t))),
+        );
+        picked = texts[matchIndex] ?? '';
         await options.nth(matchIndex).click();
       }
 
@@ -123,23 +148,23 @@ export class CreateSampleRequestPage extends BasePage {
       // innerText: confirmed live (2026-10-06, Style number) an option can
       // render its value on two stacked lines (e.g. a duplicated
       // code/description pair), while the combobox trigger only ever
-      // echoes the first one back — matching the full multi-line text
-      // against that single-line trigger produced a false "didn't
-      // register" here even though the pick worked correctly.
+      // echoes the first one back. Also accepted the other way round, so a
+      // trigger that echoes a shorter form of the option (e.g. just its
+      // code) isn't misread as a missed pick. Every trigger here is a
+      // <button> whose text is the option's (confirmed live 2026-10-14).
       const pickedFirstLine = picked.split('\n')[0]!.trim();
-      if (comboText.includes(pickedFirstLine)) {
+      if (
+        comboText &&
+        (comboText.includes(pickedFirstLine) || pickedFirstLine.includes(comboText))
+      ) {
         return picked;
       }
-      if (attempt === attempts) {
-        throw new Error(
-          `pick(): combobox text still reads "${comboText}" after clicking "${picked}" (${attempts} attempts)`,
-        );
-      }
+      lastSeen = `combobox reads "${comboText}" after clicking "${picked}"`;
       // Combobox didn't register the click (occasional miss under load) — close any
       // stray open popover and retry from scratch.
       await this.page.keyboard.press('Escape');
     }
-    throw new Error('unreachable');
+    throw new Error(`pick(): ${lastSeen} (${attempts} attempts)`);
   }
 
   /** Buyer + Season — the only two request-level fields that block Save. Assignee already defaults to self. */
@@ -152,7 +177,7 @@ export class CreateSampleRequestPage extends BasePage {
 
   /** Step 1 (Techpack) already defaults to "No techpack for this style" — nothing to fill, just advance. */
   async continueFromTechpackStep(): Promise<void> {
-    await this.locators.continueButton.click();
+    await this.continueTo(CreateSampleRequestPage.STEPS.styleDetails);
   }
 
   /** Step 2 (Style details) — the 6 fields confirmed live to block Save. */
@@ -163,20 +188,22 @@ export class CreateSampleRequestPage extends BasePage {
     await this.pick(this.locators.typeOfSample, values.typeOfSample);
     await this.pick(this.locators.washLevel, values.washLevel);
 
-    // Buyer delivery date: a date-picker, not a combobox — any future day is
-    // valid. Same settle-wait as pick() — the calendar grid is still
-    // rendering right after the trigger click.
+    // Buyer delivery date: the latest selectable day in the calendar's
+    // current month. Only today onward is selectable (see
+    // enabledDates()), so this is never in the past; it's today itself
+    // only on a month's last day.
     await this.locators.buyerDeliveryDateButton.click();
-    await this.page.waitForTimeout(500);
-    await this.locators.firstEnabledDate().click();
+    const latest = this.locators.enabledDates().last();
+    await latest.waitFor({ state: 'visible' });
+    await latest.click();
 
-    await this.locators.continueButton.click();
+    await this.continueTo(CreateSampleRequestPage.STEPS.fabric);
   }
 
   /** Step 3 (Fabric) — at least one main fabric is required. */
   async fillFabric(values: Pick<SampleRequestFieldValues, 'fabric'> = {}): Promise<void> {
     await this.pick(this.locators.fabric, values.fabric);
-    await this.locators.continueButton.click();
+    await this.continueTo(CreateSampleRequestPage.STEPS.sizes);
   }
 
   /**
@@ -197,19 +224,21 @@ export class CreateSampleRequestPage extends BasePage {
     await waistChip.click();
     await this.locators.addSizesButton.click();
     await this.locators.buyerQuantity.fill(values.buyerQuantity ?? '10');
-    await this.locators.continueButton.click();
+    await this.continueTo(CreateSampleRequestPage.STEPS.legTube);
   }
 
   /**
    * Steps 5-8 (Leg tube, Additional info, 3D view, Costing request) all
-   * default to "No" — just advance through each. Only 3 "Continue"
-   * clicks are needed from here (5→6, 6→7, 7→8): Step 8 is the last
-   * step and has no Continue button of its own, only Save.
+   * default to "No" — just advance through each, waiting for every step's
+   * heading. Step 8 is the last step and has no Continue button of its
+   * own, only Save. `artStyle`, when given, fills Step 6's optional free-text
+   * "Art style" — the wizard's only text field, used for the QA-AUTO tag.
    */
-  async continueThroughRemainingSteps(): Promise<void> {
-    for (let i = 0; i < 3; i++) {
-      await this.locators.continueButton.click();
-    }
+  async continueThroughRemainingSteps(artStyle?: string): Promise<void> {
+    await this.continueTo(CreateSampleRequestPage.STEPS.additionalInfo);
+    if (artStyle) await this.locators.artStyle.fill(artStyle);
+    await this.continueTo(CreateSampleRequestPage.STEPS.view3d);
+    await this.continueTo(CreateSampleRequestPage.STEPS.costing);
   }
 
   /**
@@ -221,7 +250,7 @@ export class CreateSampleRequestPage extends BasePage {
    */
   async save(): Promise<void> {
     await this.locators.saveButton.click();
-    await this.page.getByRole('button', { name: 'Yes, submit' }).click();
+    await this.locators.confirmSubmitButton.click();
   }
 
   /**

@@ -39,8 +39,12 @@ export class CreateSampleRequestLocators {
   readonly addSizesButton: Locator;
   readonly buyerQuantity: Locator;
 
+  // Step 6 — Additional info
+  readonly artStyle: Locator;
+
   readonly continueButton: Locator;
   readonly saveButton: Locator;
+  readonly confirmSubmitButton: Locator;
 
   constructor(private readonly page: Page) {
     // Re-confirmed live (2026-10-06): the heading reads "Create sample
@@ -88,10 +92,17 @@ export class CreateSampleRequestLocators {
     // Sizes & Quantity changes above. Accessible name unchanged.
     this.buyerQuantity = page.getByRole('textbox', { name: 'Buyer quantity' });
 
-    this.continueButton = page.getByRole('button', { name: 'Continue' });
-    // Confirmed live: the label is "Save & trigger" (referencing the
-    // auto-triggered Techpack/SO/Consumption tasks), not plain "Save".
-    this.saveButton = page.getByRole('button', { name: /^Save/ });
+    // Step 6 (Additional info) — an optional free-text field, the only one
+    // in the wizard (confirmed live 2026-10-14), so it carries the
+    // QA-AUTO test-data tag.
+    this.artStyle = page.getByRole('textbox', { name: 'Art style' });
+
+    this.continueButton = page.getByRole('button', { name: 'Continue', exact: true });
+    // Confirmed live (2026-10-14): "Save & trigger" (referencing the
+    // auto-triggered Techpack/SO/Consumption tasks) is the wizard's only
+    // save-like button — matched exactly so a future "Save draft" can't match.
+    this.saveButton = page.getByRole('button', { name: 'Save & trigger', exact: true });
+    this.confirmSubmitButton = page.getByRole('button', { name: 'Yes, submit', exact: true });
   }
 
   /** An option inside whichever combobox popover is currently open. */
@@ -99,8 +110,17 @@ export class CreateSampleRequestLocators {
     return this.page.getByRole('option', { name });
   }
 
-  /** The first enabled (selectable) day in whichever date-picker calendar is open. */
-  firstEnabledDate(): Locator {
-    return this.page.locator('[role="grid"] button:not([disabled])').first();
+  /** A wizard step's own heading, e.g. "Describe the style" — see CreateSampleRequestPage.STEPS. */
+  stepHeading(name: string): Locator {
+    return this.page.getByRole('heading', { name, exact: true });
+  }
+
+  /**
+   * Every selectable day in the open date-picker calendar. Confirmed live
+   * (2026-10-14): past days and the neighbouring months' days are rendered
+   * disabled (the latter also hidden), so only today onward is selectable.
+   */
+  enabledDates(): Locator {
+    return this.page.getByRole('grid').getByRole('button', { disabled: false });
   }
 }

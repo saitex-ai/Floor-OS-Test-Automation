@@ -36,8 +36,16 @@ export class SampleRequestListPage extends BasePage {
     await this.locators.newSampleRequestButton.click();
   }
 
-  /** Confirms a given Sample Request (by its real ID, e.g. "Sample_2026_0012") is visible in the list. */
-  async expectRowVisible(sampleRequestId: string): Promise<void> {
-    await expect(this.locators.row(sampleRequestId)).toBeVisible();
+  /**
+   * Searches for a Sample Request by its real ID (e.g. "Sample_2026_0012")
+   * and confirms its row is listed. The search filters after a debounce,
+   * and a just-created request can take a moment to be listed, so the
+   * search is re-applied until the row shows.
+   */
+  async expectSearchFinds(sampleRequestId: string): Promise<void> {
+    await expect(async () => {
+      await this.search(sampleRequestId);
+      await expect(this.locators.row(sampleRequestId)).toBeVisible({ timeout: 5_000 });
+    }).toPass({ timeout: 30_000 });
   }
 }
