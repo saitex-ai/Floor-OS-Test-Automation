@@ -26,8 +26,10 @@ export const ALERTS_LIST_PATH = '/crm/alerts';
  *   communications-email.locators.ts) and Key Meeting Notes/Log a
  *   Communication's own Notify Internally flows. From is the logged-in
  *   user (read-only); Internal sharing's "To" is a multi-select of user
- *   email IDs; Customer sharing's "To" is a single-Customer picker with
- *   a separate optional "CC" multi-select of user email IDs.
+ *   email IDs; Customer sharing's "To" is a multi-select of Customer
+ *   and Contact email addresses grouped by Customer (corrected
+ *   2026-10-15 — earlier described as a single-Customer picker), with a
+ *   separate optional "CC" multi-select of user email IDs.
  * - The Official Source section renders its URL as a real `link`, not a
  *   button — a plain `target="_blank"` new-tab open is the expected
  *   mechanism (same un-attestable-external-page boundary as every other
@@ -54,6 +56,19 @@ export class AlertsLocators {
   readonly customerCcCombobox: Locator;
   readonly redirectToOutlookButton: Locator;
   readonly emailCancelButton: Locator;
+  /** Read-only "From" value — a plain `<p>` ("Name <email>"), not an input (confirmed 2026-10-15). */
+  readonly emailFromValue: Locator;
+  /** "Email Body — Alert Details" preview — a whitespace-pre-wrap `<div>` holding exactly the text handed to Outlook as the body. */
+  readonly emailBodyPreview: Locator;
+  /** The search box at the top of an open To/CC recipient popover (only one popover is ever open). */
+  readonly recipientSearchInput: Locator;
+  readonly redirectedToOutlookToast: Locator;
+
+  // Detail screen content (for "record unchanged" checks)
+  readonly alertTitleHeading: Locator;
+  /** The detail screen's own inner `main` (the outer app-shell `main` also holds toasts). */
+  readonly alertDetailContent: Locator;
+  readonly userMenuButton: Locator;
 
   // Delete confirmation
   readonly deleteConfirmDialog: Locator;
@@ -81,8 +96,29 @@ export class AlertsLocators {
       .filter({ hasText: /^Email Alert/ });
     this.toCombobox = this.emailDialog.getByRole('combobox', { name: 'To', exact: true });
     this.customerCcCombobox = this.emailDialog.getByRole('combobox', { name: 'CC', exact: true });
-    this.redirectToOutlookButton = this.emailDialog.getByRole('button', { name: 'Redirect to Outlook' });
+    this.redirectToOutlookButton = this.emailDialog.getByRole('button', {
+      name: 'Redirect to Outlook',
+    });
     this.emailCancelButton = this.emailDialog.getByRole('button', { name: 'Cancel', exact: true });
+    // Confirmed 2026-10-15 (Sprint 5 "Email an Alert"): From is the only
+    // paragraph in the dialog; the body preview is the only div directly
+    // following the "Email Body — Alert Details" label.
+    this.emailFromValue = this.emailDialog.getByRole('paragraph').first();
+    this.emailBodyPreview = this.emailDialog
+      .locator('label', { hasText: 'Email Body — Alert Details' })
+      .locator('xpath=following-sibling::div[1]');
+    this.recipientSearchInput = page.getByRole('textbox', { name: 'Search…' });
+    this.redirectedToOutlookToast = page
+      .locator('[data-sonner-toast]')
+      .filter({ hasText: 'Redirected to Outlook' })
+      .first();
+
+    this.alertTitleHeading = page.getByRole('heading', { level: 1 });
+    this.alertDetailContent = page
+      .getByRole('main')
+      .filter({ has: page.getByRole('link', { name: 'Back to alerts' }) })
+      .last();
+    this.userMenuButton = page.getByRole('banner').getByRole('button', { name: /^Open user menu/ });
 
     // Confirmed against the running app: "Delete this Alert?" with a
     // plain Cancel/Confirm pair — no "type the alert name to confirm"
@@ -92,8 +128,14 @@ export class AlertsLocators {
       .getByRole('dialog')
       .or(page.getByRole('alertdialog'))
       .filter({ hasText: 'Delete this Alert?' });
-    this.deleteConfirmButton = this.deleteConfirmDialog.getByRole('button', { name: 'Confirm', exact: true });
-    this.deleteCancelButton = this.deleteConfirmDialog.getByRole('button', { name: 'Cancel', exact: true });
+    this.deleteConfirmButton = this.deleteConfirmDialog.getByRole('button', {
+      name: 'Confirm',
+      exact: true,
+    });
+    this.deleteCancelButton = this.deleteConfirmDialog.getByRole('button', {
+      name: 'Cancel',
+      exact: true,
+    });
   }
 
   /** A status/category tab on the List screen, by its bare name — accessible name carries a live count suffix, e.g. "Garment Trims 3". */
@@ -104,5 +146,29 @@ export class AlertsLocators {
   /** A row in the alerts table, by its Alert title (partial match — titles are long). */
   alertRow(titleSubstring: string): Locator {
     return this.page.getByRole('row').filter({ hasText: titleSubstring });
+  }
+
+  /**
+   * The open To/CC recipient popover's listbox (the popover is a separate
+   * `dialog` portal, outside the Email dialog; its listbox is labelled
+   * after its field). Customer "To" renders one `group` per Customer
+   * (aria-label = Customer name), the Customer's own email first, then its
+   * Contacts; each `option`'s accessible name is "<email> <person/customer name>".
+   */
+  recipientListbox(field: 'To' | 'CC'): Locator {
+    return this.page.getByRole('listbox', { name: field, exact: true });
+  }
+
+  /** One recipient option by its exact email address (the accessible name starts with it). */
+  recipientOption(field: 'To' | 'CC', email: string): Locator {
+    const escaped = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return this.recipientListbox(field).getByRole('option', {
+      name: new RegExp(`^${escaped}( |$)`),
+    });
+  }
+
+  /** A Customer's group in the Customer "To" list, by exact Customer name. */
+  recipientGroup(customerName: string): Locator {
+    return this.recipientListbox('To').getByRole('group', { name: customerName, exact: true });
   }
 }
