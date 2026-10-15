@@ -3,6 +3,9 @@ import { type Locator, type Page } from '@playwright/test';
 /** External Events list, under the CRM module (confirmed against the running app). */
 export const EXTERNAL_EVENTS_LIST_PATH = '/crm/events';
 
+/** Escapes a literal string for use inside a RegExp (event titles can contain "|", "." etc.). */
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /**
  * Raw element locators for "Create External Event" (CRM, Sprint 4 user
  * story) — no actions or assertions here, see
@@ -118,6 +121,23 @@ export class ExternalEventsLocators {
   readonly aiRelevanceColumnHeader: Locator;
   readonly emptyStateMessage: Locator;
 
+  // List screen (Sprint 5 — "Build External Events List with Web Crawling")
+  readonly filtersButton: Locator;
+  readonly filterTypeButton: Locator;
+  readonly filterTypeListbox: Locator;
+  readonly filterApplyButton: Locator;
+  readonly clearAllFiltersButton: Locator;
+  readonly noSplitButton: Locator;
+  readonly verticalSplitButton: Locator;
+  readonly horizontalSplitButton: Locator;
+  readonly splitPreviewHeading: Locator;
+  readonly paginationSummary: Locator;
+  readonly columnHeaders: Locator;
+  readonly dataRows: Locator;
+  readonly emptyStateHint: Locator;
+  readonly resetColumnsButton: Locator;
+  readonly closeColumnsDialogButton: Locator;
+
   // Details/workspace (Sprint 3) — shared with the create flow's own read-back
   readonly toAttendButton: Locator;
   readonly notAttendingButton: Locator;
@@ -173,6 +193,34 @@ export class ExternalEventsLocators {
     this.aiRelevanceColumnHeader = page.getByRole('button', { name: 'AI Relevance', exact: true });
     this.emptyStateMessage = page.getByText(/no (matching )?(events|records)/i);
 
+    // Sprint 5 additions, confirmed against dev (2026-10-15).
+    // The Filters toggle's accessible name gains an "(N applied)" suffix
+    // once a filter is applied — e.g. "Filters (1 applied)".
+    this.filtersButton = page.getByRole('button', { name: /^Filters( \(\d+ applied\))?$/ });
+    // Both the Filters panel's Type dropdown AND the table's Type column
+    // sort button are named "Type" — only the dropdown carries
+    // aria-expanded, which is what disambiguates them.
+    this.filterTypeButton = page
+      .getByRole('button', { name: 'Type', exact: true })
+      .and(page.locator('[aria-expanded]'));
+    this.filterTypeListbox = page.getByRole('listbox', { name: 'Type' });
+    this.filterApplyButton = page.getByRole('button', { name: 'Apply', exact: true });
+    this.clearAllFiltersButton = page.getByRole('button', { name: 'Clear all', exact: true });
+    this.noSplitButton = page.getByRole('button', { name: 'No split' });
+    this.verticalSplitButton = page.getByRole('button', { name: 'Vertical split' });
+    this.horizontalSplitButton = page.getByRole('button', { name: 'Horizontal split' });
+    // The split layouts' preview pane titles the selected event as an h3.
+    this.splitPreviewHeading = page.getByRole('heading', { level: 3 });
+    this.paginationSummary = page.getByText(/^Showing \d+ to \d+ of \d+/);
+    this.columnHeaders = page.getByRole('columnheader');
+    this.dataRows = page.getByRole('row').filter({ hasNot: page.getByRole('columnheader') });
+    this.emptyStateHint = page.getByText('Try removing a filter or clearing them all.');
+    this.resetColumnsButton = this.columnsDialog.getByRole('button', { name: 'Reset to default' });
+    this.closeColumnsDialogButton = this.columnsDialog.getByRole('button', {
+      name: 'Close',
+      exact: true,
+    });
+
     this.toAttendButton = page.getByRole('button', { name: 'To Attend', exact: true });
     this.notAttendingButton = page.getByRole('button', { name: 'Not Attending', exact: true });
     this.markAttendedButton = page.getByRole('button', { name: 'Mark Attended' });
@@ -194,7 +242,10 @@ export class ExternalEventsLocators {
     });
     this.declineDetailedReasonInput = this.declineDialog.getByRole('textbox');
     this.declineProceedButton = this.declineDialog.getByRole('button', { name: 'Proceed' });
-    this.declineCancelButton = this.declineDialog.getByRole('button', { name: 'Cancel', exact: true });
+    this.declineCancelButton = this.declineDialog.getByRole('button', {
+      name: 'Cancel',
+      exact: true,
+    });
 
     this.titleInput = page.getByRole('textbox', { name: 'External Event Title', exact: false });
     this.venueInput = page.getByRole('textbox', { name: 'External Event Venue', exact: false });
@@ -258,5 +309,49 @@ export class ExternalEventsLocators {
   /** Every one of this form's inline "Required" errors — one per blank mandatory field. */
   requiredFieldErrors(): Locator {
     return this.page.getByText('Required', { exact: true });
+  }
+
+  /** An option in the Filters panel's Type dropdown (e.g. "Trade Fair"). */
+  filterTypeOption(type: string): Locator {
+    return this.filterTypeListbox.getByRole('option', { name: type, exact: true });
+  }
+
+  /** The removable chip shown under the toolbar for an applied filter, e.g. "Type: Trade Fair". */
+  removeFilterChip(label: string): Locator {
+    return this.page.getByRole('button', { name: `Remove ${label}`, exact: true });
+  }
+
+  /** A column's header cell, by its visible label (accessible name also carries "Resize <label> column"). */
+  columnHeader(label: string): Locator {
+    return this.page.getByRole('columnheader', {
+      name: new RegExp(`^${escapeRegExp(label)} Resize`),
+    });
+  }
+
+  /** The clickable sort button inside a column header. */
+  columnSortButton(label: string): Locator {
+    return this.columnHeader(label).getByRole('button', { name: label, exact: true });
+  }
+
+  /** The sort indicator icon inside a column header's sort button. */
+  columnSortIcon(label: string): Locator {
+    return this.columnSortButton(label).locator('svg');
+  }
+
+  /** The drag handle for a column in the Configure Columns dialog. */
+  columnDragHandle(columnName: string): Locator {
+    return this.columnsDialog.getByRole('button', { name: `Drag ${columnName}`, exact: true });
+  }
+
+  /** A row checkbox in the table layouts (No split / Horizontal split), by its row's Event title. */
+  rowCheckbox(title: string): Locator {
+    return this.eventRow(title).getByRole('checkbox');
+  }
+
+  /** A list item in the Vertical split's left-hand list — a button named "Select row <title> …" or "Deselect row <title> …" once checked. */
+  splitListItem(title: string): Locator {
+    return this.page.getByRole('button', {
+      name: new RegExp(`^(Select|Deselect) row ${escapeRegExp(title)}`),
+    });
   }
 }

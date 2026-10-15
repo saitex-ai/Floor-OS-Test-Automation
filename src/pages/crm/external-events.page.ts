@@ -1,6 +1,9 @@
 import { type Page, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
-import { ExternalEventsLocators, EXTERNAL_EVENTS_LIST_PATH } from '../../locators/crm/external-events.locators';
+import {
+  ExternalEventsLocators,
+  EXTERNAL_EVENTS_LIST_PATH,
+} from '../../locators/crm/external-events.locators';
 
 /**
  * "Create External Event [created by user manually]" (CRM, Sprint 4 user
@@ -266,7 +269,10 @@ export class ExternalEventsPage extends BasePage {
 
   /** TC:5 — confirms the registration link opens in a new tab, without asserting on that external page's own content. */
   async clickRegisterOnlineAndAwaitNewTab(): Promise<Page | null> {
-    const newPagePromise = this.page.context().waitForEvent('page', { timeout: 10_000 }).catch(() => null);
+    const newPagePromise = this.page
+      .context()
+      .waitForEvent('page', { timeout: 10_000 })
+      .catch(() => null);
     await this.locators.registerOnlineLink.click();
     return newPagePromise;
   }
@@ -343,5 +349,186 @@ export class ExternalEventsPage extends BasePage {
   /** TC:4 — opens the event's own "Create Customer" lead-capture link from its Leads tab (pre-links eventId via query params). Does NOT complete the save — see class doc: the resulting form's "Origin" field is confirmed permanently disabled while still required, blocking Save through this entry point in this environment. */
   async openCreateCustomerFromLeads(): Promise<void> {
     await this.locators.createCustomerLeadLink.click();
+  }
+
+  // ---------------------------------------------------------------------
+  // List screen (CRM Sprint 5 — "Build External Events List with Web
+  // Crawling"). Confirmed against dev (2026-10-15):
+  // - Free-text search matches Event title, Type and the Schedule/venue
+  //   text (case-insensitive, partial) — NOT Status, Created By or the
+  //   event's id.
+  // - "Filters" opens an inline panel with Type + Country dropdowns and an
+  //   explicit Apply; an applied filter shows as a removable chip
+  //   ("Type: Trade Fair") and the status tab counts re-scope to it.
+  //   Status filtering is the status tabs themselves.
+  // - Sorting cycles asc -> desc -> asc (never back to unsorted).
+  // - Column visibility/order, sort, and layout ("viewMode") are persisted
+  //   per BROWSER in localStorage key "crm-events-list-prefs-v1" — not
+  //   server-side. Every Playwright test gets a fresh context, so nothing
+  //   leaks between tests, but specs still reset what they change.
+  // ---------------------------------------------------------------------
+
+  /** The "of N" total from the "Showing 1 to X of N" pagination summary. */
+  async readPaginationTotal(): Promise<number> {
+    const text = await this.locators.paginationSummary.innerText();
+    const match = text.match(/of (\d+)/);
+    expect(match, `unexpected pagination summary: "${text}"`).not.toBeNull();
+    return Number(match![1]);
+  }
+
+  /** A top-level status tab's live count badge (e.g. "All 57" -> 57). */
+  async readStatusTabCount(name: 'All' | 'Planning' | 'To Attend' | 'Attended'): Promise<number> {
+    const text = await this.locators.statusTab(name).innerText();
+    return Number(text.replace(/\D/g, ''));
+  }
+
+  /** Visible column header labels, in on-screen order (excluding the select-all checkbox column). */
+  async readColumnLabels(): Promise<string[]> {
+    const labels = await this.locators.columnHeaders.allInnerTexts();
+    return labels.map((l) => l.trim()).filter((l) => l.length > 0);
+  }
+
+  /** Every visible row's value in one column, read by that column's on-screen position. */
+  async readColumnValues(label: string): Promise<string[]> {
+    const headers = (await this.locators.columnHeaders.allInnerTexts()).map((l) => l.trim());
+    const index = headers.indexOf(label);
+    expect(
+      index,
+      `column "${label}" is not visible (headers: ${headers.join(', ')})`,
+    ).toBeGreaterThan(-1);
+    const rows = await this.locators.dataRows.all();
+    const values: string[] = [];
+    for (const row of rows) {
+      values.push((await row.getByRole('cell').nth(index).innerText()).trim());
+    }
+    return values;
+  }
+
+  /** Waits until the pagination total stops at `expected` — the grid refetches asynchronously after a search/filter/tab change. */
+  async expectPaginationTotal(expected: number): Promise<void> {
+    await expect.poll(() => this.readPaginationTotal(), { timeout: 15_000 }).toBe(expected);
+  }
+
+  async openFiltersPanel(): Promise<void> {
+    if ((await this.locators.filtersButton.getAttribute('aria-pressed')) !== 'true') {
+      await this.locators.filtersButton.click();
+    }
+    await expect(this.locators.filterTypeButton).toBeVisible();
+  }
+
+  async closeFiltersPanel(): Promise<void> {
+    if ((await this.locators.filtersButton.getAttribute('aria-pressed')) === 'true') {
+      await this.locators.filtersButton.click();
+    }
+    await expect(this.locators.filterTypeButton).toBeHidden();
+  }
+
+  /** Filters panel -> Type dropdown -> pick one type -> Apply, then collapses the panel. */
+  async filterByType(type: string): Promise<void> {
+    await this.openFiltersPanel();
+    await this.locators.filterTypeButton.click();
+    await this.locators.filterTypeOption(type).click();
+    await this.page.keyboard.press('Escape');
+    await expect(this.locators.filterTypeListbox).toBeHidden();
+    await this.locators.filterApplyButton.click();
+    await expect(this.locators.removeFilterChip(`Type: ${type}`)).toBeVisible();
+    await this.closeFiltersPanel();
+    await this.page.waitForTimeout(600);
+  }
+
+  /** Removes one applied filter via its chip's "x" (e.g. "Type: Trade Fair"). */
+  async removeFilter(label: string): Promise<void> {
+    await this.locators.removeFilterChip(label).click();
+    await expect(this.locators.removeFilterChip(label)).toBeHidden();
+    await this.page.waitForTimeout(600);
+  }
+
+  /** Clicks a column header's sort button once (asc on first click, then toggles asc/desc). */
+  async clickColumnSort(label: string): Promise<void> {
+    await this.locators.columnSortButton(label).click();
+    await this.page.waitForTimeout(800);
+  }
+
+  async openColumnsDialog(): Promise<void> {
+    await this.locators.configureColumnsButton.click();
+    await expect(this.locators.columnsDialog).toBeVisible();
+  }
+
+  async toggleColumn(columnName: string): Promise<void> {
+    await this.locators.columnToggle(columnName).click();
+  }
+
+  /**
+   * Drag-and-drop reorder in the Columns dialog: drops `columnName` onto
+   * `targetColumn`'s position. The list is a pointer-sensor sortable, so a
+   * plain dragTo() is not enough — the pointer must move a few px to
+   * activate the drag before travelling, confirmed directly.
+   */
+  async dragColumnOnto(columnName: string, targetColumn: string): Promise<void> {
+    const source = await this.locators.columnDragHandle(columnName).boundingBox();
+    const target = await this.locators.columnDragHandle(targetColumn).boundingBox();
+    expect(source && target, 'column drag handles must be visible').toBeTruthy();
+    const sx = source!.x + source!.width / 2;
+    const sy = source!.y + source!.height / 2;
+    await this.page.mouse.move(sx, sy);
+    await this.page.mouse.down();
+    await this.page.mouse.move(sx, sy - 10, { steps: 5 });
+    await this.page.mouse.move(target!.x + target!.width / 2, target!.y + target!.height / 2 - 5, {
+      steps: 20,
+    });
+    await this.page.mouse.up();
+    // Let the drop animation finish — clicking Apply mid-animation was
+    // confirmed to leave the dialog open (the click lands on the moving item).
+    await this.page.waitForTimeout(500);
+  }
+
+  /** Column order as listed in the open Columns dialog (first item is the locked "Event"). */
+  async readColumnsDialogOrder(): Promise<string[]> {
+    const items = await this.locators.columnsDialog.getByRole('listitem').allInnerTexts();
+    return items.map((t) =>
+      t
+        .replace(/\s+/g, ' ')
+        .replace(/ locked$/, '')
+        .trim(),
+    );
+  }
+
+  async applyColumns(): Promise<void> {
+    await this.locators.applyColumnsButton.click();
+    await expect(this.locators.columnsDialog).toBeHidden();
+  }
+
+  /** Confirmed directly: "Reset to default" applies immediately (Apply goes back to disabled) — only Close is needed afterward. */
+  async resetColumnsToDefault(): Promise<void> {
+    // Tolerate being called with the dialog still open (e.g. from a
+    // cleanup block after a failed step).
+    if (!(await this.locators.columnsDialog.isVisible())) {
+      await this.openColumnsDialog();
+    }
+    await this.locators.resetColumnsButton.click();
+    await expect(this.locators.applyColumnsButton).toBeDisabled();
+    await this.locators.closeColumnsDialogButton.click();
+    await expect(this.locators.columnsDialog).toBeHidden();
+  }
+
+  async switchLayout(layout: 'No split' | 'Vertical split' | 'Horizontal split'): Promise<void> {
+    const button = {
+      'No split': this.locators.noSplitButton,
+      'Vertical split': this.locators.verticalSplitButton,
+      'Horizontal split': this.locators.horizontalSplitButton,
+    }[layout];
+    await button.click();
+    await expect(button).toHaveAttribute('aria-pressed', 'true');
+  }
+
+  /** Ticks one row's checkbox in a table layout. */
+  async selectRow(title: string): Promise<void> {
+    await this.locators.rowCheckbox(title).check();
+  }
+
+  /** Re-opens the list via a full browser reload (the "come back later" half of a persistence check). */
+  async reloadList(): Promise<void> {
+    await this.page.reload();
+    await this.waitForCountsLoaded();
   }
 }
