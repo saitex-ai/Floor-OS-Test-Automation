@@ -16,8 +16,9 @@ import type { CustomerProfileDetails } from '../../../src/pages/crm/create-custo
  *   mostly other automation's "Automation QA Company …" records — so the
  *   tests pick whichever options are listed first rather than hard-coding
  *   names.
- * - TC:3 BUG: the Detail read view renders multiple companies as ONE
- *   comma-joined string, not distinct chips/items.
+ * - TC:3: multiple companies can be selected; the Detail read view shows
+ *   them as one comma-separated list, which is the intended display
+ *   (confirmed with the team 2026-10-15).
  * - TC:4 BUG: a Customer still saves with NO Company selected (ClickUp bug
  *   z941abx9aw is marked done but is not fixed on dev).
  * - TC:6 is fixme: Customer Detail has no Audit History / Activity log.
@@ -140,12 +141,9 @@ test.describe('CRM - Company for Customer', () => {
       await expect(customerDetailPage.locators.nameHeading).toHaveText(profile.name!);
     });
 
-    // BUG (confirmed on dev 2026-10-15): ClickUp expects each company as a
-    // distinct chip/item in the read view, "rather than a single
-    // comma-joined string" — the Detail page's Customer Management card
-    // renders exactly that single comma-joined plain-text string. Both
-    // companies ARE persisted. Flip this to a chip assertion once fixed.
-    await test.step('BUG: read view shows all companies as ONE comma-joined string, not distinct chips', async () => {
+    // Confirmed with the team (2026-10-15): multiple companies are shown on
+    // the Detail page as one comma-separated list — intended, not a bug.
+    await test.step('Both companies are saved and shown on the Detail page as a comma-separated list', async () => {
       await customerDetailPage.expectCompanyReadValue(companies.join(', '));
       await customerDetailPage.expectCompanyReadValueIsPlainText();
     });
