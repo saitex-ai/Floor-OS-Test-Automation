@@ -106,6 +106,30 @@ export class CustomerDetailPage extends BasePage {
     await this.saveFieldEdit();
   }
 
+  /**
+   * Edits Customer Name on the Profile section and saves. Returns the
+   * HTTP status of the profile PATCH, since the UI gives no feedback when
+   * the server rejects it (see expectNoProfileUpdatedToast()).
+   */
+  async renameCustomer(newName: string): Promise<number> {
+    await this.openFieldEdit('Customer Name');
+    await this.fillFieldEdit('Customer Name', newName);
+    const response = this.page.waitForResponse(
+      (r) => r.url().includes('/overview/profile') && r.request().method() === 'PATCH',
+    );
+    await this.saveFieldEdit();
+    return (await response).status();
+  }
+
+  async expectCustomerName(name: string): Promise<void> {
+    await expect(this.locators.nameHeading.first()).toHaveText(name);
+  }
+
+  /** No "Customer Profile updated" toast is shown. */
+  async expectNoProfileUpdatedToast(): Promise<void> {
+    await expect(this.page.getByText('Customer Profile updated')).toHaveCount(0);
+  }
+
   async expectFieldEditError(message: string | RegExp): Promise<void> {
     await expect(this.page.getByText(message).first()).toBeVisible();
   }

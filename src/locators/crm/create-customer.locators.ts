@@ -61,6 +61,8 @@ export class CreateCustomerLocators {
 
   // Duplicate-detection modal
   readonly duplicateWarningModal: Locator;
+  /** Every inline field error currently shown on the form (`.crm-error`). */
+  readonly fieldErrors: Locator;
   readonly saveAnywayButton: Locator;
   readonly cancelToReviewButton: Locator;
   readonly viewExistingCustomerButton: Locator;
@@ -128,6 +130,7 @@ export class CreateCustomerLocators {
       .or(page.getByRole('alertdialog'))
       .filter({ hasText: /may already exist|already exists in CRM|Match in Customer Name/i });
     this.saveAnywayButton = this.duplicateWarningModal.getByRole('button', { name: 'Save anyway' });
+    this.fieldErrors = page.locator('.crm-error');
     // Accepts either "Cancel to review" (the original soft-warning text)
     // or the hard-block dialog's plain "Cancel" — exact on the latter so
     // it doesn't also match "Cancel to review" ambiguously.
