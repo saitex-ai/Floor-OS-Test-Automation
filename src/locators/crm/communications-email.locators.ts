@@ -45,6 +45,8 @@ export class CommunicationsEmailLocators {
   readonly newEmailModal: Locator;
   readonly fromField: Locator;
   readonly toField: Locator;
+  /** The To recipient picker (since 2026-10-15 a required multi-select, not a pre-filled address). */
+  readonly toCombobox: Locator;
   readonly composeInOutlookButton: Locator;
   readonly cancelButton: Locator;
 
@@ -84,6 +86,7 @@ export class CommunicationsEmailLocators {
     this.toField = this.newEmailModal
       .getByText('To', { exact: true })
       .locator('xpath=following-sibling::p[1]');
+    this.toCombobox = this.newEmailModal.getByRole('combobox', { name: 'To' });
     // Confirmed against the running app: the real label is "Redirect to
     // Outlook", not "Compose in Outlook"/"Open in Outlook".
     this.composeInOutlookButton = this.newEmailModal.getByRole('button', {
@@ -115,5 +118,14 @@ export class CommunicationsEmailLocators {
   /** A system notification for an incoming email, located by its subject/text. */
   notificationItem(subject: string): Locator {
     return this.notificationsPanel.getByText(subject, { exact: false }).first();
+  }
+
+  /** A To-picker option in the given group ("Customer" or "Contacts") whose text contains `email`. */
+  toOption(group: 'Customer' | 'Contacts', email: string): Locator {
+    return this.page
+      .getByRole('listbox', { name: 'To' })
+      .getByRole('group', { name: group })
+      .getByRole('option')
+      .filter({ hasText: email });
   }
 }

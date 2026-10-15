@@ -70,14 +70,12 @@ export type CommunicationSubTab = 'logged' | 'notes' | 'emails';
  *   the event "records properly in the Customer's audit history" is NOT
  *   independently verifiable through this UI — there's simply no audit/
  *   history view to read it back from.
- * - Timestamp formatting is genuinely INCONSISTENT across this screen —
- *   see expectDateFieldFormat()/expectCreatedOnFieldFormat() below and
- *   TC:7 in the spec. The list rows and the detail view's own "Date" field
- *   both use DD-MM-YYYY; Key Meeting Notes' list/detail timestamps use
- *   DD-MM-YYYY HH:mm; but the Logged Communication detail view's own
- *   "Created On" field uses YYYY-MM-DD HH:mm — a different format than the
- *   "Date" field directly above it on the SAME screen. Real, confirmed app
- *   behavior, not a locator bug — worth flagging to product/dev.
+ * - Timestamp formatting (see expectDateFieldFormat()/
+ *   expectCreatedOnFieldFormat() below and TC:7 in the spec): list rows and
+ *   the detail view's "Date" field use DD-MM-YYYY; Key Meeting Notes'
+ *   timestamps and the detail view's "Created On" use DD-MM-YYYY HH:mm.
+ *   Until 2026-10-14 "Created On" used YYYY-MM-DD HH:mm, inconsistent with
+ *   the rest of the screen — fixed on dev by 2026-10-15.
  * - Switching sub-tabs while "Log a Communication" is open is not merely
  *   *warned against* — it's structurally impossible: the dialog is a real
  *   modal that removes the rest of the page (including the sub-tab strip)
@@ -160,7 +158,9 @@ export class CustomerCommunicationPage extends BasePage {
     // Communication tab first mounts. Emails never carries a badge at all
     // (see class doc), so only wait for one on the other two.
     if (tab !== 'emails') {
-      await expect(target).toHaveText(/\(\d+\)/, { timeout: 5_000 }).catch(() => undefined);
+      await expect(target)
+        .toHaveText(/\(\d+\)/, { timeout: 5_000 })
+        .catch(() => undefined);
     }
     const text = await target.innerText();
     const match = text.match(/\((\d+)\)/);
@@ -188,6 +188,16 @@ export class CustomerCommunicationPage extends BasePage {
   /** Confirmed real, environment-wide state (see class doc) — not a per-Customer empty state. */
   async expectEmailsUnavailable(): Promise<void> {
     await expect(this.locators.emailsUnavailableAlert).toBeVisible();
+  }
+
+  /**
+   * Confirmed live (2026-10-15): Outlook is now connected on dev — the
+   * Emails sub-tab shows a "Disconnect Outlook" button and, for a Customer
+   * with no emails, "No unread emails involving this customer."
+   */
+  async expectEmailsEmptyState(): Promise<void> {
+    await expect(this.locators.disconnectOutlookButton).toBeVisible();
+    await expect(this.locators.emailsEmptyText).toBeVisible();
   }
 
   // -------------------------------------------------------------------
@@ -220,14 +230,9 @@ export class CustomerCommunicationPage extends BasePage {
     await expect(this.locators.detailDateField).toHaveText(/^\d{2}-\d{2}-\d{4}$/);
   }
 
-  /**
-   * YYYY-MM-DD HH:mm — confirmed shape of the detail view's own "Created
-   * On" field. Deliberately a DIFFERENT regex than expectDateFieldFormat()
-   * — this is the confirmed, real inconsistency documented in the class
-   * doc, not a mistake being normalized away.
-   */
+  /** DD-MM-YYYY HH:mm — the detail view's "Created On" field, confirmed live 2026-10-15 (see class doc). */
   async expectCreatedOnFieldFormat(): Promise<void> {
-    await expect(this.locators.detailCreatedOnField).toHaveText(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+    await expect(this.locators.detailCreatedOnField).toHaveText(/^\d{2}-\d{2}-\d{4} \d{2}:\d{2}$/);
   }
 
   /**
@@ -239,7 +244,9 @@ export class CustomerCommunicationPage extends BasePage {
   async expectSubTabsUnreachableWhileLogCommunicationDialogOpen(): Promise<void> {
     await this.page.getByRole('button', { name: 'Log a Communication' }).click();
     await this.logCommunication.expectDialogVisible();
-    await this.logCommunication.locators.titleInput.fill('Dirty draft — should block sub-tab navigation');
+    await this.logCommunication.locators.titleInput.fill(
+      'Dirty draft — should block sub-tab navigation',
+    );
     await expect(this.locators.keyMeetingNotesTab).toHaveCount(0);
     await expect(this.locators.emailsTab).toHaveCount(0);
     await this.logCommunication.cancel();

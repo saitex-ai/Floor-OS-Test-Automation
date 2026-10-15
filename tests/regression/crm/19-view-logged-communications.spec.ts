@@ -92,15 +92,17 @@ test.describe('CRM - View Logged Communications', () => {
     await communicationsEmailPage.openFromCustomerDetail(customerId);
     await communicationsEmailPage.openNewEmailModal();
 
-    // CRM-side-observable: the draft preview's From/To are CRM-rendered
-    // state (FR-2.3), not Outlook's. From is the logged-in CRM user
-    // (confirmed against the running app — see communications-email.locators.ts),
-    // not a fixed address; To is this Customer's own seeded email.
-    await test.step('From/To are pre-populated per FR-2.3', async () => {
-      await communicationsEmailPage.expectRecipientsPrepopulated({
-        from: /alice@flooros\.dev/i,
-        to: customerEmail,
-      });
+    // CRM-side-observable (FR-2.3): From is the logged-in CRM user. Since
+    // 2026-10-15 To is no longer pre-filled: it's a required picker that
+    // offers this Customer's own email under "Customer" (and Contacts'
+    // emails under "Contacts"), which the user selects.
+    await test.step('From is pre-populated with the logged-in user', async () => {
+      await communicationsEmailPage.expectRecipientsPrepopulated({ from: /alice@flooros\.dev/i });
+    });
+
+    await test.step("The Customer's own email is offered in To and can be selected", async () => {
+      await communicationsEmailPage.selectCustomerEmailAsRecipient(customerEmail);
+      await communicationsEmailPage.expectToRecipientSelected(customerEmail);
     });
 
     // Un-attestable boundary: everything past this point happens inside

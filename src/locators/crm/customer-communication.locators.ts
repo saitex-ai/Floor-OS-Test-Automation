@@ -75,20 +75,28 @@ export class CustomerCommunicationLocators {
   // real `alert`-role explanatory message instead of a list, regardless of
   // record count. See class doc on CustomerCommunicationPage.
   readonly emailsUnavailableAlert: Locator;
+  readonly disconnectOutlookButton: Locator;
+  readonly emailsEmptyText: Locator;
 
   constructor(private readonly page: Page) {
     this.communicationTabButton = page.getByRole('button', { name: 'Communication', exact: true });
 
     this.subTabList = page.getByRole('tablist', { name: 'Communication views' });
-    this.loggedCommunicationsTab = this.subTabList.getByRole('tab', { name: /^Logged Communications/ });
+    this.loggedCommunicationsTab = this.subTabList.getByRole('tab', {
+      name: /^Logged Communications/,
+    });
     this.keyMeetingNotesTab = this.subTabList.getByRole('tab', { name: /^Key Meeting Notes/ });
     this.emailsTab = this.subTabList.getByRole('tab', { name: /^Emails/ });
 
     this.activeTabPanel = page.getByRole('tabpanel');
 
-    this.loggedCommunicationsEmptyText = this.activeTabPanel.getByText('No communications logged yet.');
+    this.loggedCommunicationsEmptyText = this.activeTabPanel.getByText(
+      'No communications logged yet.',
+    );
     this.loggedCommunicationRows = this.activeTabPanel.getByRole('listitem');
-    this.backToLoggedCommunicationsLink = page.getByText('Back to Logged Communications', { exact: true });
+    this.backToLoggedCommunicationsLink = page.getByText('Back to Logged Communications', {
+      exact: true,
+    });
     // Confirmed against the running app: these field labels render visually
     // as "DATE"/"CREATED ON" via CSS `uppercase`, but the real DOM text
     // content is title-case ("Date"/"Created On") — getByText matches text
@@ -98,7 +106,9 @@ export class CustomerCommunicationLocators {
     // down from the label's own wrapper — following-sibling::*[1] from the
     // label targets that wrapper, and its innerText resolves to just the
     // value (the read-only lock icon beside it carries no visible text).
-    this.detailDateField = page.getByText('Date', { exact: true }).locator('xpath=following-sibling::*[1]');
+    this.detailDateField = page
+      .getByText('Date', { exact: true })
+      .locator('xpath=following-sibling::*[1]');
     this.detailCreatedOnField = page
       .getByText('Created On', { exact: true })
       .locator('xpath=following-sibling::*[1]');
@@ -110,6 +120,8 @@ export class CustomerCommunicationLocators {
     this.emailsUnavailableAlert = page.getByRole('alert').filter({
       hasText: 'Outlook is not set up on this environment, so emails cannot be shown.',
     });
+    this.disconnectOutlookButton = page.getByRole('button', { name: 'Disconnect Outlook' });
+    this.emailsEmptyText = page.getByText('No unread emails involving this customer.');
   }
 
   /** A logged communication row's own title paragraph, by index in DOM (newest-first) order. */

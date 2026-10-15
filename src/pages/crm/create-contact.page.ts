@@ -124,6 +124,13 @@ export class CreateContactPage extends BasePage {
     await expect(this.page.getByText(message).first()).toBeVisible();
   }
 
+  /** Contact Name and Email are the mandatory Contact fields: both flagged invalid with a "Required" error. */
+  async expectNameAndEmailRequired(): Promise<void> {
+    await expect(this.locators.contactNameInput).toHaveAttribute('aria-invalid', 'true');
+    await expect(this.locators.emailInput).toHaveAttribute('aria-invalid', 'true');
+    await expect(this.page.getByRole('alert').filter({ hasText: /^Required$/ })).toHaveCount(2);
+  }
+
   async expectValidationBanner(message: string | RegExp): Promise<void> {
     await expect(this.page.getByRole('alert').filter({ hasText: message }).first()).toBeVisible();
   }

@@ -161,21 +161,16 @@ test.describe('CRM - Notify about a Key Meeting Notes', () => {
     );
     await keyMeetingNotesPage.openDetailFromHistory(title);
 
-    // Confirmed against the running app (see
-    // 14-generate-key-meeting-notes.spec.ts's TC:7): neither Notify button
-    // is a one-click dispatch — both open a real dialog, and "Notify
-    // Internally"'s Managers/Executives pickers are empty in this dev
-    // realm ("No one holds this role yet.") — a seed-data gap, not
-    // something to fake a pass for. "Notify the Customer" is the
-    // reliably-completable path here (its Customer combobox comes
-    // pre-filled), and re-triggering it is the same manual-repeat action
-    // this TC is actually about.
-    await test.step('Manually re-trigger the notification', async () => {
-      await keyMeetingNotesPage.notifyCustomer();
+    // Confirmed live (2026-10-15): Managers/Executives are now seeded on
+    // dev, so "Notify Internally" can be sent for real — the manual
+    // re-trigger this TC is about. (Until then this used "Notify the
+    // Customer", which is now an Outlook hand-off rather than a dispatch.)
+    await test.step('Send "Notify Internally" to a Manager', async () => {
+      await keyMeetingNotesPage.sendInternalNotificationTo('CRM Manager');
     });
 
-    await test.step('It is delivered again to configured recipients', async () => {
-      await keyMeetingNotesPage.sendNotification();
+    await test.step('Manually re-trigger it: delivered again to the configured recipient', async () => {
+      await keyMeetingNotesPage.sendInternalNotificationTo('CRM Manager');
     });
   });
 
@@ -197,11 +192,8 @@ test.describe('CRM - Notify about a Key Meeting Notes', () => {
     );
     await keyMeetingNotesPage.openDetailFromHistory(title);
 
-    await test.step('Trigger a notification', async () => {
-      // notifyCustomer() only opens the dialog — sendNotification() is
-      // the actual dispatch (see TC:3's comment above).
-      await keyMeetingNotesPage.notifyCustomer();
-      await keyMeetingNotesPage.sendNotification();
+    await test.step('Trigger a notification (Notify Internally to a Manager)', async () => {
+      await keyMeetingNotesPage.sendInternalNotificationTo('CRM Manager');
     });
 
     await test.step('The audit history shows the notification event', async () => {

@@ -102,6 +102,22 @@ export class CommunicationsEmailPage extends BasePage {
    * these are plain paragraphs, not form inputs, so matched by text
    * content, not `.toHaveValue()`.
    */
+  /**
+   * Confirmed live (2026-10-15): To is no longer pre-filled. It's a
+   * required picker listing the Customer's own email under "Customer" and
+   * its Contacts' emails under "Contacts"; this opens it, picks `email`
+   * from the "Customer" group, and closes it again.
+   */
+  async selectCustomerEmailAsRecipient(email: string): Promise<void> {
+    await this.locators.toCombobox.click();
+    await this.locators.toOption('Customer', email).click();
+    await this.page.keyboard.press('Escape');
+  }
+
+  async expectToRecipientSelected(email: string): Promise<void> {
+    await expect(this.locators.toCombobox).toContainText(email);
+  }
+
   async expectRecipientsPrepopulated(expected: ExpectedRecipients): Promise<void> {
     const l = this.locators;
     if (expected.from !== undefined) await expect(l.fromField).toContainText(expected.from);
