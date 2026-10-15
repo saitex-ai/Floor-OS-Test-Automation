@@ -133,16 +133,18 @@ async function expectStageOnDetails(
 }
 
 /**
- * BUG: the TCs expect the order under Customer Details → Biz Docs → Orders
- * tile, but on dev (2026-10-15) that tile is still the placeholder "Orders:
- * —. Purchase Orders is not available in floorOS yet." even after a Sales
- * Order exists for the Customer. Asserts that real behavior.
+ * The TCs expect the order under Customer Details → Biz Docs → Orders, but
+ * that tile is not implemented yet (confirmed with the team 2026-10-15):
+ * it still reads "Orders: —. Purchase Orders is not available in floorOS
+ * yet." even after a Sales Order exists. Not a bug — this checks the
+ * placeholder, and will fail (as a signal to extend the TC) once the
+ * Orders tile ships.
  */
-async function bugOrdersTileStillPlaceholder(
+async function ordersTileNotYetImplemented(
   bizDocPage: BizDocPage,
   prospect: ConvertibleProspect,
 ): Promise<void> {
-  await test.step('BUG: Biz Docs Orders tile does not list the order — still the "not available in floorOS yet" placeholder', async () => {
+  await test.step('Biz Docs Orders tile is not implemented yet — still the "not available in floorOS yet" placeholder', async () => {
     await bizDocPage.openFromCustomerDetails(prospect.id);
     await bizDocPage.waitForDocumentsLoaded();
     await bizDocPage.expectOrdersTileIsUnavailablePlaceholder();
@@ -182,7 +184,7 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
     await placeOrder(salesOrderPage, prospect, 'SMS', 'first');
 
     await expectStageOnDetails(prospectToCustomerConversionPage, prospect, 'Customer');
-    await bugOrdersTileStillPlaceholder(bizDocPage, prospect);
+    await ordersTileNotYetImplemented(bizDocPage, prospect);
   });
 
   test('TC:2 verify UI Consistency Across Views', async ({
@@ -372,7 +374,7 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
         bulkOrderNo,
       );
     });
-    await bugOrdersTileStillPlaceholder(bizDocPage, prospect);
+    await ordersTileNotYetImplemented(bizDocPage, prospect);
   });
 
   test('TC:6 Sample Order After Initial Bulk Order Conversion (Bulk --->Sample)', async ({
@@ -411,7 +413,7 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
         sampleOrderNo,
       );
     });
-    await bugOrdersTileStillPlaceholder(bizDocPage, prospect);
+    await ordersTileNotYetImplemented(bizDocPage, prospect);
   });
 
   test('TC:7 Verify First Order Created is a Bulk Order', async ({
@@ -446,6 +448,6 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
         orderNo,
       );
     });
-    await bugOrdersTileStillPlaceholder(bizDocPage, prospect);
+    await ordersTileNotYetImplemented(bizDocPage, prospect);
   });
 });
