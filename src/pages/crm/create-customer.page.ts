@@ -68,7 +68,8 @@ export class CreateCustomerPage extends BasePage {
     // toggles/clears on a second click rather than re-confirming the same
     // choice, which would otherwise clear a value already selected by an
     // earlier fillProfile() call on the same still-open form.
-    const companyIsEmpty = (await l.companyCombobox.innerText().catch(() => '')).trim() === 'Select';
+    const companyIsEmpty =
+      (await l.companyCombobox.innerText().catch(() => '')).trim() === 'Select';
     if (companyIsEmpty) {
       await l.companyCombobox.click();
       await this.page.getByRole('option').first().click();
@@ -143,6 +144,29 @@ export class CreateCustomerPage extends BasePage {
   /** Matches one of the form's `.crm-error` messages — several can be on screen at once. */
   async expectFieldError(message: string | RegExp): Promise<void> {
     await expect(this.page.getByText(message).first()).toBeVisible();
+  }
+
+  /** Exactly one inline error is shown, and it reads "Required" — i.e. only one mandatory field is missing. */
+  async expectOnlyOneRequiredError(): Promise<void> {
+    await expect(this.locators.fieldErrors).toHaveText(['Required']);
+  }
+
+  /**
+   * Confirmed live (2026-10-15): a Customer Name that already exists —
+   * also with different letter case or extra spaces — is a hard block.
+   * The field shows 'A customer named "<existing name>" already exists'
+   * and a "Match in Customer Name" modal offers only Cancel / View
+   * Existing Customer (no "Save anyway"). Nothing is saved.
+   */
+  async expectDuplicateNameBlocked(existingName: string): Promise<void> {
+    await expect(
+      this.locators.fieldErrors.filter({
+        hasText: `A customer named "${existingName}" already exists`,
+      }),
+    ).toBeVisible();
+    await expect(this.locators.duplicateWarningModal).toContainText('Match in Customer Name');
+    await expect(this.locators.saveAnywayButton).toBeHidden();
+    await expect(this.locators.postSaveModal).toBeHidden();
   }
 
   async expectDuplicateWarningVisible(): Promise<void> {
