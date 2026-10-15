@@ -138,7 +138,10 @@ async function renderUniqueBusinessCardPdf(): Promise<{ filePath: string; contac
  * Customer and links the Contact to it automatically, 1:1, confirmed
  * directly.
  */
-test.describe('CRM - Scan&Create Customer/Contact', () => {
+// Skipped on request (2026-10-15): the Scan & Create Customer/Contact tests
+// are left out of the CRM regression run for now. Change describe.skip back
+// to describe to run them again.
+test.describe.skip('CRM - Scan&Create Customer/Contact', () => {
   test.beforeEach(async () => {
     await allure.epic('CRM');
     await allure.feature('Scan&Create Customer/Contact');
