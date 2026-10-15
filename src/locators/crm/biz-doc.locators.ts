@@ -59,10 +59,35 @@ export class BizDocLocators {
   /** An UNGATED Customer Details sub-tab (present for every role) — see openFromCustomerDetailsWithoutTab()'s doc. */
   readonly communicationTabButton: Locator;
 
+  /**
+   * The "Loading documents…" placeholder the Biz Docs sub-tab shows while
+   * its tile counts load — confirmed on dev (2026-10-15): the tiles are
+   * absent from the tree until it goes away.
+   */
+  readonly loadingDocumentsText: Locator;
+  /**
+   * The fourth, "Orders" tile. Confirmed on dev (2026-10-15): a
+   * non-interactive `note` (not a button), accessible name
+   * "Orders: —. Purchase Orders is not available in floorOS yet." — the
+   * entry point the Prospect -> Customer conversion story
+   * (34-prospect-to-customer-conversion.spec.ts) expects to carry a
+   * "Create Order" action.
+   */
+  readonly ordersTile: Locator;
+  /**
+   * A "Create Order" control anywhere on the page. NOT present on dev
+   * (2026-10-15) — used only to assert its absence; re-derive its real
+   * shape once order creation ships.
+   */
+  readonly createOrderButton: Locator;
+
   constructor(private readonly page: Page) {
     this.detailsHeading = page.getByRole('heading', { level: 1 });
     this.bizDocsTabButton = page.getByRole('button', { name: 'Biz Docs', exact: true });
     this.communicationTabButton = page.getByRole('button', { name: 'Communication', exact: true });
+    this.loadingDocumentsText = page.getByText('Loading documents…');
+    this.ordersTile = page.getByRole('note', { name: /^Orders:/ });
+    this.createOrderButton = page.getByRole('button', { name: /create order/i });
   }
 
   /**
