@@ -1,10 +1,12 @@
 import { type Page, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
 import { MachineFormLocators } from '../../locators/planning/machine-form.locators';
+import { WAIT } from './waits';
 
 export interface MachineFieldValues {
   code: string;
-  machineClass: string;
+  /** A Machine type option — defaults to the first one offered if omitted. */
+  machineType?: string | RegExp;
   /** Which real work centre to assign — defaults to the first available if omitted. */
   workCentre?: string | RegExp;
 }
@@ -29,7 +31,7 @@ export class MachineFormPage extends BasePage {
   }
 
   /**
-   * Asset code + Machine class + Work centre + Status are the 4 fields
+   * Asset code + Machine type + Work centre + Status are the 4 fields
    * confirmed live to actually block save ("In service since" / class
    * properties / system links are all genuinely optional). Status is
    * fixed to "Active" here, not made configurable — a freshly created
@@ -37,10 +39,21 @@ export class MachineFormPage extends BasePage {
    */
   async fillRequired(values: MachineFieldValues): Promise<void> {
     await this.locators.assetCode.fill(values.code);
-    await this.locators.machineClass.fill(values.machineClass);
+    // Machine type opens a searchable dialog sourced from the Machine type
+    // master; a click while the form is still loading opens nothing, so the
+    // click is retried until the options show.
+    const machineType = this.locators.option(values.machineType ?? /.+/).first();
+    await expect(async () => {
+      if (!(await machineType.isVisible())) await this.locators.machineType.click();
+      await expect(machineType).toBeVisible({ timeout: WAIT.RETRY_STEP });
+    }).toPass({ timeout: WAIT.SERVER });
+    await machineType.click();
 
     await this.locators.workCentre.click();
-    await this.locators.option(values.workCentre ?? /.+/).first().click();
+    await this.locators
+      .option(values.workCentre ?? /.+/)
+      .first()
+      .click();
 
     await this.locators.status.click();
     await this.locators.option('Active').click();

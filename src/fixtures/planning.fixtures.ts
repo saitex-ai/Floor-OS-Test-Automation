@@ -5,8 +5,8 @@ import { CalendarsListPage } from '../pages/planning/calendars-list.page';
 import { CalendarFormPage } from '../pages/planning/calendar-form.page';
 import { WorkCentresListPage } from '../pages/planning/work-centres-list.page';
 import { WorkCentreFormPage } from '../pages/planning/work-centre-form.page';
-import { QualificationsListPage } from '../pages/planning/qualifications-list.page';
-import { QualificationFormPage } from '../pages/planning/qualification-form.page';
+import { OperatorsListPage } from '../pages/planning/operators-list.page';
+import { OperatorProfilePage } from '../pages/planning/operator-profile.page';
 import { MachinesListPage } from '../pages/planning/machines-list.page';
 import { MachineFormPage } from '../pages/planning/machine-form.page';
 import { ActivitiesListPage } from '../pages/planning/activities-list.page';
@@ -24,8 +24,8 @@ interface PlanningFixtures {
   calendarFormPage: CalendarFormPage;
   workCentresListPage: WorkCentresListPage;
   workCentreFormPage: WorkCentreFormPage;
-  qualificationsListPage: QualificationsListPage;
-  qualificationFormPage: QualificationFormPage;
+  operatorsListPage: OperatorsListPage;
+  operatorProfilePage: OperatorProfilePage;
   machinesListPage: MachinesListPage;
   machineFormPage: MachineFormPage;
   activitiesListPage: ActivitiesListPage;
@@ -78,12 +78,12 @@ export const test = base.extend<PlanningFixtures, PlanningWorkerFixtures>({
     await use(new WorkCentreFormPage(page));
   },
 
-  qualificationsListPage: async ({ page }, use) => {
-    await use(new QualificationsListPage(page));
+  operatorsListPage: async ({ page }, use) => {
+    await use(new OperatorsListPage(page));
   },
 
-  qualificationFormPage: async ({ page }, use) => {
-    await use(new QualificationFormPage(page));
+  operatorProfilePage: async ({ page }, use) => {
+    await use(new OperatorProfilePage(page));
   },
 
   machinesListPage: async ({ page }, use) => {

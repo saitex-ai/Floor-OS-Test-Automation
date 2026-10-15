@@ -7,7 +7,7 @@ import { type Locator, type Page } from '@playwright/test';
  */
 export class MachineFormLocators {
   readonly assetCode: Locator;
-  readonly machineClass: Locator;
+  readonly machineType: Locator;
   readonly workCentre: Locator;
   readonly status: Locator;
   readonly createButton: Locator;
@@ -15,7 +15,9 @@ export class MachineFormLocators {
 
   constructor(private readonly page: Page) {
     this.assetCode = page.getByRole('textbox', { name: 'Asset code' });
-    this.machineClass = page.getByRole('textbox', { name: 'Machine class' });
+    // Was a free-text "Machine class" textbox until the 2026-10-14 dev deploy; now a
+    // combobox of the Machine type master ("SNLS · Single needle lockstitch", …).
+    this.machineType = page.getByRole('combobox', { name: 'Machine type', exact: true });
     this.workCentre = page.getByRole('combobox', { name: 'Work centre', exact: true });
     this.status = page.getByRole('combobox', { name: 'Status', exact: true });
     this.createButton = page.getByRole('button', { name: 'Create machine' });
