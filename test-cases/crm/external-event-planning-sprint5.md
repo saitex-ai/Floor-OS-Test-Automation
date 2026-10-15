@@ -40,7 +40,6 @@
 | TC:17 | Verify Elapsed External Event Behaviour                                   | "Planning · Elapsed", banner, Elapsed tab; To Attend rule             | [link](https://app.clickup.com/t/z941abyq84) | ✅           | ✅ pass: dev blocks it (no status buttons)                                                  |
 | TC:18 | Verify Access Is Restricted Without SSO Session or External Events Rights | No session → SSO login, no data; no rights → menu/URL denied          | [link](https://app.clickup.com/t/z941abyq85) | ✅ (partial) | ⏭️ fixme after the no-session checks pass; restricted user not in `.env`                    |
 | TC:19 | Verify Double-Click on To Attend Updates Once                             | Single update/confirmation/notification                               | [link](https://app.clickup.com/t/z941abyq86) | ⏭️           | ⏭️ fixme: no Planning event this suite can change                                           |
-| TC:20 | Verify Opening an External Event That Does Not Exist                      | "Event not found." + Back link to the list                            | [link](https://app.clickup.com/t/z941abyq87) | ✅           | ✅ pass: EV-9999-999 shows a load error (no back link — expected in CRM)                    |
 | TC:21 | Verify Planning Tab Content for an "Other" Type Event                     | Overview tab, fields + System, no AI artifacts; status buttons work   | [link](https://app.clickup.com/t/z941abyq88) | ✅           | ✅ pass (creates its own manual event; it has no status buttons because it's born Attended) |
 
 ## Notes
@@ -65,4 +64,4 @@
 2. TC:7: clicking Register Online opens the link but shows no "Redirected to the event's online registration page" confirmation.
 3. TC:10: when there are no contact details, the Contact Details section shows a placeholder message instead of being hidden (AC-08).
 
-**Not a bug (confirmed with the team, 2026-10-15):** TC:20 — `/crm/events/EV-9999-999` shows "Couldn't load this event. It may not exist, or the CRM service is unavailable." with no back link. CRM screens don't provide a back link (users leave via the side navigation), so this is expected. An unknown UUID shows "Event not found." with a link.
+**TC:20 removed (2026-10-15):** "Verify Opening an External Event That Does Not Exist" was dropped from this set as a duplicate. An unknown event ID shows a load error with no back link, which is expected: CRM screens don't provide back links.
