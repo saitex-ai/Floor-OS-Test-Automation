@@ -87,3 +87,7 @@ actually rendered, and update this note the way `create-contact.md` and
 TC:6 will also need either a second seeded test identity or a documented
 way to arrange a zero-recipient Customer before they can move past
 `test.fixme()`.
+
+## Update 2026-10-15 — real Notify Internally sends
+
+Managers and Executives are now seeded on Dev, so TC:3 (manual re-trigger) and TC:4 (audit history) send a real **Notify Internally** to a Manager (toast "Notifications sent — <name>"; TC:3 sends it twice). They previously used "Notify the Customer", which is now an Outlook hand-off rather than a dispatch — see the update in [`generate-key-meeting-notes.md`](generate-key-meeting-notes.md). Both pass on Dev, and TC:4 confirms the notification event appears in the audit history.

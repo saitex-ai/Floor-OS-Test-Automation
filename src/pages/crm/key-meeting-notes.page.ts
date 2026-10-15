@@ -178,25 +178,68 @@ export class KeyMeetingNotesPage extends BasePage {
     await expect(this.locators.systemField(label)).toBeVisible();
   }
 
-  /** Opens the Notify dialog — one click, does NOT send (see sendNotification). */
+  /** Opens the "Notify Internally" dialog — one click, does NOT send. */
   async notifyInternally(): Promise<void> {
     await this.locators.notifyInternallyButton.click();
   }
 
-  /** Opens the Notify dialog — one click, does NOT send (see sendNotification). */
+  /** Opens the "Notify the Customer" dialog — one click, does NOT send. */
   async notifyCustomer(): Promise<void> {
     await this.locators.notifyCustomerButton.click();
   }
 
   /**
-   * Completes a send from an already-open Notify dialog and waits for its
-   * toast — confirmed against the running app: `onSend` only resolves (and
-   * only then does the dialog toast) once the mutation actually completes,
-   * so waiting on the toast is waiting on the real send, not just the click.
+   * "Notify Internally" end to end: opens the dialog, picks one Manager,
+   * sends, and waits for the real confirmation — confirmed live
+   * (2026-10-15) the toast reads "Notifications sent — <name>" and the
+   * dialog closes only once the send has resolved.
    */
-  async sendNotification(): Promise<void> {
+  async sendInternalNotificationTo(manager: string): Promise<void> {
+    await this.notifyInternally();
+    await expect(this.locators.notifyDialog).toBeVisible();
+    await this.locators.notifyManagersCombobox.click();
+    await this.locators.recipientOption(manager).click();
+    await this.page.keyboard.press('Escape');
     await this.locators.sendNotificationsButton.click();
-    await expect(this.locators.toast).toBeVisible();
+    await expect(this.page.getByText(`Notifications sent — ${manager}`).first()).toBeVisible();
+    await expect(this.locators.notifyDialog).toBeHidden();
+  }
+
+  /** Empty "Notify Internally" send is blocked with "Select at least one Manager or Executive". */
+  async expectInternalRecipientRequired(): Promise<void> {
+    await this.locators.sendNotificationsButton.click();
+    await expect(
+      this.locators.notifyDialog.getByText('Select at least one Manager or Executive'),
+    ).toBeVisible();
+    await expect(this.locators.notifyDialog).toBeVisible();
+  }
+
+  /** Empty "Notify the Customer" send is blocked with "Select at least one email address". */
+  async expectCustomerRecipientRequired(): Promise<void> {
+    await this.locators.customerNotifySendButton.click();
+    await expect(
+      this.locators.customerNotifyDialog.getByText('Select at least one email address'),
+    ).toBeVisible();
+    await expect(this.locators.customerNotifyDialog).toBeVisible();
+  }
+
+  /**
+   * "Notify the Customer" from an already-open dialog: picks the
+   * Customer's own email in To and sends. Confirmed live (2026-10-15):
+   * this opens Outlook compose in a new tab (returned here), toasts
+   * "Redirected to Outlook" and closes the dialog.
+   */
+  async sendCustomerNotificationTo(email: string): Promise<Page> {
+    await this.locators.customerNotifyToCombobox.click();
+    await this.locators.customerEmailOption(email).click();
+    await this.page.keyboard.press('Escape');
+    await expect(this.locators.customerNotifyToCombobox).toContainText(email);
+    const outlookTab = this.page.context().waitForEvent('page');
+    await this.locators.customerNotifySendButton.click();
+    const tab = await outlookTab;
+    await expect(this.page.getByText('Redirected to Outlook').first()).toBeVisible();
+    await expect(this.locators.customerNotifyDialog).toBeHidden();
+    return tab;
   }
 
   /** Back to the Key Meeting Notes list — confirmed against the running app: a link/button, not a route change with its own dialog. */

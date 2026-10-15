@@ -94,19 +94,26 @@ export class KeyMeetingNotesLocators {
   readonly notifyInternallyButton: Locator;
   readonly notifyCustomerButton: Locator;
 
-  // Notify dialog — confirmed against the running app: clicking either
-  // Notify button opens a REAL dialog (not a one-click dispatch), titled
-  // "Notify Internally" or "Notify the Customer". Internal mode offers
-  // empty Managers/Executives comboboxes to pick from; Customer mode's
-  // "Customer" combobox comes PRE-FILLED with the customer's own name, so
-  // Send needs no picking there. Both end in the same toast, only after
-  // the send mutation actually resolves (see meeting-note-detail.tsx's
-  // onSend — the dialog stays open and shows its own error on failure).
+  // "Notify Internally" dialog — confirmed live (2026-10-15): Managers and
+  // Executives multi-select pickers (both populated on dev), a "Send
+  // notifications" button, and "Select at least one Manager or Executive"
+  // on an empty send. A send toasts "Notifications sent — <names>".
   readonly notifyDialog: Locator;
   readonly notifyManagersCombobox: Locator;
   readonly notifyExecutivesCombobox: Locator;
   readonly sendNotificationsButton: Locator;
   readonly notifyDialogCancelButton: Locator;
+
+  // "Notify the Customer" dialog — changed on dev by 2026-10-15: now an
+  // Outlook hand-off titled "Notify <Customer name>" ("Composing continues
+  // in Outlook."), with From (logged-in user), a required To picker
+  // (Customer email + Contacts' emails), an optional Cc (CRM Managers) and
+  // a "Send notification" button. Send opens Outlook compose in a new tab
+  // and toasts "Redirected to Outlook". Previously a pre-filled "Customer"
+  // combobox with "Send notifications".
+  readonly customerNotifyDialog: Locator;
+  readonly customerNotifyToCombobox: Locator;
+  readonly customerNotifySendButton: Locator;
 
   // Communication history (existing "Communication" section on Customer
   // Details — same section log-communication.locators.ts targets)
@@ -197,9 +204,7 @@ export class KeyMeetingNotesLocators {
     this.notifyInternallyButton = page.getByRole('button', { name: 'Notify Internally' });
     this.notifyCustomerButton = page.getByRole('button', { name: 'Notify the Customer' });
 
-    this.notifyDialog = page
-      .getByRole('dialog')
-      .filter({ hasText: /Notify Internally|Notify the Customer/i });
+    this.notifyDialog = page.getByRole('dialog').filter({ hasText: 'Notify Internally' });
     this.notifyManagersCombobox = this.notifyDialog.getByRole('combobox', { name: 'Managers' });
     this.notifyExecutivesCombobox = this.notifyDialog.getByRole('combobox', {
       name: 'Executives',
@@ -208,6 +213,15 @@ export class KeyMeetingNotesLocators {
       name: 'Send notifications',
     });
     this.notifyDialogCancelButton = this.notifyDialog.getByRole('button', { name: 'Cancel' });
+
+    this.customerNotifyDialog = page
+      .getByRole('dialog')
+      .filter({ hasText: 'Composing continues in Outlook' });
+    this.customerNotifyToCombobox = this.customerNotifyDialog.getByRole('combobox', { name: 'To' });
+    this.customerNotifySendButton = this.customerNotifyDialog.getByRole('button', {
+      name: 'Send notification',
+      exact: true,
+    });
 
     // Not a heading confirmed to exist yet — matches the same "assume a
     // Communication section exists" caveat log-communication.locators.ts
@@ -286,5 +300,19 @@ export class KeyMeetingNotesLocators {
    */
   auditEntry(text: string | RegExp): Locator {
     return this.detailDialog.getByText(text).first();
+  }
+
+  /** An option in an open recipient picker (Managers / Executives / Cc), by its exact name. */
+  recipientOption(name: string): Locator {
+    return this.page.getByRole('option', { name, exact: true });
+  }
+
+  /** The Customer's own email in the "Notify the Customer" To picker's "Customer" group. */
+  customerEmailOption(email: string): Locator {
+    return this.page
+      .getByRole('listbox', { name: 'To' })
+      .getByRole('group', { name: 'Customer' })
+      .getByRole('option')
+      .filter({ hasText: email });
   }
 }

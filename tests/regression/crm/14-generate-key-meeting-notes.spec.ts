@@ -25,12 +25,13 @@ test.describe('CRM - Generate Key Meeting Notes', () => {
   async function createTestCustomer(
     createCustomerPage: import('../../../src/pages/crm/create-customer.page').CreateCustomerPage,
     page: import('@playwright/test').Page,
+    email = `pw-kmn-${Date.now()}@example.com`,
   ): Promise<string> {
     const customerName = `Playwright KMN Customer ${Date.now()}`;
     await createCustomerPage.openFromCrmHome();
     await createCustomerPage.fillProfile({
       name: customerName,
-      email: `pw-kmn-${Date.now()}@example.com`,
+      email,
       city: 'Coimbatore',
       country: 'India',
       originType: 'Referral',
@@ -157,7 +158,10 @@ test.describe('CRM - Generate Key Meeting Notes', () => {
     // and therefore nothing for "mandatory validation" to block. Same
     // disposition as TC:3 (fixme, not deleted): a real live run is what
     // surfaced this, so it stays visible rather than silently vanishing.
-    test.fixme(true, 'No create/edit form exists — notes are read-only from the moment they generate. See meeting-note-detail.tsx.');
+    test.fixme(
+      true,
+      'No create/edit form exists — notes are read-only from the moment they generate. See meeting-note-detail.tsx.',
+    );
 
     const customerId = await createTestCustomer(createCustomerPage, page);
     await keyMeetingNotesPage.openGenerateFromCustomerDetail(customerId);
@@ -187,7 +191,8 @@ test.describe('CRM - Generate Key Meeting Notes', () => {
     // well past the default per-test budget.
     test.slow();
 
-    const customerId = await createTestCustomer(createCustomerPage, page);
+    const customerEmail = `pw-kmn-${Date.now()}@example.com`;
+    const customerId = await createTestCustomer(createCustomerPage, page, customerEmail);
 
     await test.step('Generate a Key Meeting Notes record', async () => {
       await keyMeetingNotesPage.openGenerateFromCustomerDetail(customerId);
@@ -225,7 +230,8 @@ test.describe('CRM - Generate Key Meeting Notes', () => {
     // well past the default per-test budget.
     test.slow();
 
-    const customerId = await createTestCustomer(createCustomerPage, page);
+    const customerEmail = `pw-kmn-${Date.now()}@example.com`;
+    const customerId = await createTestCustomer(createCustomerPage, page, customerEmail);
 
     await test.step('Generate a Key Meeting Notes record', async () => {
       await keyMeetingNotesPage.openGenerateFromCustomerDetail(customerId);
@@ -233,28 +239,24 @@ test.describe('CRM - Generate Key Meeting Notes', () => {
       await keyMeetingNotesPage.generateDraft();
     });
 
-    await test.step('"Notify Internally" opens a real dialog, not a one-click dispatch', async () => {
-      // Confirmed against the running app: clicking the button opens a
-      // dialog with Managers/Executives recipient pickers — sending isn't
-      // groundable from here, because this dev realm has no user seeded
-      // with either job role ("No one holds this role yet." in both
-      // comboboxes). That's a seed-data gap, not a feature to guess a
-      // fake pass for — same "don't force it" discipline as TC:3/TC:5.
+    // Confirmed live (2026-10-15): both Notify actions now really send.
+    // Managers/Executives are seeded on dev, and "Notify the Customer" was
+    // changed into an Outlook hand-off with a required To picker.
+    await test.step('"Notify Internally": a recipient is required, then it sends to the picked Manager', async () => {
       await keyMeetingNotesPage.notifyInternally();
-      await expect(keyMeetingNotesPage.locators.notifyDialog).toBeVisible();
-      await expect(keyMeetingNotesPage.locators.sendNotificationsButton).toBeVisible();
-      // A real modal — must be dismissed, or it blocks "Notify the
-      // Customer" behind it for the next step.
+      await keyMeetingNotesPage.expectInternalRecipientRequired();
       await keyMeetingNotesPage.closeNotifyDialog();
+      await keyMeetingNotesPage.sendInternalNotificationTo('CRM Manager');
     });
 
-    await test.step('"Notify the Customer" dispatches a real notification', async () => {
-      // Confirmed against the running app: this dialog's "Customer"
-      // combobox comes pre-filled with the customer's own name — Send
-      // needs no picking, and `onSend` only toasts once the mutation
-      // actually resolves (meeting-note-detail.tsx).
+    await test.step('"Notify the Customer": a To address is required, then it hands off to Outlook', async () => {
       await keyMeetingNotesPage.notifyCustomer();
-      await keyMeetingNotesPage.sendNotification();
+      await keyMeetingNotesPage.expectCustomerRecipientRequired();
+      const outlookTab = await keyMeetingNotesPage.sendCustomerNotificationTo(customerEmail);
+      // Outlook compose deep link, addressed to the Customer's own email.
+      expect(outlookTab.url()).toContain('outlook');
+      expect(decodeURIComponent(outlookTab.url())).toContain(customerEmail);
+      await outlookTab.close();
     });
   });
 });

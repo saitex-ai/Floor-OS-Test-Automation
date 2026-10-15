@@ -195,16 +195,16 @@ test.describe('CRM - Customer Communication screen', () => {
       await customerCommunicationPage.expectKeyMeetingNotesEmptyState();
     });
 
-    await test.step('Emails — real, environment-wide explanatory state (see class doc), not a blank screen', async () => {
+    await test.step('Emails, empty (Outlook is connected on dev since 2026-10-15)', async () => {
       await customerCommunicationPage.selectSubTab('emails');
-      await customerCommunicationPage.expectEmailsUnavailable();
+      await customerCommunicationPage.expectEmailsEmptyState();
     });
   });
 
   test('TC:5 Verify exclusion of non-participatory emails', () => {
     test.fixme(
       true,
-      'Same environment constraint as TC:2 — no Outlook integration is configured here, so the Emails sub-tab cannot render even one real email either way (see TC:2\'s reason and CustomerCommunicationPage\'s class doc). A second CRM identity does exist for other tests (CRM_EXECUTIVE_* in .env, see biz-doc.md) but is irrelevant here: the blocker is the missing Outlook integration itself, not the lack of a second logged-in user.',
+      "Same environment constraint as TC:2 — no Outlook integration is configured here, so the Emails sub-tab cannot render even one real email either way (see TC:2's reason and CustomerCommunicationPage's class doc). A second CRM identity does exist for other tests (CRM_EXECUTIVE_* in .env, see biz-doc.md) but is irrelevant here: the blocker is the missing Outlook integration itself, not the lack of a second logged-in user.",
     );
   });
 
@@ -280,13 +280,9 @@ test.describe('CRM - Customer Communication screen', () => {
       await customerCommunicationPage.expectDateFieldFormat();
     });
 
-    // CONFIRMED, REAL discovery (see class doc) — NOT the same format as
-    // the "Date" field just asserted above, on the very same detail view.
-    // Documented explicitly rather than silently asserted as "consistent",
-    // per this suite's "honesty over false passes" discipline (same
-    // treatment as the compound Planning/Elapsed status discovery in
-    // 22-external-events-list.spec.ts).
-    await test.step('Logged Communications detail: "Created On" uses a DIFFERENT format, YYYY-MM-DD HH:mm — a real, confirmed inconsistency, not a locator bug', async () => {
+    // Until 2026-10-14 "Created On" used YYYY-MM-DD HH:mm, unlike the rest of
+    // the screen; dev now uses DD-MM-YYYY HH:mm here too (see class doc).
+    await test.step('Logged Communications detail: "Created On" uses DD-MM-YYYY HH:mm', async () => {
       await customerCommunicationPage.expectCreatedOnFieldFormat();
     });
 
@@ -298,14 +294,16 @@ test.describe('CRM - Customer Communication screen', () => {
       await customerCommunicationPage.keyMeetingNotes.uploadSourceFile();
       await customerCommunicationPage.keyMeetingNotes.generateDraft();
 
-      await expect(customerCommunicationPage.keyMeetingNotes.locators.sourceInteractionText).toHaveText(
-        /generated from .+ · \d{2}-\d{2}-\d{4} \d{2}:\d{2}/i,
-      );
+      await expect(
+        customerCommunicationPage.keyMeetingNotes.locators.sourceInteractionText,
+      ).toHaveText(/generated from .+ · \d{2}-\d{2}-\d{4} \d{2}:\d{2}/i);
 
       await customerCommunicationPage.keyMeetingNotes.backToNotesList();
       await page.waitForTimeout(600);
       await expect(
-        customerCommunicationPage.locators.activeTabPanel.getByText(/\d{2}-\d{2}-\d{4} \d{2}:\d{2}/),
+        customerCommunicationPage.locators.activeTabPanel.getByText(
+          /\d{2}-\d{2}-\d{4} \d{2}:\d{2}/,
+        ),
       ).toBeVisible();
     });
 
@@ -324,12 +322,9 @@ test.describe('CRM - Customer Communication screen', () => {
     const customerId = await createTestCustomer(createCustomerPage, page, 'TC8');
     await customerCommunicationPage.openFromCustomerDetail(customerId);
 
-    await test.step(
-      'With "Log a Communication" open and dirtied, the sub-tab strip is unreachable (confirmed: a real modal, not merely a soft warning)',
-      async () => {
-        await customerCommunicationPage.expectSubTabsUnreachableWhileLogCommunicationDialogOpen();
-      },
-    );
+    await test.step('With "Log a Communication" open and dirtied, the sub-tab strip is unreachable (confirmed: a real modal, not merely a soft warning)', async () => {
+      await customerCommunicationPage.expectSubTabsUnreachableWhileLogCommunicationDialogOpen();
+    });
 
     await test.step('After cancelling, the sub-tab strip is reachable again and context (Logged Communications, still selected) is retained', async () => {
       await customerCommunicationPage.expectSubTabSelected('logged');
