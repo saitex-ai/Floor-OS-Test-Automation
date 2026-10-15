@@ -196,13 +196,11 @@ test.describe('CRM - Build External Events List with Web Crawling', () => {
       await expect(l.columnSortIcon(column)).toHaveClass(/text-ring/);
     });
 
-    await test.step('BUG: the sort indicator does not show direction (no distinct up/down arrow)', async () => {
-      // Expected (ClickUp): an up arrow for ascending, a down arrow for
-      // descending. Actual (dev, 2026-10-15): the header shows the SAME
-      // two-headed "arrow-up-down" icon in both directions — only
-      // highlighted vs. dimmed — and the header carries no aria-sort, so
-      // neither sighted nor screen-reader users can tell the direction.
-      // Asserts today's real behavior; flip this when the app is fixed.
+    await test.step('Sort indicator: the same two-headed icon for both directions, highlighted when active', async () => {
+      // The header shows the same "arrow-up-down" icon for ascending and
+      // descending, only highlighted when active. Accepted as-is by the
+      // team (2026-10-15) — not a bug; the row order itself is what TC:4
+      // verifies above.
       const descIconClass = (await l.columnSortIcon(column).getAttribute('class')) ?? '';
       expect(ascIconClass).toContain('lucide-arrow-up-down');
       expect(descIconClass).toBe(ascIconClass);
