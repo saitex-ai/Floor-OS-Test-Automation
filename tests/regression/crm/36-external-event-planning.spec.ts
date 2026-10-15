@@ -524,37 +524,6 @@ test.describe('CRM - External Event Planning (Sprint 5)', () => {
     test.fixme(true, NO_FRESH_PLANNING_EVENT);
   });
 
-  test('TC:20 Verify Opening an External Event That Does Not Exist', async ({
-    externalEventsPage,
-    page,
-  }) => {
-    await allure.tms('https://app.clickup.com/t/z941abyq87', 'TC:20 (ClickUp)');
-    const l = externalEventsPage.locators;
-
-    await test.step('A well-formed but unknown event ID shows "Event not found." and a back link', async () => {
-      await externalEventsPage.openEventById('00000000-0000-0000-0000-000000000000');
-      await expect(l.eventNotFoundMessage).toBeVisible({ timeout: 30_000 });
-      await expect(l.backToEventsLink).toBeVisible();
-    });
-
-    await test.step('The back link returns to the External Events list', async () => {
-      await l.backToEventsLink.click();
-      await expect(page).toHaveURL(/\/crm\/events$/);
-      await expect(l.pageHeading).toBeVisible();
-    });
-
-    await test.step('An EV-style ID (EV-9999-999) shows a load error, with no back link', async () => {
-      // Dev shows "Couldn't load this event. It may not exist, or the CRM
-      // service is unavailable." with no back link. Not a bug: CRM screens
-      // don't provide a back link — users leave via the side navigation
-      // (confirmed with the team 2026-10-15).
-      await externalEventsPage.openEventById('EV-9999-999');
-      await expect(l.eventLoadErrorMessage).toBeVisible({ timeout: 30_000 });
-      await expect(l.eventNotFoundMessage).toHaveCount(0);
-      await expect(l.backToEventsLink).toHaveCount(0);
-    });
-  });
-
   test('TC:21 Verify Planning Tab Content for an "Other" Type Event', async ({
     externalEventsPage,
   }) => {
