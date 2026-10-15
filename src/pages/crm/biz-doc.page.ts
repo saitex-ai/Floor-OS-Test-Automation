@@ -131,8 +131,10 @@ export class BizDocPage extends BasePage {
    * Confirmed current dev behavior (2026-10-15): the Orders tile is a
    * read-only placeholder — a `note` whose own text says Purchase Orders
    * isn't available in floorOS yet — and no "Create Order" action exists
-   * on the Biz Docs sub-tab, so there is no way to create a Sample or
-   * Bulk Order from CRM.
+   * on the Biz Docs sub-tab. Orders are created in Master Data → Sales
+   * Order instead, and the tile STILL reads "—" after a Sales Order exists
+   * for the Customer (the "BUG:" steps in
+   * 34-prospect-to-customer-conversion.spec.ts).
    */
   async expectOrdersTileIsUnavailablePlaceholder(): Promise<void> {
     await expect(this.locators.ordersTile).toBeVisible();
