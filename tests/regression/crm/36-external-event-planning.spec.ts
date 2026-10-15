@@ -543,10 +543,11 @@ test.describe('CRM - External Event Planning (Sprint 5)', () => {
       await expect(l.pageHeading).toBeVisible();
     });
 
-    await test.step('BUG: an EV-style ID (EV-9999-999) shows a load error with no back link', async () => {
-      // Expected: "Event not found." + "Back to external events". Dev shows
-      // "Couldn't load this event. It may not exist, or the CRM service is
-      // unavailable." and no back link (only the side nav gets the user out).
+    await test.step('An EV-style ID (EV-9999-999) shows a load error, with no back link', async () => {
+      // Dev shows "Couldn't load this event. It may not exist, or the CRM
+      // service is unavailable." with no back link. Not a bug: CRM screens
+      // don't provide a back link — users leave via the side navigation
+      // (confirmed with the team 2026-10-15).
       await externalEventsPage.openEventById('EV-9999-999');
       await expect(l.eventLoadErrorMessage).toBeVisible({ timeout: 30_000 });
       await expect(l.eventNotFoundMessage).toHaveCount(0);
