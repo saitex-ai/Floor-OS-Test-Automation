@@ -256,7 +256,7 @@ export class ActivityFormPage extends BasePage {
   }
 
   async expectUniquenessError(): Promise<void> {
-    await expect(this.locators.uniquenessMessage.first()).toBeVisible({ timeout: WAIT.SERVER });
+    await expect(this.locators.uniquenessMessage).toBeVisible({ timeout: WAIT.SERVER });
   }
 
   async expectNameValue(name: string): Promise<void> {

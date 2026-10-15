@@ -85,7 +85,12 @@ export class ActivityFormLocators {
 
     this.approvalPrerequisites = page.getByText(/^Before it can be sent for approval, fill in:/);
     this.requiredMessage = page.getByText(/required|highlighted field/i);
-    this.uniquenessMessage = page.getByText(/already taken|unique|already exists|duplicate/i);
+    // The field alert only: page text alone also matches the form's helper
+    // copy ("Codes must be unique…", "…must be unique"), which is always on
+    // screen. dev answers a duplicate with 409 and "This code is already taken".
+    this.uniquenessMessage = page
+      .getByRole('alert')
+      .filter({ hasText: /already taken|already exists/i });
     this.createdToast = page.getByText('Activity created as a draft.');
     this.updatedToast = page.getByText(/Activity (updated|saved)|Draft saved/i);
     this.deleteDraftButton = page.getByRole('button', { name: 'Delete draft' });
