@@ -5,9 +5,9 @@
   - As a CRM user, I want to email a regulatory Alert to one or more Customers and their Contacts, so that buyers are informed of upcoming regulatory changes affecting their trims and packaging.
 - **Scope:** Both email modes launched from the Alert detail view: **Email Alert Internally** and **Email Alert to Customer**.
 - **Out of scope:** Sending email from inside the CRM. The composed email is handed off to Outlook, where the user reviews and sends it.
-- **Source:** User story and acceptance criteria provided 2026-10-12. The FloorOS App Launcher prototype (claude.ai/design) wasn't accessible when this was written, so exact on-screen labels and layouts still need checking against it. No ClickUp tasks yet.
+- **Source:** User story and acceptance criteria provided 2026-10-12. The FloorOS App Launcher prototype (claude.ai/design) wasn't accessible when this was written, so exact on-screen labels and layouts still need checking against it. ClickUp tasks were added later as the Sprint 5 set linked under **Automated in**.
 - **Related:** [`alert-detail-screen.md`](alert-detail-screen.md) (Sprint 3 TC:3/TC:4/TC:7/TC:8 cover parts of this flow at a lower level of detail).
-- **Automated in:** not yet.
+- **Automated in:** partly. The ClickUp set [CRM -Sprint -5-Email an Alert](https://app.clickup.com/t/z941abx7ga) (TC:1–TC:9) is automated in [`tests/regression/crm/32-email-an-alert.spec.ts`](../../tests/regression/crm/32-email-an-alert.spec.ts). See [`email-an-alert.md`](email-an-alert.md) for which TCs here it covers, its dev status, and the bugs it found.
 
 ## Prerequisites
 
