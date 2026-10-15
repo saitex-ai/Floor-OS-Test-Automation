@@ -182,6 +182,28 @@ export class ExternalEventsLocators {
   readonly saveFeedbackButton: Locator;
   readonly toast: Locator;
 
+  // Details/workspace — Planning tab (Sprint 5 "External Event Planning"),
+  // confirmed against dev 2026-10-15. Header = <h1> title + a sibling
+  // status <span> + an "Event: External Event · <type> · <date> · <venue>"
+  // line; every Planning section is an <h2> card. No event ID
+  // (EV-YYYY-NNN), Owner control, Sales Potential Report or Participation
+  // Plan is rendered on dev.
+  readonly eventTitleHeading: Locator;
+  readonly eventHeaderStatus: Locator;
+  readonly eventTypeLine: Locator;
+  readonly elapsedBanner: Locator;
+  readonly onlineRegistrationNote: Locator;
+  readonly notAttendingNote: Locator;
+  readonly aiPlaceholderText: Locator;
+  readonly eventIdText: Locator;
+  readonly ownerControl: Locator;
+  readonly backToEventsLink: Locator;
+  readonly eventNotFoundMessage: Locator;
+  readonly eventLoadErrorMessage: Locator;
+  readonly rowsPerPageCombobox: Locator;
+  readonly signInButton: Locator;
+  readonly ssoPasswordInput: Locator;
+
   constructor(private readonly page: Page) {
     this.createEventButton = page.getByRole('button', { name: 'Create Event' });
 
@@ -296,6 +318,29 @@ export class ExternalEventsLocators {
       .getByRole('dialog', { name: 'Thanks for the feedback!' })
       .getByRole('button', { name: 'Save feedback' });
     this.toast = page.locator('[data-sonner-toast]').first();
+
+    this.eventTitleHeading = page.getByRole('heading', { level: 1 });
+    this.eventHeaderStatus = this.eventTitleHeading.locator('xpath=following-sibling::span[1]');
+    this.eventTypeLine = page.getByText(/^Event: External Event · /);
+    this.elapsedBanner = page.getByText(
+      'The schedule of this External Event has elapsed — it is marked as Elapsed.',
+    );
+    this.onlineRegistrationNote = page.getByText(/^Online registration exists — /);
+    this.notAttendingNote = page.getByText(/^Not Attending — /);
+    this.aiPlaceholderText = page.getByText(
+      /^Unfortunately, no relevant information is available for the .+ online\.$/,
+    );
+    this.eventIdText = page.locator('main').getByText(/\bEV-\d{4}-\d{3}\b/);
+    this.ownerControl = page
+      .getByRole('combobox', { name: /owner/i })
+      .or(page.getByRole('button', { name: /^owner/i }))
+      .or(page.getByLabel(/^owner$/i));
+    this.backToEventsLink = page.getByRole('link', { name: 'Back to external events' });
+    this.eventNotFoundMessage = page.getByText('Event not found.', { exact: true });
+    this.eventLoadErrorMessage = page.getByText(/^Couldn't load this event\./);
+    this.rowsPerPageCombobox = page.getByRole('combobox', { name: 'Rows per page' });
+    this.signInButton = page.getByRole('button', { name: 'Sign in' });
+    this.ssoPasswordInput = page.locator('input[type="password"]');
   }
 
   scoreRadio(value: number): Locator {
@@ -372,6 +417,36 @@ export class ExternalEventsLocators {
   splitListItem(title: string): Locator {
     return this.page.getByRole('button', {
       name: new RegExp(`^(Select|Deselect) row ${escapeRegExp(title)}`),
+    });
+  }
+
+  /** A Details-screen section card (e.g. "Participant Summary", "System"), by its <h2> — the card is the heading's 3rd ancestor (confirmed against dev). */
+  sectionCard(name: string): Locator {
+    return this.page
+      .getByRole('heading', { level: 2, name, exact: true })
+      .locator('xpath=../../..');
+  }
+
+  sectionHeading(name: string | RegExp): Locator {
+    return this.page.getByRole('heading', { level: 2, name });
+  }
+
+  /** Body rows of the List table (header row excluded). */
+  tableRows(): Locator {
+    return this.page.getByRole('row').filter({ hasNot: this.page.getByRole('columnheader') });
+  }
+
+  /** List rows whose Type cell is exactly `type` (e.g. "Trade Fair", "Other"). */
+  rowsOfType(type: string): Locator {
+    return this.tableRows().filter({
+      has: this.page.getByRole('cell', { name: type, exact: true }),
+    });
+  }
+
+  /** List rows from the AI-discovery pipeline — everything that isn't a manual "Other" event. */
+  aiEventRows(): Locator {
+    return this.tableRows().filter({
+      hasNot: this.page.getByRole('cell', { name: 'Other', exact: true }),
     });
   }
 }

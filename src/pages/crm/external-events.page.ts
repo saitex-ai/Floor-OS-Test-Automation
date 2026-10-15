@@ -1,4 +1,4 @@
-import { type Page, expect } from '@playwright/test';
+import { type Locator, type Page, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
 import {
   ExternalEventsLocators,
@@ -538,4 +538,257 @@ export class ExternalEventsPage extends BasePage {
     await this.page.reload();
     await this.waitForCountsLoaded();
   }
+
+  // ---------------------------------------------------------------------
+  // Planning tab (CRM Sprint 5 — "External Event Planning"). Confirmed
+  // against dev 2026-10-15:
+  // - No non-elapsed Planning event exists on dev (the Planning tab holds
+  //   only "Planning · Elapsed" AI events, which have no status buttons),
+  //   and a manual "Create Event" is always born "Other"/Attended — so
+  //   the To Attend transition cannot be exercised on an event we own.
+  //   Everything here is READ-ONLY against AI events; nothing below
+  //   changes any event's status.
+  // - Event types present on dev: Trade Fair, Exhibition, Fashion Show
+  //   (AI) and Other (manual). No "Sales Summit" event exists.
+  // - A failed/empty AI artifact renders the card anyway with
+  //   "Unfortunately, no relevant information is available for the
+  //   <section> online." — including the Contact Details card.
+  // ---------------------------------------------------------------------
+
+  /** Opens the List on any status tab, including the two behind "+2 more". */
+  async openStatusTab(tab: EventStatusTab): Promise<void> {
+    await this.openList();
+    if (tab === 'Not Attending' || tab === 'Elapsed') {
+      await this.selectOverflowStatusTab(tab);
+    } else {
+      await this.selectStatusTab(tab);
+    }
+  }
+
+  /** The live count shown on a List status tab's badge (List must be open on a tab where `tab` is a top-level button). */
+  async statusTabCount(tab: 'All' | 'Planning' | 'To Attend' | 'Attended'): Promise<number> {
+    const text = await this.locators.statusTab(tab).innerText();
+    return Number(text.replace(/\D/g, ''));
+  }
+
+  /** Shows up to 100 rows per page so every event (57 on dev) fits on one page. */
+  async showMaxRowsPerPage(): Promise<void> {
+    await this.locators.rowsPerPageCombobox.click();
+    await this.page.getByRole('option', { name: '100', exact: true }).click();
+    await this.page.waitForTimeout(800);
+  }
+
+  /** Reads one List row's cells: [checkbox/blank, Event, Type, Status, Created By, Schedule]. */
+  async readRow(row: Locator): Promise<EventRowData> {
+    const cells = await row.getByRole('cell').allInnerTexts();
+    return {
+      title: (cells[1] ?? '').trim(),
+      type: (cells[2] ?? '').trim(),
+      status: (cells[3] ?? '').trim(),
+    };
+  }
+
+  /** Every body row currently in the table, read as data. */
+  async readAllRows(): Promise<EventRowData[]> {
+    const rows = this.locators.tableRows();
+    const count = await rows.count();
+    const out: EventRowData[] = [];
+    for (let i = 0; i < count; i++) out.push(await this.readRow(rows.nth(i)));
+    return out;
+  }
+
+  /**
+   * Clicks a List row and waits for its Details screen. Retries the click
+   * — same table-hydration race already seen on the Alerts list (a first
+   * click can land before the row's handler attaches and silently not
+   * navigate).
+   */
+  async openRow(row: Locator): Promise<EventRowData> {
+    const data = await this.readRow(row);
+    await expect(async () => {
+      if (!/\/crm\/events\/[0-9a-f-]{36}/.test(this.page.url())) await row.click();
+      await this.page.waitForURL(/\/crm\/events\/[0-9a-f-]{36}/, { timeout: 5_000 });
+    }).toPass({ timeout: 30_000 });
+    await this.waitForDetailsLoaded();
+    return data;
+  }
+
+  /** Opens the first AI-generated (non-"Other") event on a List status tab; `null` if the tab has none. */
+  async openFirstAiEventInTab(tab: EventStatusTab, index = 0): Promise<EventRowData | null> {
+    await this.openStatusTab(tab);
+    const rows = this.locators.aiEventRows();
+    if ((await rows.count()) <= index) return null;
+    return this.openRow(rows.nth(index));
+  }
+
+  /**
+   * Walks the AI events on the given List tabs (read-only — just opens
+   * each one) and stops on the first whose Details screen satisfies
+   * `predicate`. Returns its row data, or `null` if none does.
+   */
+  async findAiEvent(
+    predicate: () => Promise<boolean>,
+    tabs: EventStatusTab[] = ['Planning', 'To Attend', 'Not Attending', 'Attended'],
+  ): Promise<EventRowData | null> {
+    for (const tab of tabs) {
+      await this.openStatusTab(tab);
+      const count = await this.locators.aiEventRows().count();
+      for (let i = 0; i < count; i++) {
+        if (i > 0) await this.openStatusTab(tab);
+        const data = await this.openRow(this.locators.aiEventRows().nth(i));
+        if (await predicate()) return data;
+      }
+    }
+    return null;
+  }
+
+  /** On the All tab (100 rows/page), opens the first event whose Type column is exactly `type`; `null` if there is none. */
+  async openFirstEventOfType(type: string): Promise<EventRowData | null> {
+    await this.openStatusTab('All');
+    await this.showMaxRowsPerPage();
+    const rows = this.locators.rowsOfType(type);
+    if ((await rows.count()) === 0) return null;
+    return this.openRow(rows.first());
+  }
+
+  async waitForDetailsLoaded(): Promise<void> {
+    await expect(this.locators.eventTitleHeading).toBeVisible({ timeout: 30_000 });
+    await expect(this.locators.sectionHeading('System')).toBeVisible({ timeout: 30_000 });
+  }
+
+  async eventTitle(): Promise<string> {
+    return (await this.locators.eventTitleHeading.innerText()).trim();
+  }
+
+  async headerStatus(): Promise<string> {
+    return (await this.locators.eventHeaderStatus.innerText()).trim();
+  }
+
+  /** The "<type>" segment of "Event: External Event · <type> · <date> · <venue>". */
+  async headerEventType(): Promise<string> {
+    const line = await this.locators.eventTypeLine.innerText();
+    return (line.split(' · ')[1] ?? '').trim();
+  }
+
+  async hasRegisterOnline(): Promise<boolean> {
+    return (await this.locators.registerOnlineLink.count()) > 0;
+  }
+
+  async sectionText(name: string): Promise<string> {
+    return (await this.locators.sectionCard(name).innerText()).trim();
+  }
+
+  /** True when the card shows the AI "Unfortunately, no relevant information…" placeholder instead of content. */
+  async isSectionPlaceholder(name: string): Promise<boolean> {
+    return (
+      (await this.locators.sectionCard(name).locator(this.locators.aiPlaceholderText).count()) > 0
+    );
+  }
+
+  async hasAnyPlaceholderSection(): Promise<boolean> {
+    return (await this.locators.aiPlaceholderText.count()) > 0;
+  }
+
+  /** Each named section is shown, tagged "Generated by AI", and has real body text beyond its heading (not the failure placeholder). */
+  async expectSectionsWithContent(sections: readonly string[]): Promise<void> {
+    for (const name of sections) {
+      const card = this.locators.sectionCard(name);
+      await expect(card, `section "${name}"`).toBeVisible();
+      await expect(card).toContainText('Generated by AI');
+      const body = (await card.innerText()).replace(name, '').replace('Generated by AI', '').trim();
+      expect(body.length, `section "${name}" should have content`).toBeGreaterThan(0);
+      await expect(card.locator(this.locators.aiPlaceholderText)).toHaveCount(0);
+    }
+  }
+
+  /** System card shows `label` followed by `value` (label casing is CSS-uppercased, so case-insensitive). */
+  async expectSystemField(label: string, value: string | RegExp): Promise<void> {
+    const v = typeof value === 'string' ? escapeRegExp(value) : value.source;
+    await expect(this.locators.sectionCard('System')).toContainText(
+      new RegExp(`${escapeRegExp(label)}\\s*${v}`, 'i'),
+    );
+  }
+
+  /** The System card has no editable controls at all. */
+  async expectSystemReadOnly(): Promise<void> {
+    const card = this.locators.sectionCard('System');
+    await expect(
+      card.locator('input, textarea, select, [role="combobox"], [contenteditable="true"]'),
+    ).toHaveCount(0);
+  }
+
+  /** No To Attend / Mark Attended / Not Attending decision button at all. */
+  async expectNoStatusButtons(): Promise<void> {
+    await expect(this.locators.toAttendButton).toHaveCount(0);
+    await expect(this.locators.markAttendedButton).toHaveCount(0);
+    await expect(this.locators.notAttendingButton).toHaveCount(0);
+  }
+
+  /** The post-"To Attend" decision state: Mark Attended + Not Attending, and no To Attend. */
+  async expectToAttendDecisionButtons(): Promise<void> {
+    await expect(this.locators.markAttendedButton).toBeVisible();
+    await expect(this.locators.markAttendedButton).toBeEnabled();
+    await expect(this.locators.notAttendingButton).toBeVisible();
+    await expect(this.locators.notAttendingButton).toBeEnabled();
+    await expect(this.locators.toAttendButton).toHaveCount(0);
+  }
+
+  async registerOnlineHref(): Promise<string> {
+    return (await this.locators.registerOnlineLink.getAttribute('href')) ?? '';
+  }
+
+  /** Creates a manual ("Other") event end-to-end through the create form and lands on its Details screen. */
+  async createManualEvent(details: ExternalEventDetails): Promise<void> {
+    await this.openFromEventsList();
+    await this.fill(details);
+    await this.submit();
+    await this.expectConfirmDialogVisible();
+    await this.confirmSaveEvent();
+    await this.expectSavedSuccessfully();
+    // Lands on ?tab=feedback (no System card there), so only wait for the title.
+    await expect(this.locators.eventTitleHeading).toBeVisible({ timeout: 30_000 });
+  }
+
+  /** Plain navigation with no SSO redemption — for the unauthenticated-access check. */
+  async gotoUnauthenticated(path: string): Promise<void> {
+    await this.goto(path);
+  }
+
+  /** The FloorOS "Sign in" gate is shown and no event data is rendered. */
+  async expectSignInGateWithoutEventData(eventTitle: RegExp): Promise<void> {
+    await expect(this.locators.signInButton).toBeVisible({ timeout: 30_000 });
+    await expect(this.page.getByText(eventTitle)).toHaveCount(0);
+    await expect(this.locators.sectionHeading('System')).toHaveCount(0);
+  }
+
+  /** Clicking Sign in without a session goes to the Keycloak (SSO) credential form. */
+  async expectSignInLeadsToSsoLogin(): Promise<void> {
+    await this.locators.signInButton.click();
+    await expect(this.page).toHaveURL(/\/auth\/realms\/[^/]+\/protocol\/openid-connect\/auth/, {
+      timeout: 30_000,
+    });
+    await expect(this.locators.ssoPasswordInput).toBeVisible();
+  }
+}
+
+export type EventStatusTab =
+  'All' | 'Planning' | 'To Attend' | 'Attended' | 'Not Attending' | 'Elapsed';
+
+export interface EventRowData {
+  title: string;
+  type: string;
+  status: string;
+}
+
+/** The AI planning sections dev renders on the Planning tab (Sprint 5). */
+export const PLANNING_AI_SECTIONS = [
+  'External Event Summary',
+  'Participant Summary',
+  'Visitor Summary',
+  'External Event Schedule',
+  "External Event's Contact Details",
+] as const;
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
