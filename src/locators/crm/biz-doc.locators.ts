@@ -68,10 +68,10 @@ export class BizDocLocators {
   /**
    * The fourth, "Orders" tile. Confirmed on dev (2026-10-15): a
    * non-interactive `note` (not a button), accessible name
-   * "Orders: —. Purchase Orders is not available in floorOS yet." — the
-   * entry point the Prospect -> Customer conversion story
-   * (34-prospect-to-customer-conversion.spec.ts) expects to carry a
-   * "Create Order" action.
+   * "Orders: —. Purchase Orders is not available in floorOS yet." — even
+   * after a Sales Order (Master Data) exists for the Customer, which the
+   * Prospect -> Customer conversion TCs expect it to list
+   * (34-prospect-to-customer-conversion.spec.ts).
    */
   readonly ordersTile: Locator;
   /**
