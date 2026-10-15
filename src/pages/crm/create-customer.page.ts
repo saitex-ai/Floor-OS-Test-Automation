@@ -37,6 +37,12 @@ export interface CustomerProfileDetails {
   linkedIn?: string;
   facebook?: string;
   instagram?: string;
+  /**
+   * Leave the Company combobox untouched instead of fillProfile()'s
+   * default of auto-picking the first option — for the "save without a
+   * Company" check (company-for-customer TC:4).
+   */
+  skipCompany?: boolean;
 }
 
 export class CreateCustomerPage extends BasePage {
@@ -68,8 +74,9 @@ export class CreateCustomerPage extends BasePage {
     // toggles/clears on a second click rather than re-confirming the same
     // choice, which would otherwise clear a value already selected by an
     // earlier fillProfile() call on the same still-open form.
-    const companyIsEmpty = (await l.companyCombobox.innerText().catch(() => '')).trim() === 'Select';
-    if (companyIsEmpty) {
+    const companyIsEmpty =
+      (await l.companyCombobox.innerText().catch(() => '')).trim() === 'Select';
+    if (companyIsEmpty && !details.skipCompany) {
       await l.companyCombobox.click();
       await this.page.getByRole('option').first().click();
     }
@@ -134,6 +141,78 @@ export class CreateCustomerPage extends BasePage {
 
   async save(): Promise<void> {
     await this.locators.saveButton.click();
+  }
+
+  /**
+   * Saves (accepting a soft duplicate warning if one appears), dismisses
+   * the post-save "Proceed to Contact creation?" modal and waits for the
+   * new Customer's Detail page — same sequence as
+   * customer-detail.spec.ts's createLinkedContact() helper.
+   */
+  async saveAndOpenDetail(): Promise<void> {
+    await this.save();
+    if (await this.locators.duplicateWarningModal.isVisible().catch(() => false)) {
+      await this.locators.saveAnywayButton.click();
+    }
+    await this.expectSavedSuccessfully();
+    await this.locators.postSaveCancelButton.click();
+    await expect(this.page).toHaveURL(/\/crm\/customers\/[0-9a-f-]+$/);
+  }
+
+  // ---- Company multi-select (Company for Customer, Sprint 5) ----
+
+  async openCompanyDropdown(): Promise<void> {
+    if ((await this.locators.companyCombobox.getAttribute('aria-expanded')) !== 'true') {
+      await this.locators.companyCombobox.click();
+    }
+    await expect(this.locators.companySearchInput).toBeVisible();
+  }
+
+  async closeCompanyDropdown(): Promise<void> {
+    if ((await this.locators.companyCombobox.getAttribute('aria-expanded')) === 'true') {
+      await this.page.keyboard.press('Escape');
+    }
+    await expect(this.locators.companySearchInput).toBeHidden();
+  }
+
+  /** Opens the Company dropdown and returns every option it lists (left open). */
+  async availableCompanies(): Promise<string[]> {
+    await this.openCompanyDropdown();
+    await expect(this.locators.companyOptions.first()).toBeVisible();
+    return (await this.locators.companyOptions.allInnerTexts()).map((t) => t.trim());
+  }
+
+  /** Types free text into the open Company dropdown's search box and presses Enter. */
+  async typeFreeTextCompany(text: string): Promise<void> {
+    await this.openCompanyDropdown();
+    await this.locators.companySearchInput.fill(text);
+    await this.page.keyboard.press('Enter');
+  }
+
+  async expectNoCompanyMatches(): Promise<void> {
+    await expect(this.locators.companyNoMatches).toBeVisible();
+    await expect(this.locators.companyOptions).toHaveCount(0);
+  }
+
+  /** Picks each named company via the dropdown's search box, then closes it. */
+  async selectCompanies(names: string[]): Promise<void> {
+    await this.openCompanyDropdown();
+    for (const name of names) {
+      await this.locators.companySearchInput.fill(name);
+      await this.locators.companyOption(name).click();
+    }
+    await this.locators.companySearchInput.fill('');
+    await this.closeCompanyDropdown();
+  }
+
+  /** The trigger shows one chip per selected company, in selection order. */
+  async expectSelectedCompanies(names: string[]): Promise<void> {
+    await expect(this.locators.companyChips).toHaveText(names);
+  }
+
+  async expectNoCompanySelected(): Promise<void> {
+    await expect(this.locators.companyChips).toHaveCount(0);
+    await expect(this.locators.companyCombobox).toHaveText('Select');
   }
 
   async cancel(): Promise<void> {

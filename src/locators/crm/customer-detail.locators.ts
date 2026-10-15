@@ -58,6 +58,14 @@ export class CustomerDetailLocators {
   readonly departmentsEditButton: Locator;
   readonly departmentsAddButton: Locator;
 
+  // Customer Management > Company (Company for Customer, Sprint 5)
+  readonly companyValue: Locator;
+  readonly companyEditCombobox: Locator;
+  readonly companySearchInput: Locator;
+  readonly companyOptions: Locator;
+  readonly companyEditChips: Locator;
+  readonly managementUpdatedToast: Locator;
+
   readonly toast: Locator;
 
   constructor(private readonly page: Page) {
@@ -97,6 +105,30 @@ export class CustomerDetailLocators {
     this.departmentsEditButton = page.getByRole('button', { name: 'Edit' }).last();
     this.departmentsAddButton = page.getByRole('button', { name: 'Add', exact: true });
 
+    // Confirmed directly (2026-10-15, dev): in read mode the Company row
+    // is a label div with the exact text "Company" followed by a sibling
+    // div whose first child holds the value — every selected company
+    // joined into ONE plain string ("AFD, Other Co"), no chips/list
+    // items. In edit mode (Customer Management's section Edit) the same
+    // row becomes the same multi-select combobox as the Create form:
+    // `combobox "Company"` whose chosen values render as `.crm-chip`s,
+    // with a "Search companies…" + listbox "Company" popup.
+    this.companyValue = page
+      .getByText('Company', { exact: true })
+      .locator('xpath=following-sibling::div[1]/div[1]');
+    this.companyEditCombobox = page.getByRole('combobox', { name: 'Company', exact: true });
+    this.companySearchInput = page.getByRole('textbox', { name: 'Search companies…' });
+    this.companyOptions = page
+      .getByRole('dialog')
+      .last()
+      .getByRole('listbox', { name: 'Company' })
+      .getByRole('option');
+    this.companyEditChips = this.companyEditCombobox.locator('.crm-chip');
+    this.managementUpdatedToast = page
+      .locator('[data-sonner-toast]')
+      .filter({ hasText: 'Customer Management updated' })
+      .first();
+
     this.toast = page.locator('[data-sonner-toast]').first();
   }
 
@@ -123,5 +155,10 @@ export class CustomerDetailLocators {
 
   lastButton(name: 'Save' | 'Cancel'): Locator {
     return this.page.getByRole('button', { name }).last();
+  }
+
+  /** One option of the open Company popup, matched on its exact name. */
+  companyOption(name: string): Locator {
+    return this.companyOptions.and(this.page.getByRole('option', { name, exact: true }));
   }
 }
