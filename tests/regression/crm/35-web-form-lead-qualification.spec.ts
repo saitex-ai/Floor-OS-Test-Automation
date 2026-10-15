@@ -294,9 +294,11 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
       await lq.expectAiSectionWithContent('Contact Info');
     });
 
-    await test.step('BUG: a genuinely submitted Web Form Lead has no Contact Info — "No dossier ... integration is pending"', async () => {
+    await test.step('Not implemented yet: a genuinely submitted Web Form Lead has no dossier — "No dossier ... integration is pending"', async () => {
       // Every web-ingest lead on dev has `dossier: null`; only leads seeded
-      // by ai-lead-engine (2026-09-18 / 2026-10-12) have AI sections.
+      // by ai-lead-engine (2026-09-18 / 2026-10-12) have AI sections. The
+      // dossier integration for form submissions is pending — confirmed
+      // with the team (2026-10-15) as not a bug. Fails once it ships.
       const data = await lq.openAndReadQualification(WEB_FORM_LEADS.noPhone);
       expect(data.dossier).toBeNull();
       await lq.expectAiSectionAbsent('Contact Info');
@@ -321,9 +323,9 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
       await lq.expectAiSectionAbsent('Sales Pitch Recommendation');
     });
 
-    await test.step('BUG: AI sections are not generated from a genuine form submission (no dossier at all)', async () => {
-      // "Content reflects the submitted form" can't hold: no web-ingest
-      // lead on dev has a dossier — see TC:9's BUG step.
+    await test.step('Not implemented yet: AI sections are not generated from a genuine form submission', async () => {
+      // "Content reflects the submitted form" can't hold yet: the dossier
+      // integration for form submissions is pending (see TC:9).
       const data = await lq.openAndReadQualification(WEB_FORM_LEADS.allFields);
       expect(data.dossier).toBeNull();
       for (const title of DEV_AI_SECTION_TITLES) await lq.expectAiSectionAbsent(title);
