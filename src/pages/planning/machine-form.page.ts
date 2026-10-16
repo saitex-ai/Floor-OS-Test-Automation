@@ -10,7 +10,8 @@ import { ensureRoute } from './navigation';
 export type MachineStatus = 'Active' | 'Down' | 'In maintenance' | 'Retired';
 
 export interface MachineFieldValues {
-  code: string;
+  /** Omit since the 2026-10-16 dev deploy: the asset code is generated on save. */
+  code?: string;
   /** A Machine type option, e.g. /^BTK · / — the first one offered if omitted. */
   machineType?: string | RegExp;
   /** Which real work centre to assign — defaults to the first available if omitted. */
@@ -116,7 +117,7 @@ export class MachineFormPage extends BasePage {
    * usable is the natural happy path.
    */
   async fillRequired(values: MachineFieldValues): Promise<void> {
-    await this.locators.assetCode.fill(values.code);
+    if (values.code !== undefined) await this.locators.assetCode.fill(values.code);
     await this.setMachineType(values.machineType ?? /.+/);
     await this.setWorkCentre(values.workCentre ?? /.+/);
     await this.setStatus(values.status ?? 'Active');

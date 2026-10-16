@@ -1,5 +1,5 @@
 import * as allure from 'allure-js-commons';
-import { test } from '../../../src/fixtures/planning.fixtures';
+import { test, expect } from '../../../src/fixtures/planning.fixtures';
 
 /**
  * Planning — Smoke suite. Module-loads check plus one happy-path test per
@@ -19,7 +19,9 @@ test.describe('Planning module', () => {
     await planningPage.expectLoaded();
   });
 
-  test('Create Calendar: successful creation with code and name only', async ({
+  // Since the 2026-10-16 dev deploy the create forms generate the code on save
+  // (CAL-0001…, and likewise for work centres and machines), so none is typed.
+  test('Create Calendar: successful creation with a name only', async ({
     calendarsListPage,
     calendarFormPage,
   }) => {
@@ -28,13 +30,9 @@ test.describe('Planning module', () => {
     await calendarsListPage.openNewCalendar();
     await calendarFormPage.expectOnCreatePage();
 
-    const code = `PWC${Date.now().toString().slice(-7)}`;
-    await calendarFormPage.fillRequired({
-      code,
-      name: `Playwright Smoke Calendar ${Date.now()}`,
-    });
+    await calendarFormPage.fillRequired({ name: `Playwright Smoke Calendar ${Date.now()}` });
     await calendarFormPage.create();
-    await calendarFormPage.expectCreatedSuccessfully(code);
+    expect(await calendarFormPage.expectCreatedSuccessfully()).toMatch(/^CAL-\d+$/);
   });
 
   test('Create Work Centre: successful creation with the required fields set', async ({
@@ -46,10 +44,7 @@ test.describe('Planning module', () => {
     await workCentresListPage.openNewWorkCentre();
     await workCentreFormPage.expectOnCreatePage();
 
-    await workCentreFormPage.fillRequired({
-      code: `PWWC${Date.now().toString().slice(-6)}`,
-      name: `Playwright Smoke WC ${Date.now()}`,
-    });
+    await workCentreFormPage.fillRequired({ name: `Playwright Smoke WC ${Date.now()}` });
     await workCentreFormPage.create();
     await workCentreFormPage.expectCreatedSuccessfully();
   });
@@ -81,9 +76,7 @@ test.describe('Planning module', () => {
     await machinesListPage.openNewMachine();
     await machineFormPage.expectOnCreatePage();
 
-    await machineFormPage.fillRequired({
-      code: `PWM${Date.now().toString().slice(-6)}`,
-    });
+    await machineFormPage.fillRequired({});
     await machineFormPage.create();
     await machineFormPage.expectCreatedSuccessfully();
   });
