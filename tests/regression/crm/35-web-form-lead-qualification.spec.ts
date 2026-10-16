@@ -37,9 +37,6 @@ import { DEV_AI_SECTION_TITLES } from '../../../src/pages/crm/lead-qualification
  * - No "Manager's review and score saved" / "Review updated" confirmation
  *   (TC:14/15); the empty-edit error reads "A review and a score are both
  *   required" (TC:15).
- * - On a converted Web Form record the AI Chatbot (with Markup tool) still
- *   opens and accepts input, and enhanced pointers keep enabled "Revert"
- *   buttons (TC:18).
  * - Acknowledgement email isn't traceable from the Lead: Communication >
  *   Emails is empty for an ingested Web Form Lead (TC:19).
  */
@@ -566,11 +563,13 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
       await lq.expectQualificationInputsUnavailable();
     });
 
-    await test.step('BUG: the AI Chatbot (with Markup tool) is still available and the enhanced pointers keep enabled Revert buttons', async () => {
-      // Expected: AI Chatbot not available once past Lead. Nothing is
-      // sent/reverted here — only that the controls are live.
+    await test.step('AI Chatbot and enhancement stay available on a Qualified Lead (intended), and the chatbot says the qualification is read-only', async () => {
+      // Confirmed with the team (2026-10-16): AI enhancement is still needed
+      // for a Qualified Lead, so the chatbot, Markup tool and Revert buttons
+      // stay. Nothing is sent or reverted here.
       await expect(lq.locators.revertWordingButtons.first()).toBeEnabled();
       await lq.openAiChatbot();
+      await lq.expectAiChatbotReadOnlyNotice();
       await lq.turnOnMarkupTool();
       await lq.expectAiChatbotAcceptsInput();
     });
