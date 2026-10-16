@@ -43,8 +43,13 @@ export async function pickDayOfShownMonth(
 ): Promise<void> {
   const picker = new DatePickerLocators(page);
   await trigger.click();
+  await expect(picker.grid).toBeVisible();
+  const shown = await picker.grid.getAttribute('aria-label');
   for (let i = 0; i < Math.abs(monthOffset); i += 1)
     await (monthOffset < 0 ? picker.previousMonth : picker.nextMonth).click();
+  // After a month click the grid re-renders: wait for its label to move on.
+  if (monthOffset !== 0)
+    await expect.poll(() => picker.grid.getAttribute('aria-label')).not.toBe(shown);
   const [month, year] = ((await picker.grid.getAttribute('aria-label')) ?? '').split(' ');
   await picker.day(new RegExp(`${month} ${day}(st|nd|rd|th), ${year}$`)).click();
   if (await picker.doneButton.isVisible().catch(() => false)) await picker.doneButton.click();

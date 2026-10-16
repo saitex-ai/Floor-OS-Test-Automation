@@ -22,12 +22,12 @@ import { CodeListValuesPage } from '../../../../src/pages/planning/code-lists.pa
 import { CodeListValueDialogPage } from '../../../../src/pages/planning/code-list-value-dialog.page';
 import { CalendarsListPage } from '../../../../src/pages/planning/calendars-list.page';
 import { CalendarFormPage } from '../../../../src/pages/planning/calendar-form.page';
-import { EmployeesListPage } from '../../../../src/pages/master-data/employees-list.page';
-import { EmployeeFormPage } from '../../../../src/pages/master-data/employee-form.page';
 import { ShiftKindsPage } from '../../../../src/pages/planning/shift-kinds.page';
 import { ShiftFormPage, ShiftsListPage } from '../../../../src/pages/planning/shifts.page';
-import { DepartmentsListPage } from '../../../../src/pages/master-data/departments-list.page';
-import { DepartmentFormPage } from '../../../../src/pages/master-data/department-form.page';
+import {
+  deactivateDepartment,
+  deactivateEmployee,
+} from '../../../../src/fixtures/cross-module.helpers';
 import { currentSpecFile, takeCodes } from './created';
 import {
   openActivity,
@@ -63,20 +63,6 @@ interface Cleaner<L extends MasterDataListPage = MasterDataListPage> {
 }
 
 const retired = (row: string) => /\bRetired\b/.test(row);
-
-async function deactivateEmployee(page: Page, name: string): Promise<void> {
-  const employees = new EmployeesListPage(page);
-  const employee = new EmployeeFormPage(page);
-  await employees.open();
-  await employees.expectLoaded();
-  await employees.expectRowsLoaded();
-  await employees.openEmployeeByName(name);
-  await employee.expectOnDetailPage();
-  await employee.clickEdit();
-  if (await employee.isActive()) await employee.toggleActive();
-  await employee.saveChanges();
-  await employee.expectUpdatedSuccessfully();
-}
 
 async function retireMachine(page: Page, code: string): Promise<void> {
   await openMachine(page, code);
@@ -115,19 +101,6 @@ async function deleteActivityDraft(page: Page, code: string): Promise<void> {
 async function deleteRecipeDraft(page: Page, code: string): Promise<void> {
   await openRecipe(page, code);
   await new RecipeDetailPage(page).deleteDraft();
-}
-
-async function deactivateDepartment(page: Page, code: string): Promise<void> {
-  const list = new DepartmentsListPage(page);
-  const form = new DepartmentFormPage(page);
-  await list.open();
-  await list.expectLoaded();
-  await list.openDepartmentByCode(code);
-  await form.expectOnDetailPage();
-  await form.clickEdit();
-  if (await form.isActive()) await form.toggleActive();
-  await form.saveChanges();
-  await form.expectUpdatedSuccessfully();
 }
 
 /**

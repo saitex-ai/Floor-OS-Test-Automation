@@ -1,13 +1,11 @@
 import * as allure from 'allure-js-commons';
 import { type Page } from '@playwright/test';
-import { test, expect } from '../../../src/fixtures/planning.fixtures';
+import { test, expect } from '../../../src/fixtures/cross-module.fixtures';
 import { SetupDepartmentPage } from '../../../src/pages/planning/setup-department.page';
 import { ActivitiesListPage } from '../../../src/pages/planning/activities-list.page';
 import { RecipesListPage } from '../../../src/pages/planning/recipes-list.page';
 import { WorkCentresListPage } from '../../../src/pages/planning/work-centres-list.page';
 import { MachinesListPage } from '../../../src/pages/planning/machines-list.page';
-import { DepartmentsListPage } from '../../../src/pages/master-data/departments-list.page';
-import { DepartmentFormPage } from '../../../src/pages/master-data/department-form.page';
 import {
   asPersona,
   machineTagFor,
@@ -40,8 +38,8 @@ const cu = (id: string) => `https://app.clickup.com/t/${id}`;
 const QUALIFICATION_TASK = 'SEW-COINHEM';
 const QUALIFICATIONS_PARKED =
   'Parked: the Qualifications screen was removed on 2026-10-14 (now Operators & Qualifications), and the wizard-created operator has no profile there.';
-const CAPACITY_SKIP =
-  'Step 5 (Capacity) still reads "This step is not built yet" — ClickUp status skip until it is built.';
+const CAPACITY_FIXME =
+  'Step 5 (Capacity) still reads "This step is not built yet" — write this case when it ships.';
 
 test.describe('Planning - Set up my Department', () => {
   test.describe.configure({ mode: 'serial' });
@@ -83,8 +81,10 @@ test.describe('Planning - Set up my Department', () => {
   test('TC-DW-NAV-01 The journey card shows progress and opens the wizard', async () => {
     await allure.tms(cu('z941abw0p1'), 'TC-DW-NAV-01 (ClickUp)');
     await wizard.openLanding();
-    confirmedBefore = (await wizard.confirmedCount()).confirmed;
-    expect(confirmedBefore).toBeGreaterThanOrEqual(0);
+    const { confirmed, total } = await wizard.confirmedCount();
+    expect(total, 'departments counted on the card').toBeGreaterThan(0);
+    expect(confirmed, 'confirmed ≤ total').toBeLessThanOrEqual(total);
+    confirmedBefore = confirmed;
     await wizard.startFromCard();
   });
 
@@ -257,11 +257,8 @@ test.describe('Planning - Set up my Department', () => {
   ] as const) {
     test(`${id} ${title}`, async () => {
       await allure.tms(cu(cid), `${id} (ClickUp)`);
-      if (id === 'TC-DW-CAP-01') {
-        await wizard.continue();
-        await wizard.expectOnStep('What your department can actually do');
-      }
-      test.skip(await wizard.isNotBuilt(), CAPACITY_SKIP);
+      // Not written yet: fixme (not a pass) until Step 5 ships, so it shows up as a gap.
+      test.fixme(true, CAPACITY_FIXME);
     });
   }
 
@@ -269,6 +266,9 @@ test.describe('Planning - Set up my Department', () => {
 
   test('TC-DW-TEAM-02 "Create employee" opens the Employee form, pinned to this department', async () => {
     await allure.tms(cu('z941abw0qb'), 'TC-DW-TEAM-02 (ClickUp)');
+    // Through Step 5 (Capacity, not built yet — TC-DW-CAP-01..05) to Step 6.
+    await wizard.continue();
+    await wizard.expectOnStep('What your department can actually do');
     await wizard.continue();
     await wizard.expectOnStep('Your team and their qualifications');
     const url = page.url();
@@ -324,9 +324,7 @@ test.describe('Planning - Set up my Department', () => {
   test('TC-DW-FIN-01 Review counts every area live', async () => {
     await allure.tms(cu('z941abw0qh'), 'TC-DW-FIN-01 (ClickUp)');
     // Sept (dev-confirmed): the Capacity figures are placeholders until Step 5 is built.
-    await wizard.continue();
-    await wizard.expectOnStep('What you are completing');
-    test.skip(true, CAPACITY_SKIP);
+    test.fixme(true, CAPACITY_FIXME);
   });
 
   test('TC-DW-FIN-02 An empty area shows "empty", not "ready"', async () => {
@@ -348,8 +346,7 @@ test.describe('Planning - Set up my Department', () => {
     // (the case says "empty"). Label only; the check is that it isn't "ready".
     for (const area of ['Activities', 'Recipes', 'Centres & machines', 'Team'])
       await test.step(`${area} is not "ready"`, async () => {
-        expect(await wizard.areaChip(area)).not.toBe('ready');
-        expect(await wizard.areaChip(area)).not.toBe('');
+        await wizard.expectAreaChip(area, /^(incomplete|empty)$/);
       });
   });
 
@@ -369,10 +366,14 @@ test.describe('Planning - Set up my Department', () => {
     await wizard.goToStep('Department');
     await wizard.selectDepartment(dept);
     await wizard.goToStep('Review & Complete');
-    const atReview = await wizard.progressPercent();
+    await wizard.expectOnStep('What you are completing');
+    await wizard.expectProgress(100);
+    // Back to an earlier step: progress stays at the furthest one reached.
     await wizard.goToStep('Activities');
-    expect(await wizard.progressPercent()).toBe(atReview);
+    await wizard.expectOnStep('Confirm the work your department performs');
+    await wizard.expectProgress(100);
     await wizard.goToStep('Review & Complete');
+    await wizard.expectOnStep('What you are completing');
   });
 
   test('TC-DW-FIN-04 "Complete department" confirms it', async () => {
@@ -415,20 +416,22 @@ test.describe('Planning - Set up my Department', () => {
     await new MachinesListPage(page).findRow(machine);
   });
 
-  test('TC-DW-DEPT-05 A department edit here is the Departments master record', async () => {
-    // Reads the Master Data Departments screen, so it checks the edited name there.
+  test('TC-DW-DEPT-05 A department edit here is the Departments master record', async ({
+    departmentsListPage,
+    departmentFormPage,
+  }) => {
+    // Cross-module: reads the Master Data Departments screen (its own page,
+    // from the merged fixtures) for the name edited in the wizard.
     await allure.tms(cu('z941abw0pe'), 'TC-DW-DEPT-05 (ClickUp)');
     await wizard.open();
     await wizard.selectDepartment(dept);
     await wizard.editDepartmentName(`${deptName} (edited)`);
-    const departments = new DepartmentsListPage(page);
-    await departments.open();
-    await departments.expectLoaded();
-    await departments.search(dept);
-    await departments.openDepartmentByCode(dept);
-    const form = new DepartmentFormPage(page);
-    await form.expectOnDetailPage();
-    await form.expectNameShown(`${deptName} (edited)`);
+    await departmentsListPage.open();
+    await departmentsListPage.expectLoaded();
+    await departmentsListPage.search(dept);
+    await departmentsListPage.openDepartmentByCode(dept);
+    await departmentFormPage.expectOnDetailPage();
+    await departmentFormPage.expectNameShown(`${deptName} (edited)`);
   });
 
   test('TC-DW-DEPT-01 Switching department re-scopes the wizard', async () => {

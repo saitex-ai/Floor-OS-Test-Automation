@@ -55,4 +55,9 @@ export class DepartmentFormLocators {
   option(name: string | RegExp): Locator {
     return this.page.getByRole('option', { name });
   }
+
+  /** The read-only detail view's heading, which is the department's name. */
+  detailHeading(name: string): Locator {
+    return this.page.getByRole('heading', { level: 1, name, exact: true });
+  }
 }

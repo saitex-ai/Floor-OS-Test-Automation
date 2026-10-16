@@ -8,7 +8,6 @@ import { ActivityFormLocators } from '../../locators/planning/activity-form.loca
 import { RecipeFormLocators } from '../../locators/planning/recipe-form.locators';
 import { WorkCentreFormLocators } from '../../locators/planning/work-centre-form.locators';
 import { MachineFormLocators } from '../../locators/planning/machine-form.locators';
-import { EmployeeFormLocators } from '../../locators/master-data/employee-form.locators';
 import { MachineFormPage } from './machine-form.page';
 import { escapeRegExp } from '../../locators/planning/master-data-list.locators';
 import { becomesUsable } from './master-data-list.page';
@@ -38,7 +37,6 @@ export class SetupDepartmentPage extends BasePage {
   readonly recipe: RecipeFormLocators;
   readonly workCentre: WorkCentreFormLocators;
   readonly machine: MachineFormLocators;
-  readonly employee: EmployeeFormLocators;
   /** The standalone machine form's flows (Machine type picker, system links), rendered inline in Step 4. */
   readonly machineForm: MachineFormPage;
 
@@ -49,7 +47,6 @@ export class SetupDepartmentPage extends BasePage {
     this.recipe = new RecipeFormLocators(page);
     this.workCentre = new WorkCentreFormLocators(page);
     this.machine = new MachineFormLocators(page);
-    this.employee = new EmployeeFormLocators(page);
     this.machineForm = new MachineFormPage(page);
   }
 
@@ -114,20 +111,32 @@ export class SetupDepartmentPage extends BasePage {
     await ensureRoute(this.page, path);
     const restricted = this.page.getByText(/Access restricted/i).first();
     const onWizard = this.page.getByRole('heading', { name: 'Select department' });
-    await expect(restricted.or(onWizard).first())
-      .toBeVisible({ timeout: WAIT.PAGE_LOAD })
-      .catch(() => {});
-    if (await onWizard.isVisible()) return 'open';
-    return 'restricted';
+    // Fails unless one of the two states actually shows: the wizard's first
+    // step, or being kept out ("Access restricted", or sent off the wizard).
+    const state = async (): Promise<'restricted' | 'open' | 'loading'> => {
+      if (await onWizard.isVisible()) return 'open';
+      if ((await restricted.isVisible()) || !new URL(this.page.url()).pathname.startsWith(path))
+        return 'restricted';
+      return 'loading';
+    };
+    await expect
+      .poll(state, {
+        message: 'the wizard or "Access restricted" should show',
+        timeout: WAIT.PAGE_LOAD,
+      })
+      .not.toBe('loading');
+    return (await state()) === 'open' ? 'open' : 'restricted';
   }
 
   async expectOnStep(heading: string | RegExp): Promise<void> {
     await expect(this.locators.stepHeading).toHaveText(heading, { timeout: WAIT.PAGE_LOAD });
   }
 
-  async progressPercent(): Promise<number> {
-    const text = await this.locators.progress.innerText();
-    return Number(text.match(/^(\d+)%/)![1]);
+  /** The rail's "N% complete", re-read until it shows `percent`. */
+  async expectProgress(percent: number): Promise<void> {
+    await expect(this.locators.progress).toHaveText(new RegExp(`^${percent}% complete`), {
+      timeout: WAIT.SERVER,
+    });
   }
 
   async continue(): Promise<void> {
@@ -296,7 +305,7 @@ export class SetupDepartmentPage extends BasePage {
     const combo = {
       activity: this.activity.owningDepartment,
       recipe: this.recipe.owningDepartment,
-      employee: this.employee.department,
+      employee: this.locators.employeeDepartment,
     }[form];
     await this.expectDepartmentPreset(combo, departmentName);
   }
@@ -445,15 +454,6 @@ export class SetupDepartmentPage extends BasePage {
     await expect(this.machine.createButton).toBeHidden({ timeout: WAIT.SERVER });
   }
 
-  async expectNotBuilt(): Promise<void> {
-    await expect(this.locators.notBuilt).toBeVisible({ timeout: WAIT.SERVER });
-  }
-
-  async isNotBuilt(): Promise<boolean> {
-    await expect(this.locators.stepHeading).toBeVisible({ timeout: WAIT.PAGE_LOAD });
-    return this.locators.notBuilt.isVisible();
-  }
-
   async openCreateEmployee(): Promise<void> {
     await this.locators.createEmployeeButton.click();
     await expect(this.locators.employeeName).toBeVisible({ timeout: WAIT.NAVIGATION });
@@ -462,13 +462,8 @@ export class SetupDepartmentPage extends BasePage {
   async createEmployee(fullName: string): Promise<void> {
     await this.openCreateEmployee();
     await this.locators.employeeName.fill(fullName);
-    await this.employee.maintainedBy.click();
-    // A plain option list here; Master Data's form shows the same choice as dialog buttons.
-    await this.locators
-      .option('By hand')
-      .or(this.employee.departmentOption('By hand'))
-      .first()
-      .click();
+    await this.locators.employeeMaintainedBy.click();
+    await this.locators.maintainedByChoice('By hand').click();
     expect(
       await submitForm(this.locators.employeeCreateSubmit),
       `create employee ${fullName}`,
@@ -529,9 +524,16 @@ export class SetupDepartmentPage extends BasePage {
 
   // ── Step 7 ──
 
-  async areaChip(area: string): Promise<string> {
-    const text = await this.locators.areaRow(area).innerText();
-    return text.match(/\b(ready|incomplete|empty)\b/)?.[1] ?? '';
+  /** On Step 7: an area's chip ("ready" / "incomplete" / "empty"), re-read until it matches. */
+  async expectAreaChip(area: string, chip: string | RegExp): Promise<void> {
+    await expect
+      .poll(
+        async () =>
+          (await this.locators.areaRow(area).innerText()).match(/(ready|incomplete|empty)$/)?.[1] ??
+          '',
+        { message: `${area} chip`, timeout: WAIT.SERVER },
+      )
+      .toMatch(chip);
   }
 
   async expectReviewBanner(text: string | RegExp): Promise<void> {

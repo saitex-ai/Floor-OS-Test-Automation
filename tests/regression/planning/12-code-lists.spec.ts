@@ -303,12 +303,14 @@ test.describe('Planning - Code Lists', () => {
     const values = new CodeListValuesPage(page, 'uom');
     await values.open();
     await values.expectLoaded();
-    const all = await values.tabCount('All');
     await values.setRowsPerPage(100);
-    const { total, to } = await values.showing();
-    expect(total).toBe(all);
-    expect(to).toBe(total);
-    expect(await values.visibleRowCount()).toBe(total);
+    // The tab count, the "of N" footer and the rows shown, re-read together.
+    await values.expectTabCountMatchesRows('All');
+    await expect(async () => {
+      const { total, to } = await values.showing();
+      expect(to, 'one page holds every row').toBe(total);
+      expect(await values.visibleRowCount(), 'rows shown').toBe(total);
+    }).toPass();
   });
 
   test('TC-LCV-10 Values access requires read permission', async ({ personas }) => {

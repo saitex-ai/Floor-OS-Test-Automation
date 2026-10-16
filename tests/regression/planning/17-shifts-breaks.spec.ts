@@ -107,10 +107,8 @@ test.describe('Planning - Shifts & Breaks', () => {
     const list = new ShiftsListPage(page);
     await list.open();
     await list.expectLoaded();
-    const all = await list.tabCount('All');
-    let sum = 0;
-    for (const tab of ['Standard', 'Overtime', 'Night']) sum += await list.tabCount(tab);
-    expect(sum, 'Standard + Overtime + Night = All').toBe(all);
+    // Re-read together: other tests in this file create shifts meanwhile.
+    await list.expectTabCountsAddUp(['Standard', 'Overtime', 'Night']);
   });
 
   test('TC-LSH-03 "Breaks" shows each shift\'s own break count', async ({ page }) => {

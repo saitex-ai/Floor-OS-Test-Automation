@@ -52,9 +52,11 @@ export class SetupDepartmentLocators {
   readonly addMachineButton: Locator;
   readonly createEmployeeButton: Locator;
   readonly skillsButtons: Locator;
-  readonly notBuilt: Locator;
   /** The inline employee form's name field ("Name" here, "Full Name" on Master Data). */
   readonly employeeName: Locator;
+  /** The inline employee form's Department (locked to the department being set up) and Maintained by. */
+  readonly employeeDepartment: Locator;
+  readonly employeeMaintainedBy: Locator;
   /** The inline employee form's submit — exact, as the step's own button reads "+ Create employee". */
   readonly employeeCreateSubmit: Locator;
   readonly qualificationApprovalNote: Locator;
@@ -104,11 +106,12 @@ export class SetupDepartmentLocators {
     this.addMachineButton = page.getByRole('button', { name: /Add a machine/ });
     this.createEmployeeButton = page.getByRole('button', { name: /Create employee/ });
     this.skillsButtons = page.getByRole('button', { name: 'Skills', exact: true });
-    this.notBuilt = page.getByText('This step is not built yet.', { exact: false });
     this.employeeName = page
       .getByRole('main')
       .last()
       .getByRole('textbox', { name: 'Name', exact: true });
+    this.employeeDepartment = page.getByRole('combobox', { name: 'Department', exact: true });
+    this.employeeMaintainedBy = page.getByRole('combobox', { name: 'Maintained by', exact: true });
     this.employeeCreateSubmit = page.getByRole('button', { name: 'Create employee', exact: true });
     this.qualificationApprovalNote = page.getByText(/needs the department manager's approval/);
     this.addQualificationButton = page.getByRole('button', { name: /Add a qualification/ });
@@ -146,6 +149,14 @@ export class SetupDepartmentLocators {
       .last()
       .getByText(code, { exact: true })
       .locator('xpath=ancestor::*[.//button][1]');
+  }
+
+  /** A Maintained by choice: a plain option, or a button in the picker's dialog (as on Master Data). */
+  maintainedByChoice(name: string): Locator {
+    return this.page
+      .getByRole('option', { name, exact: true })
+      .or(this.page.getByRole('dialog').getByRole('button', { name, exact: true }))
+      .first();
   }
 
   /** A work centre's expanded machines section ("Machines in <code> — …" and its "+ Add a machine"). */
