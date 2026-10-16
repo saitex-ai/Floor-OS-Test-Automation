@@ -27,6 +27,28 @@ import {
   OperationFormPage,
   type OperationFieldValues,
 } from '../../../../src/pages/planning/operation-form.page';
+import {
+  OperationMasterFormPage,
+  type OperationMasterValues,
+} from '../../../../src/pages/planning/operation-master-form.page';
+import { OperationDetailPage } from '../../../../src/pages/planning/operation-detail.page';
+import { AllowanceFormPage } from '../../../../src/pages/planning/allowance-form.page';
+import { WorkCentresListPage } from '../../../../src/pages/planning/work-centres-list.page';
+import {
+  WorkCentreFormPage,
+  type CapabilityValues,
+} from '../../../../src/pages/planning/work-centre-form.page';
+import { WorkCentreDetailPage } from '../../../../src/pages/planning/work-centre-detail.page';
+import { MachinesListPage } from '../../../../src/pages/planning/machines-list.page';
+import {
+  MachineFormPage,
+  type MachineStatus,
+} from '../../../../src/pages/planning/machine-form.page';
+import { MachineDetailPage } from '../../../../src/pages/planning/machine-detail.page';
+import {
+  MaintenanceWindowFormPage,
+  type WindowValues,
+} from '../../../../src/pages/planning/maintenance-window-form.page';
 
 /**
  * Test data for the Planning regression suite. Every record it creates is
@@ -203,4 +225,137 @@ export async function addOperation(page: Page, values: OperationFieldValues): Pr
   await form.fill(values);
   expect(await form.create(), `create operation ${values.name}`).toBe('submitted');
   await detail.expectOperationRow(values.name!);
+}
+
+// ── Sprint 2: Operations & Allowance, Work Centres, Machines & Maintenance ──
+
+/** An off-machine grade: Machine type isn't required with it. */
+export const OFF_MACHINE_GRADE = /^M — manual/;
+/** An on-machine grade: Machine type is required with it. */
+export const ON_MACHINE_GRADE = /^D — simple/;
+
+/**
+ * Creates a Draft operation with every field the form insists on
+ * (department Sewing, the off-machine grade "M — manual", skill grade S3)
+ * and returns its code. Lands back on the list.
+ */
+export async function createOperation(
+  page: Page,
+  overrides: OperationMasterValues = {},
+): Promise<string> {
+  const code = overrides.code ?? uniqueCode('QA-OP');
+  const form = new OperationMasterFormPage(page);
+  await form.open();
+  await form.fill({
+    code,
+    name: taggedName(code),
+    department: /^Sewing$/,
+    grade: OFF_MACHINE_GRADE,
+    skillGrade: /^S3/,
+    defaultSam: '1.1',
+    ...overrides,
+  });
+  expect(await form.create(), `create operation ${code}`).toBe('submitted');
+  return code;
+}
+
+/** Opens an operation's detail page (its URL carries the code). */
+export async function openOperation(page: Page, code: string): Promise<void> {
+  await new OperationDetailPage(page).open(code);
+}
+
+/**
+ * On an operation's detail page: adds one allowance row. Leaving
+ * `percentage` out keeps the type's own default (so it's not an override).
+ */
+export async function addAllowance(
+  page: Page,
+  values: { type: string; percentage?: string; why?: string },
+): Promise<void> {
+  const detail = new OperationDetailPage(page);
+  const form = new AllowanceFormPage(page);
+  await detail.openNewAllowance();
+  await form.pickType(values.type);
+  if (values.percentage !== undefined) await form.setPercentage(values.percentage);
+  if (values.why !== undefined) await form.fillWhy(values.why);
+  expect(await form.create(), `create allowance ${values.type}`).toBe('submitted');
+  await detail.expectAllowanceRow(values.type);
+}
+
+/** Creates an Active work centre (department Sewing, Time based, Minutes) and returns its code. */
+export async function createWorkCentre(
+  page: Page,
+  options: { usedFor?: string; capability?: CapabilityValues } = {},
+): Promise<string> {
+  const code = uniqueCode('QA-WC');
+  const form = new WorkCentreFormPage(page);
+  await form.open();
+  await form.fillRequired({ code, name: taggedName(code), usedFor: options.usedFor });
+  if (options.capability) await form.addCapability(options.capability);
+  expect(await form.submitCreate(), `create work centre ${code}`).toBe('submitted');
+  return code;
+}
+
+/** Opens a work centre's detail page from the list. */
+export async function openWorkCentre(page: Page, code: string): Promise<void> {
+  const list = new WorkCentresListPage(page);
+  await list.findRow(code);
+  await list.openRow(code);
+  await new WorkCentreDetailPage(page).expectLoaded(code);
+}
+
+/**
+ * Machine type of every machine the suite creates: "BTK · Bartack", which no
+ * seed machine uses (checked 2026-10-14), so a search by type finds only QA rows.
+ */
+export const QA_MACHINE_TYPE = /^BTK · /;
+/** The type TC-EM-02 / TC-EM-05 switch to. */
+export const OTHER_MACHINE_TYPE = /^OL-3T · /;
+
+/**
+ * The QA-AUTO marker a machine carries. A machine has no name, and since the
+ * 2026-10-14 deploy its type is a picker, so the marker is a system link
+ * (System "QA-AUTO", Identifier "<code> — …"), shown on the list and detail.
+ */
+export function machineTagFor(code: string): string {
+  return `${code} — Planning regression test data (pw-hybrid-framework). Safe to delete.`;
+}
+
+/** Creates a machine on `workCentre` and returns its asset code. */
+export async function createMachine(
+  page: Page,
+  workCentre: string,
+  options: { status?: MachineStatus; property?: [string, string] } = {},
+): Promise<string> {
+  const code = uniqueCode('QA-M');
+  const form = new MachineFormPage(page);
+  await form.open();
+  await form.fillRequired({
+    code,
+    machineType: QA_MACHINE_TYPE,
+    workCentre,
+    status: options.status,
+  });
+  if (options.property) await form.addProperty(...options.property);
+  await form.addSystemLink('QA-AUTO', machineTagFor(code));
+  expect(await form.submitCreate(), `create machine ${code}`).toBe('submitted');
+  return code;
+}
+
+/** Opens a machine's detail page from the list. */
+export async function openMachine(page: Page, code: string): Promise<void> {
+  const list = new MachinesListPage(page);
+  await list.findRow(code);
+  await list.openRow(code);
+  await new MachineDetailPage(page).expectLoaded(code);
+}
+
+/** On a machine's detail page: adds one maintenance window (Why is required here, as its row key). */
+export async function addWindow(page: Page, values: WindowValues & { why: string }): Promise<void> {
+  const detail = new MachineDetailPage(page);
+  const form = new MaintenanceWindowFormPage(page);
+  await detail.openNewWindow();
+  await form.fill({ kind: 'Planned', start: '06:00', ...values });
+  expect(await form.create(), `create maintenance window ${values.why}`).toBe('submitted');
+  await detail.expectWindowRow(values.why);
 }

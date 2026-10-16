@@ -5,12 +5,13 @@ import {
   escapeRegExp,
 } from '../../locators/planning/master-data-list.locators';
 import { WAIT } from './waits';
+import { ensureRoute } from './navigation';
 
 /**
  * Shared flows for every Planning > Master Data list screen — they're all
  * the same grid component (search, tabs, Filters, Configure columns,
  * Toggle cell filters, view switch, pagination). Each concrete list page
- * (ActivitiesListPage, DifficultyGradeListPage, RecipesListPage) adds its
+ * (ActivitiesListPage, OperationsListPage, WorkCentresListPage, …) adds its
  * own route, heading and "New ..." button on top.
  */
 /**
@@ -39,6 +40,24 @@ export async function expectAbsentOrDisabled(button: Locator): Promise<void> {
   expect(await becomesUsable(button), 'control should be absent or disabled').toBe(false);
 }
 
+/**
+ * A read-only user's "New …" / "Edit …" either isn't usable (absent or
+ * disabled) or, where a screen still renders it enabled, leads to "Access
+ * restricted" instead of a form with a working `submitName` button.
+ * Screens differ in which of these they do — ClickUp z941abybge.
+ */
+export async function expectActionBlocked(
+  page: Page,
+  button: Locator,
+  submitName: string | RegExp,
+): Promise<void> {
+  if (!(await becomesUsable(button))) return;
+  const grid = new MasterDataListLocators(page);
+  await button.first().click();
+  await expect(grid.accessRestricted.first()).toBeVisible({ timeout: WAIT.PAGE_LOAD });
+  await expect(grid.submitButton(submitName)).toHaveCount(0);
+}
+
 export abstract class MasterDataListPage extends BasePage {
   readonly grid: MasterDataListLocators;
 
@@ -53,6 +72,7 @@ export abstract class MasterDataListPage extends BasePage {
 
   async open(): Promise<void> {
     await this.gotoAuthenticated(this.route);
+    await ensureRoute(this.page, this.route);
   }
 
   /** Waits past the loading skeleton: real rows carry a "Select row …" checkbox. */
@@ -77,6 +97,13 @@ export abstract class MasterDataListPage extends BasePage {
   async expectNewUnavailable(): Promise<void> {
     await expect(this.heading).toBeVisible({ timeout: WAIT.PAGE_LOAD });
     await expectAbsentOrDisabled(this.newButton);
+  }
+
+  /** A read-only user can't get to a working create form from "New …". */
+  async expectNewBlocked(): Promise<void> {
+    await expect(this.heading).toBeVisible({ timeout: WAIT.PAGE_LOAD });
+    await expect(this.grid.bodyRows().first()).toBeVisible({ timeout: WAIT.PAGE_LOAD });
+    await expectActionBlocked(this.page, this.newButton, /^Create\b/);
   }
 
   /**
@@ -186,6 +213,30 @@ export abstract class MasterDataListPage extends BasePage {
 
   async selectTab(name: string): Promise<void> {
     await this.grid.tab(name).click();
+  }
+
+  /**
+   * The `parts` tab counts add up to `total`'s. Every count is re-read on each
+   * attempt: another worker (or another file's afterAll cleanup) can create
+   * or retire records between two reads, so one stale read mustn't decide it.
+   */
+  async expectTabCountsAddUp(parts: string[], total = 'All'): Promise<void> {
+    await expect(async () => {
+      const counts = await Promise.all([total, ...parts].map((t) => this.tabCount(t)));
+      const [all, ...rest] = counts;
+      expect(
+        rest.reduce((a, b) => a + b, 0),
+        `${parts.join(' + ')} = ${total}`,
+      ).toBe(all);
+    }).toPass({ timeout: WAIT.SERVER });
+  }
+
+  /** The selected tab's count matches the grid's "of N" total, both re-read together until they agree. */
+  async expectTabCountMatchesRows(name: string): Promise<void> {
+    await expect(async () => {
+      const badge = await this.tabCount(name);
+      expect((await this.showing()).total, `"${name}" tab count = rows shown`).toBe(badge);
+    }).toPass({ timeout: WAIT.SERVER });
   }
 
   async expectColumnHeaders(names: string[]): Promise<void> {
