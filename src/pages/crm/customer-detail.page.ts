@@ -179,6 +179,53 @@ export class CustomerDetailPage extends BasePage {
     await this.locators.lastButton('Save').click();
   }
 
+  // ---- Customer Management > Company (Company for Customer, Sprint 5) ----
+
+  /**
+   * Read-mode Company value. Confirmed directly (2026-10-15, dev): all
+   * selected companies render as ONE comma-joined string
+   * ("A, B"), not as separate chips — pass the exact expected text.
+   * An empty Company renders an empty value.
+   */
+  async expectCompanyReadValue(text: string): Promise<void> {
+    await expect(this.locators.companyValue).toHaveText(text);
+  }
+
+  /** The read-mode Company row holds no chip/list-item elements, only plain text. */
+  async expectCompanyReadValueIsPlainText(): Promise<void> {
+    await expect(this.locators.companyValue.locator('*')).toHaveCount(0);
+  }
+
+  /**
+   * Opens Customer Management's section editor, deselects `remove`,
+   * selects `add` (via the "Search companies…" box), and saves the
+   * section. Confirmed directly (2026-10-15, dev): clicking an already
+   * selected option deselects it; saving shows a "Customer Management
+   * updated" toast.
+   */
+  async editCompanies(changes: { remove: string[]; add: string[] }): Promise<void> {
+    const l = this.locators;
+    await l.managementEditButton.click();
+    await l.companyEditCombobox.click();
+    await expect(l.companySearchInput).toBeVisible();
+    for (const name of [...changes.remove, ...changes.add]) {
+      await l.companySearchInput.fill(name);
+      await l.companyOption(name).click();
+    }
+    await l.companySearchInput.fill('');
+    await this.page.keyboard.press('Escape');
+    await expect(l.companySearchInput).toBeHidden();
+  }
+
+  async expectCompanyEditChips(names: string[]): Promise<void> {
+    await expect(this.locators.companyEditChips).toHaveText(names);
+  }
+
+  async saveManagementSection(): Promise<void> {
+    await this.locators.lastButton('Save').click();
+    await expect(this.locators.managementUpdatedToast).toBeVisible();
+  }
+
   private async selectComboboxOption(trigger: Locator, optionText: string | RegExp): Promise<void> {
     await trigger.click();
     const inDialog = this.page.getByRole('dialog').last().getByRole('option', { name: optionText });

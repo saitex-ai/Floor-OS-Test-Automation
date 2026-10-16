@@ -44,6 +44,12 @@ export class CreateCustomerLocators {
 
   // Management fields
   readonly companyCombobox: Locator;
+  // Company multi-select popup (Company for Customer, Sprint 5) — see
+  // the constructor comment below.
+  readonly companySearchInput: Locator;
+  readonly companyOptions: Locator;
+  readonly companyNoMatches: Locator;
+  readonly companyChips: Locator;
   readonly crmStageCombobox: Locator;
   readonly originTypeCombobox: Locator;
   readonly originCombobox: Locator;
@@ -72,7 +78,7 @@ export class CreateCustomerLocators {
   readonly postSaveCancelButton: Locator;
   readonly toast: Locator;
 
-  constructor(page: Page) {
+  constructor(private readonly page: Page) {
     this.createCustomerEntry = page.getByRole('button', { name: 'Create Customer' });
 
     this.profileSection = page.getByRole('heading', { name: 'Customer Profile' });
@@ -97,6 +103,24 @@ export class CreateCustomerLocators {
     // the Management section. See CreateCustomerPage.fillProfile()'s
     // handling of it.
     this.companyCombobox = page.getByRole('combobox', { name: 'Company', exact: true });
+    // Confirmed directly (2026-10-15, dev): Company is a MULTI-select —
+    // its trigger opens a `dialog` popup holding a "Search companies…"
+    // textbox and a listbox named "Company" (one `option` per company,
+    // `aria-selected` on chosen ones). The popup stays open after each
+    // pick; clicking a selected option again deselects it. Typing a
+    // value that matches nothing empties the listbox and shows "No
+    // companies match" — there is no "create new" affordance, and Enter
+    // doesn't add the typed text. Each chosen company renders inside the
+    // trigger as its own `.crm-chip` (no ARIA role, so a CSS locator is
+    // the only handle on them).
+    this.companySearchInput = page.getByRole('textbox', { name: 'Search companies…' });
+    this.companyOptions = page
+      .getByRole('dialog')
+      .last()
+      .getByRole('listbox', { name: 'Company' })
+      .getByRole('option');
+    this.companyNoMatches = page.getByText('No companies match');
+    this.companyChips = this.companyCombobox.locator('.crm-chip');
     this.crmStageCombobox = page.getByRole('combobox', { name: 'CRM Stage', exact: true });
     this.originTypeCombobox = page.getByRole('combobox', { name: 'Origin Type', exact: true });
     this.originCombobox = page.getByRole('combobox', { name: 'Origin', exact: true });
@@ -149,5 +173,10 @@ export class CreateCustomerLocators {
     // renders for a single save) — .first() avoids a strict-mode failure
     // when checking "a toast is visible" rather than a specific one.
     this.toast = page.locator('[data-sonner-toast]').first();
+  }
+
+  /** One option of the open Company popup, matched on its exact name. */
+  companyOption(name: string): Locator {
+    return this.companyOptions.and(this.page.getByRole('option', { name, exact: true }));
   }
 }

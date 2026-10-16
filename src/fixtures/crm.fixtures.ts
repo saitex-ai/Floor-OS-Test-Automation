@@ -16,6 +16,7 @@ import { LeadQualificationPage } from '../pages/crm/lead-qualification.page';
 import { ExternalEventsPage } from '../pages/crm/external-events.page';
 import { AlertsPage } from '../pages/crm/alerts.page';
 import { CustomerCommunicationPage } from '../pages/crm/customer-communication.page';
+import { CustomerOverviewEditPage } from '../pages/crm/customer-overview-edit.page';
 
 interface CrmFixtures {
   crmPage: CrmPage;
@@ -35,6 +36,7 @@ interface CrmFixtures {
   externalEventsPage: ExternalEventsPage;
   alertsPage: AlertsPage;
   customerCommunicationPage: CustomerCommunicationPage;
+  customerOverviewEditPage: CustomerOverviewEditPage;
 }
 
 /**
@@ -109,6 +111,10 @@ export const test = base.extend<CrmFixtures>({
 
   customerCommunicationPage: async ({ page }, use) => {
     await use(new CustomerCommunicationPage(page));
+  },
+
+  customerOverviewEditPage: async ({ page }, use) => {
+    await use(new CustomerOverviewEditPage(page));
   },
 });
 
