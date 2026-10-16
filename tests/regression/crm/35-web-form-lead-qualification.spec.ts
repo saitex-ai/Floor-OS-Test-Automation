@@ -29,8 +29,8 @@ import { DEV_AI_SECTION_TITLES } from '../../../src/pages/crm/lead-qualification
  * non-writing part (AI Chatbot + Markup tool reachable) automated.
  *
  * Headline dev findings (details in the .md):
- * - Genuine Web Form submissions get NO AI dossier: the tab shows "No
- *   dossier for this account yet ... That integration is pending" (TC:9/10).
+ * - BUG: genuine Web Form submissions get NO AI dossier: the tab shows "No
+ *   dossier for this account yet" (TC:9/10, ClickUp z941abywgu).
  * - Dev renders "Business Compatibility Report" and NO "Sales Pitch
  *   Recommendation" card, although the dossier payload carries `pitch`
  *   pointers (TC:10).
@@ -291,11 +291,10 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
       await lq.expectAiSectionWithContent('Contact Info');
     });
 
-    await test.step('Not implemented yet: a genuinely submitted Web Form Lead has no dossier — "No dossier ... integration is pending"', async () => {
+    await test.step('BUG: a genuinely submitted Web Form Lead has no dossier — "No dossier for this account yet"', async () => {
       // Every web-ingest lead on dev has `dossier: null`; only leads seeded
-      // by ai-lead-engine (2026-09-18 / 2026-10-12) have AI sections. The
-      // dossier integration for form submissions is pending — confirmed
-      // with the team (2026-10-15) as not a bug. Fails once it ships.
+      // by ai-lead-engine (2026-09-18 / 2026-10-12) have AI sections.
+      // Logged as https://app.clickup.com/t/z941abywgu. Fails once fixed.
       const data = await lq.openAndReadQualification(WEB_FORM_LEADS.noPhone);
       expect(data.dossier).toBeNull();
       await lq.expectAiSectionAbsent('Contact Info');
@@ -320,9 +319,9 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
       await lq.expectAiSectionAbsent('Sales Pitch Recommendation');
     });
 
-    await test.step('Not implemented yet: AI sections are not generated from a genuine form submission', async () => {
-      // "Content reflects the submitted form" can't hold yet: the dossier
-      // integration for form submissions is pending (see TC:9).
+    await test.step('BUG: AI sections are not generated from a genuine form submission', async () => {
+      // "Content reflects the submitted form" can't hold: no dossier is
+      // generated for form submissions (see TC:9, z941abywgu).
       const data = await lq.openAndReadQualification(WEB_FORM_LEADS.allFields);
       expect(data.dossier).toBeNull();
       for (const title of DEV_AI_SECTION_TITLES) await lq.expectAiSectionAbsent(title);
