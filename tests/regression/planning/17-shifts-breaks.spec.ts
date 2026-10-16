@@ -9,10 +9,12 @@ import {
   addBreak,
   asPersona,
   createShift,
+  nameOf,
   personaCredentials,
   personaSkipReason,
   setupPage,
-  uniqueCode,
+  trackCode,
+  uniqueTag,
 } from './support/test-data';
 import { cleanUpAfterAll } from './support/cleanup';
 
@@ -147,7 +149,7 @@ test.describe('Planning - Shifts & Breaks', () => {
       await list.expectRowVisible(night);
     });
     await test.step('By name', async () => {
-      await list.search(`QA-AUTO ${day}`);
+      await list.search(nameOf(day));
       await list.expectRowVisible(day);
     });
     await test.step('By shift kind', async () => {
@@ -256,27 +258,26 @@ test.describe('Planning - Shifts & Breaks', () => {
     const form = new ShiftFormPage(page);
     await form.open();
     expect(await form.create()).not.toBe('submitted');
-    for (const field of ['code', 'name', 'shiftKind', 'starts', 'ends'] as const)
+    for (const field of ['name', 'shiftKind', 'starts', 'ends'] as const)
       await test.step(`${field} is flagged`, async () => {
         await form.expectFieldFlagged(field);
       });
+    // Dev 2026-10-16: the code is generated on save, so it isn't required any more.
+    await test.step('The code is generated, not required', async () => {
+      await form.expectCodeGenerated();
+    });
   });
 
   test('TC-CSH-03 Shift code must be unique', async ({ page }) => {
     await allure.tms(cu('z941abw5p1'), 'TC-CSH-03 (ClickUp)');
+    // Dev 2026-10-16: the code is generated on save (SH-0001…) and can't be
+    // typed, so a duplicate can't be entered. Checks what replaces the rule:
+    // the code field is locked and each new shift gets its own code.
     const form = new ShiftFormPage(page);
-    const list = new ShiftsListPage(page);
     await form.open();
-    await form.fill({
-      code: day,
-      name: `QA-AUTO ${day} dup`,
-      kind: 'Standard',
-      starts: '07:30',
-      ends: '16:30',
-    });
-    expect(await form.create()).not.toBe('submitted');
-    await list.findRow(day);
-    await expect.poll(() => list.visibleRowCount()).toBe(1);
+    await form.expectCodeGenerated();
+    for (const code of [day, night, bare]) expect(code).toMatch(/^SH-\d+$/);
+    expect(new Set([day, night, bare]).size, 'each shift gets its own code').toBe(3);
   });
 
   test("TC-CSH-04 Gross is derived and Paid isn't on the form", async ({ page }) => {
@@ -300,12 +301,11 @@ test.describe('Planning - Shifts & Breaks', () => {
     await allure.tms(cu('z941abw5p5'), 'TC-CSH-06 (ClickUp)');
     // Sept: with the switch off, 22:00 → 06:00 reads -960 and Create is
     // blocked, so no negative shift is ever saved.
-    const code = uniqueCode('QA_SH');
+    const tag = uniqueTag('QA_SH');
     const form = new ShiftFormPage(page);
     await form.open();
     await form.fill({
-      code,
-      name: `QA-AUTO ${code}`,
+      name: `QA-AUTO ${tag}`,
       kind: 'Standard',
       starts: '22:00',
       ends: '06:00',
@@ -319,6 +319,8 @@ test.describe('Planning - Shifts & Breaks', () => {
       await form.fill({ crossesMidnight: true });
       expect(await form.grossValue()).toMatch(minutes(480));
       expect(await form.create()).toBe('submitted');
+      const code = await new ShiftsListPage(page).codeOf(tag);
+      trackCode('QA_SH', code);
       const detail = new ShiftDetailPage(page);
       await detail.open(code);
       await detail.expectValue('Gross minutes', minutes(480));
@@ -346,15 +348,15 @@ test.describe('Planning - Shifts & Breaks', () => {
 
   test('TC-CSH-09 Cancel discards the form', async ({ page }) => {
     await allure.tms(cu('z941abw5p9'), 'TC-CSH-09 (ClickUp)');
-    const code = uniqueCode('QA_SH');
+    const tag = uniqueTag('QA_SH');
     const form = new ShiftFormPage(page);
     const list = new ShiftsListPage(page);
     await form.open();
-    await form.fill({ code, name: `QA-AUTO ${code}` });
+    await form.fill({ name: `QA-AUTO ${tag}` });
     await form.cancel();
     await list.expectLoaded();
-    await list.search(code);
-    await list.expectNoRow(code);
+    await list.search(tag);
+    await list.expectNoMatchState();
   });
 
   test('TC-CSH-10 Only a user with write permission can create a shift', async ({ personas }) => {

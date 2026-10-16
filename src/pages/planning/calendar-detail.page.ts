@@ -72,6 +72,14 @@ export class CalendarDetailPage extends BasePage {
     await expect(this.locators.weekHeading).toHaveCount(0);
   }
 
+  /** After "Create calendar": the generated code (CAL-0001…), read from the new detail page's URL. */
+  async createdCode(): Promise<string> {
+    await expect(this.page).toHaveURL(/\/calendars\/(?!new$)[^/]+$/, { timeout: WAIT.NAVIGATION });
+    const code = new URL(this.page.url()).pathname.split('/').pop()!;
+    await this.expectLoaded(code);
+    return code;
+  }
+
   async expectLoaded(code: string): Promise<void> {
     await expect(this.page).toHaveURL(new RegExp(`/calendars/${code}$`), {
       timeout: WAIT.NAVIGATION,

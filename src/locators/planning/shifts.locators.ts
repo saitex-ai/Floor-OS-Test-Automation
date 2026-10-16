@@ -18,6 +18,8 @@ export class ShiftsLocators {
   readonly newHeading: Locator;
   readonly code: Locator;
   readonly codeFixedHelp: Locator;
+  /** Since the 2026-10-16 deploy the code is generated on save: the create form says so under the locked field. */
+  readonly codeGeneratedHelp: Locator;
   readonly name: Locator;
   readonly shiftKind: Locator;
   readonly starts: Locator;
@@ -56,6 +58,7 @@ export class ShiftsLocators {
     this.newHeading = page.getByRole('heading', { name: 'New shift', level: 1 });
     this.code = page.getByRole('textbox', { name: 'Shift code' });
     this.codeFixedHelp = page.getByText(/The code is fixed once the record exists/);
+    this.codeGeneratedHelp = page.getByText(/Assigned automatically when the record is saved/);
     this.name = page.getByRole('textbox', { name: 'Name', exact: true });
     this.shiftKind = page.getByRole('combobox', { name: 'Shift kind', exact: true });
     // The form's first two time fields: Starts, then Ends (shift or break form).

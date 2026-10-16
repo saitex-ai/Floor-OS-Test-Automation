@@ -25,6 +25,22 @@ export class ShiftsListPage extends MasterDataListPage {
     this.newButton = this.locators.newShiftButton;
   }
 
+  /**
+   * A just-created shift's generated code (SH-0001…): "Create shift" lands
+   * back on this list, so search for the shift's unique name and read the
+   * row's code cell.
+   */
+  async codeOf(name: string): Promise<string> {
+    await this.expectLoaded();
+    await this.search(name);
+    const row = this.grid.bodyRows().filter({ hasText: name }).first();
+    await expect(row).toBeVisible({ timeout: WAIT.SERVER });
+    const cells = (await row.getByRole('cell').allInnerTexts()).map((c) => c.trim());
+    const code = cells.find((c) => /^[A-Z][A-Z0-9_]*-\d+$/.test(c));
+    if (!code) throw new Error(`No shift code in row "${cells.join(' | ')}"`);
+    return code;
+  }
+
   async expectNoMatchState(): Promise<void> {
     await expect(this.locators.noMatchState.first()).toBeVisible({ timeout: WAIT.SERVER });
   }
@@ -189,6 +205,13 @@ export class ShiftFormPage extends BasePage {
     field: 'code' | 'name' | 'shiftKind' | 'starts' | 'ends',
   ): Promise<void> {
     await expect(fieldAlert(this.locators[field])).toBeVisible({ timeout: WAIT.VALIDATION });
+  }
+
+  /** The create form's code: locked, "Auto-generated", assigned on save (dev deploy 2026-10-16). */
+  async expectCodeGenerated(): Promise<void> {
+    await expect(this.locators.code).toBeDisabled();
+    await expect(this.locators.code).toHaveAttribute('placeholder', 'Auto-generated');
+    await expect(this.locators.codeGeneratedHelp).toBeVisible();
   }
 
   async expectCodeLocked(code: string): Promise<void> {

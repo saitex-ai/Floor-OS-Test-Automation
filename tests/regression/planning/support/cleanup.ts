@@ -262,10 +262,12 @@ export function cleanUpAfterAll(cleaners?: Cleaner[]): void {
 
 /**
  * afterAll for the Set up my department wizard. `created` lists what the
- * spec submitted, in order: departments (`QAD…`), their `-A1` / `-R1` drafts
- * (deleted), `-WC1` / `-M1` (retired) and "QA-AUTO <dept> operator"
- * (deactivated). Cleaned newest first, so machines go before their centre and
- * each department goes last. A record that can't be cleaned is logged, not failed.
+ * spec submitted, in order: department codes (`QAD…`), and "<kind>:<code>" for
+ * the records added under them — activity / recipe drafts (deleted), centre /
+ * machine (retired) and "operator:<name>" (deactivated). Their codes are the
+ * ones dev generated (since the 2026-10-16 deploy). Cleaned newest first, so
+ * machines go before their centre and each department goes last. A record that
+ * can't be cleaned is logged, not failed.
  */
 export async function cleanUpWizardDepartments(browser: Browser, created: string[]): Promise<void> {
   if (!created.length) return;
@@ -274,23 +276,20 @@ export async function cleanUpWizardDepartments(browser: Browser, created: string
   // would wait out the whole hook; fail that record instead and move on.
   page.setDefaultTimeout(30_000);
   const cleaned: string[] = [];
-  const cleanerFor = (label: string): ((page: Page, code: string) => Promise<void>) => {
-    if (label.endsWith('-M1')) return retireMachine;
-    if (label.endsWith('-WC1')) return retireWorkCentre;
-    if (label.endsWith('-R1')) return deleteRecipeDraft;
-    if (label.endsWith('-A1')) return deleteActivityDraft;
-    if (label.endsWith(' operator'))
-      return async (p, name) => {
-        // Its Step 6 qualification (TC-DW-TEAM-04) has no profile on Operators &
-        // Qualifications to retire it from; it stays on the deactivated employee.
-        await deactivateEmployee(p, name);
-      };
-    return deactivateDepartment;
+  const cleaners: Record<string, (page: Page, code: string) => Promise<void>> = {
+    machine: retireMachine,
+    centre: retireWorkCentre,
+    recipe: deleteRecipeDraft,
+    activity: deleteActivityDraft,
+    // Its Step 6 qualification (TC-DW-TEAM-04) has no profile on Operators &
+    // Qualifications to retire it from; it stays on the deactivated employee.
+    operator: deactivateEmployee,
   };
   try {
     for (const label of [...created].reverse()) {
+      const [kind, value] = label.includes(':') ? label.split(/:(.*)/) : ['department', label];
       try {
-        await cleanerFor(label)(page, label);
+        await (cleaners[kind!] ?? deactivateDepartment)(page, value!);
         cleaned.push(label);
       } catch (error) {
         console.warn(`QA-AUTO cleanup: could not clean ${label}: ${String(error).split('\n')[0]}`);

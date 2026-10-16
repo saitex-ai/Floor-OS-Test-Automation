@@ -9,6 +9,8 @@ export class CalendarFormLocators {
   readonly newHeading: Locator;
   readonly calendarCode: Locator;
   readonly codeFixedHelp: Locator;
+  /** Since the 2026-10-16 deploy the code is generated on save: the create form says so under the locked field. */
+  readonly codeGeneratedHelp: Locator;
   readonly name: Locator;
   readonly appliesTo: Locator;
   readonly inheritsFrom: Locator;
@@ -27,6 +29,7 @@ export class CalendarFormLocators {
     this.newHeading = page.getByRole('heading', { name: 'New calendar', level: 1 });
     this.calendarCode = page.getByRole('textbox', { name: 'Calendar code' });
     this.codeFixedHelp = page.getByText(/The code is fixed once the record exists/);
+    this.codeGeneratedHelp = page.getByText(/Assigned automatically when the record is saved/);
     this.name = page.getByRole('textbox', { name: 'Name', exact: true });
     this.appliesTo = page.getByRole('combobox', { name: 'Applies to', exact: true });
     this.inheritsFrom = page.getByRole('combobox', { name: 'Inherits from', exact: true });

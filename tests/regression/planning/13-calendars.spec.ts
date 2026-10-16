@@ -6,12 +6,13 @@ import { CalendarDetailPage } from '../../../src/pages/planning/calendar-detail.
 import {
   asPersona,
   createCalendar,
-  knownBug,
+  nameOf,
   openCalendar,
   personaCredentials,
   personaSkipReason,
   setupPage,
-  uniqueCode,
+  trackCode,
+  uniqueTag,
 } from './support/test-data';
 import { cleanUpAfterAll } from './support/cleanup';
 
@@ -75,21 +76,28 @@ test.describe('Planning - Calendars', () => {
     await allure.tms(cu('z941abvf6f'), 'TC-CC-02 (ClickUp)');
     // Applies to and Time zone ship with a value and have no empty choice.
     await calendarFormPage.open();
-    await test.step('Empty Code and Name are flagged', async () => {
+    // Dev 2026-10-16: the code is generated on save, so only Name is left to fill.
+    await test.step('Empty Name is flagged; the code is generated, not required', async () => {
       expect(await calendarFormPage.submitCreate()).not.toBe('submitted');
-      await calendarFormPage.expectFieldFlagged('calendarCode');
       await calendarFormPage.expectFieldFlagged('name');
+      await calendarFormPage.expectCodeGenerated();
     });
     await test.step('Applies to has no empty choice', async () => {
       await calendarFormPage.expectNoEmptyChoice('appliesTo');
     });
   });
 
-  test('TC-CC-03 Code must be unique, case-insensitively', async ({ calendarFormPage }) => {
+  test('TC-CC-03 Code must be unique, case-insensitively', async ({ page, calendarFormPage }) => {
     await allure.tms(cu('z941abvf6g'), 'TC-CC-03 (ClickUp)');
+    // Dev 2026-10-16: the code is generated on save (CAL-0001…) and can't be
+    // typed, so a duplicate can't be entered. Checks what replaces the rule:
+    // the code field is locked and each new calendar gets its own code.
     await calendarFormPage.open();
-    await calendarFormPage.fillRequired({ code: cal.toLowerCase(), name: `QA-AUTO ${cal} dup` });
-    await calendarFormPage.createExpectingToast(`Calendar code "${cal}" already exists`);
+    await calendarFormPage.expectCodeGenerated();
+    const another = await createCalendar(page);
+    expect(cal).toMatch(/^CAL-\d+$/);
+    expect(another).toMatch(/^CAL-\d+$/);
+    expect(another, 'each calendar gets its own code').not.toBe(cal);
   });
 
   test('TC-CC-04 "Applies to" accepts all four scopes', async ({ page, calendarsListPage }) => {
@@ -148,14 +156,15 @@ test.describe('Planning - Calendars', () => {
     calendarDetailPage,
   }) => {
     await allure.tms(cu('z941abvf6t'), 'TC-CC-07 (ClickUp)');
-    const code = uniqueCode('QA-CAL');
+    const tag = uniqueTag('QA-CAL');
     await calendarFormPage.open();
-    await calendarFormPage.fill({ code, name: `QA-AUTO ${code} tz`, inheritsFrom: cal });
+    await calendarFormPage.fill({ name: `QA-AUTO ${tag} tz`, inheritsFrom: cal });
     await calendarFormPage.expectTimeZoneWarning(false);
     await calendarFormPage.fill({ timeZone: 'Europe/London' });
     await calendarFormPage.expectTimeZoneWarning(true);
     expect(await calendarFormPage.submitCreate()).toBe('submitted');
-    await calendarDetailPage.expectLoaded(code);
+    const code = await calendarDetailPage.createdCode();
+    trackCode('QA-CAL', code);
     await calendarDetailPage.expectValue('Time zone', 'Europe/London');
     expect(page.url()).toContain(code);
   });
@@ -165,13 +174,13 @@ test.describe('Planning - Calendars', () => {
     calendarsListPage,
   }) => {
     await allure.tms(cu('z941abvf6w'), 'TC-CC-08 (ClickUp)');
-    const code = uniqueCode('QA-CAL');
+    const tag = uniqueTag('QA-CAL');
     await calendarFormPage.open();
-    await calendarFormPage.fillRequired({ code, name: `QA-AUTO ${code} cancelled` });
+    await calendarFormPage.fill({ name: `QA-AUTO ${tag} cancelled` });
     await calendarFormPage.cancel();
     await calendarsListPage.expectLoaded();
-    await calendarsListPage.search(code);
-    await calendarsListPage.expectNoRow(code);
+    await calendarsListPage.search(tag);
+    await calendarsListPage.expectNoMatchState();
   });
 
   test('TC-CC-09 Only a user with write permission can create a calendar', async ({
@@ -279,7 +288,7 @@ test.describe('Planning - Calendars', () => {
     await calendarFormPage.fill({ name: 'QA-AUTO SHOULD NOT PERSIST', appliesTo: 'Shift' });
     await calendarFormPage.cancel();
     await openCalendar(page, cal);
-    await calendarDetailPage.expectValue('Name', `QA-AUTO ${cal} — Planning regression test data`);
+    await calendarDetailPage.expectValue('Name', nameOf(cal));
     await calendarDetailPage.expectValue('Applies to', 'Department');
   });
 
@@ -318,10 +327,9 @@ test.describe('Planning - Calendars', () => {
   test('TC-LC-02 Search filters by code, name and scope', async ({ page, calendarsListPage }) => {
     await allure.tms(cu('z941abvf7e'), 'TC-LC-02 (ClickUp)');
     await allure.tms(cu('z941abyqd8'), 'TC-LC-02 bug (ClickUp)');
-    // Confirmed bug, ClickUp z941abyqd8 (2026-10-14): the search covers code
-    // and name only — "shift" finds no Shift-scope calendar whose code and
-    // name lack the word. Marked with knownBug() until fixed.
-    knownBug('z941abyqd8');
+    // Confirmed bug, ClickUp z941abyqd8 (2026-10-14): the search covered code
+    // and name only. On dev 2026-10-16 "shift" finds Shift-scope calendars whose
+    // code and name lack the word; the ClickUp status is left to the user.
     const shiftCal = await createCalendar(page, { appliesTo: 'Shift' });
     await calendarsListPage.open();
     await calendarsListPage.expectLoaded();
@@ -347,8 +355,10 @@ test.describe('Planning - Calendars', () => {
     await calendarsListPage.openFilters();
     await calendarsListPage.addFilterRule('Code', cal);
     await calendarsListPage.expectFiltersBadge(1);
-    await calendarsListPage.expectRowVisible(cal);
+    // Until the rule applies, cal's child calendars are listed too (they show
+    // cal's code under "Inherits from"): wait for the one row, then check it's cal.
     await expect.poll(() => calendarsListPage.visibleRowCount()).toBe(1);
+    await calendarsListPage.expectRowVisible(cal);
     await calendarsListPage.clearAllFilters();
     await calendarsListPage.expectNoFiltersBadge();
     await expect.poll(() => calendarsListPage.visibleRowCount()).toBeGreaterThan(1);

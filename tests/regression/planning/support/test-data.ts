@@ -50,6 +50,7 @@ import {
 import {
   ShiftDetailPage,
   ShiftFormPage,
+  ShiftsListPage,
   type BreakValues,
   type ShiftValues,
 } from '../../../../src/pages/planning/shifts.page';
@@ -100,6 +101,32 @@ export function uniqueCode(prefix: string): string {
   const code = `${prefix}${RUN}${counter.toString(36).toUpperCase()}`;
   track(prefix, code);
   return code;
+}
+
+/**
+ * A run-unique tag for a record whose code dev generates (since the
+ * 2026-10-16 deploy: calendars, shifts, activities, recipes, operations, work
+ * centres, machines). It goes in the record's name, so the cleanup's search for
+ * runPrefix(prefix) still finds the row; the generated code is then recorded
+ * with trackCode().
+ */
+export function uniqueTag(prefix: string): string {
+  counter += 1;
+  return `${prefix}${RUN}${counter.toString(36).toUpperCase()}`;
+}
+
+/** Records a generated code against the calling spec file for its afterAll cleanup. */
+export function trackCode(prefix: string, code: string): void {
+  track(prefix, code);
+}
+
+const names = new Map<string, string>();
+
+/** The name a create helper gave a record (it holds the record's QA-AUTO tag). */
+export function nameOf(code: string): string {
+  const name = names.get(code);
+  if (!name) throw new Error(`No name recorded for ${code}`);
+  return name;
 }
 
 /** The part of every code this worker hands out for `prefix` — one search finds them all. */
@@ -433,13 +460,17 @@ export async function openCodeListValue(page: Page, table: string, code: string)
  * Creates a calendar (default: Department scope, top level, Asia/Ho_Chi_Minh)
  * and returns its code; lands on its detail page.
  */
+/** Creates a QA-AUTO calendar and returns the code dev generated for it (CAL-0001…). */
 export async function createCalendar(page: Page, options: CalendarOptions = {}): Promise<string> {
-  const code = uniqueCode('QA-CAL');
+  const tag = uniqueTag('QA-CAL');
+  const name = `QA-AUTO ${tag} — Planning regression test data`;
   const form = new CalendarFormPage(page);
   await form.open();
-  await form.fill({ code, name: `QA-AUTO ${code} — Planning regression test data`, ...options });
-  expect(await form.submitCreate(), `create calendar ${code}`).toBe('submitted');
-  await new CalendarDetailPage(page).expectLoaded(code);
+  await form.fill({ name, ...options });
+  expect(await form.submitCreate(), `create calendar ${tag}`).toBe('submitted');
+  const code = await new CalendarDetailPage(page).createdCode();
+  trackCode('QA-CAL', code);
+  names.set(code, name);
   return code;
 }
 
@@ -470,19 +501,21 @@ export async function createShiftKind(page: Page, values: ShiftKindValues = {}):
  * Creates a shift (default: Standard, 07:30 → 16:30, same day) and returns
  * its code; leaves the page on the shift's detail.
  */
+/**
+ * Creates a QA-AUTO shift and returns the code dev generated for it
+ * (SH-0001…). Create lands on the list, so the code is read from the row
+ * with the shift's unique name; the page ends on the shift's detail.
+ */
 export async function createShift(page: Page, values: ShiftValues = {}): Promise<string> {
-  const code = values.code ?? uniqueCode('QA_SH');
+  const tag = uniqueTag('QA_SH');
+  const name = `QA-AUTO ${tag}`;
   const form = new ShiftFormPage(page);
   await form.open();
-  await form.fill({
-    code,
-    name: `QA-AUTO ${code}`,
-    kind: 'Standard',
-    starts: '07:30',
-    ends: '16:30',
-    ...values,
-  });
-  expect(await form.create(), `create shift ${code}`).toBe('submitted');
+  await form.fill({ name, kind: 'Standard', starts: '07:30', ends: '16:30', ...values });
+  expect(await form.create(), `create shift ${tag}`).toBe('submitted');
+  const code = await new ShiftsListPage(page).codeOf(tag);
+  trackCode('QA_SH', code);
+  names.set(code, name);
   await new ShiftDetailPage(page).open(code);
   return code;
 }
