@@ -159,6 +159,13 @@ export class CalendarFormPage extends BasePage {
     await expect(this.locators.timeZoneWarning).toHaveCount(shown ? 1 : 0);
   }
 
+  /** The create form's code: locked, "Auto-generated", assigned on save (dev deploy 2026-10-16). */
+  async expectCodeGenerated(): Promise<void> {
+    await expect(this.locators.calendarCode).toBeDisabled();
+    await expect(this.locators.calendarCode).toHaveAttribute('placeholder', 'Auto-generated');
+    await expect(this.locators.codeGeneratedHelp).toBeVisible();
+  }
+
   async expectCodeLocked(code: string): Promise<void> {
     await expect(this.locators.calendarCode).toBeDisabled();
     await expect(this.locators.calendarCode).toHaveValue(code);

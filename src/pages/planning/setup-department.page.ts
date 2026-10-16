@@ -31,6 +31,9 @@ export interface DepartmentValues {
  * Every step's add/edit is the standalone screen's own form inline, scoped to
  * the department being set up — and every save is live master data at once.
  */
+/** A generated code as cards show it (e.g. ACT-0012, WC-0004): capitals / digits, ending in -<number>. */
+const CODE_TEXT = /^[A-Z][A-Z0-9_]*(-[A-Z0-9]+)*-\d+$/;
+
 export class SetupDepartmentPage extends BasePage {
   readonly locators: SetupDepartmentLocators;
   readonly activity: ActivityFormLocators;
@@ -265,6 +268,16 @@ export class SetupDepartmentPage extends BasePage {
     );
   }
 
+  /**
+   * A card's code — since the 2026-10-16 deploy dev generates it on save, so
+   * find the card by its (unique) name and read the code shown on it.
+   */
+  async cardCode(name: string): Promise<string> {
+    const code = this.locators.card(name).getByText(CODE_TEXT).first();
+    await expect(code).toBeVisible({ timeout: WAIT.SERVER });
+    return (await code.innerText()).trim();
+  }
+
   /** The codes shown on the current step's cards that start with `prefix`. */
   async cardCodes(prefix: string): Promise<string[]> {
     const texts = await this.page
@@ -310,19 +323,13 @@ export class SetupDepartmentPage extends BasePage {
     await this.expectDepartmentPreset(combo, departmentName);
   }
 
-  async createActivity(code: string, name: string): Promise<void> {
-    await this.openCreateActivity();
-    await this.submitActivity(code, name);
-  }
-
-  /** Fills and submits the already-open inline activity form. */
-  async submitActivity(code: string, name: string): Promise<void> {
-    await this.activity.code.fill(code);
+  /** Fills and submits the already-open inline activity form; returns the code dev generated. */
+  async submitActivity(name: string): Promise<string> {
     await this.activity.name.fill(name);
-    expect(await submitForm(this.activity.createButton), `create activity ${code}`).toBe(
+    expect(await submitForm(this.activity.createButton), `create activity ${name}`).toBe(
       'submitted',
     );
-    await this.expectCard(code);
+    return this.cardCode(name);
   }
 
   /**
@@ -352,11 +359,6 @@ export class SetupDepartmentPage extends BasePage {
     await expect(this.recipe.code).toBeVisible({ timeout: WAIT.NAVIGATION });
   }
 
-  async createRecipe(code: string, name: string): Promise<void> {
-    await this.openCreateRecipe();
-    await this.submitRecipe(code, name);
-  }
-
   /** The recipe form has no typed duration/SAM: it is derived from the operations. */
   async expectNoTypedDuration(): Promise<void> {
     await expect(
@@ -380,11 +382,10 @@ export class SetupDepartmentPage extends BasePage {
   }
 
   /** Fills and submits the already-open inline recipe form. */
-  async submitRecipe(code: string, name: string): Promise<void> {
-    await this.recipe.code.fill(code);
+  async submitRecipe(name: string): Promise<string> {
     await this.recipe.name.fill(name);
-    expect(await submitForm(this.recipe.createButton), `create recipe ${code}`).toBe('submitted');
-    await this.expectCard(code);
+    expect(await submitForm(this.recipe.createButton), `create recipe ${name}`).toBe('submitted');
+    return this.cardCode(name);
   }
 
   async openCreateWorkCentre(): Promise<void> {
@@ -392,18 +393,18 @@ export class SetupDepartmentPage extends BasePage {
     await expect(this.workCentre.centreCode).toBeVisible({ timeout: WAIT.NAVIGATION });
   }
 
-  async createWorkCentre(code: string, name: string): Promise<void> {
+  /** Opens "Add a work centre", fills it and creates it; returns the code dev generated. */
+  async createWorkCentre(name: string): Promise<string> {
     await this.openCreateWorkCentre();
     const w = this.workCentre;
-    await w.centreCode.fill(code);
     await w.name.fill(name);
     await this.pick(w.usedFor, /^Bulk$/);
     await this.pick(w.centreType, /^Sewing lines$/);
     await this.pick(w.capacityMeasuredBy, /^Time based$/);
     await this.pick(w.capacityUnit, /^Minutes$/);
     await this.pick(w.status, /^Active$/);
-    expect(await submitForm(w.createButton), `create work centre ${code}`).toBe('submitted');
-    await this.expectCard(code);
+    expect(await submitForm(w.createButton), `create work centre ${name}`).toBe('submitted');
+    return this.cardCode(name);
   }
 
   async showMachines(centre: string): Promise<void> {
@@ -445,13 +446,19 @@ export class SetupDepartmentPage extends BasePage {
    * replaced the free-text Machine class with a Machine type picker, so the
    * QA-AUTO marker goes in a system link (`tag`), as on the standalone screen.
    */
-  async submitMachine(code: string, machineType: string | RegExp, tag: string): Promise<void> {
-    await this.machine.assetCode.fill(code);
+  async submitMachine(centre: string, machineType: string | RegExp, tag: string): Promise<string> {
     await this.machineForm.setMachineType(machineType);
     await this.pick(this.machine.status, /^Active$/);
     await this.machineForm.addSystemLink('QA-AUTO', tag);
-    expect(await submitForm(this.machine.createButton), `create machine ${code}`).toBe('submitted');
+    expect(await submitForm(this.machine.createButton), `create machine on ${centre}`).toBe(
+      'submitted',
+    );
     await expect(this.machine.createButton).toBeHidden({ timeout: WAIT.SERVER });
+    // A machine has no name: its code is the only one in its new centre's machines section.
+    await this.showMachines(centre);
+    const code = this.locators.machinesSection(centre).getByText(CODE_TEXT).first();
+    await expect(code).toBeVisible({ timeout: WAIT.SERVER });
+    return (await code.innerText()).trim();
   }
 
   async openCreateEmployee(): Promise<void> {

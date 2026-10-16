@@ -46,11 +46,20 @@ test.describe('Planning - Set up my Department', () => {
 
   const dept = uniqueCode('QAD');
   const deptName = `QA-AUTO ${dept} — Planning regression test data`;
-  const activity = `${dept}-A1`;
-  const recipe = `${dept}-R1`;
-  const centre = `${dept}-WC1`;
-  const machine = `${dept}-M1`;
+  // Dev 2026-10-16 generates activity / recipe / work centre / machine codes on
+  // save, so these records are found by their QA-AUTO names and their codes are
+  // read back after each create.
+  const ours = `QA-AUTO ${dept}-`;
+  const activityName = `${ours}A1`;
+  const recipeName = `${ours}R1`;
+  const centreName = `${ours}WC1`;
+  const machineTag = machineTagFor(`${dept}-M1`);
+  let activity = '';
+  let recipe = '';
+  let centre = '';
+  let machine = '';
   const operator = `QA-AUTO ${dept} operator`;
+  /** What to clean up, in order: department codes, and "<kind>:<code or name>" for the rest. */
   const created: string[] = [];
   let page: Page;
   let wizard: SetupDepartmentPage;
@@ -110,7 +119,7 @@ test.describe('Planning - Set up my Department', () => {
     expect(await wizard.selectedDepartment()).toContain(dept);
     await wizard.continue();
     await wizard.expectOnStep('Confirm the work your department performs');
-    expect(await wizard.cardCodes(`${dept}-`)).toEqual([]);
+    expect(await wizard.cardCodes(ours)).toEqual([]);
   });
 
   test('TC-DW-NAV-02 The rail opens reached steps only', async () => {
@@ -137,14 +146,14 @@ test.describe('Planning - Set up my Department', () => {
 
   test('TC-DW-NAV-05 An activity added here is live master data at once', async () => {
     await allure.tms(cu('z941abw0p8'), 'TC-DW-NAV-05 (ClickUp)');
-    created.push(activity);
-    await wizard.submitActivity(activity, `QA-AUTO ${activity}`);
+    activity = await wizard.submitActivity(activityName);
+    created.push(`activity:${activity}`);
   });
 
   test('TC-DW-ACT-04 Edit opens the full activity form, prefilled', async () => {
     await allure.tms(cu('z941abw0pk'), 'TC-DW-ACT-04 (ClickUp)');
     await wizard.openEditActivity(activity);
-    await wizard.expectActivityName(`QA-AUTO ${activity}`);
+    await wizard.expectActivityName(activityName);
     await wizard.cancelInlineForm();
   });
 
@@ -160,7 +169,7 @@ test.describe('Planning - Set up my Department', () => {
 
   test("TC-DW-ACT-01 Step 2 lists only this department's activities", async () => {
     await allure.tms(cu('z941abw0pg'), 'TC-DW-ACT-01 (ClickUp)');
-    expect(await wizard.cardCodes(`${dept}-`)).toEqual([activity]);
+    expect(await wizard.cardCodes(ours)).toEqual([activityName]);
     expect(await wizard.cardCodes('CUT-')).toEqual([]);
   });
 
@@ -179,13 +188,13 @@ test.describe('Planning - Set up my Department', () => {
   test("TC-DW-REC-02 A recipe's duration is derived, never typed", async () => {
     await allure.tms(cu('z941abw0pu'), 'TC-DW-REC-02 (ClickUp)');
     await wizard.expectNoTypedDuration();
-    created.push(recipe);
-    await wizard.submitRecipe(recipe, `QA-AUTO ${recipe}`);
+    recipe = await wizard.submitRecipe(recipeName);
+    created.push(`recipe:${recipe}`);
   });
 
   test("TC-DW-REC-01 Step 3 lists only this department's recipes", async () => {
     await allure.tms(cu('z941abw0pq'), 'TC-DW-REC-01 (ClickUp)');
-    expect(await wizard.cardCodes(`${dept}-`)).toEqual([recipe]);
+    expect(await wizard.cardCodes(ours)).toEqual([recipeName]);
   });
 
   test('TC-DW-REC-04 Opening a recipe reaches its operations', async () => {
@@ -200,8 +209,8 @@ test.describe('Planning - Set up my Department', () => {
     await wizard.continue();
     await wizard.expectOnStep('Work centres and the machines inside them');
     const url = page.url();
-    created.push(centre);
-    await wizard.createWorkCentre(centre, `QA-AUTO ${centre}`);
+    centre = await wizard.createWorkCentre(centreName);
+    created.push(`centre:${centre}`);
     await wizard.openCreateMachine(centre);
     await wizard.expectInline(url);
   });
@@ -209,13 +218,13 @@ test.describe('Planning - Set up my Department', () => {
   test("TC-DW-WC-03 A machine can only go on this department's work centre", async () => {
     await allure.tms(cu('z941abw0q0'), 'TC-DW-WC-03 (ClickUp)');
     await wizard.expectMachineCentreLocked(centre);
-    created.push(machine);
-    await wizard.submitMachine(machine, QA_MACHINE_TYPE, machineTagFor(machine));
+    machine = await wizard.submitMachine(centre, QA_MACHINE_TYPE, machineTag);
+    created.push(`machine:${machine}`);
   });
 
   test("TC-DW-WC-01 Step 4 lists only this department's centres and machines", async () => {
     await allure.tms(cu('z941abw0py'), 'TC-DW-WC-01 (ClickUp)');
-    expect(await wizard.cardCodes(`${dept}-WC`)).toEqual([centre]);
+    expect(await wizard.cardCodes(`${ours}WC`)).toEqual([centreName]);
     await wizard.showMachines(centre);
     await wizard.expectCard(machine);
   });
@@ -280,7 +289,7 @@ test.describe('Planning - Set up my Department', () => {
   test("TC-DW-TEAM-01 Step 6 lists only this department's operators", async () => {
     await allure.tms(cu('z941abw0qa'), 'TC-DW-TEAM-01 (ClickUp)');
     await wizard.cancelInlineForm();
-    created.push(operator);
+    created.push(`operator:${operator}`);
     await wizard.createEmployee(operator);
     await wizard.expectCard(operator);
   });
@@ -441,7 +450,7 @@ test.describe('Planning - Set up my Department', () => {
     await wizard.continue();
     // The step's cards load after the heading: wait for CUT's, then check none are ours.
     await expect.poll(async () => (await wizard.cardCodes('CUT-')).length).toBeGreaterThan(0);
-    expect(await wizard.cardCodes(`${dept}-`)).toEqual([]);
+    expect(await wizard.cardCodes(ours)).toEqual([]);
   });
 
   test('TC-DW-DEPT-06 Only a user with write permission can create or edit departments', async ({
