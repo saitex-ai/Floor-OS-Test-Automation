@@ -104,6 +104,7 @@ export class LeadQualificationLocators {
   readonly markupToolButton: Locator;
   readonly markupOnHint: Locator;
   readonly aiChatbotPrompt: Locator;
+  readonly aiChatbotReadOnlyNotice: Locator;
   readonly enhancedPointerMarkers: Locator;
   readonly revertWordingButtons: Locator;
   readonly customersSearchBox: Locator;
@@ -188,6 +189,11 @@ export class LeadQualificationLocators {
     this.markupToolButton = page.getByRole('button', { name: 'Markup tool' });
     this.markupOnHint = page.getByText('Markup on — choose the line you want to talk about.');
     this.aiChatbotPrompt = page.getByPlaceholder(/Prompt the AI Chatbot/);
+    // Past the Lead stage: "<name> is no longer a lead, so its Lead
+    // Qualification is read-only. …"
+    this.aiChatbotReadOnlyNotice = page.getByText(
+      /is no longer a lead, so its Lead Qualification is read-only/,
+    );
     // Enhanced pointers render prefixed "✦ Enhanced" plus a per-pointer
     // "Revert to the previous wording" button.
     this.enhancedPointerMarkers = this.tabRoot.getByText(/^✦ Enhanced/);

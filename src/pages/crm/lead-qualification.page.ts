@@ -409,6 +409,11 @@ export class LeadQualificationPage extends BasePage {
     await expect(this.locators.markupOnHint).toBeVisible();
   }
 
+  /** On a record past the Lead stage the chatbot says the qualification is read-only. */
+  async expectAiChatbotReadOnlyNotice(): Promise<void> {
+    await expect(this.locators.aiChatbotReadOnlyNotice).toBeVisible();
+  }
+
   async expectAiChatbotAcceptsInput(): Promise<void> {
     await expect(this.locators.markupToolButton).toBeEnabled();
     await expect(this.locators.aiChatbotPrompt).toBeEditable();
