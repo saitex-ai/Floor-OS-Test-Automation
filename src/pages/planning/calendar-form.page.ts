@@ -3,7 +3,8 @@ import { BasePage } from '../base.page';
 import { CalendarFormLocators } from '../../locators/planning/calendar-form.locators';
 
 export interface CalendarFieldValues {
-  code: string;
+  /** Omit since the 2026-10-16 dev deploy: the code is generated on save (CAL-0001…). */
+  code?: string;
   name: string;
 }
 
@@ -35,7 +36,7 @@ export class CalendarFormPage extends BasePage {
    * / Yes) that a single-calendar happy path doesn't need to touch.
    */
   async fillRequired(values: CalendarFieldValues): Promise<void> {
-    await this.locators.calendarCode.fill(values.code);
+    if (values.code !== undefined) await this.locators.calendarCode.fill(values.code);
     await this.locators.name.fill(values.name);
   }
 
@@ -48,9 +49,14 @@ export class CalendarFormPage extends BasePage {
    * create also navigates straight to the new calendar's own detail page
    * at /planning/master-data/calendars/<code> (the code, not a UUID) —
    * checked here too since it's a stronger signal than the toast alone.
+   * Returns the code from that URL — generated on save since the 2026-10-16
+   * dev deploy, so callers usually don't know it in advance.
    */
-  async expectCreatedSuccessfully(code: string): Promise<void> {
+  async expectCreatedSuccessfully(code?: string): Promise<string> {
     await expect(this.page.getByText('Calendar created.')).toBeVisible({ timeout: 15_000 });
-    await expect(this.page).toHaveURL(new RegExp(`/planning/master-data/calendars/${code}$`));
+    await expect(this.page).toHaveURL(
+      new RegExp(`/planning/master-data/calendars/${code ?? '(?!new$)[^/]+'}$`),
+    );
+    return new URL(this.page.url()).pathname.split('/').pop()!;
   }
 }
