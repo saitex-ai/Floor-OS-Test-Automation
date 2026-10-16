@@ -1,4 +1,5 @@
 import { type Locator, expect } from '@playwright/test';
+import { toast } from '../../locators/planning/form-field.locators';
 import { WAIT } from './waits';
 
 export type SubmitResult = 'blocked-disabled' | 'blocked-after-submit' | 'submitted';
@@ -26,4 +27,16 @@ export async function submitForm(button: Locator): Promise<SubmitResult> {
     .then(() => true)
     .catch(() => false);
   return disappeared ? 'submitted' : 'blocked-after-submit';
+}
+
+/**
+ * Clicks a submit button expecting the server to refuse it with a toast
+ * (duplicate code, loop, …). Toasts fade after a few seconds, so this checks
+ * straight after the click, then that the form is still there.
+ */
+export async function submitExpectingToast(button: Locator, text: string | RegExp): Promise<void> {
+  await expect(button).toBeEnabled();
+  await button.click();
+  await expect(toast(button.page(), text).first()).toBeVisible({ timeout: WAIT.SERVER });
+  await expect(button).toBeVisible();
 }

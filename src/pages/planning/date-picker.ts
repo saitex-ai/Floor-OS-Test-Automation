@@ -29,3 +29,43 @@ export async function pickTodayAt(
   await picker.minute(mm).click();
   await picker.doneButton.click();
 }
+
+/**
+ * Opens a date field's picker and picks day `day` of the month it opens on
+ * (the current month), or `monthOffset` months before (-) / after (+) it. Day buttons are named like "Monday, October 5th,
+ * 2026" ("Today, …" for today); the grid is labelled "October 2026".
+ */
+export async function pickDayOfShownMonth(
+  page: Page,
+  trigger: Locator,
+  day: number,
+  monthOffset = 0,
+): Promise<void> {
+  const picker = new DatePickerLocators(page);
+  await trigger.click();
+  await expect(picker.grid).toBeVisible();
+  const shown = await picker.grid.getAttribute('aria-label');
+  for (let i = 0; i < Math.abs(monthOffset); i += 1)
+    await (monthOffset < 0 ? picker.previousMonth : picker.nextMonth).click();
+  // After a month click the grid re-renders: wait for its label to move on.
+  if (monthOffset !== 0)
+    await expect.poll(() => picker.grid.getAttribute('aria-label')).not.toBe(shown);
+  const [month, year] = ((await picker.grid.getAttribute('aria-label')) ?? '').split(' ');
+  await picker.day(new RegExp(`${month} ${day}(st|nd|rd|th), ${year}$`)).click();
+  if (await picker.doneButton.isVisible().catch(() => false)) await picker.doneButton.click();
+}
+
+/** Opens a time field's picker and picks hh:mm (minutes in 5-minute steps); closes it. */
+export async function pickTime(
+  page: Page,
+  trigger: Locator,
+  hh: string,
+  mm: string,
+): Promise<void> {
+  const picker = new DatePickerLocators(page);
+  await trigger.click();
+  await picker.hour(hh).click();
+  await picker.minute(mm).click();
+  // The time popover stays open after the minute click.
+  if (await picker.dialog.isVisible().catch(() => false)) await page.keyboard.press('Escape');
+}
