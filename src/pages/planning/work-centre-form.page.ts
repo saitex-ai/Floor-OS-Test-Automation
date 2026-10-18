@@ -8,7 +8,8 @@ import { ensureRoute } from './navigation';
 import { expectAbsentOrDisabled } from './master-data-list.page';
 
 export interface WorkCentreFieldValues {
-  code: string;
+  /** Omit since the 2026-10-16 dev deploy: the code is generated on save. */
+  code?: string;
   name: string;
   /** Live-sourced from the Departments master — defaults to "Sewing" (a real seeded department). */
   owningDepartment?: string | RegExp;
@@ -139,7 +140,8 @@ export class WorkCentreFormPage extends BasePage {
     options: { except?: WorkCentreRequiredField } = {},
   ): Promise<void> {
     const skip = (field: WorkCentreRequiredField) => options.except === field;
-    if (!skip('code')) await this.locators.centreCode.fill(values.code);
+    if (!skip('code') && values.code !== undefined)
+      await this.locators.centreCode.fill(values.code);
     if (!skip('name')) await this.locators.name.fill(values.name);
     if (!skip('owningDepartment'))
       await this.pick(this.locators.owningDepartment, values.owningDepartment ?? 'Sewing');
