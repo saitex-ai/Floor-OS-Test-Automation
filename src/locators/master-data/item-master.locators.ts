@@ -69,6 +69,7 @@ export class ItemMasterLocators {
   readonly purchaseUnitField: Locator;
 
   readonly createButton: Locator;
+  readonly createBlockedByDuplicateButton: Locator;
   readonly updateButton: Locator;
   readonly cancelButton: Locator;
   readonly deletePermanentlyButton: Locator;
@@ -128,6 +129,13 @@ export class ItemMasterLocators {
     this.purchaseUnitField = page.getByRole('textbox', { name: 'Purchase Unit', exact: true });
 
     this.createButton = page.getByRole('button', { name: 'Create', exact: true });
+    // Confirmed live (2026-10-21): while the Alternate Code duplicates
+    // another item's, Create is disabled and its accessible name becomes
+    // this hint instead of "Create".
+    this.createBlockedByDuplicateButton = page.getByRole('button', {
+      name: 'Alternate Code already used by another item in this category. Change it before saving.',
+      exact: true,
+    });
     // Confirmed live: this button's accessible name is NOT a stable
     // "Update" — while disabled (no change made yet since opening Edit),
     // its real accessible name is "No changes to save." (a tooltip-style

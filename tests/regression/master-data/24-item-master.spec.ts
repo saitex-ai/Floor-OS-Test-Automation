@@ -21,8 +21,9 @@ import { test, expect } from '../../../src/fixtures/master-data.fixtures';
  *   auto-derive or already hold a non-empty default).
  * - TC:10 — a duplicate Alternate Code was blocked with a misleading
  *   "This record was updated by someone else…" message; fixed on dev by
- *   2026-10-21, it now says "Alternate Code already exists. Please enter a
- *   unique code." (https://app.clickup.com/t/z941abyf86).
+ *   2026-10-21 (https://app.clickup.com/t/z941abyf86): it is now caught
+ *   before saving, with an inline alert naming the item already using the
+ *   code and Create disabled.
  * - TC:13 — the "Active flag" checkbox is always checked and genuinely
  *   disabled; there is no way to deactivate an item through this UI, even
  *   though the delete-confirmation dialog's own text recommends it.
@@ -301,7 +302,7 @@ test.describe('Master Data - Item Master', () => {
     });
   });
 
-  test('TC:10 Verify duplicate Alternate Code is blocked with a duplicate-code error', async ({
+  test('TC:10 Verify duplicate Alternate Code is blocked before saving', async ({
     itemMasterPage,
   }) => {
     const alternateCode = `TC-Item-Dup-${Date.now()}`;
@@ -322,18 +323,17 @@ test.describe('Master Data - Item Master', () => {
         firstItemId = await itemMasterPage.getCreatedItemId();
       });
 
-      await test.step('Attempt a second item reusing the exact same Alternate Code', async () => {
+      await test.step('Fill a second item reusing the exact same Alternate Code', async () => {
         await itemMasterPage.openNewItem();
         await itemMasterPage.fillRequired({
           alternateCode,
           description: `TC-Item dup second ${Date.now()}`,
           itemClassMatch: /CHEM-WASH/,
         });
-        await itemMasterPage.create();
       });
 
-      await test.step('Blocked with "Alternate Code already exists", still on the create form', async () => {
-        await itemMasterPage.expectDuplicateAlternateCodeError();
+      await test.step('Blocked before saving: an inline alert names the first item and Create is disabled', async () => {
+        await itemMasterPage.expectDuplicateAlternateCodeBlocked(firstItemId);
         await itemMasterPage.expectStillOnCreatePage();
       });
     } finally {

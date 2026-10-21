@@ -367,24 +367,26 @@ export class ItemMasterPage extends BasePage {
   }
 
   /**
-   * A duplicate Alternate Code on Create is rejected (POST 409) with
-   * "Alternate Code already exists. Please enter a unique code." as both a
-   * toast and an inline alert. Until 2026-10-21 dev showed a misleading
-   * "This record was updated by someone else…" toast instead
+   * A duplicate Alternate Code is caught before saving (dev, 2026-10-21):
+   * an inline alert names the item that already uses it, and Create is
+   * disabled. Earlier the same day dev rejected it on save (409, "Alternate
+   * Code already exists…"), and before that with a misleading
+   * "This record was updated by someone else…" toast
    * (https://app.clickup.com/t/z941abyf86, now fixed).
    */
-  async expectDuplicateAlternateCodeError(): Promise<void> {
-    const message = 'Alternate Code already exists. Please enter a unique code.';
-    await expect(this.page.getByRole('alert').filter({ hasText: message })).toBeVisible({
-      timeout: 45_000,
-    });
-    await expect(this.page.locator('[data-sonner-toast]').filter({ hasText: message })).toHaveCount(
-      1,
-    );
+  async expectDuplicateAlternateCodeBlocked(existingItemId: string): Promise<void> {
+    await expect(
+      this.page
+        .getByRole('alert')
+        .filter({ hasText: `Alternate code already used by item "${existingItemId}".` }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(this.locators.createBlockedByDuplicateButton).toBeDisabled();
   }
 
   async expectStillOnCreatePage(): Promise<void> {
-    await expect(this.locators.createButton).toBeVisible();
+    await expect(
+      this.locators.createButton.or(this.locators.createBlockedByDuplicateButton),
+    ).toBeVisible();
   }
 
   /** Proof the keyboard-submit workaround hit the real form, not the overlapping AI launcher. */
