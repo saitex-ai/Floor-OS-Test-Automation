@@ -68,10 +68,23 @@ export class CreateCustomerPage extends BasePage {
     // toggles/clears on a second click rather than re-confirming the same
     // choice, which would otherwise clear a value already selected by an
     // earlier fillProfile() call on the same still-open form.
-    const companyIsEmpty = (await l.companyCombobox.innerText().catch(() => '')).trim() === 'Select';
+    const companyIsEmpty =
+      (await l.companyCombobox.innerText().catch(() => '')).trim() === 'Select';
     if (companyIsEmpty) {
       await l.companyCombobox.click();
-      await this.page.getByRole('option').first().click();
+      // The Company list can be empty for some users (dev, 2026-10-21: the
+      // CRM Executive test user has no Companies). Company isn't enforced on
+      // save, so close the empty list and carry on.
+      const firstOption = this.page.getByRole('option').first();
+      const hasOption = await firstOption
+        .waitFor({ state: 'visible', timeout: 5_000 })
+        .then(() => true)
+        .catch(() => false);
+      if (hasOption) {
+        await firstOption.click();
+      } else {
+        await this.page.keyboard.press('Escape');
+      }
     }
     if (details.crmStage !== undefined)
       await this.selectComboboxOption(l.crmStageCombobox, details.crmStage);
