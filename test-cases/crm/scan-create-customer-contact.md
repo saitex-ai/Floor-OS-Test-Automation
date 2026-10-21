@@ -1,12 +1,18 @@
 # CRM — Scan&Create Customer/Contact (Sprint 2)
 
+> **Superseded (2026-10-21).** Dev replaced this "Start Scan" screen with the
+> Floor OS Assistant. The current test cases and automation are in
+> [`scan-create-floor-os-assistant.md`](scan-create-floor-os-assistant.md)
+> (ClickUp set [z941abzcx1](https://app.clickup.com/t/z941abzcx1)). This
+> file is kept for the Sprint 2 history.
+
 - **User Story:** [Scan&Create Customer/Contact](https://app.clickup.com/t/86eye4dtv) — as a CRM user
   (Owner / Manager / Executive), I want to upload a file or capture a photo
   and scan it so that the system pre-populates Customer and Contact fields,
   allowing me to review, edit, and save both records in a single flow.
 - **Test-case set:** [CRM - Sprint 2 - Scan&Create Customer/Contact](https://app.clickup.com/t/z941abt9dj)
 - **Source:** ClickUp ("Test Cases and Runs" list, PI-1 - CRM folder), pulled 2026-09-22
-- **Automated in:** [`tests/regression/crm/20-scan-create-customer-contact.spec.ts`](../../tests/regression/crm/20-scan-create-customer-contact.spec.ts)
+- **Automated in:** no longer automated; see the superseded note above.
 - **Page object:** [`src/pages/crm/scan-create.page.ts`](../../src/pages/crm/scan-create.page.ts)
 
 ## Functional requirements (from the User Story)
