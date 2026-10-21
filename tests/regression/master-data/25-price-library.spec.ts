@@ -4,10 +4,7 @@ import type {
   PriceLibraryPage,
   PriceRowValues,
 } from '../../../src/pages/master-data/price-library.page';
-import {
-  type ItemMasterPage,
-  ItemAlreadyHasSuppliersError,
-} from '../../../src/pages/master-data/item-master.page';
+import type { ItemMasterPage } from '../../../src/pages/master-data/item-master.page';
 import type { VendorListPage } from '../../../src/pages/master-data/vendor-list.page';
 
 /**
@@ -25,13 +22,16 @@ import type { VendorListPage } from '../../../src/pages/master-data/vendor-list.
  * module's backend enforces a **permanent** uniqueness constraint on
  * (item, supplier) — confirmed live, a real 409 (TC:7) — and there is no
  * delete anywhere in this module. The seeded pairs ran out on dev on
- * 2026-10-12, so every create-flow test now makes its own fresh pair
- * first: createFreshPriceRecord() below picks a random Approved item in
- * Item Master that has no supplier yet, links one Approved vendor to it
- * (Supplier tab), and then prices exactly that pair. Price Library's Supplier picker
- * only offers an item's default supplier, which is why items that already
- * have suppliers are skipped rather than given a second one. Each run therefore leaves one extra
- * item–supplier mapping and one price record on dev.
+ * 2026-10-12, so every create-flow test now makes its own pair first:
+ * createFreshPriceRecord() below creates a brand-new QA-AUTO-tagged item in
+ * Item Master (unique Alternate Code, created straight as Approved), links
+ * one Approved vendor to it (Supplier tab — Price Library's Supplier picker
+ * only offers an item's default supplier), and then prices exactly that
+ * pair. Every write lands on a record the test created; no existing item
+ * is ever edited, and the pool can't run out. afterEach deletes the
+ * test's own items (confirmed live 2026-10-21 that a priced item can be
+ * deleted); price records have no delete, so they stay on dev, showing the
+ * QA-AUTO description (safe to delete from the backend).
  *
  * Two real, confirmed app gaps are deliberately asserted as-is (not worked
  * around) per this repo's established discipline:
@@ -47,13 +47,15 @@ import type { VendorListPage } from '../../../src/pages/master-data/vendor-list.
  * unconfirmed submission mechanism would be inventing behavior, not
  * automating it.
  */
+// Item Master IDs created by the current test, deleted in afterEach.
+const createdItemIds: string[] = [];
+let itemCounter = 0;
+
 /**
- * Creates a price record for a brand-new (item, supplier) pair: links one
- * Approved vendor (from Vendor Master's Approved tab) to a random Approved
- * item in Item Master that has no supplier yet, then prices exactly that
- * pair in Price Library (ending on the create form's save). Each attempt
- * adds exactly one item–supplier link; up to 3 attempts, since this runs
- * against busy shared dev data.
+ * Creates a price record for a brand-new (item, supplier) pair, with no
+ * retries: creates a fresh QA-AUTO item in Item Master, links one random
+ * Approved vendor (from Vendor Master's Approved tab) to it, then prices
+ * exactly that pair in Price Library (ending on the create form's save).
  */
 async function createFreshPriceRecord(
   priceLibraryPage: PriceLibraryPage,
@@ -71,43 +73,32 @@ async function createFreshPriceRecord(
   await vendorListPage.expectLoaded();
   const vendors = await vendorListPage.approvedVendors();
   if (vendors.length === 0) throw new Error('No Approved vendor on Vendor Master');
+  const vendor = vendors[Math.floor(Math.random() * vendors.length)]!;
 
-  const failures: string[] = [];
-  let skippedItems = 0;
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    const vendor = vendors[Math.floor(Math.random() * vendors.length)]!;
-    try {
-      const item = await itemMasterPage.pickRandomApprovedItem();
-      try {
-        await itemMasterPage.linkSupplier(item.itemId, vendor);
-      } catch (error) {
-        // Items that already have suppliers are skipped untouched, without
-        // using up an attempt.
-        if (error instanceof ItemAlreadyHasSuppliersError && skippedItems++ < 30) {
-          attempt--;
-          continue;
-        }
-        throw error;
-      }
-      await priceLibraryPage.open();
-      await priceLibraryPage.expectLoaded();
-      const { response, itemName } = await priceLibraryPage.createPriceRecordFor(
-        item,
-        vendor.code,
-        rowValues,
-      );
-      const status = response?.status();
-      if (status === 201) {
-        return { status, itemName, supplierName: vendor.name, item, vendorCode: vendor.code };
-      }
-      failures.push(
-        `attempt ${attempt} (${item.itemId} + ${vendor.code}): HTTP ${status ?? 'no response'}`,
-      );
-    } catch (error) {
-      failures.push(`attempt ${attempt}: ${(error as Error).message.split('\n')[0]}`);
-    }
-  }
-  throw new Error(`Could not create a fresh Price Library record:\n${failures.join('\n')}`);
+  // Unique per run and per call: Item Master rejects a duplicate Alternate Code.
+  itemCounter += 1;
+  const alternateCode = `QA-AUTO-PL-${Date.now().toString(36).toUpperCase()}${itemCounter}`;
+  const description = `QA-AUTO ${alternateCode} Price Library test item. Safe to delete.`;
+  const itemId = await itemMasterPage.createItem({ alternateCode, description });
+  createdItemIds.push(itemId);
+  const item = { itemId, description, alternateCode };
+
+  await itemMasterPage.linkSupplier(itemId, vendor);
+
+  await priceLibraryPage.open();
+  await priceLibraryPage.expectLoaded();
+  const { response, itemName } = await priceLibraryPage.createPriceRecordFor(
+    item,
+    vendor.code,
+    rowValues,
+  );
+  return {
+    status: response?.status(),
+    itemName,
+    supplierName: vendor.name,
+    item,
+    vendorCode: vendor.code,
+  };
 }
 
 test.describe('Master Data - Price Library', () => {
@@ -117,14 +108,30 @@ test.describe('Master Data - Price Library', () => {
     await allure.owner('Master Data QA');
   });
 
+  // Best-effort cleanup of this test's own items only. A failure is logged,
+  // not raised: the item is QA-AUTO tagged, so a leftover is clearly test data.
+  test.afterEach(async ({ itemMasterPage }) => {
+    while (createdItemIds.length > 0) {
+      const itemId = createdItemIds.pop()!;
+      try {
+        await itemMasterPage.deleteItemById(itemId);
+        console.log(`QA-AUTO cleanup: deleted item ${itemId}`);
+      } catch (error) {
+        console.warn(
+          `QA-AUTO cleanup: could not delete item ${itemId}: ${String(error).split('\n')[0]}`,
+        );
+      }
+    }
+  });
+
   test('TC:1 Verify successful creation with all fields filled', async ({
     priceLibraryPage,
     itemMasterPage,
     vendorListPage,
   }) => {
-    // createFreshPriceRecord() first links a new supplier in Item Master,
-    // then creates the price record, with up to 3 attempts — longer than
-    // the dev project's default 60s test timeout comfortably allows.
+    // createFreshPriceRecord() creates an item and links a supplier in Item
+    // Master before creating the price record — longer than the dev
+    // project's default 60s test timeout comfortably allows.
     test.setTimeout(300_000);
     let itemName = '';
     let supplierName = '';

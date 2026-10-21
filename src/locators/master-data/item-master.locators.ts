@@ -213,11 +213,6 @@ export class ItemMasterLocators {
       .filter({ hasText: /^(Draft|Approved|Inactive)$/ });
   }
 
-  /** Data rows of the main Item list (header row excluded). */
-  listDataRows(): Locator {
-    return this.page.getByRole('row').filter({ hasNot: this.page.getByRole('columnheader') });
-  }
-
   /** Data rows of the Supplier tab's linked-suppliers table. */
   supplierDataRows(): Locator {
     return this.supplierPanel

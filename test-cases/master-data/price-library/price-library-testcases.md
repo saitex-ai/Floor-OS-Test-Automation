@@ -101,22 +101,25 @@ collapsed "Inventory Item Management" nav group.
   (TC:1/TC:2/TC:4/TC:7/TC:14) therefore **skip with an explicit reason** until new item–supplier
   mappings exist. They still fail on any other error.
 
-## Update 2026-10-13 — create tests now make their own (item, supplier) pair
+## Update 2026-10-13 (revised 2026-10-21) — create tests make their own (item, supplier) pair
 
-The skip-on-exhausted-pool approach from 2026-10-12 is replaced. Every create test (TC:1/TC:2/TC:4/TC:7/TC:14) now provisions a brand-new pair first:
+The skip-on-exhausted-pool approach from 2026-10-12 is replaced. Every create test (TC:1/TC:2/TC:4/TC:7/TC:14) now provisions a brand-new pair first, on a **new item the test creates itself** — no existing Item Master record is ever edited:
 
 1. Vendor Master: take a random vendor from the **Approved** tab.
-2. Item Master: pick a random Approved item that has **no supplier yet** (items with suppliers are skipped untouched).
-3. Supplier tab → **Add supplier** → that vendor → fill Per Unit Price → **Save changes**.
+2. Item Master: create a new item with only the 7 required fields (Item Class CHEM-WASH), a unique Alternate Code `QA-AUTO-PL-<run id><n>` and the description `QA-AUTO <Alternate Code> Price Library test item. Safe to delete.` Item Master creates items straight as **Approved**, so no approval step is needed.
+3. That item's Supplier tab → **Add supplier** → the vendor → fill Per Unit Price → **Save changes**.
 4. Price Library: create the price record for exactly that item (matched by Alternate Code + description) and vendor (matched by Vendor Code).
+5. Cleanup (afterEach): delete the test's own item (Edit → Delete permanently). Failures are logged, not raised. Price Library has no delete, so the price record stays; its Item column still shows the QA-AUTO description, so it is clearly test data and safe to delete from the backend.
+
+Confirmed live 2026-10-21: Item Master **does** delete an item that has a supplier link and a price record. The price record is not removed with it — it stays on the Price Library list (Active), still showing the deleted item's code and description. Observation only, not asserted.
 
 Confirmed live while building this (2026-10-13):
 
 - Price Library's Item code picker searches by **Alternate Code**, not Item ID or description. Alternate Codes are **not unique** (e.g. GSM406EW26030 is on two items), so the description is matched too.
-- Price Library's Supplier picker offers only the item's **default** supplier, and only Approved vendors. A vendor added to an item that already has suppliers is not offered, which is why only supplier-less items are used. The new vendor becomes their default, and no one else's item setup is changed.
+- Price Library's Supplier picker offers only the item's **default** supplier, and only Approved vendors. A vendor added to an item that already has suppliers is not offered — another reason to use a fresh item, where the vendor is its first (default) supplier.
 - Picking a vendor in "Add supplier" can save the link immediately, before Save changes. So the tests add exactly one vendor, already known to be Approved, and never try several.
 - Save changes stays disabled until the new row's Per Unit Price is filled, and the value only commits on blur. Saving sends `PUT` or `POST /api/inventory-items/{id}/suppliers`.
 
-Each create test therefore leaves exactly one new item–supplier link and one price record on dev. A cleanup option for test-created price records (raised with the backend team) would let runs tidy up after themselves.
+Each create test therefore writes only to its own QA-AUTO item, and the pool can't run out. An earlier revision of this update borrowed a random real Approved item without a supplier instead; that permanently changed real items and used them up, so it was replaced (PR #21 review). A cleanup option for test-created price records (raised with the backend team) would let runs tidy up fully.
 
 **Note:** an earlier, unreleased version of this approach tried vendors one after another and so left 83 extra links on 60 dev items (2026-10-13, 09:00–11:00 UTC). All of them were removed again and verified by a full scan of the 673 items; older suppliers on those items were kept as they were.

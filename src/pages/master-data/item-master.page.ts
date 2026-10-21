@@ -4,14 +4,6 @@ import { ItemMasterLocators } from '../../locators/master-data/item-master.locat
 
 const ITEM_MASTER_PATH = '/master-data/inventory-item-management/item-master';
 
-/** Thrown by ItemMasterPage.linkSupplier() for an item that already has suppliers; nothing is changed. */
-export class ItemAlreadyHasSuppliersError extends Error {
-  constructor(itemId: string, supplierCount: number) {
-    super(`${itemId} already has ${supplierCount} supplier(s)`);
-    this.name = 'ItemAlreadyHasSuppliersError';
-  }
-}
-
 /**
  * Item Master list + "New Item"/Edit full-page form
  * (/master-data/inventory-item-management/item-master), under the
@@ -80,48 +72,44 @@ export class ItemMasterPage extends BasePage {
   }
 
   /**
-   * A random Approved item from the list's first page that has an
-   * Alternate Code. List columns, confirmed live: [select, Item ID,
-   * Description, Alternate Code, Item Category, Stock Type, Base Unit,
-   * Status, actions]. The Alternate Code matters because Price Library's
-   * item picker searches by it, not by Item ID or description.
+   * Creates a new item with only the 7 required General-tab fields (same
+   * flow as this suite's TC:2) and returns its auto-generated Item ID.
+   * Item Master creates items straight as Approved (TC:1), so no separate
+   * approval step is needed. Item Class defaults to CHEM-WASH, the class
+   * the Item Master tests create with.
    */
-  async pickRandomApprovedItem(): Promise<{
-    itemId: string;
-    description: string;
+  async createItem(values: {
     alternateCode: string;
-  }> {
+    description: string;
+    itemClassMatch?: string | RegExp;
+  }): Promise<string> {
     await this.open();
     await this.expectLoaded();
-    const rows = this.locators.listDataRows();
-    // The grid first renders empty placeholder rows; wait for a real Item ID.
-    await expect(rows.first().getByRole('cell').nth(1)).not.toHaveText('', { timeout: 30_000 });
-    const candidates: { itemId: string; description: string; alternateCode: string }[] = [];
-    for (const row of await rows.all()) {
-      const cells = (await row.getByRole('cell').allInnerTexts()).map((t) => t.trim());
-      const [, itemId, description, alternateCode] = cells;
-      if (itemId && description && alternateCode && cells.at(-2) === 'Approved') {
-        candidates.push({ itemId, description, alternateCode });
-      }
-    }
-    if (candidates.length === 0)
-      throw new Error('No Approved item with an Alternate Code on the list');
-    return candidates[Math.floor(Math.random() * candidates.length)]!;
+    await this.openNewItem();
+    await this.fillRequired({ itemClassMatch: /CHEM-WASH/, ...values });
+    await this.create();
+    return this.getCreatedItemId();
+  }
+
+  /** Opens `itemId`'s Edit form and deletes it permanently, waiting for the success toast. */
+  async deleteItemById(itemId: string): Promise<void> {
+    await this.openEditById(itemId);
+    await this.deletePermanently();
+    await this.expectDeletedSuccessfully();
   }
 
   /**
    * Links `vendor` to an item that has no supplier yet, via the Supplier
-   * tab, and saves. Confirmed live (2026-10-13):
+   * tab, and saves. Meant for an item the caller created itself (see
+   * createItem()) — never a real one. Confirmed live (2026-10-13):
    * - Picking a vendor in "Add supplier" -> "Select Vendor" can persist the
    *   link straight away, before Save changes — so this adds exactly one
    *   vendor, already known to be Approved, and never "tries" others.
    * - Save changes stays disabled until the row's Per Unit Price is filled
    *   (it commits on blur); saving sends PUT or POST .../suppliers.
    * - Price Library's Supplier picker offers only an item's default
-   *   supplier, so only supplier-less items are used: the vendor becomes
-   *   their default, and nobody else's item setup is touched.
-   * Throws ItemAlreadyHasSuppliersError, before changing anything, for an
-   * item that already has suppliers.
+   *   supplier, so the vendor must be the item's first (default) one.
+   * Throws, before changing anything, if the item already has suppliers.
    */
   async linkSupplier(itemId: string, vendor: { code: string; name: string }): Promise<void> {
     await this.openEditById(itemId);
@@ -131,7 +119,9 @@ export class ItemMasterPage extends BasePage {
     const existing = (await this.locators.supplierDataRows().allInnerTexts()).filter((t) =>
       t.trim(),
     );
-    if (existing.length > 0) throw new ItemAlreadyHasSuppliersError(itemId, existing.length);
+    if (existing.length > 0) {
+      throw new Error(`${itemId} already has ${existing.length} supplier(s); not linking another`);
+    }
 
     await this.locators.addSupplierButton.click({ timeout: 15_000 });
     const dialog = this.locators.selectVendorDialog;
