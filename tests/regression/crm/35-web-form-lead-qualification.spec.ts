@@ -579,16 +579,12 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
       await lq.expectQualificationInputsUnavailable();
     });
 
-    await test.step('AI Chatbot and enhancement stay available on a Qualified Lead (intended), and the chatbot says the qualification is read-only', async () => {
-      // Confirmed with the team (2026-10-16): AI enhancement is still needed
-      // for a Qualified Lead, so the chatbot, Markup tool and Revert buttons
-      // stay. Nothing is sent or reverted here.
-      await lq.expectRevertWordingAvailable();
-      await lq.openAiChatbot();
-      await lq.expectAiChatbotReadOnlyNotice();
-      await lq.turnOnMarkupTool();
-      await lq.expectAiChatbotAcceptsInput();
-    });
+    // AI Chatbot on a Qualified Lead: skipped on request (2026-10-21). The
+    // Assistant button no longer shows on a Qualified Lead on dev, and the
+    // intended behaviour there is still being confirmed with the team.
+    partial(
+      'AI Chatbot on a Qualified Lead not checked (skipped on request, 2026-10-21): the Assistant button is not shown on dev.',
+    );
   });
 
   test('TC:19 Verify the Acknowledgement Email Is Sent and Traceable from the Lead', async ({

@@ -71,7 +71,7 @@ Existing leads used, all read-only (picked 2026-10-15):
 | TC:15 | An Existing Manager's Review Can Be Edited                             | Updated text/score, "Review updated", refreshed timestamp; empty review blocked       | [link](https://app.clickup.com/t/z941abytej) | ✅ (own Web Form lead) incl. BUG step                     | ✅ edit + timestamp + empty blocked; **BUG**: no "Review updated"                                                           |
 | TC:16 | Conversion Is Blocked Until a Manager's Review and Score Exists        | Convert disabled with the reason; click does nothing                                  | [link](https://app.clickup.com/t/z941abytek) | ✅ (own Web Form lead)                                    | ✅ passing                                                                                                                  |
 | TC:17 | A Web Form Lead Converts to a Qualified Lead After a Review            | Convert enables; stage → Qualified Lead on Lead and in list; form card unchanged      | [link](https://app.clickup.com/t/z941abytem) | ✅ (own Web Form lead)                                    | ✅ passing (form-card part checked in TC:18)                                                                                |
-| TC:18 | Qualification Screen Is Read-Only After the Lead Leaves the Lead Stage | All readable; no inputs; no review edit; AI Chatbot unavailable; no Convert           | [link](https://app.clickup.com/t/z941abytep) | ✅                                                        | ✅ inputs/edit/Convert gone; AI Chatbot + enhancement stay (intended); chatbot says read-only                               |
+| TC:18 | Qualification Screen Is Read-Only After the Lead Leaves the Lead Stage | All readable; no inputs; no review edit; AI Chatbot unavailable; no Convert           | [link](https://app.clickup.com/t/z941abytep) | ✅                                                        | ✅ inputs/edit/Convert gone; AI Chatbot check skipped on request (2026-10-21)                                               |
 | TC:19 | Acknowledgement Email Is Sent and Traceable from the Lead              | Submitter receives the email; it's traceable from the Lead                            | [link](https://app.clickup.com/t/z941abyteq) | ✅ BUG step + fixme (inbox)                               | **BUG**: Communication > Emails is empty; fixme: store password + mailbox                                                   |
 | TC:20 | Each Web Form Submission Creates Its Own Lead with Its Own Form Card   | Each Lead shows only its own card                                                     | [link](https://app.clickup.com/t/z941abyter) | ✅ on two existing leads + fixme (two new submissions)    | ✅ passing; repeat submissions from one company share a lead (see Notes)                                                    |
 
@@ -79,9 +79,10 @@ Last full dev run (2026-10-15, `--workers=1`): 20 passed, 6 fixme (plus the crm 
 
 ## Notes for whoever picks this up next
 
-**Not a bug (confirmed 2026-10-16):** on a Qualified Lead the AI Chatbot, Markup
-tool and enhanced-pointer Revert stay available — AI enhancement is still needed
-there. The chatbot itself states the qualification is read-only.
+**AI Chatbot on a Qualified Lead (TC:18):** confirmed 2026-10-16 that AI
+enhancement is still needed there, so it is not a bug when the chatbot shows.
+On 2026-10-21 the Assistant button no longer showed on a Qualified Lead on
+dev; the check is skipped on request and recorded as a `partial` annotation.
 
 **Bugs / gaps found on dev (asserted as real behaviour in `BUG:` steps):**
 
