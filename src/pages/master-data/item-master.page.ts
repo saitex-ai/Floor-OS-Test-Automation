@@ -367,22 +367,20 @@ export class ItemMasterPage extends BasePage {
   }
 
   /**
-   * Real, confirmed-live bug: a duplicate Alternate Code on Create is
-   * blocked, but surfaced via a misleading optimistic-concurrency message
-   * instead of a duplicate-key message. See item-master-testcases.md
-   * TC:10 — asserted as-is, not papered over.
-   *
-   * Since 2026-10-12 a second toast, "Failed to create inventory item.",
-   * fires alongside it. Sonner collapses the older toast behind the newer
-   * one, so visibility of the first is racy — this checks both are present
-   * in the toast region instead.
+   * A duplicate Alternate Code on Create is rejected (POST 409) with
+   * "Alternate Code already exists. Please enter a unique code." as both a
+   * toast and an inline alert. Until 2026-10-21 dev showed a misleading
+   * "This record was updated by someone else…" toast instead
+   * (https://app.clickup.com/t/z941abyf86, now fixed).
    */
   async expectDuplicateAlternateCodeError(): Promise<void> {
-    const toasts = this.page.locator('[data-sonner-toast]');
-    await expect(
-      toasts.filter({ hasText: 'This record was updated by someone else. Reload and try again.' }),
-    ).toHaveCount(1, { timeout: 45_000 });
-    await expect(toasts.filter({ hasText: 'Failed to create inventory item.' })).toHaveCount(1);
+    const message = 'Alternate Code already exists. Please enter a unique code.';
+    await expect(this.page.getByRole('alert').filter({ hasText: message })).toBeVisible({
+      timeout: 45_000,
+    });
+    await expect(this.page.locator('[data-sonner-toast]').filter({ hasText: message })).toHaveCount(
+      1,
+    );
   }
 
   async expectStillOnCreatePage(): Promise<void> {

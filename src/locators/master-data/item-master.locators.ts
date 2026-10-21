@@ -177,16 +177,14 @@ export class ItemMasterLocators {
   }
 
   /**
-   * Confirmed live: the real last `cell` in this table is a trailing,
-   * empty row-actions column — the table's own `columnheader`s confirm the
-   * order is [select-checkbox, Item ID, Description, Alternate Code, Item
-   * Category, Stock Type, Base Unit, **Status**, '' (actions)]. A naive
-   * `.last()` silently resolves to that empty trailing cell instead of
-   * Status — caught only by actually running this against the live table.
-   * `.nth(-2)` (second-to-last) is Status.
+   * The row's Status cell, found by its value rather than its position:
+   * on dev (2026-10-21) a newly created item's row doesn't always have the
+   * trailing actions cell, so the old fixed `.nth(-2)` landed on Base Unit.
    */
   statusCell(exactCellText: string): Locator {
-    return this.row(exactCellText).getByRole('cell').nth(-2);
+    return this.row(exactCellText)
+      .getByRole('cell')
+      .filter({ hasText: /^(Draft|Approved|Inactive)$/ });
   }
 
   /** Real data rows only in any of the 5 picker dialogs — the header row's cells are `columnheader`, not `cell`. */

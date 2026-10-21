@@ -19,9 +19,10 @@ import { test, expect } from '../../../src/fixtures/master-data.fixtures';
  * - TC:5 — Stock Group/Stock Type/Custom Code/HS Code all carry a red `*`
  *   but only Stock Group is genuinely unenforced (the other three either
  *   auto-derive or already hold a non-empty default).
- * - TC:10 — a duplicate Alternate Code is blocked, but with the wrong/
- *   misleading "This record was updated by someone else. Reload and try
- *   again." message instead of a duplicate-key message.
+ * - TC:10 — a duplicate Alternate Code was blocked with a misleading
+ *   "This record was updated by someone else…" message; fixed on dev by
+ *   2026-10-21, it now says "Alternate Code already exists. Please enter a
+ *   unique code." (https://app.clickup.com/t/z941abyf86).
  * - TC:13 — the "Active flag" checkbox is always checked and genuinely
  *   disabled; there is no way to deactivate an item through this UI, even
  *   though the delete-confirmation dialog's own text recommends it.
@@ -300,7 +301,7 @@ test.describe('Master Data - Item Master', () => {
     });
   });
 
-  test('TC:10 Verify duplicate Alternate Code is blocked — with a confusing/wrong error message (bug)', async ({
+  test('TC:10 Verify duplicate Alternate Code is blocked with a duplicate-code error', async ({
     itemMasterPage,
   }) => {
     const alternateCode = `TC-Item-Dup-${Date.now()}`;
@@ -331,7 +332,7 @@ test.describe('Master Data - Item Master', () => {
         await itemMasterPage.create();
       });
 
-      await test.step('BUG: blocked with a misleading optimistic-concurrency message, not a duplicate-key message', async () => {
+      await test.step('Blocked with "Alternate Code already exists", still on the create form', async () => {
         await itemMasterPage.expectDuplicateAlternateCodeError();
         await itemMasterPage.expectStillOnCreatePage();
       });
@@ -488,7 +489,7 @@ test.describe('Master Data - Item Master', () => {
     });
   });
 
-  test('TC:17 Verify the floating AI launcher overlaps Create/Update, and the keyboard workaround submits the real form', async ({
+  test('TC:17 Verify the Create button is not obstructed by a floating AI launcher and submits the form', async ({
     itemMasterPage,
   }) => {
     const alternateCode = `TC-Item-AiTrap-${Date.now()}`;
@@ -498,15 +499,18 @@ test.describe('Master Data - Item Master', () => {
     await itemMasterPage.expectLoaded();
     await itemMasterPage.openNewItem();
 
-    await test.step('The Create button is physically obstructed by the "Ask FloorOS AI" launcher', async () => {
+    // The "Ask FloorOS AI" launcher used to sit on top of Create/Update
+    // and swallow clicks. It is gone from dev as of 2026-10-21, so the
+    // button must now be reachable.
+    await test.step('Nothing covers the Create button', async () => {
       const obstructed = await itemMasterPage.isButtonObstructedByAiLauncher(
         itemMasterPage.locators.createButton,
       );
-      expect(obstructed).toBe(true);
+      expect(obstructed).toBe(false);
     });
 
     try {
-      await test.step('focus() + Enter reaches the real form, not the AI launcher', async () => {
+      await test.step('Create submits the real form and no AI dialog opens', async () => {
         await itemMasterPage.fillRequired({
           alternateCode,
           description: `TC-Item ai trap ${Date.now()}`,
