@@ -1,6 +1,5 @@
 import * as allure from 'allure-js-commons';
-import type { Page } from '@playwright/test';
-import { test, expect } from '../../../src/fixtures/crm.fixtures';
+import { test as crossModuleTest } from '../../../src/fixtures/cross-module.fixtures';
 import type { CreateCustomerPage } from '../../../src/pages/crm/create-customer.page';
 import type { BizDocPage } from '../../../src/pages/crm/biz-doc.page';
 import type { ProspectToCustomerConversionPage } from '../../../src/pages/crm/prospect-to-customer-conversion.page';
@@ -25,15 +24,74 @@ import type {
  * every TC creates, through the UI and with unique names: its own CRM
  * Customer at stage Prospect → a Season for it → the order(s). Nothing
  * pre-existing is touched.
+ *
+ * Cross-module: uses src/fixtures/cross-module.fixtures.ts (CRM + Master
+ * Data page objects merged) because the flow genuinely spans both. It
+ * still runs in the `crm` project on the CRM session — confirmed on dev
+ * (2026-10-15) that the CRM user can create the Master Data Customer
+ * Seasons and Sales Orders this needs.
+ *
+ * Teardown (the `createdRecords` fixture): every Sales Order and Customer
+ * Season a test created is deleted again afterwards — orders first, then
+ * the Season (confirmed on dev 2026-10-21: Sales Orders delete from the
+ * list's row-select "Delete", Seasons from Edit Season → Delete).
+ * Failures there are logged and annotated, never fail the test. The CRM
+ * Customers themselves, and the conversion notifications/emails, stay.
  */
+
+/** What a test created on shared dev, for the teardown to delete again. */
+interface CreatedRecords {
+  orderDescriptions: string[];
+  seasonCodes: string[];
+}
+
+const test = crossModuleTest.extend<{ createdRecords: CreatedRecords }>({
+  createdRecords: async (
+    { salesOrderPage, customerSeasonListPage, customerSeasonFormPage },
+    use,
+    testInfo,
+  ) => {
+    const created: CreatedRecords = { orderDescriptions: [], seasonCodes: [] };
+    await use(created);
+
+    const cleanupFailed = (what: string, error: unknown): void => {
+      const description = `Teardown could not delete ${what}: ${String(error).split('\n')[0]}`;
+      console.warn(description);
+      testInfo.annotations.push({ type: 'cleanup failed', description });
+    };
+    for (const description of created.orderDescriptions) {
+      await test.step(`Teardown: delete Sales Order "${description}"`, async () => {
+        try {
+          await salesOrderPage.open();
+          await salesOrderPage.deleteOrder(description);
+        } catch (error) {
+          cleanupFailed(`Sales Order "${description}"`, error);
+        }
+      });
+    }
+    for (const seasonCode of created.seasonCodes) {
+      await test.step(`Teardown: delete Customer Season ${seasonCode}`, async () => {
+        try {
+          await customerSeasonListPage.open();
+          await customerSeasonListPage.search(seasonCode);
+          await customerSeasonListPage.openEdit(seasonCode);
+          await customerSeasonFormPage.clickDelete();
+          await customerSeasonFormPage.confirmDelete();
+          await customerSeasonFormPage.expectDeletedSuccessfully();
+        } catch (error) {
+          cleanupFailed(`Customer Season ${seasonCode}`, error);
+        }
+      });
+    }
+  },
+});
 
 interface ConversionFixtures {
   createCustomerPage: CreateCustomerPage;
   prospectToCustomerConversionPage: ProspectToCustomerConversionPage;
   customerSeasonListPage: CustomerSeasonListPage;
   customerSeasonFormPage: CustomerSeasonFormPage;
-  salesOrderPage: SalesOrderPage;
-  page: Page;
+  createdRecords: CreatedRecords;
 }
 
 interface ConvertibleProspect {
@@ -68,14 +126,8 @@ async function arrangeProspectWithSeason(
       referredBy: 'Jordan Smith',
       crmStage: 'Prospect',
     });
-    await f.createCustomerPage.save();
-    if (await f.createCustomerPage.locators.duplicateWarningModal.isVisible().catch(() => false)) {
-      await f.createCustomerPage.locators.saveAnywayButton.click();
-    }
-    await f.createCustomerPage.expectSavedSuccessfully();
-    await f.createCustomerPage.locators.postSaveCancelButton.click();
-    await expect(f.page).toHaveURL(/\/crm\/customers\/[0-9a-f-]+$/);
-    id = f.page.url().split('/').pop()!;
+    await f.createCustomerPage.saveAndOpenDetail();
+    id = await f.prospectToCustomerConversionPage.openedCustomerId();
   });
 
   await test.step('Customer Details shows CRM Stage: Prospect', async () => {
@@ -94,6 +146,7 @@ async function arrangeProspectWithSeason(
     });
     await f.customerSeasonFormPage.create();
     await f.customerSeasonFormPage.expectCreatedSuccessfully();
+    f.createdRecords.seasonCodes.push(seasonCode);
   });
 
   return { id, name, code, seasonCode, stamp };
@@ -102,6 +155,7 @@ async function arrangeProspectWithSeason(
 /** Creates an SMS/BULK Sales Order for the prospect and returns its Order #. */
 async function placeOrder(
   salesOrderPage: SalesOrderPage,
+  createdRecords: CreatedRecords,
   prospect: ConvertibleProspect,
   type: SalesOrderType,
   label: string,
@@ -115,6 +169,7 @@ async function placeOrder(
   let orderNo = '';
   await test.step(`Create ${label} Sales Order (Order Type ${type}) for ${prospect.code}`, async () => {
     await salesOrderPage.open();
+    createdRecords.orderDescriptions.push(order.description);
     orderNo = await salesOrderPage.createOrder(order);
     await salesOrderPage.expectOrderListed(orderNo, order);
   });
@@ -165,7 +220,7 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
     customerSeasonFormPage,
     salesOrderPage,
     bizDocPage,
-    page,
+    createdRecords,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abyn6c', 'TC:1 (ClickUp)');
     test.setTimeout(300_000);
@@ -176,12 +231,11 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
         prospectToCustomerConversionPage,
         customerSeasonListPage,
         customerSeasonFormPage,
-        salesOrderPage,
-        page,
+        createdRecords,
       },
       'TC1',
     );
-    await placeOrder(salesOrderPage, prospect, 'SMS', 'first');
+    await placeOrder(salesOrderPage, createdRecords, prospect, 'SMS', 'first');
 
     await expectStageOnDetails(prospectToCustomerConversionPage, prospect, 'Customer');
     await ordersTileNotYetImplemented(bizDocPage, prospect);
@@ -194,7 +248,7 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
     customerSeasonListPage,
     customerSeasonFormPage,
     salesOrderPage,
-    page,
+    createdRecords,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abyn6d', 'TC:2 (ClickUp)');
     test.setTimeout(300_000);
@@ -205,8 +259,7 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
         prospectToCustomerConversionPage,
         customerSeasonListPage,
         customerSeasonFormPage,
-        salesOrderPage,
-        page,
+        createdRecords,
       },
       'TC2',
     );
@@ -218,7 +271,7 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
       await listTab.expectCustomerListedWithStage(prospect.name, 'Prospect');
     });
 
-    await placeOrder(salesOrderPage, prospect, 'SMS', 'first');
+    await placeOrder(salesOrderPage, createdRecords, prospect, 'SMS', 'first');
 
     // Not real-time on dev: an open list/Overview keeps showing Prospect
     // until refreshed (allowed by the TC: "or immediately upon refresh").
@@ -247,7 +300,7 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
     customerSeasonListPage,
     customerSeasonFormPage,
     salesOrderPage,
-    page,
+    createdRecords,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abypre', 'TC:3 (ClickUp)');
     test.setTimeout(300_000);
@@ -258,12 +311,11 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
         prospectToCustomerConversionPage,
         customerSeasonListPage,
         customerSeasonFormPage,
-        salesOrderPage,
-        page,
+        createdRecords,
       },
       'TC3',
     );
-    const orderNo = await placeOrder(salesOrderPage, prospect, 'SMS', 'first');
+    const orderNo = await placeOrder(salesOrderPage, createdRecords, prospect, 'SMS', 'first');
 
     await expectStageOnDetails(prospectToCustomerConversionPage, prospect, 'Customer');
 
@@ -301,7 +353,7 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
     customerSeasonListPage,
     customerSeasonFormPage,
     salesOrderPage,
-    page,
+    createdRecords,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abypt1', 'TC:4 (ClickUp)');
     test.setTimeout(360_000);
@@ -312,12 +364,11 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
         prospectToCustomerConversionPage,
         customerSeasonListPage,
         customerSeasonFormPage,
-        salesOrderPage,
-        page,
+        createdRecords,
       },
       'TC4',
     );
-    const firstOrderNo = await placeOrder(salesOrderPage, prospect, 'SMS', 'first');
+    const firstOrderNo = await placeOrder(salesOrderPage, createdRecords, prospect, 'SMS', 'first');
     await expectStageOnDetails(prospectToCustomerConversionPage, prospect, 'Customer');
     await test.step(`Conversion notification for ${firstOrderNo} arrived`, async () => {
       await prospectToCustomerConversionPage.expectSingleConversionNotification(
@@ -326,7 +377,13 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
       );
     });
 
-    const secondOrderNo = await placeOrder(salesOrderPage, prospect, 'SMS', 'second');
+    const secondOrderNo = await placeOrder(
+      salesOrderPage,
+      createdRecords,
+      prospect,
+      'SMS',
+      'second',
+    );
 
     await expectStageOnDetails(prospectToCustomerConversionPage, prospect, 'Customer');
     await test.step(`No new conversion notification for the second order ${secondOrderNo}`, async () => {
@@ -345,7 +402,7 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
     customerSeasonFormPage,
     salesOrderPage,
     bizDocPage,
-    page,
+    createdRecords,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abypt2', 'TC:5 (ClickUp)');
     test.setTimeout(360_000);
@@ -356,15 +413,26 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
         prospectToCustomerConversionPage,
         customerSeasonListPage,
         customerSeasonFormPage,
-        salesOrderPage,
-        page,
+        createdRecords,
       },
       'TC5',
     );
-    const sampleOrderNo = await placeOrder(salesOrderPage, prospect, 'SMS', 'first');
+    const sampleOrderNo = await placeOrder(
+      salesOrderPage,
+      createdRecords,
+      prospect,
+      'SMS',
+      'first',
+    );
     await expectStageOnDetails(prospectToCustomerConversionPage, prospect, 'Customer');
 
-    const bulkOrderNo = await placeOrder(salesOrderPage, prospect, 'BULK', 'second');
+    const bulkOrderNo = await placeOrder(
+      salesOrderPage,
+      createdRecords,
+      prospect,
+      'BULK',
+      'second',
+    );
 
     await expectStageOnDetails(prospectToCustomerConversionPage, prospect, 'Customer');
     await test.step(`No stage-change notification for the Bulk order ${bulkOrderNo}`, async () => {
@@ -384,7 +452,7 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
     customerSeasonFormPage,
     salesOrderPage,
     bizDocPage,
-    page,
+    createdRecords,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abypt4', 'TC:6 (ClickUp)');
     test.setTimeout(360_000);
@@ -395,15 +463,20 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
         prospectToCustomerConversionPage,
         customerSeasonListPage,
         customerSeasonFormPage,
-        salesOrderPage,
-        page,
+        createdRecords,
       },
       'TC6',
     );
-    const bulkOrderNo = await placeOrder(salesOrderPage, prospect, 'BULK', 'first');
+    const bulkOrderNo = await placeOrder(salesOrderPage, createdRecords, prospect, 'BULK', 'first');
     await expectStageOnDetails(prospectToCustomerConversionPage, prospect, 'Customer');
 
-    const sampleOrderNo = await placeOrder(salesOrderPage, prospect, 'SMS', 'second');
+    const sampleOrderNo = await placeOrder(
+      salesOrderPage,
+      createdRecords,
+      prospect,
+      'SMS',
+      'second',
+    );
 
     await expectStageOnDetails(prospectToCustomerConversionPage, prospect, 'Customer');
     await test.step(`No stage-change notification for the Sample order ${sampleOrderNo}`, async () => {
@@ -423,7 +496,7 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
     customerSeasonFormPage,
     salesOrderPage,
     bizDocPage,
-    page,
+    createdRecords,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abypt5', 'TC:7 (ClickUp)');
     test.setTimeout(300_000);
@@ -434,12 +507,11 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
         prospectToCustomerConversionPage,
         customerSeasonListPage,
         customerSeasonFormPage,
-        salesOrderPage,
-        page,
+        createdRecords,
       },
       'TC7',
     );
-    const orderNo = await placeOrder(salesOrderPage, prospect, 'BULK', 'first');
+    const orderNo = await placeOrder(salesOrderPage, createdRecords, prospect, 'BULK', 'first');
 
     await expectStageOnDetails(prospectToCustomerConversionPage, prospect, 'Customer');
     await test.step(`Conversion notification names the Bulk order ${orderNo}`, async () => {

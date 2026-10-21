@@ -123,6 +123,11 @@ export class BizDocPage extends BasePage {
 
   /** Waits for the Biz Docs sub-tab's "Loading documents…" placeholder to clear. */
   async waitForDocumentsLoaded(): Promise<void> {
+    // 60s rather than the default: the tile counts load in a separate
+    // request after the sub-tab renders, and shared dev is slow under
+    // parallel workers — same allowance as BasePage.gotoAuthenticated()'s
+    // 60s. A generous ceiling, not a measured value; it only costs time
+    // when the placeholder never clears (a genuine failure).
     await this.locators.loadingDocumentsText.waitFor({ state: 'hidden', timeout: 60_000 });
     await expect(this.locators.ordersTile).toBeVisible();
   }
@@ -143,7 +148,7 @@ export class BizDocPage extends BasePage {
     // Clicking the tile itself opens nothing either (no dialog, no
     // Create Order action) — confirmed by diffing the page before/after.
     await this.locators.ordersTile.click();
-    await expect(this.page.getByRole('dialog')).toHaveCount(0);
+    await expect(this.locators.anyDialog).toHaveCount(0);
     await expect(this.locators.createOrderButton).toHaveCount(0);
   }
 }

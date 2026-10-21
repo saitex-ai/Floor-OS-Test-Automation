@@ -80,6 +80,8 @@ export class BizDocLocators {
    * shape once order creation ships.
    */
   readonly createOrderButton: Locator;
+  /** Any open `dialog` — used only to assert clicking the Orders tile opens none. */
+  readonly anyDialog: Locator;
 
   constructor(private readonly page: Page) {
     this.detailsHeading = page.getByRole('heading', { level: 1 });
@@ -88,6 +90,7 @@ export class BizDocLocators {
     this.loadingDocumentsText = page.getByText('Loading documents…');
     this.ordersTile = page.getByRole('note', { name: /^Orders:/ });
     this.createOrderButton = page.getByRole('button', { name: /create order/i });
+    this.anyDialog = page.getByRole('dialog');
   }
 
   /**

@@ -27,6 +27,9 @@ export type SalesOrderType = 'SMS' | 'BULK';
  *   read "<Code> <Name>" (customers) or "<Code> <Description> <Code>"
  *   (seasons). A brand-new CRM Prospect is selectable straight away.
  * - Save shows a sonner toast "Sales order created." and closes the dialog.
+ * - Deleting (confirmed on dev 2026-10-21): the Edit Sales Order dialog has
+ *   no Delete; instead ticking a row's checkbox reveals a list-level
+ *   "Delete" button.
  */
 export class SalesOrderLocators {
   readonly heading: Locator;
@@ -43,6 +46,11 @@ export class SalesOrderLocators {
   /** The type-to-search combobox inside the open Customer/Season picker popup. */
   readonly pickerSearchInput: Locator;
   readonly createdToast: Locator;
+
+  /** List-level "Delete" — only rendered while at least one row is ticked. */
+  readonly deleteSelectedButton: Locator;
+  /** Confirmation shown after clicking deleteSelectedButton, if any. */
+  readonly deleteConfirmDialog: Locator;
 
   constructor(private readonly page: Page) {
     this.heading = page.getByRole('heading', { name: 'Sales Order', exact: true });
@@ -61,6 +69,9 @@ export class SalesOrderLocators {
 
     this.pickerSearchInput = page.getByRole('dialog').last().getByRole('combobox');
     this.createdToast = page.getByText('Sales order created.', { exact: true });
+
+    this.deleteSelectedButton = page.getByRole('button', { name: 'Delete', exact: true });
+    this.deleteConfirmDialog = page.getByRole('alertdialog');
   }
 
   orderTypeOption(type: SalesOrderType): Locator {
@@ -77,6 +88,16 @@ export class SalesOrderLocators {
   /** The list row for one order, matched by its (unique) description. */
   rowByText(text: string): Locator {
     return this.page.getByRole('row').filter({ hasText: text });
+  }
+
+  /** The select checkbox in a list row. */
+  rowCheckbox(row: Locator): Locator {
+    return row.getByRole('checkbox');
+  }
+
+  /** The confirm button inside deleteConfirmDialog. */
+  confirmDeleteButton(): Locator {
+    return this.deleteConfirmDialog.getByRole('button', { name: /^(Delete|Confirm)/ });
   }
 
   /** Cell n of a list row (0 = select checkbox, 1 = Order #, 2 = Order Type, ...). */

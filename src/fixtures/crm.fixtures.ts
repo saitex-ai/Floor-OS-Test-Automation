@@ -17,9 +17,6 @@ import { ExternalEventsPage } from '../pages/crm/external-events.page';
 import { AlertsPage } from '../pages/crm/alerts.page';
 import { CustomerCommunicationPage } from '../pages/crm/customer-communication.page';
 import { ProspectToCustomerConversionPage } from '../pages/crm/prospect-to-customer-conversion.page';
-import { SalesOrderPage } from '../pages/master-data/sales-order.page';
-import { CustomerSeasonListPage } from '../pages/master-data/customer-season-list.page';
-import { CustomerSeasonFormPage } from '../pages/master-data/customer-season-form.page';
 
 interface CrmFixtures {
   crmPage: CrmPage;
@@ -42,10 +39,6 @@ interface CrmFixtures {
   prospectToCustomerConversionPage: ProspectToCustomerConversionPage;
   /** Same page object on a SECOND browser tab (same context/session) — for cross-view checks. */
   prospectToCustomerConversionSecondTab: ProspectToCustomerConversionPage;
-  /** Master Data screens the Prospect -> Customer conversion depends on (season + sales order). */
-  salesOrderPage: SalesOrderPage;
-  customerSeasonListPage: CustomerSeasonListPage;
-  customerSeasonFormPage: CustomerSeasonFormPage;
 }
 
 /**
@@ -130,18 +123,6 @@ export const test = base.extend<CrmFixtures>({
     const secondTab = await context.newPage();
     await use(new ProspectToCustomerConversionPage(secondTab));
     await secondTab.close();
-  },
-
-  salesOrderPage: async ({ page }, use) => {
-    await use(new SalesOrderPage(page));
-  },
-
-  customerSeasonListPage: async ({ page }, use) => {
-    await use(new CustomerSeasonListPage(page));
-  },
-
-  customerSeasonFormPage: async ({ page }, use) => {
-    await use(new CustomerSeasonFormPage(page));
   },
 });
 

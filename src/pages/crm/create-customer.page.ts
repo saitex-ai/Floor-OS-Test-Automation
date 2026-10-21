@@ -143,6 +143,22 @@ export class CreateCustomerPage extends BasePage {
     await this.locators.saveButton.click();
   }
 
+  /**
+   * Saves (accepting a soft duplicate warning if one appears), dismisses
+   * the post-save "Proceed to Contact creation?" modal and waits for the
+   * new Customer's Detail page — same sequence as
+   * customer-detail.spec.ts's createLinkedContact() helper.
+   */
+  async saveAndOpenDetail(): Promise<void> {
+    await this.save();
+    if (await this.locators.duplicateWarningModal.isVisible().catch(() => false)) {
+      await this.locators.saveAnywayButton.click();
+    }
+    await this.expectSavedSuccessfully();
+    await this.locators.postSaveCancelButton.click();
+    await expect(this.page).toHaveURL(/\/crm\/customers\/[0-9a-f-]+$/);
+  }
+
   async cancel(): Promise<void> {
     await this.locators.cancelButton.click();
   }

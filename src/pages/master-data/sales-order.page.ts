@@ -94,4 +94,20 @@ export class SalesOrderPage extends BasePage {
     await expect(this.locators.rowCell(row, COL.customerCode)).toHaveText(order.customerCode);
     await expect(this.locators.rowCell(row, COL.season)).toHaveText(order.seasonCode);
   }
+
+  /**
+   * Deletes the one order whose (unique) description is `description`:
+   * ticks its row, clicks the list's Delete, confirms, and waits for the
+   * row to disappear. For tearing down orders a test created itself.
+   */
+  async deleteOrder(description: string): Promise<void> {
+    const l = this.locators;
+    await this.search(description);
+    const row = l.rowByText(description);
+    await expect(row).toHaveCount(1, { timeout: 15_000 });
+    await l.rowCheckbox(row).check();
+    await l.deleteSelectedButton.click();
+    await l.confirmDeleteButton().click();
+    await expect(row).toHaveCount(0, { timeout: 15_000 });
+  }
 }

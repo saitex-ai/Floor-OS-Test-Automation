@@ -10,6 +10,17 @@ export { type OverflowStageTab } from '../../locators/crm/prospect-to-customer-c
 
 const CUSTOMERS_LIST_PATH = '/crm/customers';
 const CUSTOMER_DETAIL_PATH = (customerId: string) => `/crm/customers/${customerId}`;
+const CUSTOMER_DETAIL_URL = /\/crm\/customers\/([0-9a-f-]+)$/;
+
+/**
+ * How long expectNoRepeatConversionNotification() waits before checking
+ * that a later order did NOT produce a second conversion notification.
+ * Absence can't be polled for, so this is a deliberate fixed wait: the
+ * first order's notification was observed to arrive within a few seconds
+ * on dev, so 15s is generous. Caveat: a repeat notification that arrives
+ * AFTER this window would go unnoticed and the check would still pass.
+ */
+const NO_REPEAT_NOTIFICATION_SETTLE_MS = 15_000;
 
 /**
  * "Prospect to Customer Conversion (1st Ever Sample Order)" (CRM, Sprint 5).
@@ -95,8 +106,15 @@ export class ProspectToCustomerConversionPage extends BasePage {
     await this.gotoAuthenticated(CUSTOMER_DETAIL_PATH(customerId));
   }
 
-  async reload(): Promise<void> {
-    await this.page.reload();
+  /**
+   * The id of the Customer whose Details page is open — e.g. straight
+   * after CreateCustomerPage.saveAndOpenDetail(), which lands there.
+   */
+  async openedCustomerId(): Promise<string> {
+    await expect(this.page).toHaveURL(CUSTOMER_DETAIL_URL);
+    const id = CUSTOMER_DETAIL_URL.exec(new URL(this.page.url()).pathname)?.[1];
+    if (!id) throw new Error(`Not on a Customer Details page: ${this.page.url()}`);
+    return id;
   }
 
   /** CRM Stage field row on Customer Details ("CRM Stage • {value}"). */
@@ -150,15 +168,16 @@ export class ProspectToCustomerConversionPage extends BasePage {
    * After a LATER order (`laterOrderNo`) for an already-converted Customer:
    * still exactly one conversion notification (the first order's), and none
    * naming the later order. Absence can't be polled for, so this first
-   * waits out a settle window — the first order's notification was observed
-   * to arrive within a few seconds on dev, so 15s is generous.
+   * waits out NO_REPEAT_NOTIFICATION_SETTLE_MS — see its caveat: a repeat
+   * arriving after that window would not be caught.
    */
   async expectNoRepeatConversionNotification(
     customerId: string,
     firstOrderNo: string,
     laterOrderNo: string,
   ): Promise<void> {
-    await this.page.waitForTimeout(15_000);
+    // Deliberate fixed wait — see NO_REPEAT_NOTIFICATION_SETTLE_MS.
+    await this.page.waitForTimeout(NO_REPEAT_NOTIFICATION_SETTLE_MS);
     await this.openCustomerDetail(customerId);
     await this.openNotificationPanel();
     const notifications = this.locators.conversionNotifications(customerId);
