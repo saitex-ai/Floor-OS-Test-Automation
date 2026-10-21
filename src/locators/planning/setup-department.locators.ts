@@ -5,7 +5,7 @@ export const WIZARD_STEPS = [
   'Department',
   'Activities',
   'Recipes & Operations',
-  'Centres & Machines',
+  'Centres, Stations & Machines',
   'Capacity',
   'Team & Skills',
   'Review & Complete',

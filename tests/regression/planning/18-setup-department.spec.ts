@@ -202,12 +202,12 @@ test.describe('Planning - Set up my Department', () => {
     await wizard.expectRecipeOperationsToggle(recipe);
   });
 
-  // ── Step 4: Centres & machines ────────────────────────────────────────
+  // ── Step 4: Centres, stations & machines ──────────────────────────────
 
   test('TC-DW-WC-02 "Add a work centre" / "Add a machine" open the full forms inline', async () => {
     await allure.tms(cu('z941abw0pz'), 'TC-DW-WC-02 (ClickUp)');
     await wizard.continue();
-    await wizard.expectOnStep('Work centres and the machines inside them');
+    await wizard.expectOnStep('Work centres, their stations and machines');
     const url = page.url();
     centre = await wizard.createWorkCentre(centreName);
     created.push(`centre:${centre}`);
@@ -219,6 +219,8 @@ test.describe('Planning - Set up my Department', () => {
     await allure.tms(cu('z941abw0q0'), 'TC-DW-WC-03 (ClickUp)');
     await wizard.expectMachineCentreLocked(centre);
     machine = await wizard.submitMachine(centre, QA_MACHINE_TYPE, machineTag);
+    // The read-back must be the machine's own code, not the centre's on the same card.
+    expect(machine).not.toBe(centre);
     created.push(`machine:${machine}`);
   });
 

@@ -224,13 +224,21 @@ export async function cleanUpCreated(
   try {
     for (const cleaner of cleaners) {
       const norm = cleaner.normalize ?? ((c: string) => c);
-      const codes = takeCodes(file, cleaner.prefix).map(norm);
-      if (!codes.length) continue;
+      const tracked = takeCodes(file, cleaner.prefix);
+      // "tag:<tag>": a record whose code dev generates, tracked by its name tag
+      // before saving — found by that tag here, in case reading its code failed.
+      const tags = tracked.filter((c) => c.startsWith('tag:')).map((c) => c.slice(4));
+      const known = tracked.filter((c) => !c.startsWith('tag:')).map(norm);
+      if (!known.length && !tags.length) continue;
+      const term = norm(runPrefix(cleaner.prefix));
       for (const list of cleaner.lists(page)) {
         await list.open();
         await list.expectLoaded();
+        const codes = [
+          ...new Set([...known, ...(tags.length ? await list.codesForTags(term, tags) : [])]),
+        ];
         // Codes that were generated but never saved (blocked/cancel cases) have no row.
-        const rows = await list.rowTexts(norm(runPrefix(cleaner.prefix)), codes);
+        const rows = await list.rowTexts(term, codes);
         for (const [code, rowText] of rows) {
           if (cleaner.done?.(rowText)) continue;
           try {

@@ -180,6 +180,34 @@ export abstract class MasterDataListPage extends BasePage {
    * until every visible row contains `term` (or the grid is empty) — a read
    * before that would still see the unfiltered first page.
    */
+  /**
+   * For cleanup: the codes of rows whose text holds one of `tags` (a record's
+   * unique name tag), after searching `term`. Codes as dev generates them
+   * (CAL-0001, SH-0002…): the first cell that reads like one.
+   */
+  async codesForTags(term: string, tags: string[]): Promise<string[]> {
+    await this.search(term);
+    await expect
+      .poll(
+        async () =>
+          (await this.grid.bodyRows().allInnerTexts()).every((t) =>
+            t.toLowerCase().includes(term.toLowerCase()),
+          ),
+        { message: `rows should all match "${term}"`, timeout: WAIT.SERVER },
+      )
+      .toBe(true);
+    if (tags.length > 25) await this.setRowsPerPage(100);
+    const codes: string[] = [];
+    for (const tag of tags) {
+      const row = this.grid.bodyRows().filter({ hasText: tag }).first();
+      if ((await row.count()) === 0) continue;
+      const cells = (await row.getByRole('cell').allInnerTexts()).map((c) => c.trim());
+      const code = cells.find((c) => /^[A-Z][A-Z0-9_]*-\d+$/.test(c));
+      if (code) codes.push(code);
+    }
+    return codes;
+  }
+
   async rowTexts(term: string, codes: string[]): Promise<Map<string, string>> {
     await this.search(term);
     const rows = this.grid.bodyRows();

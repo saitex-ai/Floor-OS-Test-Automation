@@ -112,7 +112,11 @@ export function uniqueCode(prefix: string): string {
  */
 export function uniqueTag(prefix: string): string {
   counter += 1;
-  return `${prefix}${RUN}${counter.toString(36).toUpperCase()}`;
+  const tag = `${prefix}${RUN}${counter.toString(36).toUpperCase()}`;
+  // Tracked up front too, so cleanup finds the record by its name even if
+  // reading its generated code back fails.
+  track(prefix, `tag:${tag}`);
+  return tag;
 }
 
 /** Records a generated code against the calling spec file for its afterAll cleanup. */
