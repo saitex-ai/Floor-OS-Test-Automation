@@ -27,6 +27,11 @@ export class EmployeesListPage extends BasePage {
     await expect(this.locators.newEmployeeButton).toBeVisible();
   }
 
+  /** The grid has its first rows — a search typed before this is wiped when the rows arrive. */
+  async expectRowsLoaded(): Promise<void> {
+    await expect(this.locators.row('').nth(1)).toBeVisible({ timeout: 60_000 });
+  }
+
   async openNewEmployee(): Promise<void> {
     await this.locators.newEmployeeButton.click();
   }

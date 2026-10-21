@@ -24,6 +24,7 @@ import { AllowanceFormPage } from '../pages/planning/allowance-form.page';
 import { WorkCentreDetailPage } from '../pages/planning/work-centre-detail.page';
 import { MachineDetailPage } from '../pages/planning/machine-detail.page';
 import { MaintenanceWindowFormPage } from '../pages/planning/maintenance-window-form.page';
+import { CalendarDetailPage } from '../pages/planning/calendar-detail.page';
 
 interface PlanningFixtures {
   planningPage: PlanningPage;
@@ -50,6 +51,7 @@ interface PlanningFixtures {
   workCentreDetailPage: WorkCentreDetailPage;
   machineDetailPage: MachineDetailPage;
   maintenanceWindowFormPage: MaintenanceWindowFormPage;
+  calendarDetailPage: CalendarDetailPage;
 }
 
 interface PlanningWorkerFixtures {
@@ -166,6 +168,10 @@ export const test = base.extend<PlanningFixtures, PlanningWorkerFixtures>({
 
   maintenanceWindowFormPage: async ({ page }, use) => {
     await use(new MaintenanceWindowFormPage(page));
+  },
+
+  calendarDetailPage: async ({ page }, use) => {
+    await use(new CalendarDetailPage(page));
   },
 });
 

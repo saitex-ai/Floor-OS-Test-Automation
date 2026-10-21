@@ -71,6 +71,11 @@ export class DepartmentFormPage extends BasePage {
     await expect(this.locators.editButton).toBeVisible({ timeout: 15_000 });
   }
 
+  /** The detail view shows the department under `name` (its heading). */
+  async expectNameShown(name: string): Promise<void> {
+    await expect(this.locators.detailHeading(name)).toBeVisible({ timeout: 15_000 });
+  }
+
   /** Switches the detail view into its editable form — same fields/locators as create. */
   async clickEdit(): Promise<void> {
     await this.locators.editButton.click();
