@@ -109,7 +109,7 @@ export class CustomerDetailPage extends BasePage {
   /**
    * Edits Customer Name on the Profile section and saves. Returns the
    * HTTP status of the profile PATCH, since the UI gives no feedback when
-   * the server rejects it (see expectNoProfileUpdatedToast()).
+   * the server rejects it (see expectRenameRejectedMessage()).
    */
   async renameCustomer(newName: string): Promise<number> {
     await this.openFieldEdit('Customer Name');
@@ -125,9 +125,15 @@ export class CustomerDetailPage extends BasePage {
     await expect(this.locators.nameHeading.first()).toHaveText(name);
   }
 
-  /** No "Customer Profile updated" toast is shown. */
-  async expectNoProfileUpdatedToast(): Promise<void> {
-    await expect(this.page.getByText('Customer Profile updated')).toHaveCount(0);
+  /**
+   * After a rename the server rejected (409 customer_name_exists), the
+   * Customer Name field shows an inline error naming the taken name
+   * (fixed on dev by 2026-10-21; was https://app.clickup.com/t/z941abytcd).
+   */
+  async expectRenameRejectedMessage(existingName: string): Promise<void> {
+    await expect(
+      this.page.getByText(`A customer named "${existingName}" already exists`),
+    ).toBeVisible();
   }
 
   async expectFieldEditError(message: string | RegExp): Promise<void> {

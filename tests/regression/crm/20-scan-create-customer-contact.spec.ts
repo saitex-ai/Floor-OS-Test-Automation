@@ -5,7 +5,9 @@ import { SAMPLE_SCAN_FILE_PATH } from '../../../src/pages/crm/scan-create.page';
 
 /** Contact Name is validated "Alphabets only" — no digits allowed (confirmed elsewhere, e.g. create-contact.locators.ts). */
 function randomLetters(length = 6): string {
-  return Array.from({ length }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join('');
+  return Array.from({ length }, () =>
+    String.fromCharCode(97 + Math.floor(Math.random() * 26)),
+  ).join('');
 }
 
 /**
@@ -63,7 +65,12 @@ const COMPANY_NAME_PREFIXES = [
   'Northgate',
   'Ironwood',
 ];
-const COMPANY_NAME_SUFFIXES = ['Apparel Group', 'Garment Works', 'Textiles Co.', 'Apparel Partners'];
+const COMPANY_NAME_SUFFIXES = [
+  'Apparel Group',
+  'Garment Works',
+  'Textiles Co.',
+  'Apparel Partners',
+];
 const CONTACT_NAME_POOL = [
   'Jordan Ecclestone',
   'Morgan Whitfield',
@@ -76,7 +83,8 @@ const CONTACT_NAME_POOL = [
 async function renderUniqueBusinessCardPdf(): Promise<{ filePath: string; contactName: string }> {
   const contactName = CONTACT_NAME_POOL[Math.floor(Math.random() * CONTACT_NAME_POOL.length)]!;
   const suffix = randomLetters(8);
-  const companyPrefix = COMPANY_NAME_PREFIXES[Math.floor(Math.random() * COMPANY_NAME_PREFIXES.length)]!;
+  const companyPrefix =
+    COMPANY_NAME_PREFIXES[Math.floor(Math.random() * COMPANY_NAME_PREFIXES.length)]!;
   const companySuffix =
     COMPANY_NAME_SUFFIXES[Math.floor(Math.random() * COMPANY_NAME_SUFFIXES.length)]!;
   const companyName = `${companyPrefix} ${companySuffix}`;
@@ -138,10 +146,16 @@ async function renderUniqueBusinessCardPdf(): Promise<{ filePath: string; contac
  * Customer and links the Contact to it automatically, 1:1, confirmed
  * directly.
  */
-// Skipped on request (2026-10-15): the Scan & Create Customer/Contact tests
-// are left out of the CRM regression run for now. Change describe.skip back
-// to describe to run them again.
-test.describe.skip('CRM - Scan&Create Customer/Contact', () => {
+/**
+ * Dev replaced the "Start Scan" screen with the Floor OS Assistant chat
+ * (confirmed 2026-10-21), so every TC below that drives the old screen is
+ * fixme'd with this reason until the rewrite for the new flow lands.
+ */
+const REDESIGNED =
+  'Dev replaced the Scan & Create screen with the Floor OS Assistant (2026-10-21); this TC drives the old ' +
+  '"Start Scan" screen. Rewritten for the new flow in https://app.clickup.com/t/z941abzcx1';
+
+test.describe('CRM - Scan&Create Customer/Contact', () => {
   test.beforeEach(async () => {
     await allure.epic('CRM');
     await allure.feature('Scan&Create Customer/Contact');
@@ -150,6 +164,7 @@ test.describe.skip('CRM - Scan&Create Customer/Contact', () => {
 
   test('TC:1 Scan&Create screen access and provisions', async ({ scanCreatePage }) => {
     await allure.tms('https://app.clickup.com/t/z941abt9ea', 'TC:1 (ClickUp)');
+    test.fixme(true, REDESIGNED);
 
     await test.step('Navigate to Customers and open Scan&Create', async () => {
       await scanCreatePage.openFromCustomersList();
@@ -164,6 +179,7 @@ test.describe.skip('CRM - Scan&Create Customer/Contact', () => {
     scanCreatePage,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abt9eb', 'TC:2 (ClickUp)');
+    test.fixme(true, REDESIGNED);
     // Real extraction against a local vision model — confirmed to vary
     // 35-90s+ per call. test.slow()'s x3 alone isn't enough headroom
     // (confirmed: cuts startScan()'s own wait off early) — set explicitly.
@@ -206,6 +222,7 @@ test.describe.skip('CRM - Scan&Create Customer/Contact', () => {
 
   test('TC:3 Post-scan value-populated field editability', async ({ scanCreatePage }) => {
     await allure.tms('https://app.clickup.com/t/z941abt9ec', 'TC:3 (ClickUp)');
+    test.fixme(true, REDESIGNED);
     // Real extraction against a local vision model — see TC:2's comment.
     test.setTimeout(180_000);
 
@@ -231,6 +248,7 @@ test.describe.skip('CRM - Scan&Create Customer/Contact', () => {
     scanCreatePage,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abt9ee', 'TC:4 (ClickUp)');
+    test.fixme(true, REDESIGNED);
     // Real extraction against a local vision model — see TC:2's comment.
     test.setTimeout(180_000);
 
@@ -282,6 +300,7 @@ test.describe.skip('CRM - Scan&Create Customer/Contact', () => {
     scanCreatePage,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abt9ef', 'TC:5 (ClickUp)');
+    test.fixme(true, REDESIGNED);
     // Real extraction against a local vision model — see TC:2's comment.
     test.setTimeout(180_000);
 
@@ -314,7 +333,9 @@ test.describe.skip('CRM - Scan&Create Customer/Contact', () => {
       // still empty so this reliably exercises "corrected value re-saves
       // successfully," not "the scan happened to extract everything."
       if (!(await l.contactEmailInput.inputValue()))
-        await scanCreatePage.fillContactProfile({ email: `pw-scan-contact-${Date.now()}@example.com` });
+        await scanCreatePage.fillContactProfile({
+          email: `pw-scan-contact-${Date.now()}@example.com`,
+        });
       if (!(await l.contactCityInput.inputValue()))
         await scanCreatePage.fillContactProfile({ city: 'San Francisco' });
       if ((await l.contactCountryCombobox.innerText()).match(/^(select|choose)\b/i))
@@ -353,6 +374,7 @@ test.describe.skip('CRM - Scan&Create Customer/Contact', () => {
     page,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abt9ge', 'TC:8 (ClickUp)');
+    test.fixme(true, REDESIGNED);
     // Real extraction against a local vision model — see TC:2's comment.
     test.setTimeout(180_000);
 
@@ -392,6 +414,7 @@ test.describe.skip('CRM - Scan&Create Customer/Contact', () => {
     page,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abt9gf', 'TC:9 (ClickUp)');
+    test.fixme(true, REDESIGNED);
 
     await scanCreatePage.openFromCustomersList();
 

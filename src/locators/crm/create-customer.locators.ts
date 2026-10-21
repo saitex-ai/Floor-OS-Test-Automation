@@ -130,6 +130,8 @@ export class CreateCustomerLocators {
       .or(page.getByRole('alertdialog'))
       .filter({ hasText: /may already exist|already exists in CRM|Match in Customer Name/i });
     this.saveAnywayButton = this.duplicateWarningModal.getByRole('button', { name: 'Save anyway' });
+    // Inline field errors have no role, label or test id to target (they
+    // are plain text under each field), so the CSS class is the only hook.
     this.fieldErrors = page.locator('.crm-error');
     // Accepts either "Cancel to review" (the original soft-warning text)
     // or the hard-block dialog's plain "Cancel" — exact on the latter so
