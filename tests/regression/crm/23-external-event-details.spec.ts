@@ -63,7 +63,7 @@ test.describe('CRM - External Event Details screen', () => {
     const eventId = await externalEventsPage.findFreshPlanningEvent();
     test.skip(
       eventId === null,
-      'No un-elapsed Planning event left in this environment\'s fixed AI-seed pool — see class doc.',
+      "No un-elapsed Planning event left in this environment's fixed AI-seed pool — see class doc.",
     );
 
     await test.step('Feedback Form and Leads tabs are gated until Attended', async () => {
@@ -79,7 +79,7 @@ test.describe('CRM - External Event Details screen', () => {
     const eventId = await externalEventsPage.findFreshPlanningEvent();
     test.skip(
       eventId === null,
-      'No un-elapsed Planning event left in this environment\'s fixed AI-seed pool — see class doc.',
+      "No un-elapsed Planning event left in this environment's fixed AI-seed pool — see class doc.",
     );
 
     await test.step('Click To Attend', async () => {
@@ -100,7 +100,7 @@ test.describe('CRM - External Event Details screen', () => {
     const eventId = await externalEventsPage.findFreshPlanningEvent();
     test.skip(
       eventId === null,
-      'No un-elapsed Planning event left in this environment\'s fixed AI-seed pool — see class doc.',
+      "No un-elapsed Planning event left in this environment's fixed AI-seed pool — see class doc.",
     );
     await externalEventsPage.decideToAttend();
 
@@ -122,7 +122,7 @@ test.describe('CRM - External Event Details screen', () => {
     const eventId = await externalEventsPage.findFreshPlanningEvent();
     test.skip(
       eventId === null,
-      'No un-elapsed Planning event left in this environment\'s fixed AI-seed pool — see class doc.',
+      "No un-elapsed Planning event left in this environment's fixed AI-seed pool — see class doc.",
     );
     await externalEventsPage.decideToAttend();
     await externalEventsPage.markAttended();
@@ -138,10 +138,13 @@ test.describe('CRM - External Event Details screen', () => {
       await l.couldBeBetterInput.fill('Nothing major.');
       await l.attendNextEditionsInput.fill('Yes');
       await l.submitButton.click();
+      await l.saveFeedbackButton.click();
     });
 
     await test.step('Feedback is stored and the Leads tab reflects the capture', async () => {
-      await expect(externalEventsPage.locators.toast).toBeVisible();
+      // Dev (2026-10-21): no toast any more; the "Thanks for the feedback!"
+      // dialog confirms, and the tab switches to the saved, read-only view.
+      await externalEventsPage.expectFeedbackSaved(['Good turnout.', 'Nothing major.']);
       // Confirmed against the running app: capturing a lead here hands off
       // to the same Scan&Create/Create Customer flow already owned by
       // scan-create.page.ts/create-customer.page.ts elsewhere in this
@@ -161,7 +164,7 @@ test.describe('CRM - External Event Details screen', () => {
     const eventId = await externalEventsPage.findFreshPlanningEvent();
     test.skip(
       eventId === null,
-      'No un-elapsed Planning event left in this environment\'s fixed AI-seed pool — see class doc.',
+      "No un-elapsed Planning event left in this environment's fixed AI-seed pool — see class doc.",
     );
 
     await test.step('Clicking Register Online opens the registration URL in a new tab', async () => {
@@ -182,7 +185,7 @@ test.describe('CRM - External Event Details screen', () => {
     const eventId = await externalEventsPage.findFreshPlanningEvent();
     test.skip(
       eventId === null,
-      'No un-elapsed Planning event left in this environment\'s fixed AI-seed pool — see class doc.',
+      "No un-elapsed Planning event left in this environment's fixed AI-seed pool — see class doc.",
     );
 
     await test.step('Open the decline modal and attempt Proceed with blank fields', async () => {
@@ -205,12 +208,15 @@ test.describe('CRM - External Event Details screen', () => {
     const eventId = await externalEventsPage.findFreshPlanningEvent();
     test.skip(
       eventId === null,
-      'No un-elapsed Planning event left in this environment\'s fixed AI-seed pool — see class doc.',
+      "No un-elapsed Planning event left in this environment's fixed AI-seed pool — see class doc.",
     );
 
     await test.step('Fill a reason and detailed text, then Cancel instead of Proceed', async () => {
       await externalEventsPage.openDeclineDialog();
-      await externalEventsPage.fillDeclineReason('Travel constraints', 'Team unavailable to travel this quarter.');
+      await externalEventsPage.fillDeclineReason(
+        'Travel constraints',
+        'Team unavailable to travel this quarter.',
+      );
       await externalEventsPage.cancelDecline();
     });
 
@@ -223,7 +229,7 @@ test.describe('CRM - External Event Details screen', () => {
   test('TC:8 verify Automatic Expiration to Elapsed Status', () => {
     test.fixme(
       true,
-      'Already marked skip in ClickUp — needs a real server-time jump past an event\'s end date, which this framework cannot simulate.',
+      "Already marked skip in ClickUp — needs a real server-time jump past an event's end date, which this framework cannot simulate.",
     );
   });
 });

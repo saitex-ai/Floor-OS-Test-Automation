@@ -159,6 +159,7 @@ export class ExternalEventsLocators {
   readonly saveEventButton: Locator;
   readonly keepEditingButton: Locator;
 
+  readonly saveFeedbackButton: Locator;
   readonly toast: Locator;
 
   constructor(private readonly page: Page) {
@@ -194,25 +195,42 @@ export class ExternalEventsLocators {
     });
     this.declineDetailedReasonInput = this.declineDialog.getByRole('textbox');
     this.declineProceedButton = this.declineDialog.getByRole('button', { name: 'Proceed' });
-    this.declineCancelButton = this.declineDialog.getByRole('button', { name: 'Cancel', exact: true });
+    this.declineCancelButton = this.declineDialog.getByRole('button', {
+      name: 'Cancel',
+      exact: true,
+    });
 
     this.titleInput = page.getByRole('textbox', { name: 'External Event Title', exact: false });
     this.venueInput = page.getByRole('textbox', { name: 'External Event Venue', exact: false });
     this.dateInput = page.getByRole('textbox', { name: 'External Event Date', exact: false });
     this.aboutInput = page.getByRole('textbox', { name: 'About the External Event', exact: false });
 
-    this.attendeesButton = page.getByRole('button', { name: 'SAITEX Attendees' });
+    // Create Event form: labelled controls. Planning event's Feedback Form
+    // (dev, 2026-10-21): the attendees button reads "Who attended?" and the
+    // other inputs aren't linked to their labels, so fall back to the first
+    // input after the label text.
+    // Labels carry a trailing required "*", so match on the start.
+    const inputAfter = (label: string): Locator =>
+      page
+        .getByText(new RegExp(`^${label.replace(/[?]/g, '\\?')}`))
+        .first()
+        .locator('xpath=following::*[self::input or self::textarea][1]');
+    this.attendeesButton = page
+      .getByRole('button', { name: 'SAITEX Attendees' })
+      .or(page.getByRole('button', { name: 'Who attended?' }));
     this.scoreRadiogroup = page.getByRole('radiogroup', { name: /Score/ });
-    this.numberOfLeadsInput = page.getByRole('textbox', { name: 'Number of Leads', exact: false });
-    this.wentWellInput = page.getByRole('textbox', { name: 'What went well?', exact: false });
-    this.couldBeBetterInput = page.getByRole('textbox', {
-      name: 'What could have been better?',
-      exact: false,
-    });
-    this.attendNextEditionsInput = page.getByRole('textbox', {
-      name: 'Attend next editions?',
-      exact: false,
-    });
+    this.numberOfLeadsInput = page
+      .getByRole('textbox', { name: 'Number of Leads', exact: false })
+      .or(page.getByPlaceholder('e.g. 4'));
+    this.wentWellInput = page
+      .getByRole('textbox', { name: 'What went well?', exact: false })
+      .or(inputAfter('What went well?'));
+    this.couldBeBetterInput = page
+      .getByRole('textbox', { name: 'What could have been better?', exact: false })
+      .or(inputAfter('What could have been better?'));
+    this.attendNextEditionsInput = page
+      .getByRole('textbox', { name: 'Attend next editions?', exact: false })
+      .or(inputAfter('Attend next editions?'));
 
     this.submitButton = page.getByRole('button', { name: 'Submit' });
     this.cancelButton = page.getByRole('button', { name: 'Cancel', exact: true });
@@ -224,6 +242,11 @@ export class ExternalEventsLocators {
     this.saveEventButton = this.confirmDialog.getByRole('button', { name: 'Save event' });
     this.keepEditingButton = this.confirmDialog.getByRole('button', { name: 'Keep editing' });
 
+    // Feedback Form Submit opens a "Thanks for the feedback!" dialog; the
+    // feedback is only saved from there (dev, 2026-10-21).
+    this.saveFeedbackButton = page
+      .getByRole('dialog', { name: 'Thanks for the feedback!' })
+      .getByRole('button', { name: 'Save feedback' });
     this.toast = page.locator('[data-sonner-toast]').first();
   }
 

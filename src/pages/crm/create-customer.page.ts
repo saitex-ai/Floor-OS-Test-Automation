@@ -37,6 +37,12 @@ export interface CustomerProfileDetails {
   linkedIn?: string;
   facebook?: string;
   instagram?: string;
+  /**
+   * Leave the Company combobox untouched instead of fillProfile()'s
+   * default of auto-picking the first option — for users with no
+   * Companies to pick (the CRM Executive test user on dev, 2026-10-21).
+   */
+  skipCompany?: boolean;
 }
 
 export class CreateCustomerPage extends BasePage {
@@ -68,8 +74,9 @@ export class CreateCustomerPage extends BasePage {
     // toggles/clears on a second click rather than re-confirming the same
     // choice, which would otherwise clear a value already selected by an
     // earlier fillProfile() call on the same still-open form.
-    const companyIsEmpty = (await l.companyCombobox.innerText().catch(() => '')).trim() === 'Select';
-    if (companyIsEmpty) {
+    const companyIsEmpty =
+      (await l.companyCombobox.innerText().catch(() => '')).trim() === 'Select';
+    if (companyIsEmpty && !details.skipCompany) {
       await l.companyCombobox.click();
       await this.page.getByRole('option').first().click();
     }
