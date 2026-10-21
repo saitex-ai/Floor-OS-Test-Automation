@@ -76,6 +76,8 @@ export class CustomerCommunicationLocators {
   // record count. See class doc on CustomerCommunicationPage.
   readonly emailsUnavailableAlert: Locator;
   readonly disconnectOutlookButton: Locator;
+  readonly connectOutlookButton: Locator;
+  readonly connectOutlookPrompt: Locator;
   readonly emailsEmptyText: Locator;
 
   constructor(private readonly page: Page) {
@@ -121,6 +123,10 @@ export class CustomerCommunicationLocators {
       hasText: 'Outlook is not set up on this environment, so emails cannot be shown.',
     });
     this.disconnectOutlookButton = page.getByRole('button', { name: 'Disconnect Outlook' });
+    this.connectOutlookButton = page.getByRole('button', { name: 'Connect Outlook' });
+    this.connectOutlookPrompt = page.getByText(
+      'Connect your Outlook mailbox to see the emails you have exchanged with this customer.',
+    );
     this.emailsEmptyText = page.getByText('No unread emails involving this customer.');
   }
 

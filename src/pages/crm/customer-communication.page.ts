@@ -191,13 +191,20 @@ export class CustomerCommunicationPage extends BasePage {
   }
 
   /**
-   * Confirmed live (2026-10-15): Outlook is now connected on dev — the
-   * Emails sub-tab shows a "Disconnect Outlook" button and, for a Customer
-   * with no emails, "No unread emails involving this customer."
+   * Whether Outlook is connected on dev changes between runs (connected
+   * 2026-10-15, disconnected 2026-10-21), so both states are accepted:
+   * - connected: "Disconnect Outlook" plus "No unread emails involving this
+   *   customer." for a Customer with no emails;
+   * - not connected: "Connect Outlook" plus the connect prompt.
    */
   async expectEmailsEmptyState(): Promise<void> {
-    await expect(this.locators.disconnectOutlookButton).toBeVisible();
-    await expect(this.locators.emailsEmptyText).toBeVisible();
+    const l = this.locators;
+    await expect(l.disconnectOutlookButton.or(l.connectOutlookButton)).toBeVisible();
+    if (await l.disconnectOutlookButton.isVisible()) {
+      await expect(l.emailsEmptyText).toBeVisible();
+    } else {
+      await expect(l.connectOutlookPrompt).toBeVisible();
+    }
   }
 
   // -------------------------------------------------------------------

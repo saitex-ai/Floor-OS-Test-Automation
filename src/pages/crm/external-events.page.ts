@@ -1,6 +1,9 @@
 import { type Page, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
-import { ExternalEventsLocators, EXTERNAL_EVENTS_LIST_PATH } from '../../locators/crm/external-events.locators';
+import {
+  ExternalEventsLocators,
+  EXTERNAL_EVENTS_LIST_PATH,
+} from '../../locators/crm/external-events.locators';
 
 /**
  * "Create External Event [created by user manually]" (CRM, Sprint 4 user
@@ -260,13 +263,23 @@ export class ExternalEventsPage extends BasePage {
     await this.locators.feedbackFormTabButton.click();
   }
 
+  /** After Save feedback the tab shows the saved, read-only form with the submitted answers. */
+  async expectFeedbackSaved(answers: string[]): Promise<void> {
+    for (const answer of answers) {
+      await expect(this.page.getByText(answer, { exact: true })).toBeVisible();
+    }
+  }
+
   async openLeadsTab(): Promise<void> {
     await this.locators.leadsTabButton.click();
   }
 
   /** TC:5 — confirms the registration link opens in a new tab, without asserting on that external page's own content. */
   async clickRegisterOnlineAndAwaitNewTab(): Promise<Page | null> {
-    const newPagePromise = this.page.context().waitForEvent('page', { timeout: 10_000 }).catch(() => null);
+    const newPagePromise = this.page
+      .context()
+      .waitForEvent('page', { timeout: 10_000 })
+      .catch(() => null);
     await this.locators.registerOnlineLink.click();
     return newPagePromise;
   }
