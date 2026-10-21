@@ -58,6 +58,9 @@ export class AlertsLocators {
   readonly emailCancelButton: Locator;
   /** Read-only "From" value — a plain `<p>` ("Name <email>"), not an input (confirmed 2026-10-15). */
   readonly emailFromValue: Locator;
+  /** Any text box in the Email dialog — there should be none (From is plain text; To/CC are comboboxes). */
+  readonly emailDialogTextboxes: Locator;
+  readonly emailFromCombobox: Locator;
   /** "Email Body — Alert Details" preview — a whitespace-pre-wrap `<div>` holding exactly the text handed to Outlook as the body. */
   readonly emailBodyPreview: Locator;
   /** The search box at the top of an open To/CC recipient popover (only one popover is ever open). */
@@ -104,6 +107,8 @@ export class AlertsLocators {
     // paragraph in the dialog; the body preview is the only div directly
     // following the "Email Body — Alert Details" label.
     this.emailFromValue = this.emailDialog.getByRole('paragraph').first();
+    this.emailDialogTextboxes = this.emailDialog.getByRole('textbox');
+    this.emailFromCombobox = this.emailDialog.getByRole('combobox', { name: 'From' });
     this.emailBodyPreview = this.emailDialog
       .locator('label', { hasText: 'Email Body — Alert Details' })
       .locator('xpath=following-sibling::div[1]');
@@ -165,6 +170,16 @@ export class AlertsLocators {
     return this.recipientListbox(field).getByRole('option', {
       name: new RegExp(`^${escaped}( |$)`),
     });
+  }
+
+  /** Text inside the Email dialog (e.g. an inline validation error). */
+  emailDialogText(text: string): Locator {
+    return this.emailDialog.getByText(text);
+  }
+
+  /** The open recipient popover's empty state: "No match for “<query>”" (confirmed 2026-10-21). */
+  recipientNoMatch(query: string): Locator {
+    return this.page.getByText(`No match for “${query}”`, { exact: true });
   }
 
   /** A Customer's group in the Customer "To" list, by exact Customer name. */

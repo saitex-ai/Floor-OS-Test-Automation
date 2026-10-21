@@ -185,6 +185,66 @@ export class AlertsPage extends BasePage {
     for (const email of emails) await expect(trigger).toContainText(email);
   }
 
+  /** From shows "Name <email>" as plain text — no text box and no From picker in the dialog. */
+  async expectFromIsReadOnly(): Promise<string> {
+    const from = (await this.locators.emailFromValue.innerText()).trim();
+    expect(from).toMatch(/^.+ <[^\s@<>]+@[^\s@<>]+>$/);
+    await expect(this.locators.emailDialogTextboxes).toHaveCount(0);
+    await expect(this.locators.emailFromCombobox).toHaveCount(0);
+    return from;
+  }
+
+  async expectDialogError(text: string): Promise<void> {
+    await expect(this.locators.emailDialogText(text)).toBeVisible();
+  }
+
+  /** Call only after expectDialogError() has shown the error that IS there. */
+  async expectNoDialogError(text: string): Promise<void> {
+    await expect(this.locators.emailDialogText(text)).toHaveCount(0);
+  }
+
+  /**
+   * Of the given addresses, the ones the open dialog's To/CC list does NOT
+   * offer — for checking seed directory users exist before using them.
+   * Opens the list, searches each address, and closes it again.
+   */
+  async missingRecipients(field: 'To' | 'CC', emails: string[]): Promise<string[]> {
+    await this.openRecipientList(field);
+    const missing: string[] = [];
+    for (const email of emails) {
+      await this.searchRecipients(email);
+      // The search filters an already-loaded list, so it settles at once:
+      // either the option or the "No match" empty state shows.
+      const option = this.locators.recipientOption(field, email);
+      await expect(option.or(this.locators.recipientNoMatch(email)).first()).toBeVisible();
+      if ((await option.count()) === 0) missing.push(email);
+    }
+    await this.searchRecipients('');
+    await this.closeRecipientList();
+    return missing;
+  }
+
+  /** The Customer's group header (its name) is shown in the open To list. */
+  async expectRecipientGroupHeader(customerName: string): Promise<void> {
+    await expect(
+      this.locators.recipientGroup(customerName).getByText(customerName).first(),
+    ).toBeVisible();
+  }
+
+  /**
+   * A Customer with no email (and no Contacts) is listed in the open To
+   * list as its own group with a "No email on file" label and no option to
+   * select. Confirmed on dev 2026-10-21 (`p.crm-menu-group-empty` under the
+   * group header).
+   */
+  async expectCustomerListedWithoutEmail(customerName: string): Promise<void> {
+    const group = this.locators.recipientGroup(customerName);
+    await expect(group).toBeVisible();
+    await expect(group.getByText(customerName, { exact: true })).toBeVisible();
+    await expect(group.getByText('No email on file', { exact: true })).toBeVisible();
+    await expect(group.getByRole('option')).toHaveCount(0);
+  }
+
   /** The option labels (accessible names) under one Customer group of the open To list, in rendered order. */
   async recipientGroupOptionNames(customerName: string): Promise<string[]> {
     const options = this.locators.recipientGroup(customerName).getByRole('option');

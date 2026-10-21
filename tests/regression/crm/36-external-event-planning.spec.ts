@@ -1,6 +1,10 @@
 import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/crm.fixtures';
-import { PLANNING_AI_SECTIONS } from '../../../src/pages/crm/external-events.page';
+import {
+  ExternalEventsPage,
+  PLANNING_AI_SECTIONS,
+} from '../../../src/pages/crm/external-events.page';
+import seed from '../../../src/data/crm/seed-records.data.json';
 
 /**
  * CRM — External Event Planning (Sprint 5).
@@ -17,9 +21,14 @@ import { PLANNING_AI_SECTIONS } from '../../../src/pages/crm/external-events.pag
  *   that offers "To Attend".
  * - AI/seeded events must never have their status changed by this suite.
  *
- * So every To Attend transition TC (TC:11/12/14/19) is `test.fixme()`'d
- * on the transition itself, after running whatever READ-ONLY part can be
- * checked against existing events in the needed state. Everything else
+ * So the To Attend transition TCs that are nothing BUT the transition
+ * (TC:11/14/19) are `test.fixme()`'d; the others run whatever READ-ONLY
+ * part can be checked against existing events in the needed state and
+ * record the transition itself as a "partial" annotation.
+ *
+ * Features not on dev (TC:4 Owner drop-down, TC:5 Sales Potential Report
+ * and Participation Plan) are `test.fail()` known failures asserting the
+ * EXPECTED control, so they flip to "unexpectedly passed" when it ships. Everything else
  * here is read-only (opening events, switching tabs, opening the
  * Register Online link in a new tab), except TC:21, which creates its own
  * manual "Other" event.
@@ -34,6 +43,11 @@ const NO_FRESH_PLANNING_EVENT =
   'dev has no non-elapsed Planning event (Planning tab holds only "Planning · Elapsed" AI events, which offer no To Attend button), ' +
   'and a manually-created event is always born "Other"/Attended — so there is no event this suite owns that can be marked To Attend, ' +
   'and AI/seeded events must not be changed. Re-enable once a Planning event can be created (or seeded per-run) for tests.';
+
+/** Records the part of a TC that can't be exercised, without skipping the checks that did run. */
+function partial(description: string): void {
+  test.info().annotations.push({ type: 'partial', description });
+}
 
 test.describe('CRM - External Event Planning (Sprint 5)', () => {
   test.beforeEach(async () => {
@@ -70,7 +84,7 @@ test.describe('CRM - External Event Planning (Sprint 5)', () => {
       // Planning is the default tab: its AI sections render without
       // clicking anything, and neither Feedback Form nor Leads content is shown.
       await expect(l.sectionHeading('External Event Summary')).toBeVisible();
-      await expect(page.getByText(/^The Feedback Form opens once/)).toHaveCount(0);
+      await externalEventsPage.expectFeedbackFormGateHidden();
     });
   });
 
@@ -101,8 +115,11 @@ test.describe('CRM - External Event Planning (Sprint 5)', () => {
 
     await test.step('BUG: no event ID (e.g. "EV-2026-019") is shown in the header', async () => {
       // ClickUp/prototype expect an event ID next to the title; dev renders
-      // none anywhere on the screen (the only identifier is the UUID in the URL).
-      await expect(l.eventIdText).toHaveCount(0);
+      // none (the only identifier is the UUID in the URL). Asserted
+      // structurally rather than by guessing the ID's format: the header
+      // row holds exactly the title and the status, and the line below
+      // holds only type, date and venue.
+      await externalEventsPage.expectHeaderShowsOnlyTitleAndStatus(row!.title, row!.status);
     });
   });
 
@@ -112,6 +129,7 @@ test.describe('CRM - External Event Planning (Sprint 5)', () => {
     const l = externalEventsPage.locators;
 
     const missing: string[] = [];
+    const verified: string[] = [];
     for (const type of ['Trade Fair', 'Fashion Show', 'Sales Summit', 'Exhibition']) {
       await test.step(`${type}: header and System show the same Event value as the List`, async () => {
         const row = await externalEventsPage.openFirstEventOfType(type);
@@ -121,37 +139,52 @@ test.describe('CRM - External Event Planning (Sprint 5)', () => {
         }
         await expect(l.eventTypeLine).toHaveText(new RegExp(`^Event: External Event · ${type} · `));
         await externalEventsPage.expectSystemField('External Event', type);
+        verified.push(type);
       });
     }
 
-    test.fixme(
-      missing.length > 0,
-      `No "${missing.join('", "')}" event exists on dev (types present: Trade Fair, Exhibition, Fashion Show, Other) — the other types were verified.`,
-    );
+    expect(verified.length, 'expected at least one event type to check').toBeGreaterThan(0);
+    if (missing.length > 0) {
+      partial(
+        `No "${missing.join('", "')}" event exists on this environment, so that type was not checked; verified: ${verified.join(', ')}.`,
+      );
+    }
   });
 
   test('TC:4 Verify Owner Drop-down List', async ({ externalEventsPage }) => {
     await allure.tms('https://app.clickup.com/t/z941abyq7e', 'TC:4 (ClickUp)');
+    // Known failure: the Owner drop-down (FR-03 / AC-03) is not on dev —
+    // the Planning tab and System section have no Owner control (matches
+    // the prototype). No bug ticket yet; tracked on the TC itself. Flips to
+    // "unexpectedly passed" once the control ships.
+    test.fail(
+      true,
+      'Owner drop-down not implemented on dev (https://app.clickup.com/t/z941abyq7e) — confirm scope with the team.',
+    );
     const l = externalEventsPage.locators;
 
-    const row = await externalEventsPage.openFirstAiEventInTab('Planning');
-    expect(row).not.toBeNull();
+    await test.step('Open a Planning event', async () => {
+      const row = await externalEventsPage.openFirstAiEventInTab('Planning');
+      expect(row, 'expected at least one AI event on the Planning tab').not.toBeNull();
+    });
 
-    const ownerCount =
-      await test.step('Look for an Owner drop-down on the Details screen', async () => {
-        return l.ownerControl.count();
-      });
-
-    test.fixme(
-      ownerCount === 0,
-      'Owner drop-down (FR-03 / AC-03) not present on dev — Planning tab and System section have no Owner control (matches the prototype). Confirm scope with the team.',
-    );
+    await test.step('An Owner drop-down is shown on the Details screen', async () => {
+      await expect(l.ownerControl.first()).toBeVisible();
+    });
   });
 
   test('TC:5 Verify AI-Generated Planning Artifacts Are Displayed', async ({
     externalEventsPage,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abyq7f', 'TC:5 (ClickUp)');
+    // Known failure: Sales Potential Report and Participation Plan
+    // (FR-07/FR-08) are not on dev (nor in the prototype). No bug ticket
+    // yet; tracked on the TC itself. The other five sections are asserted
+    // first; the test flips to "unexpectedly passed" once both ship.
+    test.fail(
+      true,
+      'Sales Potential Report and Participation Plan not implemented on dev (https://app.clickup.com/t/z941abyq7f) — confirm scope with the team.',
+    );
     test.slow();
     const l = externalEventsPage.locators;
 
@@ -164,24 +197,13 @@ test.describe('CRM - External Event Planning (Sprint 5)', () => {
       await externalEventsPage.expectSectionsWithContent(PLANNING_AI_SECTIONS);
     });
 
-    const missingCount =
-      await test.step('Look for Sales Potential Report and Participation Plan', async () => {
-        return (
-          (await l.sectionHeading(/Sales Potential Report/i).count()) +
-          (await l.sectionHeading(/Participation Plan/i).count())
-        );
-      });
-
-    test.fixme(
-      missingCount === 0,
-      'Sales Potential Report and Participation Plan (FR-07/FR-08) not present on dev (nor in the prototype) — confirm scope. The other 5 sections were verified.',
-    );
+    await test.step('Sales Potential Report and Participation Plan are shown', async () => {
+      await expect(l.sectionHeading(/Sales Potential Report/i)).toBeVisible();
+      await expect(l.sectionHeading(/Participation Plan/i)).toBeVisible();
+    });
   });
 
-  test('TC:6 Verify AI Artifacts Match the Selected Event', async ({
-    externalEventsPage,
-    page,
-  }) => {
+  test('TC:6 Verify AI Artifacts Match the Selected Event', async ({ externalEventsPage }) => {
     await allure.tms('https://app.clickup.com/t/z941abyq7h', 'TC:6 (ClickUp)');
     const l = externalEventsPage.locators;
 
@@ -206,7 +228,7 @@ test.describe('CRM - External Event Planning (Sprint 5)', () => {
       expect(b!.title).not.toBe(aTitle);
       await expect(l.eventTitleHeading).toHaveText(b!.title);
       await externalEventsPage.expectSystemField('External Event Title', b!.title);
-      await expect(page.locator('main').last()).not.toContainText(aTitle);
+      await externalEventsPage.expectDetailsNotContaining(aTitle);
       const bSummary = await externalEventsPage.sectionText('External Event Summary');
       expect(bSummary).not.toContain(aSummary);
     });
@@ -226,10 +248,7 @@ test.describe('CRM - External Event Planning (Sprint 5)', () => {
     const href = await externalEventsPage.registerOnlineHref();
 
     await test.step('Register Online is shown in the Schedule section with "Online registration exists — <site>"', async () => {
-      const schedule = l.sectionCard('External Event Schedule');
-      await expect(schedule.getByRole('link', { name: 'Register Online' })).toBeVisible();
-      await expect(schedule.locator(l.onlineRegistrationNote)).toBeVisible();
-      const site = (await l.onlineRegistrationNote.innerText()).split('— ')[1]?.trim() ?? '';
+      const site = await externalEventsPage.expectRegisterOnlineInSchedule();
       expect(site.length).toBeGreaterThan(0);
       expect(new URL(href).hostname).toContain(site);
     });
@@ -245,11 +264,10 @@ test.describe('CRM - External Event Planning (Sprint 5)', () => {
 
     await test.step('BUG: no "Redirected to the event\'s online registration page" confirmation is shown', async () => {
       // Expected per ClickUp/prototype: a confirmation toast. Dev shows none
-      // (the link is a plain target=_blank anchor).
-      await page.waitForTimeout(1000);
-      await expect(
-        page.getByText("Redirected to the event's online registration page"),
-      ).toHaveCount(0);
+      // (the link is a plain target=_blank anchor). Checked straight after
+      // the click/new tab above, well inside a toast's on-screen time, and
+      // for ANY toast — not just the expected wording.
+      await externalEventsPage.expectNoToastShown();
     });
   });
 
@@ -295,11 +313,10 @@ test.describe('CRM - External Event Planning (Sprint 5)', () => {
     expect(row, 'expected an AI event with contact details').not.toBeNull();
 
     await test.step("The Contact Details section shows this event's contact information", async () => {
+      await externalEventsPage.expectSectionHasNoPlaceholder(contact);
       const card = l.sectionCard(contact);
-      await expect(card).toBeVisible();
       await expect(card).toContainText('Generated by AI');
       await expect(card).toContainText(/[\w.+-]+@[\w-]+\.[\w.]+/);
-      await expect(card.locator(l.aiPlaceholderText)).toHaveCount(0);
       await expect(l.eventTitleHeading).toHaveText(row!.title);
     });
   });
@@ -321,9 +338,7 @@ test.describe('CRM - External Event Planning (Sprint 5)', () => {
       // AC-08 / Alternate Flow A2 expects the section to be hidden. Dev
       // renders the card with "Unfortunately, no relevant information is
       // available for the External Event's Contact Details online." instead.
-      const card = l.sectionCard(contact);
-      await expect(card).toBeVisible();
-      await expect(card.locator(l.aiPlaceholderText)).toBeVisible();
+      await externalEventsPage.expectSectionPlaceholder(contact);
     });
 
     await test.step('The rest of the screen is unaffected — no broken section', async () => {
@@ -331,10 +346,7 @@ test.describe('CRM - External Event Planning (Sprint 5)', () => {
       await expect(l.sectionHeading('System')).toBeVisible();
     });
 
-    test.info().annotations.push({
-      type: 'partial',
-      description: `"To Attend still works" not exercised: ${NO_FRESH_PLANNING_EVENT}`,
-    });
+    partial(`"To Attend still works" not exercised: ${NO_FRESH_PLANNING_EVENT}`);
   });
 
   test('TC:11 Verify Marking an External Event as To Attend', async () => {
@@ -370,9 +382,8 @@ test.describe('CRM - External Event Planning (Sprint 5)', () => {
       expect(toAttendTitles.length).toBeGreaterThan(0);
     });
 
-    test.fixme(
-      true,
-      `The +1 To Attend / -1 Planning count change cannot be checked: ${NO_FRESH_PLANNING_EVENT}`,
+    partial(
+      `The +1 To Attend / -1 Planning count change is not exercised: ${NO_FRESH_PLANNING_EVENT}`,
     );
   });
 
@@ -405,10 +416,9 @@ test.describe('CRM - External Event Planning (Sprint 5)', () => {
       expect(await externalEventsPage.headerStatus()).toBe('To Attend');
     });
 
-    test.info().annotations.push({
-      type: 'partial',
-      description: `Verified on an existing To Attend event (read-only); marking one, and an explicit logout/login, not exercised: ${NO_FRESH_PLANNING_EVENT}`,
-    });
+    partial(
+      `Verified on an existing To Attend event (read-only); marking one, and an explicit logout/login, not exercised: ${NO_FRESH_PLANNING_EVENT}`,
+    );
   });
 
   test('TC:14 Verify Manager Notification and Audit Trail on To Attend', async () => {
@@ -458,10 +468,7 @@ test.describe('CRM - External Event Planning (Sprint 5)', () => {
       await expect(l.sectionHeading('External Event Summary')).toBeVisible();
     });
 
-    test.info().annotations.push({
-      type: 'partial',
-      description: `"Click To Attend" not exercised: ${NO_FRESH_PLANNING_EVENT}`,
-    });
+    partial(`"Click To Attend" not exercised: ${NO_FRESH_PLANNING_EVENT}`);
   });
 
   test('TC:16 Verify To Attend Is Not Offered for Events Not in Planning', async ({
@@ -531,7 +538,7 @@ test.describe('CRM - External Event Planning (Sprint 5)', () => {
     test.slow();
     const l = externalEventsPage.locators;
     const details = {
-      title: `Regression Planning Other Event ${Date.now()}`,
+      title: `Playwright Regression Planning Other Event ${Date.now()}`,
       venue: 'Regression Planning Venue',
       date: '2026-09-20',
       about: 'A regression "Other" event for the Planning tab check.',
@@ -590,24 +597,41 @@ test.describe('CRM - External Event Planning (Sprint 5) - access', () => {
 
   test('TC:18 Verify Access Is Restricted Without SSO Session or External Events Rights', async ({
     externalEventsPage,
+    browser,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abyq85', 'TC:18 (ClickUp)');
+    // Seeded AI event (src/data/crm/seed-records.data.json), read-only.
+    const event = seed.externalEvents.seededAiEvent;
+
+    await test.step('Precondition: the seed event exists (checked with a signed-in session)', async () => {
+      const context = await browser.newContext({
+        storageState: test.info().project.use.storageState,
+      });
+      try {
+        const title = await new ExternalEventsPage(await context.newPage()).readEventTitleIfExists(
+          event.id,
+        );
+        test.skip(
+          title !== event.title,
+          `Seed event "${event.title}" (${event.id}) ${title === null ? 'no longer exists' : `is now titled "${title}"`} on this environment — ` +
+            'replace externalEvents.seededAiEvent in src/data/crm/seed-records.data.json.',
+        );
+      } finally {
+        await context.close();
+      }
+    });
 
     await test.step('Without a session, a direct Details URL shows the sign-in gate and no event data', async () => {
-      // Seeded AI event "Munich Fabric Start / Bluezone" (read-only).
-      await externalEventsPage.gotoUnauthenticated(
-        '/crm/events/e5100000-0000-4000-8000-000000000001',
-      );
-      await externalEventsPage.expectSignInGateWithoutEventData(/Munich Fabric Start/);
+      await externalEventsPage.gotoUnauthenticated(`/crm/events/${event.id}`);
+      await externalEventsPage.expectSignInGateWithoutEventData(event.title);
     });
 
     await test.step('Signing in goes to the SSO (Keycloak) login form', async () => {
       await externalEventsPage.expectSignInLeadsToSsoLogin();
     });
 
-    test.fixme(
-      true,
-      'The "user without External Events rights" half needs a restricted SSO user (e.g. CRM_EXECUTIVE_USER_DEV), which is not configured in .env.',
+    partial(
+      'The "user without External Events rights" half is not exercised: it needs a restricted SSO user (e.g. CRM_EXECUTIVE_USER_DEV), which is not configured in .env.',
     );
   });
 });

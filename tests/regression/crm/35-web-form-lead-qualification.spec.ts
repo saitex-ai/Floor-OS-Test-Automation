@@ -2,7 +2,12 @@ import * as allure from 'allure-js-commons';
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../../src/fixtures/crm.fixtures';
 import type { CreateCustomerPage } from '../../../src/pages/crm/create-customer.page';
-import { DEV_AI_SECTION_TITLES } from '../../../src/pages/crm/lead-qualification.page';
+import {
+  DEV_AI_SECTION_TITLES,
+  type LeadQualificationData,
+  type LeadQualificationPage,
+} from '../../../src/pages/crm/lead-qualification.page';
+import seed from '../../../src/data/crm/seed-records.data.json';
 
 /**
  * CRM — [Origin Type = Web Form] Lead Qualification (Sprint 5).
@@ -18,15 +23,16 @@ import { DEV_AI_SECTION_TITLES } from '../../../src/pages/crm/lead-qualification
  * ingestion (`createdBy: "web-ingest"`), using the tab's own GET
  * `/lead-qualification` payload (the request the UI makes) as the record
  * of what was submitted. The submission-dependent halves of TC:1/3/6/19/20
- * are separate `test.fixme()`s.
+ * are recorded as a "partial" annotation on the TC's own test.
  *
  * TCs that write (save/edit a review, convert) run on a Web Form Lead this
  * spec creates itself through Create Customer (Origin Type "Web Form",
  * Origin "Contact Us Form"). Such a lead has no form card (no submission)
  * and no AI dossier — dev only has dossiers on leads seeded by
  * `ai-lead-engine` on 2026-09-18 / 2026-10-12. So TC:12's "apply an
- * enhancement" can't be done on a lead we own: fixme'd, with the
- * non-writing part (AI Chatbot + Markup tool reachable) automated.
+ * enhancement" can't be done on a lead we own: recorded as a "partial"
+ * annotation, with the non-writing part (AI Chatbot + Markup tool
+ * reachable) automated.
  *
  * Headline dev findings (details in the .md):
  * - BUG: genuine Web Form submissions get NO AI dossier: the tab shows "No
@@ -42,34 +48,50 @@ import { DEV_AI_SECTION_TITLES } from '../../../src/pages/crm/lead-qualification
  */
 
 /**
- * Existing Web Form Leads on dev, picked by inspection (2026-10-15). All
- * are used READ-ONLY — nothing in this spec writes to them.
+ * Existing Web Form Leads on dev (src/data/crm/seed-records.data.json),
+ * all used READ-ONLY — nothing in this spec writes to them.
  */
-const WEB_FORM_LEADS = {
-  /** "Denim Co304" — Contact Us Form, Lead, ALL fields + message (web-ingest). */
-  allFields: '97ec6287-607e-410e-8e1d-ab3bc72ea675',
-  /** "test9k" — Contact Us Form, Lead, all fields + message; different company/subject (web-ingest). */
-  allFieldsOther: 'f7f16e0b-24dc-4568-a492-311c3a651fc3',
-  /** "woodpickerjeans" — Contact Us Form, Lead, no Phone (web-ingest). */
-  noPhone: '32529a6a-8f3f-44c3-b76b-9f6d2f618218',
-  /** "tech6k" — Sign Up Form, Lead, Email only: no Name/Company/Phone/Subject/Message (web-ingest). */
-  emailOnly: '12df259e-997d-495c-9d74-e657b0efc3d0',
-  /** "Denim Co202" — Lead with TWO stored submissions from the same company (web-ingest). */
-  twoSubmissions: 'd7de92fa-4f5d-4885-9600-b2577d5529a2',
-  /** "picker" — Contact Us Form, already converted to Qualified Lead, 1 review (web-ingest). */
-  convertedWithForm: '714f0cf0-8ded-4939-af97-643497774f0b',
-  /** "Asiam" — Web Form origin, Qualified Lead, seeded AI dossier with enhanced pointers. */
-  convertedWithDossier: '87bf71bf-fea5-41db-9a18-623e2b7a2264',
-  /** "ACME Apparel" — Web Form origin, form card AND seeded dossier AND stored social posts. */
-  formAndDossier: 'd0e2ad9d-9281-4198-ac49-87956b728791',
-  /** "Highland Apparel Partners" — Web Form origin, Lead stage, seeded AI dossier (no form card). */
-  leadWithDossier: '214abd8a-dab1-40bc-b4c8-2232855831cd',
-} as const;
+const WEB_FORM_LEADS = seed.webFormLeads;
+type SeedLeadKey = keyof typeof WEB_FORM_LEADS;
 
 const SUBMISSION_UNAVAILABLE =
-  'Needs a NEW submission of https://unusual-dev-store.myshopify.com/pages/contact — the store is ' +
-  'password-protected and the password is not available to automation. The checkable part runs ' +
-  'against existing Web Form Leads in the sibling test.';
+  'the test web form (https://unusual-dev-store.myshopify.com/pages/contact) is password-protected and ' +
+  'the password is not available to automation, so no new submission can be made.';
+
+/** Records the part of a TC that can't be exercised, without skipping the checks that did run. */
+function partial(description: string): void {
+  test.info().annotations.push({ type: 'partial', description });
+}
+
+/**
+ * Opens a seed Web Form Lead's Lead Qualification tab and returns the
+ * tab's own GET payload — or skips the test, naming the record, when it no
+ * longer exists or (where the data file gives a "stage") has left the
+ * stage this spec relies on.
+ */
+async function openSeedLead(
+  lq: LeadQualificationPage,
+  key: SeedLeadKey,
+): Promise<LeadQualificationData> {
+  const lead = WEB_FORM_LEADS[key];
+  const data = await lq.tryOpenAndReadQualification(lead.id);
+  test.skip(
+    data === null,
+    `Seed Web Form Lead "${lead.name}" (${lead.id}) no longer exists on this environment — ` +
+      'replace webFormLeads.' +
+      key +
+      ' in src/data/crm/seed-records.data.json.',
+  );
+  const expectedStage = (lead as { stage?: string }).stage;
+  test.skip(
+    expectedStage !== undefined && data!.stageLabel !== expectedStage,
+    `Seed Web Form Lead "${lead.name}" (${lead.id}) is now at stage "${data!.stageLabel}", not "${expectedStage}" — ` +
+      'replace webFormLeads.' +
+      key +
+      ' in src/data/crm/seed-records.data.json.',
+  );
+  return data!;
+}
 
 /** Creates a Web Form Lead owned by this spec (no submission, so no form card / AI dossier). */
 async function createOwnWebFormLead(
@@ -89,13 +111,7 @@ async function createOwnWebFormLead(
     buyer: 'Fabric',
     crmStage: 'Lead',
   });
-  await createCustomerPage.save();
-  if (await createCustomerPage.locators.duplicateWarningModal.isVisible().catch(() => false)) {
-    await createCustomerPage.locators.saveAnywayButton.click();
-  }
-  await createCustomerPage.expectSavedSuccessfully();
-  await createCustomerPage.locators.postSaveCancelButton.click();
-  await expect(page).toHaveURL(/\/crm\/customers\/[0-9a-f-]+$/);
+  await createCustomerPage.saveAndOpenDetail();
   return { id: page.url().split('/').pop()!, name };
 }
 
@@ -112,25 +128,24 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
     await allure.tms('https://app.clickup.com/t/z941abytdw', 'TC:1 (ClickUp)');
 
     await test.step('An ingested Web Form Lead has Origin Type Web Form and opens with its form card first', async () => {
-      const data = await lq.openAndReadQualification(WEB_FORM_LEADS.allFields);
+      const data = await openSeedLead(lq, 'allFields');
       expect(data.originTypeLabel).toBe('Web Form');
       expect(data.stageLabel).toBe('Lead');
       await lq.expectFormCardIsFirstCard(lq.latestSubmission(data).originLabel);
     });
 
     await test.step('Where AI sections exist, the form card sits above all of them', async () => {
-      const data = await lq.openAndReadQualification(WEB_FORM_LEADS.formAndDossier);
+      const data = await openSeedLead(lq, 'formAndDossier');
       await lq.expectFormCardIsFirstCard(lq.latestSubmission(data).originLabel);
       const titles = await lq.cardTitlesInOrder();
       for (const section of DEV_AI_SECTION_TITLES) {
         expect(titles.indexOf(section)).toBeGreaterThan(0);
       }
     });
-  });
 
-  test('TC:1 Verify Web Form Lead Opens with the Submitted Form as the First Card (new submission)', async () => {
-    await allure.tms('https://app.clickup.com/t/z941abytdw', 'TC:1 (ClickUp)');
-    test.fixme(true, SUBMISSION_UNAVAILABLE);
+    partial(
+      `Checked on existing ingested Web Form Leads; opening the Lead created by a NEW submission is not exercised: ${SUBMISSION_UNAVAILABLE}`,
+    );
   });
 
   test('TC:2 Verify Form Card Names the Form Type and Is Marked as Origin', async ({
@@ -139,13 +154,13 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
     await allure.tms('https://app.clickup.com/t/z941abytdx', 'TC:2 (ClickUp)');
 
     await test.step('Contact Us Form lead: title "Contact Us Form" + Origin badge', async () => {
-      const data = await lq.openAndReadQualification(WEB_FORM_LEADS.allFields);
+      const data = await openSeedLead(lq, 'allFields');
       expect(data.originLabel).toBe('Contact Us Form');
       await lq.expectFormCardTitleAndOriginBadge('Contact Us Form');
     });
 
     await test.step('Sign Up Form lead: title "Sign Up Form" + Origin badge', async () => {
-      const data = await lq.openAndReadQualification(WEB_FORM_LEADS.emailOnly);
+      const data = await openSeedLead(lq, 'emailOnly');
       expect(data.originLabel).toBe('Sign Up Form');
       await lq.expectFormCardTitleAndOriginBadge('Sign Up Form');
     });
@@ -156,20 +171,19 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abytdy', 'TC:3 (ClickUp)');
 
-    for (const id of [WEB_FORM_LEADS.allFields, WEB_FORM_LEADS.emailOnly]) {
-      await test.step(`Source site and the stored submission date/time are shown (${id})`, async () => {
-        const data = await lq.openAndReadQualification(id);
+    for (const key of ['allFields', 'emailOnly'] as const) {
+      await test.step(`Source site and the stored submission date/time are shown (${WEB_FORM_LEADS[key].name})`, async () => {
+        const data = await openSeedLead(lq, key);
         // Every ingested card on dev reads "Submitted via saitex.com",
         // although the ClickUp test form lives on
         // unusual-dev-store.myshopify.com — see the .md (uncertain).
         await lq.expectFormCardSourceAndSubmittedAt(lq.latestSubmission(data));
       });
     }
-  });
 
-  test('TC:3 Verify Submission Source and Date Are Shown on the Form Card (matches own submission time)', async () => {
-    await allure.tms('https://app.clickup.com/t/z941abytdy', 'TC:3 (ClickUp)');
-    test.fixme(true, SUBMISSION_UNAVAILABLE);
+    partial(
+      `The shown date is checked against the stored submission time; matching it to the time of our own submission is not exercised: ${SUBMISSION_UNAVAILABLE}`,
+    );
   });
 
   test('TC:4 Verify All Submitted Fields Are Shown As Submitted', async ({
@@ -180,7 +194,7 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
     // Partial vs ClickUp: uses an existing all-fields submission instead
     // of submitting "Priya Raman / Universal Standard" (store password).
     await test.step("Name, Company's Name, Email, Phone and Subject each match the stored submission exactly", async () => {
-      const data = await lq.openAndReadQualification(WEB_FORM_LEADS.allFields);
+      const data = await openSeedLead(lq, 'allFields');
       const { formData } = lq.latestSubmission(data);
       for (const key of [
         'sender_name',
@@ -201,7 +215,7 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
     await allure.tms('https://app.clickup.com/t/z941abyte0', 'TC:5 (ClickUp)');
 
     await test.step('Email-only Sign Up submission: only Email is shown', async () => {
-      const data = await lq.openAndReadQualification(WEB_FORM_LEADS.emailOnly);
+      const data = await openSeedLead(lq, 'emailOnly');
       const { formData } = lq.latestSubmission(data);
       expect(Object.keys(formData)).toEqual(['sender_email']);
       await lq.expectFormCardFieldsMatch(formData);
@@ -209,7 +223,7 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
     });
 
     await test.step('Contact Us submission without Phone: no Phone row, no placeholder', async () => {
-      const data = await lq.openAndReadQualification(WEB_FORM_LEADS.noPhone);
+      const data = await openSeedLead(lq, 'noPhone');
       const { formData } = lq.latestSubmission(data);
       expect(formData.sender_phone ?? '').toBe('');
       await lq.expectFormCardFieldsMatch(formData);
@@ -223,18 +237,17 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
     await allure.tms('https://app.clickup.com/t/z941abyte1', 'TC:6 (ClickUp)');
 
     await test.step('Message renders in its own Message block, in full, unclamped', async () => {
-      const data = await lq.openAndReadQualification(WEB_FORM_LEADS.allFields);
+      const data = await openSeedLead(lq, 'allFields');
       const { formData } = lq.latestSubmission(data);
       expect(formData.message).toBeTruthy();
       await lq.expectFullMessageShownSeparately(formData.message!);
     });
-  });
 
-  test('TC:6 Verify the Full Message Is Shown Separately and Not Truncated (long message with special characters)', async () => {
-    await allure.tms('https://app.clickup.com/t/z941abyte1', 'TC:6 (ClickUp)');
-    // No existing dev submission has a long, multi-line message with
-    // &, %, quotes or accents (all 30+ were checked) — needs a new one.
-    test.fixme(true, SUBMISSION_UNAVAILABLE);
+    // No existing dev submission has a long, multi-line message with &, %,
+    // quotes or accents (all 30+ were checked).
+    partial(
+      `A long multi-line message with special characters is not exercised: ${SUBMISSION_UNAVAILABLE}`,
+    );
   });
 
   test('TC:7 Verify Form Card Renders Correctly Without a Message or Phone Number', async ({
@@ -243,7 +256,7 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
     await allure.tms('https://app.clickup.com/t/z941abyte2', 'TC:7 (ClickUp)');
 
     await test.step('Submission with no Message and no Phone: no Message area, no Phone row', async () => {
-      const data = await lq.openAndReadQualification(WEB_FORM_LEADS.emailOnly);
+      const data = await openSeedLead(lq, 'emailOnly');
       const { formData } = lq.latestSubmission(data);
       expect(formData.message ?? '').toBe('');
       expect(formData.sender_phone ?? '').toBe('');
@@ -257,7 +270,7 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
   test('TC:8 Verify Submitted Form Content Is Read-Only', async ({ leadQualificationPage: lq }) => {
     await allure.tms('https://app.clickup.com/t/z941abyte9', 'TC:8 (ClickUp)');
 
-    const data = await lq.openAndReadQualification(WEB_FORM_LEADS.allFields);
+    const data = await openSeedLead(lq, 'allFields');
     const { formData } = lq.latestSubmission(data);
 
     await test.step('No editable control or edit icon on the card; typing into a value changes nothing', async () => {
@@ -279,14 +292,14 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
     await allure.tms('https://app.clickup.com/t/z941abytea', 'TC:9 (ClickUp)');
 
     await test.step('Web Form record with a dossier: Contact Info is the first AI section, right under the form card', async () => {
-      await lq.openAndReadQualification(WEB_FORM_LEADS.formAndDossier);
+      await openSeedLead(lq, 'formAndDossier');
       const titles = await lq.cardTitlesInOrder();
       expect(titles[1]).toBe('Contact Info');
       await lq.expectAiSectionWithContent('Contact Info');
     });
 
     await test.step('Web Form Lead (Lead stage) with a dossier: Contact Info is the first card', async () => {
-      await lq.openAndReadQualification(WEB_FORM_LEADS.leadWithDossier);
+      await openSeedLead(lq, 'leadWithDossier');
       expect((await lq.cardTitlesInOrder())[0]).toBe('Contact Info');
       await lq.expectAiSectionWithContent('Contact Info');
     });
@@ -295,7 +308,7 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
       // Every web-ingest lead on dev has `dossier: null`; only leads seeded
       // by ai-lead-engine (2026-09-18 / 2026-10-12) have AI sections.
       // Logged as https://app.clickup.com/t/z941abywgu. Fails once fixed.
-      const data = await lq.openAndReadQualification(WEB_FORM_LEADS.noPhone);
+      const data = await openSeedLead(lq, 'noPhone');
       expect(data.dossier).toBeNull();
       await lq.expectAiSectionAbsent('Contact Info');
       await lq.expectNoDossierEmptyState();
@@ -308,7 +321,7 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
     await allure.tms('https://app.clickup.com/t/z941abyteb', 'TC:10 (ClickUp)');
 
     await test.step('Dev renders five AI sections, each with content', async () => {
-      await lq.openAndReadQualification(WEB_FORM_LEADS.leadWithDossier);
+      await openSeedLead(lq, 'leadWithDossier');
       for (const title of DEV_AI_SECTION_TITLES) await lq.expectAiSectionWithContent(title);
     });
 
@@ -322,7 +335,7 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
     await test.step('BUG: AI sections are not generated from a genuine form submission', async () => {
       // "Content reflects the submitted form" can't hold: no dossier is
       // generated for form submissions (see TC:9, z941abywgu).
-      const data = await lq.openAndReadQualification(WEB_FORM_LEADS.allFields);
+      const data = await openSeedLead(lq, 'allFields');
       expect(data.dossier).toBeNull();
       for (const title of DEV_AI_SECTION_TITLES) await lq.expectAiSectionAbsent(title);
       await lq.expectNoDossierEmptyState();
@@ -335,14 +348,22 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
     await allure.tms('https://app.clickup.com/t/z941abytec', 'TC:11 (ClickUp)');
 
     await test.step('Ingested Web Form Lead: only the form card is the origin, no social sections', async () => {
-      const data = await lq.openAndReadQualification(WEB_FORM_LEADS.allFields);
+      const data = await openSeedLead(lq, 'allFields');
       await lq.expectFormCardIsFirstCard(data.originLabel);
       await lq.expectNoSocialOriginContent(data);
     });
 
     await test.step('Web Form record that ALSO has stored social posts: none of them render', async () => {
-      const data = await lq.openAndReadQualification(WEB_FORM_LEADS.formAndDossier);
-      expect(data.socialInteractions.length).toBeGreaterThan(0);
+      const data = await openSeedLead(lq, 'formAndDossier');
+      if (data.socialInteractions.length === 0) {
+        // Seed drift, not a UI result: record it rather than skip the
+        // ingested-lead check above, which did run.
+        partial(
+          `Not checked: seed lead "${WEB_FORM_LEADS.formAndDossier.name}" (${WEB_FORM_LEADS.formAndDossier.id}) no longer ` +
+            'has stored social posts — replace webFormLeads.formAndDossier in src/data/crm/seed-records.data.json.',
+        );
+        return;
+      }
       await lq.expectFormCardIsFirstCard(lq.latestSubmission(data).originLabel);
       await lq.expectNoSocialOriginContent(data);
     });
@@ -354,25 +375,21 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
     await allure.tms('https://app.clickup.com/t/z941abyted', 'TC:12 (ClickUp)');
 
     await test.step('AI Chatbot opens on a Web Form Lead and the Markup tool can be switched on (nothing sent)', async () => {
-      await lq.openAndReadQualification(WEB_FORM_LEADS.leadWithDossier);
+      await openSeedLead(lq, 'leadWithDossier');
       await lq.openAiChatbot();
       await lq.turnOnMarkupTool();
       await lq.expectAiChatbotAcceptsInput();
     });
 
     await test.step('How an enhanced pointer is marked (existing enhanced record, read-only)', async () => {
-      await lq.openAndReadQualification(WEB_FORM_LEADS.convertedWithDossier);
+      await openSeedLead(lq, 'convertedWithDossier');
       await lq.expectEnhancedPointersMarked();
     });
-  });
 
-  test('TC:12 Verify an AI Pointer Can Be Refined with the AI Chatbot Markup Tool (apply + persist)', async () => {
-    await allure.tms('https://app.clickup.com/t/z941abyted', 'TC:12 (ClickUp)');
-    test.fixme(
-      true,
-      'Applying an enhancement writes to the AI dossier. Only pre-existing seeded leads have a dossier ' +
-        '(leads this suite can create get none — "AI lead engine ... integration is pending"), and ' +
-        "this suite doesn't modify data it didn't create.",
+    partial(
+      'Applying an enhancement and checking it persists is not exercised: it writes to the AI dossier. Only pre-existing ' +
+        'seeded leads have a dossier (leads this suite can create get none — "AI lead engine ... integration is pending"), ' +
+        "and this suite doesn't modify data it didn't create.",
     );
   });
 
@@ -543,7 +560,7 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
     await allure.tms('https://app.clickup.com/t/z941abytep', 'TC:18 (ClickUp)');
 
     await test.step('Converted ingested Web Form record: form card and reviews still readable', async () => {
-      const data = await lq.openAndReadQualification(WEB_FORM_LEADS.convertedWithForm);
+      const data = await openSeedLead(lq, 'convertedWithForm');
       expect(data.stageLabel).not.toBe('Lead');
       const submission = lq.latestSubmission(data);
       await lq.expectFormCardIsFirstCard(submission.originLabel);
@@ -556,7 +573,7 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
     });
 
     await test.step('Converted record with an AI dossier: AI sections still readable, inputs still absent', async () => {
-      const data = await lq.openAndReadQualification(WEB_FORM_LEADS.convertedWithDossier);
+      const data = await openSeedLead(lq, 'convertedWithDossier');
       expect(data.stageLabel).not.toBe('Lead');
       for (const title of DEV_AI_SECTION_TITLES) await lq.expectAiSectionWithContent(title);
       await lq.expectQualificationInputsUnavailable();
@@ -566,7 +583,7 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
       // Confirmed with the team (2026-10-16): AI enhancement is still needed
       // for a Qualified Lead, so the chatbot, Markup tool and Revert buttons
       // stay. Nothing is sent or reverted here.
-      await expect(lq.locators.revertWordingButtons.first()).toBeEnabled();
+      await lq.expectRevertWordingAvailable();
       await lq.openAiChatbot();
       await lq.expectAiChatbotReadOnlyNotice();
       await lq.turnOnMarkupTool();
@@ -575,22 +592,20 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
   });
 
   test('TC:19 Verify the Acknowledgement Email Is Sent and Traceable from the Lead', async ({
+    leadQualificationPage: lq,
     customerCommunicationPage,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abyteq', 'TC:19 (ClickUp)');
 
     await test.step("BUG: an ingested Web Form Lead's Communication > Emails holds no acknowledgement email", async () => {
-      await customerCommunicationPage.openFromCustomerDetail(WEB_FORM_LEADS.noPhone);
+      await openSeedLead(lq, 'noPhone');
+      await customerCommunicationPage.openFromCustomerDetail(WEB_FORM_LEADS.noPhone.id);
       await customerCommunicationPage.selectSubTab('emails');
       await customerCommunicationPage.expectEmailsEmptyState();
     });
-  });
 
-  test('TC:19 Verify the Acknowledgement Email Is Sent and Traceable from the Lead (inbox)', async () => {
-    await allure.tms('https://app.clickup.com/t/z941abyteq', 'TC:19 (ClickUp)');
-    test.fixme(
-      true,
-      `${SUBMISSION_UNAVAILABLE} It also needs access to the submitter's mailbox, which automation doesn't have.`,
+    partial(
+      `Receipt in the submitter's inbox is not exercised: ${SUBMISSION_UNAVAILABLE} It also needs the submitter's mailbox, which automation doesn't have.`,
     );
   });
 
@@ -600,7 +615,7 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
     await allure.tms('https://app.clickup.com/t/z941abyter', 'TC:20 (ClickUp)');
 
     const a = await test.step('Lead A shows only its own submission', async () => {
-      const data = await lq.openAndReadQualification(WEB_FORM_LEADS.allFields);
+      const data = await openSeedLead(lq, 'allFields');
       const submission = lq.latestSubmission(data);
       await lq.expectFormCardFieldsMatch(submission.formData);
       await lq.expectFullMessageShownSeparately(submission.formData.message!);
@@ -609,28 +624,26 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
     });
 
     await test.step('Lead B shows only its own submission, nothing from Lead A', async () => {
-      const data = await lq.openAndReadQualification(WEB_FORM_LEADS.allFieldsOther);
+      const data = await openSeedLead(lq, 'allFieldsOther');
       const submission = lq.latestSubmission(data);
       expect(submission.formData.company_name).not.toBe(a.formData.company_name);
       await lq.expectFormCardFieldsMatch(submission.formData);
       await lq.expectFullMessageShownSeparately(submission.formData.message!);
       await lq.expectFormCardSourceAndSubmittedAt(submission);
-      await expect(lq.locators.formCard).not.toContainText(a.formData.company_name!);
-      await expect(lq.locators.formCard).not.toContainText(a.formData.sender_email!);
+      await lq.expectFormCardNotContaining([a.formData.company_name!, a.formData.sender_email!]);
     });
 
     await test.step('Observed: repeat submissions from the same company land on ONE lead, which shows only the latest card', async () => {
-      const data = await lq.openAndReadQualification(WEB_FORM_LEADS.twoSubmissions);
+      const data = await openSeedLead(lq, 'twoSubmissions');
       expect(data.webFormSubmissions.length).toBeGreaterThan(1);
       const latest = lq.latestSubmission(data);
       await lq.expectFormCardIsFirstCard(latest.originLabel);
       await lq.expectFormCardFieldsMatch(latest.formData);
       await lq.expectFormCardSourceAndSubmittedAt(latest);
     });
-  });
 
-  test('TC:20 Verify Each Web Form Submission Creates Its Own Lead with Its Own Form Card (two new submissions)', async () => {
-    await allure.tms('https://app.clickup.com/t/z941abyter', 'TC:20 (ClickUp)');
-    test.fixme(true, SUBMISSION_UNAVAILABLE);
+    partial(
+      `Checked on existing ingested Leads; two new back-to-back submissions are not exercised: ${SUBMISSION_UNAVAILABLE}`,
+    );
   });
 });

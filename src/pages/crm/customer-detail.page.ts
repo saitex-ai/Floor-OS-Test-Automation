@@ -228,10 +228,11 @@ export class CustomerDetailPage extends BasePage {
 
   /**
    * Opens Customer Management's section editor, deselects `remove`,
-   * selects `add` (via the "Search companies…" box), and saves the
-   * section. Confirmed directly (2026-10-15, dev): clicking an already
-   * selected option deselects it; saving shows a "Customer Management
-   * updated" toast.
+   * selects `add` (via the "Search companies…" box) and closes the
+   * dropdown. Does NOT save — the section is left in edit mode so the
+   * chips can be checked first; call saveManagementSection() to save.
+   * Confirmed directly (2026-10-15, dev): clicking an already selected
+   * option deselects it; saving shows a "Customer Management updated" toast.
    */
   async editCompanies(changes: { remove: string[]; add: string[] }): Promise<void> {
     const l = this.locators;

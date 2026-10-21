@@ -4,6 +4,7 @@ import { test, expect } from '../../../src/fixtures/crm.fixtures';
 import type { CreateCustomerPage } from '../../../src/pages/crm/create-customer.page';
 import type { CreateContactPage } from '../../../src/pages/crm/create-contact.page';
 import type { AlertsPage } from '../../../src/pages/crm/alerts.page';
+import seed from '../../../src/data/crm/seed-records.data.json';
 
 /**
  * CRM — Email an Alert (Sprint 5): "Email Alert Internally" and "Email
@@ -28,8 +29,6 @@ import type { AlertsPage } from '../../../src/pages/crm/alerts.page';
  * Real dev findings (asserted as "BUG:" steps):
  * - TC:4: the Customer popup's empty-To error reads "Select a Customer
  *   email ID", not "Select at least one email address".
- * - TC:6: an active Customer with no email (and no Contacts) isn't listed
- *   at all — no "No email on file" (disabled) entry.
  * - TC:7: a deactivated Customer (and its Contact) is still offered in To.
  */
 test.describe('CRM - Email an Alert', () => {
@@ -39,9 +38,13 @@ test.describe('CRM - Email an Alert', () => {
     await allure.owner('CRM QA');
   });
 
-  /** Internal directory users confirmed on dev (CRM manager + CRM executive test accounts). */
-  const INTERNAL_MANAGER = 'crmmanager@flooros.dev';
-  const INTERNAL_EXECUTIVE = 'crmexecutive@flooros.dev';
+  /**
+   * Internal directory users (CRM manager + CRM executive test accounts),
+   * from src/data/crm/seed-records.data.json. Each test checks the open
+   * dialog offers the ones it uses and skips, naming them, if not.
+   */
+  const INTERNAL_MANAGER = seed.internalUsers.crmManager;
+  const INTERNAL_EXECUTIVE = seed.internalUsers.crmExecutive;
 
   const BODY_FIELDS_COMMON = [
     'ALERT:',
@@ -52,6 +55,20 @@ test.describe('CRM - Email an Alert', () => {
     'Regulations:',
     'Official Source:',
   ];
+
+  /** Skips the test when the open Email dialog's To/CC list lacks any of the seed directory users. */
+  async function requireDirectoryUsers(
+    alertsPage: AlertsPage,
+    field: 'To' | 'CC',
+    emails: string[],
+  ): Promise<void> {
+    const missing = await alertsPage.missingRecipients(field, emails);
+    test.skip(
+      missing.length > 0,
+      `Internal directory user(s) ${missing.join(', ')} not offered in ${field} on this environment — ` +
+        'update internalUsers in src/data/crm/seed-records.data.json.',
+    );
+  }
 
   /** Creates an Active Customer via the UI (email optional) and returns its id. */
   async function createCustomer(
@@ -72,13 +89,7 @@ test.describe('CRM - Email an Alert', () => {
       referredBy: 'Jordan Smith',
       crmStage: 'Lead',
     });
-    await createCustomerPage.save();
-    if (await createCustomerPage.locators.duplicateWarningModal.isVisible().catch(() => false)) {
-      await createCustomerPage.locators.saveAnywayButton.click();
-    }
-    await createCustomerPage.expectSavedSuccessfully();
-    await createCustomerPage.locators.postSaveCancelButton.click();
-    await expect(page).toHaveURL(/\/crm\/customers\/[0-9a-f-]+$/);
+    await createCustomerPage.saveAndOpenDetail();
     return page.url().split('/').pop()!;
   }
 
@@ -128,18 +139,14 @@ test.describe('CRM - Email an Alert', () => {
     });
 
     await test.step("From shows the logged-in user's name and email, read-only", async () => {
-      const from = (await alertsPage.locators.emailFromValue.innerText()).trim();
-      expect(from).toMatch(/^.+ <[^\s@<>]+@[^\s@<>]+>$/);
-      const userName = from.replace(/ <.*$/, '');
-      expect(userMenuText).toContain(userName);
       // Plain text, not a form control — nothing to type into.
-      await expect(alertsPage.locators.emailDialog.getByRole('textbox')).toHaveCount(0);
-      await expect(
-        alertsPage.locators.emailDialog.getByRole('combobox', { name: 'From' }),
-      ).toHaveCount(0);
+      const from = await alertsPage.expectFromIsReadOnly();
+      expect(userMenuText).toContain(from.replace(/ <.*$/, ''));
       // Internal popup has no Cc.
       await expect(alertsPage.locators.customerCcCombobox).toHaveCount(0);
     });
+
+    await requireDirectoryUsers(alertsPage, 'To', [INTERNAL_MANAGER, INTERNAL_EXECUTIVE]);
 
     await test.step('Select two internal user email IDs in To', async () => {
       await alertsPage.selectRecipients('To', [INTERNAL_MANAGER, INTERNAL_EXECUTIVE]);
@@ -186,9 +193,7 @@ test.describe('CRM - Email an Alert', () => {
     });
 
     await test.step('Inline "Select at least one user email ID" error; popup stays open', async () => {
-      await expect(
-        alertsPage.locators.emailDialog.getByText('Select at least one user email ID'),
-      ).toBeVisible();
+      await alertsPage.expectDialogError('Select at least one user email ID');
       await expect(alertsPage.locators.emailDialog).toBeVisible();
       await expect(alertsPage.locators.redirectedToOutlookToast).toBeHidden();
     });
@@ -233,6 +238,8 @@ test.describe('CRM - Email an Alert', () => {
       await alertsPage.openEmailToCustomerDialog();
       await alertsPage.waitForRecipientsLoaded();
     });
+
+    await requireDirectoryUsers(alertsPage, 'CC', [INTERNAL_MANAGER]);
 
     await test.step('Select the Customer and Contact emails in To and a CRM Manager in Cc', async () => {
       await alertsPage.selectRecipients('To', [customerEmail, contactEmail]);
@@ -282,12 +289,8 @@ test.describe('CRM - Email an Alert', () => {
     // "Select a Customer email ID" instead. Asserting the real text so the
     // block itself stays covered — flip once the copy is fixed.
     await test.step('BUG: inline error reads "Select a Customer email ID", not "Select at least one email address"', async () => {
-      await expect(
-        alertsPage.locators.emailDialog.getByText('Select a Customer email ID'),
-      ).toBeVisible();
-      await expect(
-        alertsPage.locators.emailDialog.getByText('Select at least one email address'),
-      ).toHaveCount(0);
+      await alertsPage.expectDialogError('Select a Customer email ID');
+      await alertsPage.expectNoDialogError('Select at least one email address');
     });
 
     await alertsPage.closeEmailDialog();
@@ -335,9 +338,7 @@ test.describe('CRM - Email an Alert', () => {
     });
 
     await test.step("The Customer is a group header with its own email first, then its Contacts' name and email", async () => {
-      await expect(
-        alertsPage.locators.recipientGroup(customerName).getByText(customerName).first(),
-      ).toBeVisible();
+      await alertsPage.expectRecipientGroupHeader(customerName);
       await expect
         .poll(() => alertsPage.recipientGroupOptionNames(customerName))
         .toEqual([`${customerEmail} ${customerName}`, `${contactEmail} ${contactName}`]);
@@ -369,18 +370,11 @@ test.describe('CRM - Email an Alert', () => {
       await alertsPage.searchRecipients(customerName);
     });
 
-    // BUG (confirmed on dev 2026-10-15): expected the Customer to be listed
-    // with a disabled "No email on file" label. Instead it is left out of
-    // the To list entirely (searching its exact name returns nothing, and
-    // "No email on file" never appears) — so the user can't tell the
-    // Customer exists but lacks an email. Not selectable either way.
-    await test.step('BUG: the Customer is omitted from To instead of shown as "No email on file" (disabled)', async () => {
-      const listbox = alertsPage.locators.recipientListbox('To');
-      await expect(listbox).toBeVisible();
-      // Give the filter time to settle before asserting absence.
-      await expect(listbox.getByRole('option')).toHaveCount(0, { timeout: 10_000 });
-      await expect(alertsPage.locators.recipientGroup(customerName)).toHaveCount(0);
-      await expect(page.getByText('No email on file')).toHaveCount(0);
+    // Was asserted as a BUG on 2026-10-15 (the Customer was left out of To
+    // entirely). Re-checked on dev 2026-10-21: it is now listed as
+    // expected, so the expected behaviour is asserted.
+    await test.step('The Customer is listed with a "No email on file" label and nothing to select', async () => {
+      await alertsPage.expectCustomerListedWithoutEmail(customerName);
     });
 
     await alertsPage.closeRecipientList();
@@ -429,7 +423,7 @@ test.describe('CRM - Email an Alert', () => {
     });
 
     await test.step('Set the Customer to Inactive', async () => {
-      await customerDetailPage.goto(`/crm/customers/${customerId}`);
+      await customerDetailPage.gotoAuthenticated(`/crm/customers/${customerId}`);
       await customerDetailPage.deactivate(
         ['Business misalignment'],
         'Playwright: Email an Alert TC:7',
@@ -522,6 +516,7 @@ test.describe('CRM - Email an Alert', () => {
     await test.step('Email Alert to Customer: select To and Cc, then Cancel — closes, no Outlook tab, no confirmation', async () => {
       await alertsPage.openEmailToCustomerDialog();
       await alertsPage.waitForRecipientsLoaded();
+      await requireDirectoryUsers(alertsPage, 'CC', [INTERNAL_MANAGER]);
       await alertsPage.selectRecipients('To', [customerEmail]);
       await alertsPage.selectRecipients('CC', [INTERNAL_MANAGER]);
       await alertsPage.expectNoNewTabDuring(() => alertsPage.closeEmailDialog());

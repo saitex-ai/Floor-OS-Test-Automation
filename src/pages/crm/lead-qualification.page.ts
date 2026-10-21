@@ -243,6 +243,44 @@ export class LeadQualificationPage extends BasePage {
     return data;
   }
 
+  /**
+   * Same as openAndReadQualification(), but for a pre-existing (seed)
+   * record that may have been removed: returns `null` when the Customer's
+   * own GET answers non-2xx. Confirmed on dev (2026-10-21): an unknown id
+   * gets a 404 and the screen stays on "Loading customer…" (no tab to click).
+   */
+  async tryOpenAndReadQualification(customerId: string): Promise<LeadQualificationData | null> {
+    const customer = this.page.waitForResponse(
+      (r) => r.request().method() === 'GET' && r.url().endsWith(`/api/crm/customers/${customerId}`),
+      { timeout: 60_000 },
+    );
+    const qualification = this.page.waitForResponse(
+      (r) =>
+        r.request().method() === 'GET' &&
+        r.url().endsWith(`/customers/${customerId}/lead-qualification`) &&
+        r.ok(),
+      { timeout: 60_000 },
+    );
+    // Only awaited when the record exists — keep a rejected wait from going unhandled.
+    qualification.catch(() => undefined);
+    await this.gotoAuthenticated(CUSTOMER_DETAIL_PATH(customerId));
+    if (!(await customer).ok()) return null;
+    await this.locators.tabButton.click();
+    const data = (await (await qualification).json()) as LeadQualificationData;
+    await expect(this.locators.cardHeadings.first()).toBeVisible();
+    return data;
+  }
+
+  /** Revert buttons on enhanced AI pointers are present and enabled (nothing is clicked). */
+  async expectRevertWordingAvailable(): Promise<void> {
+    await expect(this.locators.revertWordingButtons.first()).toBeEnabled();
+  }
+
+  /** The form card shows none of the given values (e.g. another Lead's company/email). */
+  async expectFormCardNotContaining(values: string[]): Promise<void> {
+    for (const value of values) await expect(this.locators.formCard).not.toContainText(value);
+  }
+
   /** Reload the page and return to the Lead Qualification tab. */
   async reloadOnTab(): Promise<void> {
     await this.page.reload();

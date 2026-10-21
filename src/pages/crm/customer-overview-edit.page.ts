@@ -132,8 +132,9 @@ export class CustomerOverviewEditPage extends BasePage {
     await expect(row).toHaveText(before, { useInnerText: true });
   }
 
-  /** Not present on dev as of 2026-10-15 — see TC:4 in 30-customer-overview-edit.spec.ts. */
+  /** Not present on dev as of 2026-10-15 — see TC:4 (known failure) in 30-customer-overview-edit.spec.ts. */
   async openAuditHistoryTab(): Promise<void> {
+    await expect(this.locators.detailTab(/Audit History/i)).toBeVisible();
     await this.locators.detailTab(/Audit History/i).click();
   }
 

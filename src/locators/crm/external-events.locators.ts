@@ -189,13 +189,20 @@ export class ExternalEventsLocators {
   // (EV-YYYY-NNN), Owner control, Sales Potential Report or Participation
   // Plan is rendered on dev.
   readonly eventTitleHeading: Locator;
+  /** The header row holding the <h1> title and its status <span> — nothing else (confirmed 2026-10-21). */
+  readonly eventHeaderTitleRow: Locator;
   readonly eventHeaderStatus: Locator;
+  /** The Details screen's own content area (the inner `main`). */
+  readonly detailsContent: Locator;
+  readonly feedbackFormLockedNote: Locator;
+  /** sonner's toast region — always mounted (empty) in the app shell, confirmed 2026-10-21. */
+  readonly toastRegion: Locator;
+  readonly toasts: Locator;
   readonly eventTypeLine: Locator;
   readonly elapsedBanner: Locator;
   readonly onlineRegistrationNote: Locator;
   readonly notAttendingNote: Locator;
   readonly aiPlaceholderText: Locator;
-  readonly eventIdText: Locator;
   readonly ownerControl: Locator;
   readonly backToEventsLink: Locator;
   readonly eventNotFoundMessage: Locator;
@@ -320,7 +327,13 @@ export class ExternalEventsLocators {
     this.toast = page.locator('[data-sonner-toast]').first();
 
     this.eventTitleHeading = page.getByRole('heading', { level: 1 });
+    this.eventHeaderTitleRow = this.eventTitleHeading.locator('xpath=..');
     this.eventHeaderStatus = this.eventTitleHeading.locator('xpath=following-sibling::span[1]');
+    this.detailsContent = page.locator('main').last();
+    this.feedbackFormLockedNote = page.getByText(/^The Feedback Form opens once/);
+    // The shell and the CRM remote each mount one (two on the page).
+    this.toastRegion = page.locator('section[aria-label^="Notifications"]').first();
+    this.toasts = page.locator('[data-sonner-toast]');
     this.eventTypeLine = page.getByText(/^Event: External Event · /);
     this.elapsedBanner = page.getByText(
       'The schedule of this External Event has elapsed — it is marked as Elapsed.',
@@ -330,7 +343,6 @@ export class ExternalEventsLocators {
     this.aiPlaceholderText = page.getByText(
       /^Unfortunately, no relevant information is available for the .+ online\.$/,
     );
-    this.eventIdText = page.locator('main').getByText(/\bEV-\d{4}-\d{3}\b/);
     this.ownerControl = page
       .getByRole('combobox', { name: /owner/i })
       .or(page.getByRole('button', { name: /^owner/i }))

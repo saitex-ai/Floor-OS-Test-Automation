@@ -77,6 +77,8 @@ test.describe('CRM - Build External Events List with Web Crawling', () => {
 
     await test.step(`Search "${keyword}" — the list narrows to matching events only`, async () => {
       await externalEventsPage.search(keyword);
+      // 15 s: the search is debounced and then refetched server-side; dev
+      // has taken several seconds to answer under load.
       await expect
         .poll(() => externalEventsPage.readPaginationTotal(), { timeout: 15_000 })
         .toBeLessThan(unfilteredTotal);
@@ -91,6 +93,7 @@ test.describe('CRM - Build External Events List with Web Crawling', () => {
       await externalEventsPage.expectPaginationTotal(unfilteredTotal);
       const type = (await externalEventsPage.readColumnValues('Type'))[0] ?? '';
       await externalEventsPage.search(type);
+      // 15 s: debounced server-side refetch, as above.
       await expect
         .poll(() => externalEventsPage.readPaginationTotal(), { timeout: 15_000 })
         .toBeLessThan(unfilteredTotal);
@@ -334,6 +337,8 @@ test.describe('CRM - Build External Events List with Web Crawling', () => {
       // Real copy is "No events found" + "Try removing a filter or
       // clearing them all." — generic rather than search-specific like
       // the ClickUp example, but a clear, friendly empty state.
+      // 15 s: the empty state only renders once the debounced server-side
+      // search returns, which dev has taken several seconds to do.
       await expect(l.emptyStateMessage).toBeVisible({ timeout: 15_000 });
       await expect(l.emptyStateMessage).toHaveText('No events found');
       await expect(l.emptyStateHint).toBeVisible();

@@ -17,7 +17,7 @@
 | TC:3 | Successful redirection for Customer Email Alert (with optional Cc)                        | 24, 27, 45, 46, 53, 54         | [link](https://app.clickup.com/t/z941abyjc0) | ✅           | ✅ passing                              |
 | TC:4 | Redirection blocked when no customer recipient is selected                                | 29                             | [link](https://app.clickup.com/t/z941abyjc1) | ✅           | 🐞 passing, asserts BUG (wrong message) |
 | TC:5 | Customers and their Contacts are grouped and formatted in the dropdown                    | 22                             | [link](https://app.clickup.com/t/z941abyjc2) | ✅           | ✅ passing                              |
-| TC:6 | Display for active Customers lacking an email address                                     | 31                             | [link](https://app.clickup.com/t/z941abyjc3) | ✅           | 🐞 passing, asserts BUG (not listed)    |
+| TC:6 | Display for active Customers lacking an email address                                     | 31                             | [link](https://app.clickup.com/t/z941abyjc3) | ✅           | ✅ passing (fixed on dev by 2026-10-21) |
 | TC:7 | Inactive Customers and inactive Contacts are excluded                                     | 32, 33, 37                     | [link](https://app.clickup.com/t/z941abyjc4) | ✅ (partial) | 🐞 passing, asserts BUG (still listed)  |
 | TC:8 | An email shared across records appears only once                                          | 36                             | [link](https://app.clickup.com/t/z941abyjc5) | ✅           | ✅ passing                              |
 | TC:9 | Closing or cancelling the popup aborts without side effects                               | 56, 57, 58, 59                 | [link](https://app.clickup.com/t/z941abyjc6) | ✅           | ✅ passing                              |
@@ -25,7 +25,7 @@
 ## Bugs found on dev (2026-10-15)
 
 1. **TC:4: wrong validation message on the Customer popup.** Open an Alert, click Email Alert to Customer, leave To empty and click Redirect to Outlook. The redirect is correctly blocked, but the message reads "Select a Customer email ID". Expected: "Select at least one email address" (the wording Key Meeting Notes' "Notify the Customer" uses).
-2. **TC:6: a Customer with no email is left out.** Create an active Customer with no email and no Contacts, open Email Alert to Customer and search the To list for it. Nothing is returned and "No email on file" never appears. Expected: the Customer is listed with "No email on file" and can't be selected.
+2. **TC:6: a Customer with no email is left out.** Create an active Customer with no email and no Contacts, open Email Alert to Customer and search the To list for it. Nothing is returned and "No email on file" never appears. Expected: the Customer is listed with "No email on file" and can't be selected. **Fixed on dev by 2026-10-21:** the Customer is now listed with "No email on file" and no option, and TC:6 asserts that.
 3. **TC:7: inactive Customers are still offered.** Create a Customer with a Contact, deactivate the Customer (its status reads Inactive), reload the Alert and open Email Alert to Customer. The Customer's own email and its Contact are still listed and can be selected. Expected: neither is listed.
 
 ## Notes

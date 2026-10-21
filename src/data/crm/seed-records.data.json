@@ -1,0 +1,63 @@
+{
+  "description": "Existing dev records the CRM Sprint 5 specs read but never create or modify (picked by inspection on dev, 2026-10-15). Specs check each record still exists and skip with a reason when it doesn't; \"stage\" is given only where a spec relies on it (the spec skips when the record has moved on). If a record is converted/deleted on dev, replace it here with an equivalent one.",
+  "webFormLeads": {
+    "allFields": {
+      "id": "97ec6287-607e-410e-8e1d-ab3bc72ea675",
+      "name": "Denim Co304",
+      "stage": "Lead",
+      "note": "Contact Us Form, ALL fields + message (web-ingest)."
+    },
+    "allFieldsOther": {
+      "id": "f7f16e0b-24dc-4568-a492-311c3a651fc3",
+      "name": "test9k",
+      "note": "Contact Us Form, all fields + message; different company/subject (web-ingest)."
+    },
+    "noPhone": {
+      "id": "32529a6a-8f3f-44c3-b76b-9f6d2f618218",
+      "name": "woodpickerjeans",
+      "note": "Contact Us Form, no Phone (web-ingest)."
+    },
+    "emailOnly": {
+      "id": "12df259e-997d-495c-9d74-e657b0efc3d0",
+      "name": "tech6k",
+      "note": "Sign Up Form, Email only: no Name/Company/Phone/Subject/Message (web-ingest)."
+    },
+    "twoSubmissions": {
+      "id": "d7de92fa-4f5d-4885-9600-b2577d5529a2",
+      "name": "Denim Co202",
+      "note": "TWO stored submissions from the same company (web-ingest)."
+    },
+    "convertedWithForm": {
+      "id": "714f0cf0-8ded-4939-af97-643497774f0b",
+      "name": "picker",
+      "note": "Contact Us Form, already converted to Qualified Lead, 1 review (web-ingest)."
+    },
+    "convertedWithDossier": {
+      "id": "87bf71bf-fea5-41db-9a18-623e2b7a2264",
+      "name": "Asiam",
+      "note": "Web Form origin, Qualified Lead, seeded AI dossier with enhanced pointers."
+    },
+    "formAndDossier": {
+      "id": "d0e2ad9d-9281-4198-ac49-87956b728791",
+      "name": "ACME Apparel",
+      "note": "Web Form origin, form card AND seeded dossier AND stored social posts."
+    },
+    "leadWithDossier": {
+      "id": "214abd8a-dab1-40bc-b4c8-2232855831cd",
+      "name": "Highland Apparel Partners",
+      "stage": "Lead",
+      "note": "Web Form origin, Lead stage, seeded AI dossier (no form card)."
+    }
+  },
+  "externalEvents": {
+    "seededAiEvent": {
+      "id": "e5100000-0000-4000-8000-000000000001",
+      "title": "Munich Fabric Start / Bluezone",
+      "note": "Seeded AI event, used read-only for the unauthenticated-access check."
+    }
+  },
+  "internalUsers": {
+    "crmManager": "crmmanager@flooros.dev",
+    "crmExecutive": "crmexecutive@flooros.dev"
+  }
+}
