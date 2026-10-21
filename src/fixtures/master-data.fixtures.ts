@@ -24,6 +24,17 @@ import { CurrencyRateBuyerPage } from '../pages/master-data/currency-rate-buyer.
 import { CustomerPercentagePage } from '../pages/master-data/customer-percentage.page';
 import { TechpackTypePage } from '../pages/master-data/techpack-type.page';
 import { SampleRequestCreationPage } from '../pages/master-data/sample-request-creation.page';
+import { UomConversionPage } from '../pages/master-data/uom-conversion.page';
+import { InventoryItemHistoryPage } from '../pages/master-data/inventory-item-history.page';
+import { AttributeMasterPage } from '../pages/master-data/attribute-master.page';
+import { AttributeValueMasterPage } from '../pages/master-data/attribute-value-master.page';
+import { ProductServiceMasterPage } from '../pages/master-data/product-service-master.page';
+import { ProductServiceValueMasterPage } from '../pages/master-data/product-service-value-master.page';
+import { ItemClassMasterPage } from '../pages/master-data/item-class-master.page';
+import { ItemMasterPage } from '../pages/master-data/item-master.page';
+import { PriceLibraryPage } from '../pages/master-data/price-library.page';
+import { AdditionalMasterPage } from '../pages/master-data/additional-master.page';
+import { ItemUnitPricePage } from '../pages/master-data/item-unit-price.page';
 
 interface MasterDataFixtures {
   masterDataPage: MasterDataPage;
@@ -51,6 +62,17 @@ interface MasterDataFixtures {
   customerPercentagePage: CustomerPercentagePage;
   techpackTypePage: TechpackTypePage;
   sampleRequestCreationPage: SampleRequestCreationPage;
+  uomConversionPage: UomConversionPage;
+  inventoryItemHistoryPage: InventoryItemHistoryPage;
+  attributeMasterPage: AttributeMasterPage;
+  attributeValueMasterPage: AttributeValueMasterPage;
+  productServiceMasterPage: ProductServiceMasterPage;
+  productServiceValueMasterPage: ProductServiceValueMasterPage;
+  itemClassMasterPage: ItemClassMasterPage;
+  itemMasterPage: ItemMasterPage;
+  priceLibraryPage: PriceLibraryPage;
+  additionalMasterPage: AdditionalMasterPage;
+  itemUnitPricePage: ItemUnitPricePage;
 }
 
 /**
@@ -157,6 +179,50 @@ export const test = base.extend<MasterDataFixtures>({
 
   sampleRequestCreationPage: async ({ page }, use) => {
     await use(new SampleRequestCreationPage(page));
+  },
+
+  uomConversionPage: async ({ page }, use) => {
+    await use(new UomConversionPage(page));
+  },
+
+  inventoryItemHistoryPage: async ({ page }, use) => {
+    await use(new InventoryItemHistoryPage(page));
+  },
+
+  attributeMasterPage: async ({ page }, use) => {
+    await use(new AttributeMasterPage(page));
+  },
+
+  attributeValueMasterPage: async ({ page }, use) => {
+    await use(new AttributeValueMasterPage(page));
+  },
+
+  productServiceMasterPage: async ({ page }, use) => {
+    await use(new ProductServiceMasterPage(page));
+  },
+
+  productServiceValueMasterPage: async ({ page }, use) => {
+    await use(new ProductServiceValueMasterPage(page));
+  },
+
+  itemClassMasterPage: async ({ page }, use) => {
+    await use(new ItemClassMasterPage(page));
+  },
+
+  itemMasterPage: async ({ page }, use) => {
+    await use(new ItemMasterPage(page));
+  },
+
+  priceLibraryPage: async ({ page }, use) => {
+    await use(new PriceLibraryPage(page));
+  },
+
+  additionalMasterPage: async ({ page }, use) => {
+    await use(new AdditionalMasterPage(page));
+  },
+
+  itemUnitPricePage: async ({ page }, use) => {
+    await use(new ItemUnitPricePage(page));
   },
 });
 
