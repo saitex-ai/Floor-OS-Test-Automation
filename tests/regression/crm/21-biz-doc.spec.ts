@@ -18,6 +18,7 @@ import { moduleCredentials } from '../../../src/config/env';
 async function createRealCustomer(
   createCustomerPage: CreateCustomerPage,
   page: Page,
+  { skipCompany = false } = {},
 ): Promise<string> {
   const stamp = Date.now();
   await createCustomerPage.openFromCrmHome();
@@ -31,6 +32,7 @@ async function createRealCustomer(
     buyer: 'Fabric',
     referredBy: 'Jordan Smith',
     crmStage: 'Lead',
+    skipCompany,
   });
   await createCustomerPage.save();
   if (await createCustomerPage.locators.duplicateWarningModal.isVisible().catch(() => false)) {
@@ -94,11 +96,7 @@ test.describe('CRM - Biz Doc', () => {
     });
   });
 
-  test('TC:2 Each icon loads its data table', async ({
-    bizDocPage,
-    createCustomerPage,
-    page,
-  }) => {
+  test('TC:2 Each icon loads its data table', async ({ bizDocPage, createCustomerPage, page }) => {
     await allure.tms('https://app.clickup.com/t/z941abt9cm', 'TC:2 (ClickUp)');
 
     const customerId = await createRealCustomer(createCustomerPage, page);
@@ -198,7 +196,10 @@ test.describe('CRM - Biz Doc', () => {
       // screen at all, isolating the Biz Docs check below to the
       // permission this test is actually about.
       const executiveCreateCustomerPage = new CreateCustomerPage(executivePage);
-      const customerId = await createRealCustomer(executiveCreateCustomerPage, executivePage);
+      // The Executive test user has no Companies to pick on dev.
+      const customerId = await createRealCustomer(executiveCreateCustomerPage, executivePage, {
+        skipCompany: true,
+      });
 
       const executiveBizDocPage = new BizDocPage(executivePage);
       await executiveBizDocPage.openFromCustomerDetailsWithoutTab(customerId);
