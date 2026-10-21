@@ -174,7 +174,10 @@ test.describe('CRM - Build External Events List with Web Crawling', () => {
     // click shows no visible change. "Event" (title) demonstrates the
     // asc -> desc toggle unambiguously.
     const column = 'Event';
-    const collator = new Intl.Collator('en', { sensitivity: 'base' });
+    // Dev's sort ignores case, accents, spaces and punctuation (confirmed
+    // 2026-10-21: "Denimsandjeans Vietnam" sorts before "Denim Show"), so
+    // the order check compares the same way.
+    const collator = new Intl.Collator('en', { sensitivity: 'base', ignorePunctuation: true });
     const isSorted = (values: string[], dir: 1 | -1): boolean =>
       values.slice(1).every((v, i) => dir * collator.compare(values[i] ?? '', v) <= 0);
 
