@@ -65,6 +65,11 @@ const CONTACT_NAMES = [
 
 const pick = <T>(items: readonly T[]): T => items[Math.floor(Math.random() * items.length)]!;
 
+/** A realistic, test-tagged company name, e.g. "Playwright Halvorsen Oakley Denim Works". */
+export function uniqueCompanyName(): string {
+  return `Playwright ${pick(SURNAMES)} ${pick(SURNAMES)} ${pick(TRADES)}`;
+}
+
 export interface BusinessCard {
   filePath: string;
   companyName: string | null;
@@ -87,10 +92,7 @@ export async function renderBusinessCard(
 ): Promise<BusinessCard> {
   const id = Math.random().toString(36).slice(2, 10);
   const contactName = pick(CONTACT_NAMES);
-  const companyName =
-    options.companyName === undefined
-      ? `Playwright ${pick(SURNAMES)} ${pick(SURNAMES)} ${pick(TRADES)}`
-      : options.companyName;
+  const companyName = options.companyName === undefined ? uniqueCompanyName() : options.companyName;
   const contactEmail =
     options.contactEmail === undefined
       ? `${contactName.split(' ')[0]!.toLowerCase()}.${id}@cardscan.example`

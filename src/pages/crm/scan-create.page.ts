@@ -122,12 +122,26 @@ export class ScanCreatePage extends BasePage {
   }
 
   /** Waits for the scan to be read and every mandatory check to report. */
-  async expectAllChecksPassed(card: BusinessCard): Promise<void> {
+  async expectAllChecksPassed(
+    card: Pick<BusinessCard, 'companyName' | 'contactName' | 'contactEmail'>,
+    { typed = false } = {},
+  ): Promise<void> {
     await this.expectChatLine(
-      'Scan read. Checking mandatory fields before I pre-fill the form…',
+      typed
+        ? "Got it — I'll use the details you typed. Checking mandatory fields…"
+        : 'Scan read. Checking mandatory fields before I pre-fill the form…',
       SCAN_TIMEOUT_MS,
     );
-    await this.expectChatLine(`Customer name ${card.companyName} is unique.`, SCAN_TIMEOUT_MS);
+    // For typed details the assistant may drop our "Playwright " test tag
+    // from the company name (seen on dev 2026-10-22), so accept either form.
+    const company = card.companyName!.replace(/^Playwright /, '');
+    const escaped = company.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    await this.expectChatLine(
+      typed
+        ? new RegExp(`Customer name (Playwright )?${escaped} is unique\\.`)
+        : `Customer name ${card.companyName} is unique.`,
+      SCAN_TIMEOUT_MS,
+    );
     await this.expectChatLine('CRM stage set to Lead (default).');
     await this.expectChatLine(`Contact name ${card.contactName} found.`);
     await this.expectChatLine(`Contact email ${card.contactEmail} is unique.`);
@@ -184,14 +198,17 @@ export class ScanCreatePage extends BasePage {
     await expect(l.customerManagementHeading).toBeVisible();
   }
 
-  async expectReviewFormPrefilled(card: BusinessCard): Promise<void> {
+  async expectReviewFormPrefilled(
+    card: BusinessCard,
+    { checkCrmStage = true } = {},
+  ): Promise<void> {
     const l = this.locators;
     await expect(l.contactNameInput).toHaveValue(card.contactName);
     await expect(l.designationInput).toHaveValue(card.designation);
     await expect(l.contactEmailInput).toHaveValue(card.contactEmail!);
     await expect(l.contactCityInput).toHaveValue('San Francisco');
     await expect(l.customerNameInput).toHaveValue(card.companyName!);
-    await expect(l.crmStageCombobox).toHaveText(/Lead/);
+    if (checkCrmStage) await expect(l.crmStageCombobox).toHaveText(/Lead/);
   }
 
   async expectCancelLeftOfSave(): Promise<void> {

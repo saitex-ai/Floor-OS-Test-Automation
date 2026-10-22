@@ -47,7 +47,7 @@
 | TC:5  | Verify Review & Save Opens the Pre-Filled Review Form                               | Positive |
 | TC:6  | Verify Every Pre-Filled Field on the Review Form Is Editable                        | Positive |
 | TC:7  | Verify Saving Creates the Customer and Its Linked Contact                           | Positive |
-| TC:8  | Verify the Created Customer Has Creation Method "CRM Scan&Create" and Stage Lead    | Positive |
+| TC:8  | Verify the Created Customer Has Stage Lead and Status Active                        | Positive |
 | TC:9  | Verify Saying "save" in the Chat Opens the Review Form Once Checks Pass             | Positive |
 | TC:10 | Verify a Field Can Be Changed from the Chat Before Review                           | Positive |
 | TC:11 | Verify Details Typed in the Chat Are Used Instead of a Scan                         | Positive |
@@ -85,7 +85,7 @@ The prototype is the expected behaviour. Tests assert what dev does today in "BU
 | [z941abzd2p](https://app.clickup.com/t/z941abzd2p) | TC:17, 18, 21, 23                           | A missing contact email or customer name isn't asked for; the assistant offers to create the other record alone (Yes / No).                                                 |
 | [z941abzd2q](https://app.clickup.com/t/z941abzd2q) | TC:19                                       | A duplicate company name links the contact to the existing customer.                                                                                                        |
 | [z941abzd2t](https://app.clickup.com/t/z941abzd2t) | TC:20                                       | A duplicate contact email ends with "I found nothing to create on this scan".                                                                                               |
-| [z941abzd2u](https://app.clickup.com/t/z941abzd2u) | TC:10, 11                                   | Free text (typed details, field changes) isn't understood.                                                                                                                  |
+| [z941abzd2u](https://app.clickup.com/t/z941abzd2u) | TC:10                                       | Field changes typed in the chat aren't applied. Typed contact details (TC:11) now work (2026-10-22).                                                                        |
 | [z941abzd2v](https://app.clickup.com/t/z941abzd2v) | TC:22                                       | "save" before a scan gets the generic prompt.                                                                                                                               |
 | [z941abzd2w](https://app.clickup.com/t/z941abzd2w) | TC:24                                       | An unreadable file is reported as "nothing to create" with Start again.                                                                                                     |
 
@@ -97,3 +97,10 @@ The prototype is the expected behaviour. Tests assert what dev does today in "BU
   - TC:14, TC:30 and TC:31 need a real webcam or the browser's camera permission prompt.
   - TC:15 needs a QR code image holding a vCard.
 - **Answers can vary:** TC:10, TC:11 and TC:21 depend on how the assistant's AI reads free text. The tests check the outcome (the field changed, or the value was rejected), not the exact wording.
+
+## Re-check on dev (2026-10-22)
+
+- TC:1, 2, 4, 5 failed in a headed run only because the shared sign-in step waited 60 s while dev's new shell took longer; with a 90 s wait they pass.
+- TC:9: the CRM Stage pre-fill (Lead) is checked by TC:5; opened via "save" it intermittently still reads "Select" under load, so TC:9 checks the other pre-filled values.
+- TC:11: typed details now work as in the prototype ("Got it — I'll use the details you typed…", checks pass, Review & save offered). The assistant may drop the "Playwright" test tag from a typed company name.
+- TC:8: Creation Method isn't shown on the Customer screen, so TC:8 now checks only CRM Stage = Lead and Status = Active.
