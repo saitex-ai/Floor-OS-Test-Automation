@@ -13,6 +13,8 @@ const DUMMY_PDF = {
   buffer: Buffer.from('%PDF-1.4\n%%EOF'),
 };
 
+const SMOKE_DESCRIPTION = 'QA-AUTO smoke test data (safe to delete)';
+
 test.describe('Techpack module', () => {
   test.beforeEach(async () => {
     await allure.epic('Techpack');
@@ -32,6 +34,8 @@ test.describe('Techpack module', () => {
     test.setTimeout(120000);
     await createTechpackPage.openFromTechpacksList();
     await createTechpackPage.fillAllRequiredWithRandomAvailable();
+    // Marks the record as test data so it can be found and deleted later.
+    await createTechpackPage.fillDetails({ description: SMOKE_DESCRIPTION });
     await createTechpackPage.uploadTechpackFile(DUMMY_PDF);
 
     // Customer+Season+Style+Fabric+Wash is a real uniqueness key server-side

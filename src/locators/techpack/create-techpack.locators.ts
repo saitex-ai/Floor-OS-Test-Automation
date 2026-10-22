@@ -22,7 +22,11 @@ import { type Locator, type Page } from '@playwright/test';
  *   </div>
  */
 export class CreateTechpackLocators {
+  /** The module landing's <h1>, "Dashboard" as of the 2026-10-22 design-system release. */
+  readonly landingHeading: Locator;
   readonly heading: Locator;
+  /** Every open listbox, including one still fading out after a pick. */
+  readonly listboxes: Locator;
   readonly closeButton: Locator;
 
   readonly identificationSection: Locator;
@@ -91,7 +95,9 @@ export class CreateTechpackLocators {
   readonly noTechpackTypesMatchText: Locator;
 
   constructor(private readonly page: Page) {
+    this.landingHeading = page.getByRole('heading', { name: 'Dashboard', level: 1 });
     this.heading = page.getByRole('heading', { name: 'New Techpack', level: 1 });
+    this.listboxes = page.getByRole('listbox');
     this.closeButton = page.getByRole('button', { name: 'Close' });
 
     this.identificationSection = page.getByRole('heading', { name: 'Identification' });
