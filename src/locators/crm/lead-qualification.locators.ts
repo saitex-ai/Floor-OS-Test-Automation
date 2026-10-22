@@ -81,6 +81,34 @@ export class LeadQualificationLocators {
   readonly noDossierHeading: Locator;
   readonly noDossierParagraph: Locator;
 
+  // --- [Origin Type = Web Form] Lead Qualification (Sprint 5) ---------
+  // Confirmed against dev (2026-10-15) — see the WEB FORM block comment in
+  // the constructor below.
+  readonly tabRoot: Locator;
+  readonly cardHeadings: Locator;
+  readonly formCard: Locator;
+  readonly formCardTitle: Locator;
+  readonly formCardSourceLine: Locator;
+  readonly formCardOriginBadge: Locator;
+  readonly formCardFieldLabels: Locator;
+  readonly formCardLockIcons: Locator;
+  readonly formCardEditableControls: Locator;
+  readonly formCardMessageArea: Locator;
+  readonly formCardMessageText: Locator;
+  readonly reviewSavedConfirmation: Locator;
+  readonly reviewUpdatedConfirmation: Locator;
+  readonly editReviewRequiredError: Locator;
+  readonly reviewSavedTimestamps: Locator;
+  readonly assistantButton: Locator;
+  readonly aiChatbotTitle: Locator;
+  readonly markupToolButton: Locator;
+  readonly markupOnHint: Locator;
+  readonly aiChatbotPrompt: Locator;
+  readonly aiChatbotReadOnlyNotice: Locator;
+  readonly enhancedPointerMarkers: Locator;
+  readonly revertWordingButtons: Locator;
+  readonly customersSearchBox: Locator;
+
   constructor(private readonly page: Page) {
     this.tabButton = page.getByRole('button', { name: 'Lead Qualification', exact: true });
 
@@ -112,7 +140,91 @@ export class LeadQualificationLocators {
     );
 
     this.noDossierHeading = page.getByRole('heading', { name: 'No dossier for this account yet' });
-    this.noDossierParagraph = page.getByText('Nothing has analysed this account.');
+    // Dev (2026-10-21) reworded this to "Nothing has analysed this account
+    // yet. …" (Web Form Leads also get a "Get Dossier" button); the
+    // optional "yet" keeps the older wording matching too.
+    this.noDossierParagraph = page.getByText(/^Nothing has analysed this account( yet)?\./);
+
+    // WEB FORM (Sprint 5, confirmed on dev 2026-10-15):
+    // - Every card on the tab (form card, AI sections, the Lead
+    //   Qualification review card) is an <h2>-headed block under
+    //   `#lead-qualification-tab-root`.
+    // - A Web Form Lead's submission renders as a <section> whose <h2> is
+    //   the form type ("Contact Us Form" / "Sign Up Form"), a sub-line
+    //   "Submitted via <site> · <M/D/YYYY, h:mm:ss AM>", an "Origin" pill,
+    //   one row per NON-blank field (label div styled `uppercase`, DOM text
+    //   "Name" / "Company's name" / "Email" / "Phone" / "Subject", value,
+    //   and a lock icon titled "System field"), then a separate grey
+    //   "Message" block (`whitespace-pre-wrap`, no clamp) when a message
+    //   was submitted. No inputs, textareas, contenteditable or buttons.
+    this.tabRoot = page.locator('#lead-qualification-tab-root');
+    this.cardHeadings = this.tabRoot.getByRole('heading', { level: 2 });
+    this.formCard = this.tabRoot
+      .locator('section')
+      .filter({ has: page.getByText(/^Submitted via /) });
+    this.formCardTitle = this.formCard.getByRole('heading', { level: 2 });
+    this.formCardSourceLine = this.formCard.getByText(/^Submitted via /);
+    this.formCardOriginBadge = this.formCard.getByText('Origin', { exact: true });
+    this.formCardFieldLabels = this.formCard.locator('div.uppercase');
+    this.formCardLockIcons = this.formCard.locator('[title="System field"]');
+    this.formCardEditableControls = this.formCard.locator(
+      'input, textarea, select, button, [contenteditable="true"], [role="textbox"]',
+    );
+    this.formCardMessageArea = this.formCard
+      .locator('div.bg-muted')
+      .filter({ has: page.locator('span', { hasText: /^Message$/ }) });
+    this.formCardMessageText = this.formCardMessageArea.locator('div.whitespace-pre-wrap');
+
+    // The ClickUp confirmations ("Manager's review and score saved",
+    // "Review updated") — confirmed NOT shown on dev (no toast/status text
+    // at all after Save or after an inline edit's Save).
+    this.reviewSavedConfirmation = page.getByText("Manager's review and score saved");
+    this.reviewUpdatedConfirmation = page.getByText('Review updated', { exact: true });
+    // Inline edit with the review text cleared — dev's real wording
+    // (ClickUp expects "Review is required").
+    this.editReviewRequiredError = page.getByText('A review and a score are both required');
+    this.reviewSavedTimestamps = this.tabRoot.getByText(/^Saved \d{1,2}\/\d{1,2}\/\d{4}, /);
+
+    // AI Chatbot: the shell's floating "Assistant" button opens a panel
+    // titled "AI Chatbot" with a "Markup tool" toggle and a prompt box.
+    this.assistantButton = page.getByRole('button', { name: 'Assistant', exact: true });
+    this.aiChatbotTitle = page.getByText('AI Chatbot', { exact: true });
+    this.markupToolButton = page.getByRole('button', { name: 'Markup tool' });
+    this.markupOnHint = page.getByText('Markup on — choose the line you want to talk about.');
+    this.aiChatbotPrompt = page.getByPlaceholder(/Prompt the AI Chatbot/);
+    // Past the Lead stage: "<name> is no longer a lead, so its Lead
+    // Qualification is read-only. …"
+    this.aiChatbotReadOnlyNotice = page.getByText(
+      /is no longer a lead, so its Lead Qualification is read-only/,
+    );
+    // Enhanced pointers render prefixed "✦ Enhanced" plus a per-pointer
+    // "Revert to the previous wording" button.
+    this.enhancedPointerMarkers = this.tabRoot.getByText(/^✦ Enhanced/);
+    this.revertWordingButtons = page.getByRole('button', {
+      name: 'Revert to the previous wording',
+    });
+
+    // Customers list (/crm/customers) search box.
+    this.customersSearchBox = page.getByRole('textbox', { name: 'Search', exact: true });
+  }
+
+  /** A form-card field's value, located from its label's DOM text (e.g. "Company's name"). */
+  formCardFieldValue(label: string): Locator {
+    return this.formCardFieldLabels
+      .filter({ hasText: new RegExp(`^${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`) })
+      .locator('xpath=following-sibling::div[1]/div[1]');
+  }
+
+  /** An AI section card on the tab, by its <h2> title (e.g. "Contact Info"). */
+  aiSection(title: string): Locator {
+    return this.tabRoot
+      .locator('section')
+      .filter({ has: this.page.getByRole('heading', { level: 2, name: title, exact: true }) });
+  }
+
+  /** A row in the Customers list, matched by Customer Name. */
+  customerRow(name: string): Locator {
+    return this.page.getByRole('row').filter({ hasText: name });
   }
 
   scoreRadio(value: number): Locator {

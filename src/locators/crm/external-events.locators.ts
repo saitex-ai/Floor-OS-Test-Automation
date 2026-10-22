@@ -3,6 +3,9 @@ import { type Locator, type Page } from '@playwright/test';
 /** External Events list, under the CRM module (confirmed against the running app). */
 export const EXTERNAL_EVENTS_LIST_PATH = '/crm/events';
 
+/** Escapes a literal string for use inside a RegExp (event titles can contain "|", "." etc.). */
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /**
  * Raw element locators for "Create External Event" (CRM, Sprint 4 user
  * story) — no actions or assertions here, see
@@ -118,6 +121,23 @@ export class ExternalEventsLocators {
   readonly aiRelevanceColumnHeader: Locator;
   readonly emptyStateMessage: Locator;
 
+  // List screen (Sprint 5 — "Build External Events List with Web Crawling")
+  readonly filtersButton: Locator;
+  readonly filterTypeButton: Locator;
+  readonly filterTypeListbox: Locator;
+  readonly filterApplyButton: Locator;
+  readonly clearAllFiltersButton: Locator;
+  readonly noSplitButton: Locator;
+  readonly verticalSplitButton: Locator;
+  readonly horizontalSplitButton: Locator;
+  readonly splitPreviewHeading: Locator;
+  readonly paginationSummary: Locator;
+  readonly columnHeaders: Locator;
+  readonly dataRows: Locator;
+  readonly emptyStateHint: Locator;
+  readonly resetColumnsButton: Locator;
+  readonly closeColumnsDialogButton: Locator;
+
   // Details/workspace (Sprint 3) — shared with the create flow's own read-back
   readonly toAttendButton: Locator;
   readonly notAttendingButton: Locator;
@@ -162,6 +182,35 @@ export class ExternalEventsLocators {
   readonly saveFeedbackButton: Locator;
   readonly toast: Locator;
 
+  // Details/workspace — Planning tab (Sprint 5 "External Event Planning"),
+  // confirmed against dev 2026-10-15. Header = <h1> title + a sibling
+  // status <span> + an "Event: External Event · <type> · <date> · <venue>"
+  // line; every Planning section is an <h2> card. No event ID
+  // (EV-YYYY-NNN), Owner control, Sales Potential Report or Participation
+  // Plan is rendered on dev.
+  readonly eventTitleHeading: Locator;
+  /** The header row holding the <h1> title and its status <span> — nothing else (confirmed 2026-10-21). */
+  readonly eventHeaderTitleRow: Locator;
+  readonly eventHeaderStatus: Locator;
+  /** The Details screen's own content area (the inner `main`). */
+  readonly detailsContent: Locator;
+  readonly feedbackFormLockedNote: Locator;
+  /** sonner's toast region — always mounted (empty) in the app shell, confirmed 2026-10-21. */
+  readonly toastRegion: Locator;
+  readonly toasts: Locator;
+  readonly eventTypeLine: Locator;
+  readonly elapsedBanner: Locator;
+  readonly onlineRegistrationNote: Locator;
+  readonly notAttendingNote: Locator;
+  readonly aiPlaceholderText: Locator;
+  readonly ownerControl: Locator;
+  readonly backToEventsLink: Locator;
+  readonly eventNotFoundMessage: Locator;
+  readonly eventLoadErrorMessage: Locator;
+  readonly rowsPerPageCombobox: Locator;
+  readonly signInButton: Locator;
+  readonly ssoPasswordInput: Locator;
+
   constructor(private readonly page: Page) {
     this.createEventButton = page.getByRole('button', { name: 'Create Event' });
 
@@ -173,6 +222,34 @@ export class ExternalEventsLocators {
     this.applyColumnsButton = this.columnsDialog.getByRole('button', { name: 'Apply' });
     this.aiRelevanceColumnHeader = page.getByRole('button', { name: 'AI Relevance', exact: true });
     this.emptyStateMessage = page.getByText(/no (matching )?(events|records)/i);
+
+    // Sprint 5 additions, confirmed against dev (2026-10-15).
+    // The Filters toggle's accessible name gains an "(N applied)" suffix
+    // once a filter is applied — e.g. "Filters (1 applied)".
+    this.filtersButton = page.getByRole('button', { name: /^Filters( \(\d+ applied\))?$/ });
+    // Both the Filters panel's Type dropdown AND the table's Type column
+    // sort button are named "Type" — only the dropdown carries
+    // aria-expanded, which is what disambiguates them.
+    this.filterTypeButton = page
+      .getByRole('button', { name: 'Type', exact: true })
+      .and(page.locator('[aria-expanded]'));
+    this.filterTypeListbox = page.getByRole('listbox', { name: 'Type' });
+    this.filterApplyButton = page.getByRole('button', { name: 'Apply', exact: true });
+    this.clearAllFiltersButton = page.getByRole('button', { name: 'Clear all', exact: true });
+    this.noSplitButton = page.getByRole('button', { name: 'No split' });
+    this.verticalSplitButton = page.getByRole('button', { name: 'Vertical split' });
+    this.horizontalSplitButton = page.getByRole('button', { name: 'Horizontal split' });
+    // The split layouts' preview pane titles the selected event as an h3.
+    this.splitPreviewHeading = page.getByRole('heading', { level: 3 });
+    this.paginationSummary = page.getByText(/^Showing \d+ to \d+ of \d+/);
+    this.columnHeaders = page.getByRole('columnheader');
+    this.dataRows = page.getByRole('row').filter({ hasNot: page.getByRole('columnheader') });
+    this.emptyStateHint = page.getByText('Try removing a filter or clearing them all.');
+    this.resetColumnsButton = this.columnsDialog.getByRole('button', { name: 'Reset to default' });
+    this.closeColumnsDialogButton = this.columnsDialog.getByRole('button', {
+      name: 'Close',
+      exact: true,
+    });
 
     this.toAttendButton = page.getByRole('button', { name: 'To Attend', exact: true });
     this.notAttendingButton = page.getByRole('button', { name: 'Not Attending', exact: true });
@@ -248,6 +325,34 @@ export class ExternalEventsLocators {
       .getByRole('dialog', { name: 'Thanks for the feedback!' })
       .getByRole('button', { name: 'Save feedback' });
     this.toast = page.locator('[data-sonner-toast]').first();
+
+    this.eventTitleHeading = page.getByRole('heading', { level: 1 });
+    this.eventHeaderTitleRow = this.eventTitleHeading.locator('xpath=..');
+    this.eventHeaderStatus = this.eventTitleHeading.locator('xpath=following-sibling::span[1]');
+    this.detailsContent = page.locator('main').last();
+    this.feedbackFormLockedNote = page.getByText(/^The Feedback Form opens once/);
+    // The shell and the CRM remote each mount one (two on the page).
+    this.toastRegion = page.locator('section[aria-label^="Notifications"]').first();
+    this.toasts = page.locator('[data-sonner-toast]');
+    this.eventTypeLine = page.getByText(/^Event: External Event · /);
+    this.elapsedBanner = page.getByText(
+      'The schedule of this External Event has elapsed — it is marked as Elapsed.',
+    );
+    this.onlineRegistrationNote = page.getByText(/^Online registration exists — /);
+    this.notAttendingNote = page.getByText(/^Not Attending — /);
+    this.aiPlaceholderText = page.getByText(
+      /^Unfortunately, no relevant information is available for the .+ online\.$/,
+    );
+    this.ownerControl = page
+      .getByRole('combobox', { name: /owner/i })
+      .or(page.getByRole('button', { name: /^owner/i }))
+      .or(page.getByLabel(/^owner$/i));
+    this.backToEventsLink = page.getByRole('link', { name: 'Back to external events' });
+    this.eventNotFoundMessage = page.getByText('Event not found.', { exact: true });
+    this.eventLoadErrorMessage = page.getByText(/^Couldn't load this event\./);
+    this.rowsPerPageCombobox = page.getByRole('combobox', { name: 'Rows per page' });
+    this.signInButton = page.getByRole('button', { name: 'Sign in' });
+    this.ssoPasswordInput = page.locator('input[type="password"]');
   }
 
   scoreRadio(value: number): Locator {
@@ -281,5 +386,79 @@ export class ExternalEventsLocators {
   /** Every one of this form's inline "Required" errors — one per blank mandatory field. */
   requiredFieldErrors(): Locator {
     return this.page.getByText('Required', { exact: true });
+  }
+
+  /** An option in the Filters panel's Type dropdown (e.g. "Trade Fair"). */
+  filterTypeOption(type: string): Locator {
+    return this.filterTypeListbox.getByRole('option', { name: type, exact: true });
+  }
+
+  /** The removable chip shown under the toolbar for an applied filter, e.g. "Type: Trade Fair". */
+  removeFilterChip(label: string): Locator {
+    return this.page.getByRole('button', { name: `Remove ${label}`, exact: true });
+  }
+
+  /** A column's header cell, by its visible label (accessible name also carries "Resize <label> column"). */
+  columnHeader(label: string): Locator {
+    return this.page.getByRole('columnheader', {
+      name: new RegExp(`^${escapeRegExp(label)} Resize`),
+    });
+  }
+
+  /** The clickable sort button inside a column header. */
+  columnSortButton(label: string): Locator {
+    return this.columnHeader(label).getByRole('button', { name: label, exact: true });
+  }
+
+  /** The sort indicator icon inside a column header's sort button. */
+  columnSortIcon(label: string): Locator {
+    return this.columnSortButton(label).locator('svg');
+  }
+
+  /** The drag handle for a column in the Configure Columns dialog. */
+  columnDragHandle(columnName: string): Locator {
+    return this.columnsDialog.getByRole('button', { name: `Drag ${columnName}`, exact: true });
+  }
+
+  /** A row checkbox in the table layouts (No split / Horizontal split), by its row's Event title. */
+  rowCheckbox(title: string): Locator {
+    return this.eventRow(title).getByRole('checkbox');
+  }
+
+  /** A list item in the Vertical split's left-hand list — a button named "Select row <title> …" or "Deselect row <title> …" once checked. */
+  splitListItem(title: string): Locator {
+    return this.page.getByRole('button', {
+      name: new RegExp(`^(Select|Deselect) row ${escapeRegExp(title)}`),
+    });
+  }
+
+  /** A Details-screen section card (e.g. "Participant Summary", "System"), by its <h2> — the card is the heading's 3rd ancestor (confirmed against dev). */
+  sectionCard(name: string): Locator {
+    return this.page
+      .getByRole('heading', { level: 2, name, exact: true })
+      .locator('xpath=../../..');
+  }
+
+  sectionHeading(name: string | RegExp): Locator {
+    return this.page.getByRole('heading', { level: 2, name });
+  }
+
+  /** Body rows of the List table (header row excluded). */
+  tableRows(): Locator {
+    return this.page.getByRole('row').filter({ hasNot: this.page.getByRole('columnheader') });
+  }
+
+  /** List rows whose Type cell is exactly `type` (e.g. "Trade Fair", "Other"). */
+  rowsOfType(type: string): Locator {
+    return this.tableRows().filter({
+      has: this.page.getByRole('cell', { name: type, exact: true }),
+    });
+  }
+
+  /** List rows from the AI-discovery pipeline — everything that isn't a manual "Other" event. */
+  aiEventRows(): Locator {
+    return this.tableRows().filter({
+      hasNot: this.page.getByRole('cell', { name: 'Other', exact: true }),
+    });
   }
 }
