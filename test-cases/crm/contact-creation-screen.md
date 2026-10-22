@@ -18,3 +18,7 @@
 ## Notes for whoever picks this up next
 
 TC:3 → TC:4 → TC:5 are one continuous flow (save with a new Customer name → the prompt → either path from it) — automate as steps within one test, or as an explicit chain, not independent tests. Confirms the real route is `/crm/contacts/new` (TC:2) and the reverse hand-off target is `/crm/customers/new?name=...&contactId=...&contactName=...` (TC:4) — genuinely useful, concrete routing detail not available anywhere else yet. Not yet live-probed against the running app for actual locators/selectors.
+
+## Update 2026-10-15 — Contact Name and Email rules
+
+Contact Name and Email are mandatory (TC:6); Contact Name may be a duplicate, but Email must be unique across Contacts. The full set of cases for these rules is in [`create-contact.md`](create-contact.md) (TC:11–TC:16).

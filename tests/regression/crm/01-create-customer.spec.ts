@@ -1,16 +1,46 @@
 import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/crm.fixtures';
+import type { CreateCustomerPage } from '../../../src/pages/crm/create-customer.page';
 
 /**
  * CRM — Create Customer (Sprint 1, User Story 1).
  *
- * Source of truth for these 11 cases: test-cases/crm/create-customer.md
+ * Source of truth for these 17 cases: test-cases/crm/create-customer.md
  * (mirrors ClickUp task https://app.clickup.com/t/86eyqvaq4 — each test
  * below links to its own ClickUp test-case task via allure.tms(), so the
  * Allure report can jump straight to it). Storage state from
  * auth.setup.ts is already applied via the "crm" project's dependency —
  * no login needed here.
  */
+/** Every mandatory Customer field filled with valid values; pass a name (or override) per test. */
+function validProfile(name?: string) {
+  const stamp = Date.now();
+  return {
+    name,
+    email: `pw-test-${stamp}@example.com`,
+    city: 'Coimbatore',
+    country: 'India',
+    crmStage: 'Lead',
+    originType: 'Referral',
+    origin: 'Internal Referral',
+    buyer: 'Fabric',
+    referredBy: 'Jordan Smith',
+  };
+}
+
+/**
+ * Creates a Customer for the uniqueness tests to collide with, so they
+ * don't depend on a seeded record that could be renamed or deleted on dev.
+ */
+async function createDuplicateTarget(createCustomerPage: CreateCustomerPage): Promise<string> {
+  const name = `Playwright Dup ${Date.now()}`;
+  await createCustomerPage.openFromCrmHome();
+  await createCustomerPage.fillProfile(validProfile(name));
+  await createCustomerPage.save();
+  await createCustomerPage.expectSavedSuccessfully();
+  return name;
+}
+
 test.describe('CRM - Create Customer', () => {
   test.beforeEach(async () => {
     await allure.epic('CRM');
@@ -145,16 +175,15 @@ test.describe('CRM - Create Customer', () => {
       await createCustomerPage.locators.cancelToReviewButton.click();
     });
 
-    await test.step('The duplicate is not created and the user returns to the Customers list', async () => {
-      // Corrected from the original premise: confirmed directly against
-      // the running app (2026-10-01) — for an exact Customer Name match,
-      // this is a hard block (heading "Match in Customer Name", no "Save
-      // anyway" override at all). Cancel here abandons the whole
-      // creation attempt and navigates back to the Customers list — it
-      // does not just dismiss the modal and leave the create form open
-      // for further editing.
+    await test.step('The duplicate is not created and the user stays on the form to review', async () => {
+      // Confirmed live (2026-10-15): Cancel on the "Match in Customer Name"
+      // hard-block modal now closes it and leaves the user on the Create
+      // Customer form (/crm/customers/new) to review — the original TC:6
+      // expectation. Until then it navigated back to the Customers list.
       await expect(createCustomerPage.locators.duplicateWarningModal).toBeHidden();
-      await expect(page).toHaveURL(/\/crm\/customers$/);
+      await expect(page).toHaveURL(/\/crm\/customers\/new$/);
+      await expect(createCustomerPage.locators.saveButton).toBeVisible();
+      await expect(createCustomerPage.locators.postSaveModal).toBeHidden();
     });
   });
 
@@ -308,6 +337,126 @@ test.describe('CRM - Create Customer', () => {
 
     await test.step('Creation is canceled, nothing persisted, back on the Customers list', async () => {
       await expect(page.getByText('Should Not Be Saved')).toHaveCount(0);
+    });
+  });
+
+  test('TC:12 Verify Customer Name is mandatory', async ({ createCustomerPage }) => {
+    await allure.tms('https://app.clickup.com/t/z941abyt4j', 'TC:12 (ClickUp)');
+    await createCustomerPage.openFromCrmHome();
+
+    await test.step('Fill every mandatory field except Customer Name and save', async () => {
+      await createCustomerPage.fillProfile(validProfile());
+      await createCustomerPage.save();
+    });
+
+    await test.step('Save is blocked with a single "Required" error (Customer Name)', async () => {
+      await createCustomerPage.expectOnlyOneRequiredError();
+      await expect(createCustomerPage.locators.saveButton).toBeVisible();
+      await expect(createCustomerPage.locators.postSaveModal).toBeHidden();
+    });
+  });
+
+  test('TC:13 Verify Customer Name with only spaces is treated as blank', async ({
+    createCustomerPage,
+  }) => {
+    await allure.tms('https://app.clickup.com/t/z941abyt4k', 'TC:13 (ClickUp)');
+    await createCustomerPage.openFromCrmHome();
+
+    await test.step('Enter only spaces as Customer Name, fill the rest, and save', async () => {
+      await createCustomerPage.fillProfile(validProfile('   '));
+      await createCustomerPage.save();
+    });
+
+    await test.step('Save is blocked with the same "Required" error', async () => {
+      await createCustomerPage.expectOnlyOneRequiredError();
+      await expect(createCustomerPage.locators.postSaveModal).toBeHidden();
+    });
+  });
+
+  test('TC:14 Verify Customer Name must be unique', async ({ createCustomerPage }) => {
+    await allure.tms('https://app.clickup.com/t/z941abyt4m', 'TC:14 (ClickUp)');
+    const existingName = await test.step('Create a Customer to duplicate', () =>
+      createDuplicateTarget(createCustomerPage));
+
+    await test.step('Enter that Customer Name with otherwise new details and save', async () => {
+      await createCustomerPage.openFromCrmHome();
+      await createCustomerPage.fillProfile(validProfile(existingName));
+      await createCustomerPage.save();
+    });
+
+    await test.step('Hard block: duplicate-name error and modal, no "Save anyway"', async () => {
+      await createCustomerPage.expectDuplicateNameBlocked(existingName);
+    });
+  });
+
+  test('TC:15 Verify Customer Name uniqueness ignores letter case and surrounding spaces', async ({
+    createCustomerPage,
+  }) => {
+    await allure.tms('https://app.clickup.com/t/z941abyt4n', 'TC:15 (ClickUp)');
+    const existingName = await test.step('Create a Customer to duplicate', () =>
+      createDuplicateTarget(createCustomerPage));
+
+    for (const variant of [existingName.toUpperCase(), `  ${existingName}  `]) {
+      await test.step(`"${variant}" is blocked as a duplicate of "${existingName}"`, async () => {
+        await createCustomerPage.openFromCrmHome();
+        await createCustomerPage.fillProfile(validProfile(variant));
+        await createCustomerPage.save();
+        await createCustomerPage.expectDuplicateNameBlocked(existingName);
+      });
+    }
+  });
+
+  test("TC:16 Verify a Customer cannot be renamed to an existing Customer's name", async ({
+    createCustomerPage,
+    customerDetailPage,
+    page,
+  }) => {
+    await allure.tms('https://app.clickup.com/t/z941abyt4p', 'TC:16 (ClickUp)');
+    const originalName = `Playwright Rename Test ${Date.now()}`;
+
+    const existingName = await test.step('Create a Customer to duplicate', () =>
+      createDuplicateTarget(createCustomerPage));
+
+    await test.step('Create a throwaway Customer and open its details', async () => {
+      await createCustomerPage.openFromCrmHome();
+      await createCustomerPage.fillProfile(validProfile(originalName));
+      await createCustomerPage.save();
+      await createCustomerPage.expectSavedSuccessfully();
+      await createCustomerPage.locators.postSaveCancelButton.click();
+      await customerDetailPage.expectCustomerName(originalName);
+    });
+
+    await test.step("Rename it to the existing Customer's name: the server rejects it (409)", async () => {
+      expect(await customerDetailPage.renameCustomer(existingName)).toBe(409);
+    });
+
+    await test.step('An inline error says the name already exists', async () => {
+      await customerDetailPage.expectRenameRejectedMessage(existingName);
+    });
+
+    await test.step('The Customer keeps its original name', async () => {
+      await page.reload();
+      await customerDetailPage.expectCustomerName(originalName);
+    });
+  });
+
+  test('TC:17 Verify a unique Customer Name saves successfully', async ({
+    createCustomerPage,
+    customerDetailPage,
+  }) => {
+    await allure.tms('https://app.clickup.com/t/z941abyt4q', 'TC:17 (ClickUp)');
+    const name = `Playwright Unique Customer ${Date.now()}`;
+
+    await test.step('Create a Customer with a name no other Customer uses', async () => {
+      await createCustomerPage.openFromCrmHome();
+      await createCustomerPage.fillProfile(validProfile(name));
+      await createCustomerPage.save();
+    });
+
+    await test.step('It saves, and its details page shows that name', async () => {
+      await createCustomerPage.expectSavedSuccessfully();
+      await createCustomerPage.locators.postSaveCancelButton.click();
+      await customerDetailPage.expectCustomerName(name);
     });
   });
 });

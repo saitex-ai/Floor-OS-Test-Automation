@@ -128,14 +128,15 @@ test.describe('CRM - Customer List', () => {
       await createCustomerPage.locators.cancelToReviewButton.click();
     });
 
-    await test.step('The duplicate is not created and the user returns to the Customers list', async () => {
-      // Corrected from the original premise — see 01-create-customer.spec.ts
-      // TC:6's class-doc comment for the full confirmed explanation: an
-      // exact Customer Name match is a hard block with no "Save anyway"
-      // override, and Cancel abandons the attempt entirely rather than
-      // just dismissing the modal.
+    await test.step('The duplicate is not created and the user stays on the form to review', async () => {
+      // Confirmed live (2026-10-15): Cancel on the "Match in Customer Name"
+      // hard-block modal now closes it and leaves the user on the Create
+      // Customer form (/crm/customers/new) to review — the original TC:6
+      // expectation. Until then it navigated back to the Customers list.
       await expect(createCustomerPage.locators.duplicateWarningModal).toBeHidden();
-      await expect(page).toHaveURL(/\/crm\/customers$/);
+      await expect(page).toHaveURL(/\/crm\/customers\/new$/);
+      await expect(createCustomerPage.locators.saveButton).toBeVisible();
+      await expect(createCustomerPage.locators.postSaveModal).toBeHidden();
     });
   });
 
