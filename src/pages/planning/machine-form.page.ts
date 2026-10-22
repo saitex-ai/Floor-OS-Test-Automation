@@ -103,10 +103,18 @@ export class MachineFormPage extends BasePage {
     }).toPass({ timeout: WAIT.SERVER });
   }
 
+  /**
+   * Waits for the picked popover to close before returning. As of the
+   * 2026-10-22 design-system release a popover stays in the DOM for about
+   * 0.4 s after a pick while it fades out (`data-state="closed"`, an exit
+   * animation), so the next picker's `.first()` option could resolve to the
+   * old popover's option ("element is not stable", then detached).
+   */
   private async pick(combo: Locator, option: string | RegExp): Promise<void> {
     const target = this.locators.option(option).first();
     await this.openPicker(combo, target);
     await target.click();
+    await expect(this.locators.options()).toHaveCount(0);
   }
 
   /**
