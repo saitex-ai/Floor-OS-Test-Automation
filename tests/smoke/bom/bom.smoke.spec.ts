@@ -1,6 +1,7 @@
 import * as allure from 'allure-js-commons';
 import { test, expect, type Page } from '@playwright/test';
 import { authFile } from '../../../src/fixtures/auth-setup';
+import { env } from '../../../src/config/env';
 import { BomListPage } from '../../../src/pages/bom/bom-list.page';
 import { BomDetailPage } from '../../../src/pages/bom/bom-detail.page';
 
@@ -20,8 +21,12 @@ import { BomDetailPage } from '../../../src/pages/bom/bom-detail.page';
  * worker opens a fresh tab and openInPlace() falls back to a full load.
  */
 
-/** An Approved (so locked) BOM on dev — the one the sanity run used. */
-const APPROVED_BOM = 'TP202607-000029';
+/**
+ * An Approved (so locked) single-revision BOM per environment. dev's is the
+ * one the sanity run used; uat's is QA-AUTO data (confirmed Approved,
+ * LOCKED, Rev 00 only on 2026-10-22).
+ */
+const APPROVED_BOM = env.testEnv === 'uat' ? 'TP202610-000120' : 'TP202607-000029';
 
 test.describe.configure({ mode: 'default', timeout: 150_000 });
 
