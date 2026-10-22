@@ -1,6 +1,7 @@
 import * as allure from 'allure-js-commons';
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../../src/fixtures/crm.fixtures';
+import { partial } from '../../../src/utils/test-annotations';
 import type { CreateCustomerPage } from '../../../src/pages/crm/create-customer.page';
 import {
   DEV_AI_SECTION_TITLES,
@@ -57,11 +58,6 @@ type SeedLeadKey = keyof typeof WEB_FORM_LEADS;
 const SUBMISSION_UNAVAILABLE =
   'the test web form (https://unusual-dev-store.myshopify.com/pages/contact) is password-protected and ' +
   'the password is not available to automation, so no new submission can be made.';
-
-/** Records the part of a TC that can't be exercised, without skipping the checks that did run. */
-function partial(description: string): void {
-  test.info().annotations.push({ type: 'partial', description });
-}
 
 /**
  * Opens a seed Web Form Lead's Lead Qualification tab and returns the

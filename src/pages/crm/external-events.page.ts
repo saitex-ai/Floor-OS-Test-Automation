@@ -491,6 +491,7 @@ export class ExternalEventsPage extends BasePage {
    * activate the drag before travelling, confirmed directly.
    */
   async dragColumnOnto(columnName: string, targetColumn: string): Promise<void> {
+    const before = await this.readColumnsDialogOrder();
     const source = await this.locators.columnDragHandle(columnName).boundingBox();
     const target = await this.locators.columnDragHandle(targetColumn).boundingBox();
     expect(source && target, 'column drag handles must be visible').toBeTruthy();
@@ -503,9 +504,14 @@ export class ExternalEventsPage extends BasePage {
       steps: 20,
     });
     await this.page.mouse.up();
-    // Let the drop animation finish — clicking Apply mid-animation was
-    // confirmed to leave the dialog open (the click lands on the moving item).
-    await this.page.waitForTimeout(500);
+    // Wait for the drop to land: the order must change and then read the
+    // same twice. Clicking Apply mid-animation was confirmed to leave the
+    // dialog open (the click lands on the moving item).
+    await expect(async () => {
+      const after = await this.readColumnsDialogOrder();
+      expect(after).not.toEqual(before);
+      expect(await this.readColumnsDialogOrder()).toEqual(after);
+    }).toPass({ timeout: 5_000 });
   }
 
   /** Column order as listed in the open Columns dialog (first item is the locked "Event"). */

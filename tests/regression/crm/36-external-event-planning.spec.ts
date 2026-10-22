@@ -1,5 +1,6 @@
 import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/crm.fixtures';
+import { partial } from '../../../src/utils/test-annotations';
 import {
   ExternalEventsPage,
   PLANNING_AI_SECTIONS,
@@ -43,11 +44,6 @@ const NO_FRESH_PLANNING_EVENT =
   'dev has no non-elapsed Planning event (Planning tab holds only "Planning · Elapsed" AI events, which offer no To Attend button), ' +
   'and a manually-created event is always born "Other"/Attended — so there is no event this suite owns that can be marked To Attend, ' +
   'and AI/seeded events must not be changed. Re-enable once a Planning event can be created (or seeded per-run) for tests.';
-
-/** Records the part of a TC that can't be exercised, without skipping the checks that did run. */
-function partial(description: string): void {
-  test.info().annotations.push({ type: 'partial', description });
-}
 
 test.describe('CRM - External Event Planning (Sprint 5)', () => {
   test.beforeEach(async () => {
@@ -157,16 +153,15 @@ test.describe('CRM - External Event Planning (Sprint 5)', () => {
     // the Planning tab and System section have no Owner control (matches
     // the prototype). No bug ticket yet; tracked on the TC itself. Flips to
     // "unexpectedly passed" once the control ships.
+    const l = externalEventsPage.locators;
+
+    // Missing data is a skip, not part of the expected failure.
+    const row = await externalEventsPage.openFirstAiEventInTab('Planning');
+    test.skip(row === null, 'No AI event on the Planning tab on dev to open');
     test.fail(
       true,
       'Owner drop-down not implemented on dev (https://app.clickup.com/t/z941abyq7e) — confirm scope with the team.',
     );
-    const l = externalEventsPage.locators;
-
-    await test.step('Open a Planning event', async () => {
-      const row = await externalEventsPage.openFirstAiEventInTab('Planning');
-      expect(row, 'expected at least one AI event on the Planning tab').not.toBeNull();
-    });
 
     await test.step('An Owner drop-down is shown on the Details screen', async () => {
       await expect(l.ownerControl.first()).toBeVisible();
@@ -181,17 +176,18 @@ test.describe('CRM - External Event Planning (Sprint 5)', () => {
     // (FR-07/FR-08) are not on dev (nor in the prototype). No bug ticket
     // yet; tracked on the TC itself. The other five sections are asserted
     // first; the test flips to "unexpectedly passed" once both ship.
+    test.slow();
+    const l = externalEventsPage.locators;
+
+    // Missing data is a skip, not part of the expected failure.
+    const row = await externalEventsPage.findAiEvent(
+      async () => !(await externalEventsPage.hasAnyPlaceholderSection()),
+    );
+    test.skip(row === null, 'No AI event on dev whose artifacts all generated');
     test.fail(
       true,
       'Sales Potential Report and Participation Plan not implemented on dev (https://app.clickup.com/t/z941abyq7f) — confirm scope with the team.',
     );
-    test.slow();
-    const l = externalEventsPage.locators;
-
-    const row = await externalEventsPage.findAiEvent(
-      async () => !(await externalEventsPage.hasAnyPlaceholderSection()),
-    );
-    expect(row, 'expected an AI event whose artifacts all generated').not.toBeNull();
 
     await test.step('External Event Summary, Participant Summary, Visitor Summary, Schedule and Contact Details are shown with content', async () => {
       await externalEventsPage.expectSectionsWithContent(PLANNING_AI_SECTIONS);
