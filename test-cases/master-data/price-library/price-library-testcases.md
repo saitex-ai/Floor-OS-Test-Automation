@@ -106,12 +106,12 @@ collapsed "Inventory Item Management" nav group.
 The skip-on-exhausted-pool approach from 2026-10-12 is replaced. Every create test (TC:1/TC:2/TC:4/TC:7/TC:14) now provisions a brand-new pair first, on a **new item the test creates itself** — no existing Item Master record is ever edited:
 
 1. Vendor Master: take a random vendor from the **Approved** tab.
-2. Item Master: create a new item with only the 7 required fields (Item Class CHEM-WASH), a unique Alternate Code `QA-AUTO-PL-<run id><n>` and the description `QA-AUTO <Alternate Code> Price Library test item. Safe to delete.` Item Master creates items straight as **Approved**, so no approval step is needed.
+2. Item Master: create a new item with only the 7 required fields (Item Class CHEM-WASH), a unique Alternate Code `QA-AUTO-PL-<run id>W<worker>N<n>` and the description `QA-AUTO <Alternate Code> Price Library test item. Safe to delete.` Item Master creates items straight as **Approved**, so no approval step is needed.
 3. That item's Supplier tab → **Add supplier** → the vendor → fill Per Unit Price → **Save changes**.
 4. Price Library: create the price record for exactly that item (matched by Alternate Code + description) and vendor (matched by Vendor Code).
-5. Cleanup (afterEach): delete the test's own item (Edit → Delete permanently). Failures are logged, not raised. Price Library has no delete, so the price record stays; its Item column still shows the QA-AUTO description, so it is clearly test data and safe to delete from the backend.
+5. Cleanup (afterEach): a test's item that got a **price record is kept**, because deleting it would leave the price record orphaned (see below); it is QA-AUTO tagged and recorded as a `test data kept` annotation. An item whose test failed before pricing is deleted (Edit → Delete permanently); a failed delete is recorded as a `cleanup failed` annotation, not raised. Price Library has no delete, so each run leaves its tagged items and price records for backend cleanup.
 
-Confirmed live 2026-10-21: Item Master **does** delete an item that has a supplier link and a price record. The price record is not removed with it — it stays on the Price Library list (Active), still showing the deleted item's code and description. Observation only, not asserted.
+Confirmed live 2026-10-21: Item Master **does** delete an item that has a supplier link and a price record. The price record is not removed with it — it stays on the Price Library list (Active), still showing the deleted item's code and description — an orphaned record. That is why priced items are no longer deleted. Raised with the backend team (PR #21 review).
 
 Confirmed live while building this (2026-10-13):
 

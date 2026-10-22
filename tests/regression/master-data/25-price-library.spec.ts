@@ -47,8 +47,14 @@ import type { VendorListPage } from '../../../src/pages/master-data/vendor-list.
  * unconfirmed submission mechanism would be inventing behavior, not
  * automating it.
  */
-// Item Master IDs created by the current test, deleted in afterEach.
+// Item Master IDs created by the current test; afterEach deletes the unpriced ones.
 const createdItemIds: string[] = [];
+/**
+ * Items that got a price record. These are NOT deleted: on dev, deleting
+ * an item leaves its price record Active and pointing at the deleted item
+ * (confirmed 2026-10-21), which is worse than a tagged leftover item.
+ */
+const pricedItemIds = new Set<string>();
 let itemCounter = 0;
 
 /**
@@ -76,8 +82,9 @@ async function createFreshPriceRecord(
   const vendor = vendors[Math.floor(Math.random() * vendors.length)]!;
 
   // Unique per run and per call: Item Master rejects a duplicate Alternate Code.
+  // The worker index keeps two workers apart within the same millisecond.
   itemCounter += 1;
-  const alternateCode = `QA-AUTO-PL-${Date.now().toString(36).toUpperCase()}${itemCounter}`;
+  const alternateCode = `QA-AUTO-PL-${Date.now().toString(36).toUpperCase()}W${test.info().parallelIndex}N${itemCounter}`;
   const description = `QA-AUTO ${alternateCode} Price Library test item. Safe to delete.`;
   const itemId = await itemMasterPage.createItem({ alternateCode, description });
   createdItemIds.push(itemId);
@@ -92,6 +99,7 @@ async function createFreshPriceRecord(
     vendor.code,
     rowValues,
   );
+  pricedItemIds.add(itemId);
   return {
     status: response?.status(),
     itemName,
@@ -108,18 +116,26 @@ test.describe('Master Data - Price Library', () => {
     await allure.owner('Master Data QA');
   });
 
-  // Best-effort cleanup of this test's own items only. A failure is logged,
+  // Best-effort cleanup of this test's own items only. Priced items are
+  // kept (see pricedItemIds). A failed delete is recorded as an annotation,
   // not raised: the item is QA-AUTO tagged, so a leftover is clearly test data.
   test.afterEach(async ({ itemMasterPage }) => {
     while (createdItemIds.length > 0) {
       const itemId = createdItemIds.pop()!;
+      if (pricedItemIds.delete(itemId)) {
+        test.info().annotations.push({
+          type: 'test data kept',
+          description: `QA-AUTO item ${itemId} has a price record, so it is not deleted (deleting would orphan the record).`,
+        });
+        continue;
+      }
       try {
         await itemMasterPage.deleteItemById(itemId);
-        console.log(`QA-AUTO cleanup: deleted item ${itemId}`);
       } catch (error) {
-        console.warn(
-          `QA-AUTO cleanup: could not delete item ${itemId}: ${String(error).split('\n')[0]}`,
-        );
+        test.info().annotations.push({
+          type: 'cleanup failed',
+          description: `Could not delete QA-AUTO item ${itemId}: ${String(error).split('\n')[0]}`,
+        });
       }
     }
   });
