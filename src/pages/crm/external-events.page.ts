@@ -504,14 +504,23 @@ export class ExternalEventsPage extends BasePage {
       steps: 20,
     });
     await this.page.mouse.up();
-    // Wait for the drop to land: the order must change and then read the
-    // same twice. Clicking Apply mid-animation was confirmed to leave the
-    // dialog open (the click lands on the moving item).
-    await expect(async () => {
-      const after = await this.readColumnsDialogOrder();
-      expect(after).not.toEqual(before);
-      expect(await this.readColumnsDialogOrder()).toEqual(after);
-    }).toPass({ timeout: 5_000 });
+    // Wait for the drop to land: the order must change, and the dialog's
+    // drop animation must have finished. Clicking Apply mid-animation was
+    // confirmed to leave the dialog open (the click lands on the moving item).
+    await expect.poll(() => this.readColumnsDialogOrder(), { timeout: 5_000 }).not.toEqual(before);
+    await expect
+      .poll(
+        () =>
+          this.locators.columnsDialog.evaluate(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- no "dom" lib in tsconfig; this runs in the browser.
+            (dialog: any) =>
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- same as above.
+              dialog.getAnimations({ subtree: true }).filter((a: any) => a.playState === 'running')
+                .length as number,
+          ),
+        { timeout: 5_000 },
+      )
+      .toBe(0);
   }
 
   /** Column order as listed in the open Columns dialog (first item is the locked "Event"). */
