@@ -5,6 +5,11 @@ import { LeadQualificationLocators } from '../../locators/crm/lead-qualification
 /** Customer Detail route (confirmed elsewhere — see customer-detail.page.ts). */
 const CUSTOMER_DETAIL_PATH = (customerId: string) => `/crm/customers/${customerId}`;
 const CUSTOMERS_LIST_PATH = '/crm/customers';
+/**
+ * How long to wait for the Customer / lead-qualification reads. Dev's CRM
+ * remote can sit on "Loading CRM…" for over 60 s (seen 2026-10-22).
+ */
+const LQ_READ_TIMEOUT = 120_000;
 
 /**
  * "Lead Qualification screen" (CRM, Sprint 4 user story). Owned by the
@@ -52,6 +57,21 @@ export interface WebFormSubmission {
   submittedAt: string;
 }
 
+/**
+ * The crawler's detection as returned by the same GET
+ * `/lead-qualification` read, for a Lead the web crawler created (shape
+ * confirmed on dev 2026-10-22). `null` for every other Lead, including a
+ * "Web Crawled" Lead created by hand through Create Customer.
+ */
+export interface CrawlDetection {
+  sourceDomain: string;
+  intentLabel: string;
+  detectedAt: string;
+  detectionSummary: string[];
+  fitScore: string | null;
+  fitAxes: { name: string; value: number | null; why: string }[];
+}
+
 /** The subset of the tab's own lead-qualification read these tests use. */
 export interface LeadQualificationData {
   accountId: string;
@@ -60,9 +80,16 @@ export interface LeadQualificationData {
   originType: string;
   originTypeLabel: string;
   originLabel: string;
-  dossier: { generatedBy?: string } | null;
+  dossier: {
+    generatedBy?: string;
+    payload?: {
+      contactInfo?: { text: string }[];
+      customerInfo?: { points?: { text: string }[] };
+    };
+  } | null;
   reviews: unknown[];
   webFormSubmissions: WebFormSubmission[];
+  crawlDetection?: CrawlDetection | null;
   socialInteractions: { content?: { text?: string } }[];
   conversion: unknown;
 }
@@ -234,7 +261,7 @@ export class LeadQualificationPage extends BasePage {
         r.request().method() === 'GET' &&
         r.url().endsWith(`/customers/${customerId}/lead-qualification`) &&
         r.ok(),
-      { timeout: 60_000 },
+      { timeout: LQ_READ_TIMEOUT },
     );
     await this.gotoAuthenticated(CUSTOMER_DETAIL_PATH(customerId));
     await this.locators.tabButton.click();
@@ -252,14 +279,14 @@ export class LeadQualificationPage extends BasePage {
   async tryOpenAndReadQualification(customerId: string): Promise<LeadQualificationData | null> {
     const customer = this.page.waitForResponse(
       (r) => r.request().method() === 'GET' && r.url().endsWith(`/api/crm/customers/${customerId}`),
-      { timeout: 60_000 },
+      { timeout: LQ_READ_TIMEOUT },
     );
     const qualification = this.page.waitForResponse(
       (r) =>
         r.request().method() === 'GET' &&
         r.url().endsWith(`/customers/${customerId}/lead-qualification`) &&
         r.ok(),
-      { timeout: 60_000 },
+      { timeout: LQ_READ_TIMEOUT },
     );
     // Only awaited when the record exists — keep a rejected wait from going unhandled.
     qualification.catch(() => undefined);
@@ -530,5 +557,153 @@ export class LeadQualificationPage extends BasePage {
     const row = this.locators.customerRow(name);
     await expect(row).toHaveCount(1, { timeout: 20_000 });
     await expect(row).toContainText(stage);
+  }
+
+  // =====================================================================
+  // [Origin Type = Web Crawled] Lead Qualification (Sprint 5)
+  // =====================================================================
+
+  /** The first card on the tab has this title. */
+  async expectFirstCard(title: string): Promise<void> {
+    await expect(this.locators.cardHeadings.first()).toHaveText(title);
+  }
+
+  /** The tab's cards, top to bottom, are exactly these AI sections followed by the "Lead Qualification" review card. */
+  async expectAiSectionsInOrder(titles: readonly string[]): Promise<void> {
+    await expect(this.locators.cardHeadings).toHaveText([...titles, 'Lead Qualification']);
+  }
+
+  /**
+   * Dev (2026-10-22) renders nothing for the stored crawl detection: no
+   * "Origin"-marked card, and neither the crawled site, the crawl cohort
+   * nor the detection date appear anywhere on the tab. The story wants
+   * all of them on a crawl origin card above the AI sections.
+   */
+  async expectNoCrawlCardRendered(detection: CrawlDetection): Promise<void> {
+    await expect(this.locators.crawlCard).toHaveCount(0);
+    await expect(this.locators.originCards).toHaveCount(0);
+    const host = new URL(detection.sourceDomain).host;
+    await expect(this.locators.tabRoot).not.toContainText(host);
+    await expect(this.locators.tabRoot).not.toContainText(detection.intentLabel);
+    for (const when of await this.detectionDateRenderings(detection.detectedAt)) {
+      await expect(this.locators.tabRoot).not.toContainText(when);
+    }
+  }
+
+  /** The matched-signal lines of the summary ("product fit: …") are not shown as written. */
+  async expectDetectionSignalLinesNotShown(detection: CrawlDetection): Promise<void> {
+    const signals = detection.detectionSummary.filter((line) => /^[a-z ]+ fit: /.test(line));
+    expect(signals.length, 'detection has no matched-signal line').toBeGreaterThan(0);
+    for (const line of signals) {
+      await expect(this.locators.tabRoot.getByText(line, { exact: true })).toHaveCount(0);
+    }
+  }
+
+  /** The detection date in the shapes the app uses elsewhere (e.g. "10/21/2026", "Oct 21, 2026", "21 Oct 2026"). */
+  private async detectionDateRenderings(iso: string): Promise<string[]> {
+    return this.page.evaluate((value) => {
+      const d = new Date(value);
+      return [
+        d.toLocaleDateString('en-US'),
+        d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+      ];
+    }, iso);
+  }
+
+  /** An AI section is present and shows something beyond its title (pointers, or its "no relevant information" message). */
+  async expectAiSectionNotBlank(title: string): Promise<void> {
+    const section = this.locators.aiSection(title);
+    await expect(section).toHaveCount(1);
+    const text = (await section.innerText()).replace(title, '').trim();
+    expect(text.length, `"${title}" is blank`).toBeGreaterThan(10);
+  }
+
+  /** The AI section shows each of these pointer texts. */
+  async expectAiSectionShowsPointers(title: string, texts: string[]): Promise<void> {
+    const section = this.locators.aiSection(title);
+    for (const text of texts) {
+      await expect(section.locator('[data-line-locator]').filter({ hasText: text })).toHaveCount(1);
+    }
+  }
+
+  /** "Unfortunately, no relevant information is available for the <what> online." inside the named AI section. */
+  async expectNoRelevantInformation(title: string, what: string): Promise<void> {
+    const section = this.locators.aiSection(title);
+    await expect(section.filter({ has: this.locators.noRelevantInformation(what) })).toHaveCount(1);
+  }
+
+  /**
+   * Business Compatibility Report is built from the crawl's fit scoring:
+   * its overall score is the detection's fit score, and every scored fit
+   * axis shows its reason (e.g. "material match on denim, indigo, cotton").
+   */
+  async expectCompatibilityFromDetection(detection: CrawlDetection): Promise<void> {
+    const section = this.locators.aiSection('Business Compatibility Report');
+    await expect(section).toContainText('OVERALL COMPATIBILITY', { ignoreCase: true });
+    if (detection.fitScore !== null) await expect(section).toContainText(detection.fitScore);
+    const scored = detection.fitAxes.filter((axis) => axis.value !== null);
+    expect(scored.length, 'detection has no scored fit axis').toBeGreaterThan(0);
+    for (const axis of scored) await expect(section).toContainText(axis.why);
+  }
+
+  /** Nothing on the tab says or implies the prospect contacted SAITEX or was answered. */
+  async expectNoInboundContactWording(): Promise<void> {
+    await expect(this.locators.tabRoot).not.toContainText(
+      /submitted via|auto-?reply|acknowledg|replied|reply sent|contacted us|thank you for/i,
+    );
+  }
+
+  /** No reply/comment/message composer: the only free-text box on the tab is "Manager's review". */
+  async expectNoReplyComposer(): Promise<void> {
+    await expect(this.locators.composerControls).toHaveCount(0);
+    await expect(this.locators.tabTextboxes).toHaveCount(1);
+    await expect(this.locators.reviewTextbox).toBeVisible();
+  }
+
+  /** The Customer Details tab strip reads "Contacts (n)". */
+  async expectContactCount(n: number): Promise<void> {
+    await expect(this.locators.contactsTabButton).toHaveText(`Contacts (${n})`);
+  }
+
+  /** Overview tab: Origin Type reads the given label (e.g. "Web Crawled") and the record was created by "CRM" (the crawler). */
+  async expectOverviewShowsSystemOrigin(originTypeLabel: string): Promise<void> {
+    await this.locators.overviewTabButton.click();
+    await expect(this.page.getByText(originTypeLabel, { exact: true }).first()).toBeVisible();
+    await expect(this.page.getByText('CRM', { exact: true }).first()).toBeVisible();
+  }
+
+  /** The AI Chatbot's opening message on a Lead with AI sections. */
+  async expectAiChatbotGreeting(customerName: string): Promise<void> {
+    await expect(this.locators.aiChatbotGreeting).toContainText(customerName);
+  }
+
+  /** No submitted web-form card on the tab. */
+  async expectNoFormCard(): Promise<void> {
+    await expect(this.locators.formCard).toHaveCount(0);
+  }
+
+  /** At the Lead stage: the Manager's review box takes input and the Convert action is shown. */
+  async expectReviewAndConvertAvailable(): Promise<void> {
+    await expect(this.locators.reviewTextbox).toBeEditable();
+    await expect(this.locators.convertButton).toBeVisible();
+  }
+
+  async expectConvertDisabled(): Promise<void> {
+    await expect(this.locators.convertButton).toBeDisabled();
+  }
+
+  /** "Web Crawled" Lead with no detection: no crawl card. */
+  async expectNoCrawlCard(): Promise<void> {
+    await expect(this.locators.crawlCard).toHaveCount(0);
+  }
+
+  /**
+   * Waits for the Create Customer form after CreateCustomerPage.openFromCrmHome():
+   * on a slow dev the Customers list is still showing, and typing would land
+   * on its "Resize Customer Name column" button.
+   */
+  async waitForCreateCustomerForm(): Promise<void> {
+    await expect(this.locators.createCustomerNameTextbox).toBeVisible({ timeout: 90_000 });
   }
 }

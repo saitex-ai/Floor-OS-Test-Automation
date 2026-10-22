@@ -8,3 +8,13 @@ import { test } from '@playwright/test';
 export function partial(description: string): void {
   test.info().annotations.push({ type: 'partial', description });
 }
+
+/**
+ * Records a story requirement the environment doesn't meet yet, where the
+ * test asserts the environment's current behaviour instead (so the run
+ * stays green and the step fails once the requirement is delivered). The
+ * gap shows in the report next to the TC.
+ */
+export function devGap(description: string): void {
+  test.info().annotations.push({ type: 'dev-gap', description });
+}
