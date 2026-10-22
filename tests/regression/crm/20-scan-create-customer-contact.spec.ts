@@ -44,7 +44,6 @@ const BUG = {
   missingEmail: 'https://app.clickup.com/t/z941abzd2p',
   duplicateCustomer: 'https://app.clickup.com/t/z941abzd2q',
   duplicateEmail: 'https://app.clickup.com/t/z941abzd2t',
-  freeText: 'https://app.clickup.com/t/z941abzd2u',
   saveBeforeScan: 'https://app.clickup.com/t/z941abzd2v',
   unreadableFile: 'https://app.clickup.com/t/z941abzd2w',
   saveStuck: 'https://app.clickup.com/t/z941abzd34',
@@ -273,12 +272,15 @@ test.describe('CRM - Scan & Create Customer/Contact (Floor OS Assistant)', () =>
     await scanCreatePage.scanToReview(card);
     await scanCreatePage.send('set the contact designation to Head of Sourcing');
 
-    await test.step(`BUG: the change isn't understood or applied (${BUG.freeText})`, async () => {
-      await scanCreatePage.expectChatLine(
-        'You can change any field, ask about the scan, or say save.',
-      );
+    // Works on dev since 2026-10-22 (it used to reply "You can change any
+    // field…" and leave the value unchanged).
+    await test.step('The assistant confirms the change', async () => {
+      await scanCreatePage.expectChatLine('Designation set to Head of Sourcing.');
+    });
+
+    await test.step('The review form shows the new Designation', async () => {
       await scanCreatePage.reviewAndSave();
-      await expect(scanCreatePage.locators.designationInput).toHaveValue(card.designation);
+      await expect(scanCreatePage.locators.designationInput).toHaveValue('Head of Sourcing');
     });
   });
 
