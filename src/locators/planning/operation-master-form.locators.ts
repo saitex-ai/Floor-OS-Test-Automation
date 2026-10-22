@@ -10,6 +10,8 @@ import { type Locator, type Page } from '@playwright/test';
 export class OperationMasterFormLocators {
   readonly newHeading: Locator;
   readonly code: Locator;
+  /** New form, since the 2026-10-16 deploy: the code is generated on save. */
+  readonly codeGeneratedHelp: Locator;
   readonly codeFixedHelp: Locator;
   readonly name: Locator;
   readonly owningDepartment: Locator;
@@ -42,6 +44,7 @@ export class OperationMasterFormLocators {
   constructor(private readonly page: Page) {
     this.newHeading = page.getByRole('heading', { name: 'New operation', level: 1 });
     this.code = page.getByRole('textbox', { name: 'Operation code' });
+    this.codeGeneratedHelp = page.getByText(/Assigned automatically when the record is saved/);
     this.codeFixedHelp = page.getByText(/The code is fixed once the record exists/);
     this.name = page.getByRole('textbox', { name: 'Operation', exact: true });
     this.owningDepartment = page.getByRole('combobox', { name: 'Owning department', exact: true });

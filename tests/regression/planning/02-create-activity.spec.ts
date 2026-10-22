@@ -9,7 +9,7 @@ import {
   personaCredentials,
   personaSkipReason,
   taggedName,
-  uniqueCode,
+  uniqueTag,
 } from './support/test-data';
 import { cleanUpAfterAll } from './support/cleanup';
 
@@ -20,8 +20,10 @@ import { cleanUpAfterAll } from './support/cleanup';
  * (ClickUp "Planning -Sprint -1 - Activities"). Since Sprint 1 a new
  * activity is created as a draft ("Send it for approval from its page to
  * publish it") — the cases assert that, see the doc's "Adjusted" notes.
- * Uniqueness cases try a seeded active code (CUT-BUFFER) and are blocked
- * before anything is saved; everything that saves is a QA-AUTO draft.
+ * Since the 2026-10-16 dev deploy the activity code is generated on save
+ * (ACT-0001…) and can't be typed: each draft carries a run-unique tag in its
+ * name instead, and its code is read back from the list. Everything that
+ * saves is a QA-AUTO draft.
  */
 const cu = (id: string) => `https://app.clickup.com/t/${id}`;
 
@@ -70,18 +72,20 @@ test.describe('Planning - Create Activity', () => {
     await activitiesListPage.open();
     await activitiesListPage.expectLoaded();
     await activitiesListPage.openNew();
-    // Since Sprint 1 a draft needs only code + name to save; every other
-    // required field is checked before it can be sent for approval.
-    await test.step('Create is blocked while Activity code and name are empty', async () => {
+    // Since Sprint 1 a draft needs only a name to save (the code is generated
+    // since the 2026-10-16 deploy); every other required field is checked
+    // before it can be sent for approval.
+    await test.step('Create is blocked while Activity name is empty; the code is generated', async () => {
       expect(await activityFormPage.create()).not.toBe('submitted');
       await activityFormPage.expectRequiredFlagged();
       await activityFormPage.expectOnCreatePage();
+      await activityFormPage.expectCodeGenerated();
     });
-    await test.step('A code-and-name-only draft lists the rest as approval prerequisites', async () => {
-      const code = uniqueCode('CUT-QA');
-      await activityFormPage.fill({ code, name: taggedName(code) });
+    await test.step('A name-only draft lists the rest as approval prerequisites', async () => {
+      const tag = uniqueTag('CUT-QA');
+      await activityFormPage.fill({ name: taggedName(tag) });
       expect(await activityFormPage.create()).toBe('submitted');
-      await openActivity(page, code);
+      await openActivity(page, await activitiesListPage.codeOf(tag));
       await activityFormPage.expectApprovalPrerequisites([
         'Owning department',
         'Activity type',
@@ -95,16 +99,22 @@ test.describe('Planning - Create Activity', () => {
   });
 
   test('TC-CA-03 Code must be unique among active activities', async ({
+    page,
     activitiesListPage,
     activityFormPage,
   }) => {
     await allure.tms(cu('z941abtdu6'), 'TC-CA-03 (ClickUp)');
+    // Dev 2026-10-16: the code is generated on save (ACT-0001…) and can't be
+    // typed, so a duplicate can't be entered. Checks what replaces the rule:
+    // the code field is locked and each new activity gets its own code.
     await activitiesListPage.open();
     await activitiesListPage.expectLoaded();
     await activitiesListPage.openNew();
-    await activityFormPage.fillAllRequired(SEED_ACTIVE_CODE, taggedName(SEED_ACTIVE_CODE));
-    expect(await activityFormPage.create()).not.toBe('submitted');
-    await activityFormPage.expectUniquenessError();
+    await activityFormPage.expectCodeGenerated();
+    const a = await createActivityDraft(page);
+    const b = await createActivityDraft(page);
+    for (const code of [a, b]) expect(code).toMatch(/^ACT-\d+$/);
+    expect(b, 'each activity gets its own code').not.toBe(a);
   });
 
   test('TC-CA-04 Standard time must be > 0 and is always minutes', async ({
@@ -118,8 +128,7 @@ test.describe('Planning - Create Activity', () => {
     await activitiesListPage.open();
     await activitiesListPage.expectLoaded();
     await activitiesListPage.openNew();
-    const code = uniqueCode('CUT-QA');
-    await activityFormPage.fillAllRequired(code, taggedName(code));
+    await activityFormPage.fillAllRequired(taggedName(uniqueTag('CUT-QA')));
     await test.step('A negative value cannot be entered (the "-" never lands)', async () => {
       await activityFormPage.typeInto('standardTime', '-10');
       expect(await activityFormPage.inputValue('standardTime')).not.toContain('-');
@@ -166,8 +175,7 @@ test.describe('Planning - Create Activity', () => {
     await activitiesListPage.open();
     await activitiesListPage.expectLoaded();
     await activitiesListPage.openNew();
-    const code = uniqueCode('CUT-QA');
-    await activityFormPage.fillAllRequired(code, taggedName(code));
+    await activityFormPage.fillAllRequired(taggedName(uniqueTag('CUT-QA')));
     await activityFormPage.addPredecessorRule(SEED_ACTIVE_CODE);
     await activityFormPage.addRequiredInput('fabric.in_house');
     await activityFormPage.addDownstreamConsumer('lab_lead');
@@ -195,16 +203,17 @@ test.describe('Planning - Create Activity', () => {
     test.skip(!probe.some((o) => o.startsWith(CYCLE_PROBE)), CYCLE_SKIP);
     knownBug('z941abu4ac');
     const a = await createActivityDraft(page);
-    const b = uniqueCode('CUT-QA');
+    const bTag = uniqueTag('CUT-QA');
     await activitiesListPage.open();
     await activitiesListPage.expectLoaded();
     await activitiesListPage.openNew();
     await activityFormPage.expectOnCreatePage();
     const offered = await activityFormPage.predecessorOptions(a);
     test.skip(!offered.some((o) => o.startsWith(a)), `Draft ${a} isn't offered as a predecessor.`);
-    await activityFormPage.fillAllRequired(b, taggedName(b));
+    await activityFormPage.fillAllRequired(taggedName(bTag));
     await activityFormPage.addPredecessorRule(a);
     expect(await activityFormPage.create()).toBe('submitted');
+    const b = await activitiesListPage.codeOf(bTag);
     await openActivity(page, a);
     await activityFormPage.startEditing();
     await activityFormPage.addPredecessorRule(b);
@@ -222,13 +231,13 @@ test.describe('Planning - Create Activity', () => {
     await activitiesListPage.open();
     await activitiesListPage.expectLoaded();
     await activitiesListPage.openNew();
-    const code = uniqueCode('CUT-QA');
-    await activityFormPage.fill({ code, name: taggedName(code) });
+    const tag = uniqueTag('CUT-QA');
+    await activityFormPage.fill({ name: taggedName(tag) });
     await activityFormPage.cancel();
     await activityFormPage.expectBackOnList();
     await activitiesListPage.expectLoaded();
-    await activitiesListPage.search(code);
-    await activitiesListPage.expectNoRow(code);
+    await activitiesListPage.search(tag);
+    await activitiesListPage.expectNoRowContaining(tag);
   });
 
   test('TC-CA-10 Only a user with write permission can create an activity', async ({
@@ -257,8 +266,7 @@ test.describe('Planning - Create Activity', () => {
     await activitiesListPage.open();
     await activitiesListPage.expectLoaded();
     await activitiesListPage.openNew();
-    const code = uniqueCode('CUT-QA');
-    await activityFormPage.fillAllRequired(code, taggedName(code));
+    await activityFormPage.fillAllRequired(taggedName(uniqueTag('CUT-QA')));
     for (const field of ['standardTime', 'efficiencyAssumed'] as const) {
       await test.step(`"abc" never saves in ${field}`, async () => {
         await activityFormPage.typeInto(field, 'abc');
@@ -271,17 +279,19 @@ test.describe('Planning - Create Activity', () => {
   });
 
   test('TC-CA-12 Code uniqueness check is case-insensitive', async ({
+    page,
     activitiesListPage,
     activityFormPage,
   }) => {
     await allure.tms(cu('z941abtduj'), 'TC-CA-12 (ClickUp)');
-    const lower = SEED_ACTIVE_CODE.toLowerCase();
+    // Dev 2026-10-16: the code is generated on save and can't be typed, so a
+    // lower-case copy of an existing code can't be entered. Checks the field
+    // is locked and the generated code is upper case.
     await activitiesListPage.open();
     await activitiesListPage.expectLoaded();
     await activitiesListPage.openNew();
-    await activityFormPage.fillAllRequired(lower, taggedName(lower));
-    expect(await activityFormPage.create()).not.toBe('submitted');
-    await activityFormPage.expectUniquenessError();
+    await activityFormPage.expectCodeGenerated();
+    expect(await createActivityDraft(page)).toMatch(/^ACT-\d+$/);
   });
 
   test('TC-CA-13 An activity cannot list itself as its own predecessor', async ({
@@ -290,13 +300,14 @@ test.describe('Planning - Create Activity', () => {
   }) => {
     await allure.tms(cu('z941abtduk'), 'TC-CA-13 (ClickUp)');
     // "The activity must already exist, and an activity cannot be its own
-    // predecessor": a code being created is never offered as a predecessor.
+    // predecessor": the activity being created is never offered as a
+    // predecessor (it has no code until saved, so look for its name tag).
     await activitiesListPage.open();
     await activitiesListPage.expectLoaded();
     await activitiesListPage.openNew();
-    const code = uniqueCode('CUT-QA');
-    await activityFormPage.fillAllRequired(code, taggedName(code));
-    const offered = await activityFormPage.predecessorOptions(code);
-    expect(offered.filter((o) => o.startsWith(`${code} `))).toEqual([]);
+    const tag = uniqueTag('CUT-QA');
+    await activityFormPage.fillAllRequired(taggedName(tag));
+    const offered = await activityFormPage.predecessorOptions(tag);
+    expect(offered.filter((o) => o.includes(tag))).toEqual([]);
   });
 });

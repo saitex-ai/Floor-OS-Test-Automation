@@ -225,20 +225,31 @@ export async function cleanUpCreated(
     for (const cleaner of cleaners) {
       const norm = cleaner.normalize ?? ((c: string) => c);
       const tracked = takeCodes(file, cleaner.prefix);
-      // "tag:<tag>": a record whose code dev generates, tracked by its name tag
-      // before saving — found by that tag here, in case reading its code failed.
-      const tags = tracked.filter((c) => c.startsWith('tag:')).map((c) => c.slice(4));
+      // "tag:<tag>[@<term>]": a record whose code dev generates, tracked by its
+      // name tag before saving — found by that tag here (searching <term> when
+      // the list's search doesn't cover the tag), in case reading its code failed.
+      const tagged = tracked.filter((c) => c.startsWith('tag:')).map((c) => c.slice(4));
       const known = tracked.filter((c) => !c.startsWith('tag:')).map(norm);
-      if (!known.length && !tags.length) continue;
+      if (!known.length && !tagged.length) continue;
       const term = norm(runPrefix(cleaner.prefix));
+      const tagsByTerm = new Map<string, string[]>();
+      for (const entry of tagged) {
+        const [tag = entry, searchBy = term] = entry.split('@');
+        tagsByTerm.set(searchBy, [...(tagsByTerm.get(searchBy) ?? []), tag]);
+      }
       for (const list of cleaner.lists(page)) {
         await list.open();
         await list.expectLoaded();
-        const codes = [
-          ...new Set([...known, ...(tags.length ? await list.codesForTags(term, tags) : [])]),
-        ];
+        const found: string[] = [];
+        for (const [searchBy, tags] of tagsByTerm)
+          found.push(...(await list.codesForTags(searchBy, tags)));
+        const codes = [...new Set([...known, ...found])];
         // Codes that were generated but never saved (blocked/cancel cases) have no row.
         const rows = await list.rowTexts(term, codes);
+        // A row without the run prefix (a machine: its tag is in a system link,
+        // which the search doesn't cover) is looked up by its own code instead.
+        for (const code of codes.filter((c) => !rows.has(c) && !c.startsWith(term)))
+          for (const [c, text] of await list.rowTexts(code, [code])) rows.set(c, text);
         for (const [code, rowText] of rows) {
           if (cleaner.done?.(rowText)) continue;
           try {

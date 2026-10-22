@@ -16,6 +16,8 @@ import { type Locator, type Page } from '@playwright/test';
 export class WorkCentreFormLocators {
   readonly newHeading: Locator;
   readonly centreCode: Locator;
+  /** New form, since the 2026-10-16 deploy: the code is generated on save. */
+  readonly codeGeneratedHelp: Locator;
   readonly codeFixedHelp: Locator;
   readonly name: Locator;
   readonly owningDepartment: Locator;
@@ -50,6 +52,7 @@ export class WorkCentreFormLocators {
   constructor(private readonly page: Page) {
     this.newHeading = page.getByRole('heading', { name: 'New work centre', level: 1 });
     this.centreCode = page.getByRole('textbox', { name: 'Centre code' });
+    this.codeGeneratedHelp = page.getByText(/Assigned automatically when the record is saved/);
     this.codeFixedHelp = page.getByText(/The code is fixed once the record exists/);
     this.name = page.getByRole('textbox', { name: 'Name', exact: true });
     this.owningDepartment = page.getByRole('combobox', { name: 'Owning department', exact: true });

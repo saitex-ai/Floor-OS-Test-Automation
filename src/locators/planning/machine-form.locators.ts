@@ -9,6 +9,8 @@ import { type Locator, type Page } from '@playwright/test';
 export class MachineFormLocators {
   readonly newHeading: Locator;
   readonly assetCode: Locator;
+  /** New form, since the 2026-10-16 deploy: the code is generated on save. */
+  readonly codeGeneratedHelp: Locator;
   readonly codeFixedHelp: Locator;
   readonly machineType: Locator;
   readonly workCentre: Locator;
@@ -33,6 +35,7 @@ export class MachineFormLocators {
   constructor(private readonly page: Page) {
     this.newHeading = page.getByRole('heading', { name: 'New machine', level: 1 });
     this.assetCode = page.getByRole('textbox', { name: 'Asset code' });
+    this.codeGeneratedHelp = page.getByText(/Assigned automatically when the record is saved/);
     this.codeFixedHelp = page.getByText(/The code is fixed once the record exists/);
     // Was a free-text "Machine class" textbox until the 2026-10-14 dev deploy; now a
     // combobox of the Machine type master ("BTK · Bartack", …) with no empty choice.

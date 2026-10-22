@@ -13,6 +13,8 @@ export class RecipeFormLocators {
   readonly cancelButton: Locator;
 
   readonly code: Locator;
+  /** New form, since the 2026-10-16 deploy: the code is generated on save. */
+  readonly codeGeneratedHelp: Locator;
   readonly codeLockedHelp: Locator;
   readonly name: Locator;
   readonly recipeType: Locator;
@@ -42,6 +44,7 @@ export class RecipeFormLocators {
     this.cancelButton = page.getByRole('button', { name: 'Cancel' });
 
     this.code = this.textbox('Code');
+    this.codeGeneratedHelp = page.getByText(/Assigned automatically when the record is saved/);
     this.codeLockedHelp = page.getByText(/The code is fixed once the record exists/);
     this.name = this.textbox('Recipe');
     this.recipeType = this.combobox('Recipe type');
