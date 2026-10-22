@@ -1,6 +1,7 @@
 import { type Page, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
 import { RecipeDetailLocators } from '../../locators/planning/recipe-detail.locators';
+import { detailValue } from '../../locators/planning/form-field.locators';
 import { expectAbsentOrDisabled } from './master-data-list.page';
 import { WAIT } from './waits';
 
@@ -16,6 +17,16 @@ export class RecipeDetailPage extends BasePage {
   constructor(page: Page) {
     super(page);
     this.locators = new RecipeDetailLocators(page);
+  }
+
+  /** After "Create recipe": the code dev generated (RCP-0001…), read from the new detail page. */
+  async createdCode(): Promise<string> {
+    await expect(this.page).toHaveURL(/\/planning\/master-data\/recipes\/(?!new$)[\w-]+$/, {
+      timeout: WAIT.NAVIGATION,
+    });
+    const code = detailValue(this.page, 'Code');
+    await expect(code).toHaveText(/^[A-Z][A-Z0-9_]*-\d+$/, { timeout: WAIT.NAVIGATION });
+    return (await code.innerText()).trim();
   }
 
   async expectLoaded(code: string): Promise<void> {

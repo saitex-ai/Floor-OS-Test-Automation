@@ -54,6 +54,7 @@ import {
   type BreakValues,
   type ShiftValues,
 } from '../../../../src/pages/planning/shifts.page';
+import { OperationsListPage } from '../../../../src/pages/planning/operations-list.page';
 import { WorkCentresListPage } from '../../../../src/pages/planning/work-centres-list.page';
 import {
   WorkCentreFormPage,
@@ -108,14 +109,15 @@ export function uniqueCode(prefix: string): string {
  * 2026-10-16 deploy: calendars, shifts, activities, recipes, operations, work
  * centres, machines). It goes in the record's name, so the cleanup's search for
  * runPrefix(prefix) still finds the row; the generated code is then recorded
- * with trackCode().
+ * with trackCode(). `searchBy` is what cleanup searches instead when the list's
+ * search doesn't cover where the tag is (a machine's: its work centre).
  */
-export function uniqueTag(prefix: string): string {
+export function uniqueTag(prefix: string, searchBy?: string): string {
   counter += 1;
   const tag = `${prefix}${RUN}${counter.toString(36).toUpperCase()}`;
   // Tracked up front too, so cleanup finds the record by its name even if
   // reading its generated code back fails.
-  track(prefix, `tag:${tag}`);
+  track(prefix, `tag:${tag}${searchBy ? `@${searchBy}` : ''}`);
   return tag;
 }
 
@@ -125,12 +127,30 @@ export function trackCode(prefix: string, code: string): void {
 }
 
 const names = new Map<string, string>();
+const tags = new Map<string, string>();
 
 /** The name a create helper gave a record (it holds the record's QA-AUTO tag). */
 export function nameOf(code: string): string {
   const name = names.get(code);
   if (!name) throw new Error(`No name recorded for ${code}`);
   return name;
+}
+
+/**
+ * The run tag a create helper put in a record's name. A rename keeps it, so
+ * the record's cleanup (which searches the run's tags) still finds it.
+ */
+export function tagOf(code: string): string {
+  const tag = tags.get(code);
+  if (!tag) throw new Error(`No tag recorded for ${code}`);
+  return tag;
+}
+
+/** Records a created record's generated code, its tag and its name for later steps and cleanup. */
+function remember(prefix: string, code: string, tag: string, name: string): void {
+  trackCode(prefix, code);
+  names.set(code, name);
+  tags.set(code, tag);
 }
 
 /** The part of every code this worker hands out for `prefix` — one search finds them all. */
@@ -173,23 +193,27 @@ export async function setupPage(browser: Browser): Promise<Page> {
 }
 
 /**
- * Creates an activity draft ("Create draft") with every required field
- * set and returns its code. Activity codes are department-prefixed.
+ * Creates an activity draft ("Create draft") with every required field set
+ * and returns the code dev generated for it (ACT-0001…). Create lands on the
+ * list, so the code is read from the row with the activity's tagged name.
  */
 export async function createActivityDraft(
   page: Page,
   overrides: ActivityFieldValues = {},
 ): Promise<string> {
-  const code = overrides.code ?? uniqueCode('CUT-QA');
+  const tag = uniqueTag('CUT-QA');
+  const name = taggedName(tag);
   const list = new ActivitiesListPage(page);
   const form = new ActivityFormPage(page);
   await list.open();
   await list.expectLoaded();
   await list.openNew();
   await form.expectOnCreatePage();
-  await form.fillAllRequired(code, taggedName(code), overrides);
-  expect(await form.create(), `create activity draft ${code}`).toBe('submitted');
+  await form.fillAllRequired(name, overrides);
+  expect(await form.create(), `create activity draft ${tag}`).toBe('submitted');
   await form.expectCreatedAsDraft();
+  const code = await list.codeOf(tag);
+  remember('CUT-QA', code, tag, name);
   return code;
 }
 
@@ -233,18 +257,25 @@ export async function openGrade(page: Page, code: string): Promise<void> {
   await new DifficultyGradeFormPage(page).expectOnDetailPage();
 }
 
-/** Creates a recipe (draft v1) and leaves the page on its detail page. Returns its code. */
+/**
+ * Creates a recipe (draft v1) and returns the code dev generated for it
+ * (RCP-0001…), read from the detail page create lands on (and leaves it there).
+ */
 export async function createRecipe(page: Page, overrides: RecipeFieldValues = {}): Promise<string> {
-  const code = overrides.code ?? uniqueCode('QAR-');
+  const tag = uniqueTag('QAR-');
+  const name = taggedName(tag);
   const list = new RecipesListPage(page);
   const form = new RecipeFormPage(page);
   await list.open();
   await list.expectLoaded();
   await list.openNew();
   await form.expectOnCreatePage();
-  await form.fillAllRequired(code, taggedName(code), overrides);
-  expect(await form.create(), `create recipe ${code}`).toBe('submitted');
-  await new RecipeDetailPage(page).expectLoaded(code);
+  await form.fillAllRequired(name, overrides);
+  expect(await form.create(), `create recipe ${tag}`).toBe('submitted');
+  const detail = new RecipeDetailPage(page);
+  const code = await detail.createdCode();
+  remember('QAR-', code, tag, name);
+  await detail.expectLoaded(code);
   return code;
 }
 
@@ -288,25 +319,31 @@ export const ON_MACHINE_GRADE = /^D — simple/;
 /**
  * Creates a Draft operation with every field the form insists on
  * (department Sewing, the off-machine grade "M — manual", skill grade S3)
- * and returns its code. Lands back on the list.
+ * and returns the code dev generated for it (OP-0001…). `beforeCreate` adds
+ * anything else (parameters, a motion study) just before Create. Lands back on
+ * the list, where the code is read from the row with the operation's tagged name.
  */
 export async function createOperation(
   page: Page,
   overrides: OperationMasterValues = {},
+  beforeCreate?: (form: OperationMasterFormPage) => Promise<void>,
 ): Promise<string> {
-  const code = overrides.code ?? uniqueCode('QA-OP');
+  const tag = uniqueTag('QA-OP');
+  const name = taggedName(tag);
   const form = new OperationMasterFormPage(page);
   await form.open();
   await form.fill({
-    code,
-    name: taggedName(code),
     department: /^Sewing$/,
     grade: OFF_MACHINE_GRADE,
     skillGrade: /^S3/,
     defaultSam: '1.1',
     ...overrides,
+    name,
   });
-  expect(await form.create(), `create operation ${code}`).toBe('submitted');
+  await beforeCreate?.(form);
+  expect(await form.create(), `create operation ${tag}`).toBe('submitted');
+  const code = await new OperationsListPage(page).codeOf(tag);
+  remember('QA-OP', code, tag, name);
   return code;
 }
 
@@ -333,17 +370,24 @@ export async function addAllowance(
   await detail.expectAllowanceRow(values.type);
 }
 
-/** Creates an Active work centre (department Sewing, Time based, Minutes) and returns its code. */
+/**
+ * Creates an Active work centre (department Sewing, Time based, Minutes) and
+ * returns the code dev generated for it (WC-0001…), read from the list row
+ * with the centre's tagged name (create lands on the list).
+ */
 export async function createWorkCentre(
   page: Page,
   options: { usedFor?: string; capability?: CapabilityValues } = {},
 ): Promise<string> {
-  const code = uniqueCode('QA-WC');
+  const tag = uniqueTag('QA-WC');
+  const name = taggedName(tag);
   const form = new WorkCentreFormPage(page);
   await form.open();
-  await form.fillRequired({ code, name: taggedName(code), usedFor: options.usedFor });
+  await form.fillRequired({ name, usedFor: options.usedFor });
   if (options.capability) await form.addCapability(options.capability);
-  expect(await form.submitCreate(), `create work centre ${code}`).toBe('submitted');
+  expect(await form.submitCreate(), `create work centre ${tag}`).toBe('submitted');
+  const code = await new WorkCentresListPage(page).codeOf(tag);
+  remember('QA-WC', code, tag, name);
   return code;
 }
 
@@ -366,30 +410,36 @@ export const OTHER_MACHINE_TYPE = /^OL-3T · /;
 /**
  * The QA-AUTO marker a machine carries. A machine has no name, and since the
  * 2026-10-14 deploy its type is a picker, so the marker is a system link
- * (System "QA-AUTO", Identifier "<code> — …"), shown on the list and detail.
+ * (System "QA-AUTO", Identifier "<tag> — …"), shown on the list and detail.
  */
-export function machineTagFor(code: string): string {
-  return `${code} — Planning regression test data (pw-hybrid-framework). Safe to delete.`;
+export function machineTagFor(tag: string): string {
+  return `${tag} — Planning regression test data (pw-hybrid-framework). Safe to delete.`;
 }
 
-/** Creates a machine on `workCentre` and returns its asset code. */
+/**
+ * Creates a machine on `workCentre` and returns the asset code dev generated
+ * for it (MC-0001…). The list's search doesn't cover system links, so the
+ * code is read from the row with the machine's tag among `workCentre`'s
+ * machines (create lands on the list). nameOf(code) is its system-link tag.
+ */
 export async function createMachine(
   page: Page,
   workCentre: string,
   options: { status?: MachineStatus; property?: [string, string] } = {},
 ): Promise<string> {
-  const code = uniqueCode('QA-M');
+  const tag = uniqueTag('QA-M', workCentre);
   const form = new MachineFormPage(page);
   await form.open();
   await form.fillRequired({
-    code,
     machineType: QA_MACHINE_TYPE,
     workCentre,
     status: options.status,
   });
   if (options.property) await form.addProperty(...options.property);
-  await form.addSystemLink('QA-AUTO', machineTagFor(code));
-  expect(await form.submitCreate(), `create machine ${code}`).toBe('submitted');
+  await form.addSystemLink('QA-AUTO', machineTagFor(tag));
+  expect(await form.submitCreate(), `create machine ${tag}`).toBe('submitted');
+  const code = await new MachinesListPage(page).codeOf(tag, workCentre);
+  remember('QA-M', code, tag, machineTagFor(tag));
   return code;
 }
 
@@ -473,8 +523,7 @@ export async function createCalendar(page: Page, options: CalendarOptions = {}):
   await form.fill({ name, ...options });
   expect(await form.submitCreate(), `create calendar ${tag}`).toBe('submitted');
   const code = await new CalendarDetailPage(page).createdCode();
-  trackCode('QA-CAL', code);
-  names.set(code, name);
+  remember('QA-CAL', code, tag, name);
   return code;
 }
 
@@ -518,8 +567,7 @@ export async function createShift(page: Page, values: ShiftValues = {}): Promise
   await form.fill({ name, kind: 'Standard', starts: '07:30', ends: '16:30', ...values });
   expect(await form.create(), `create shift ${tag}`).toBe('submitted');
   const code = await new ShiftsListPage(page).codeOf(tag);
-  trackCode('QA_SH', code);
-  names.set(code, name);
+  remember('QA_SH', code, tag, name);
   await new ShiftDetailPage(page).open(code);
   return code;
 }

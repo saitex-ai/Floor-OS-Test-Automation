@@ -14,9 +14,11 @@ import {
   openWorkCentre,
   personaCredentials,
   personaSkipReason,
+  nameOf,
   setupPage,
   taggedName,
-  uniqueCode,
+  tagOf,
+  uniqueTag,
 } from './support/test-data';
 import { cleanUpAfterAll } from './support/cleanup';
 
@@ -26,7 +28,8 @@ import { cleanUpAfterAll } from './support/cleanup';
  *
  * Source of truth for these cases: test-cases/planning/work-centres.md
  * (ClickUp "Planning -Sprint-2 - Work Centre"). Work centres are only ever
- * created by this file (QA-AUTO tagged, code prefix QA-WC); seed centres
+ * created by this file (QA-AUTO tagged, a QA-WC… tag in the name; dev
+ * generates the code, WC-0001…, since the 2026-10-16 deploy); seed centres
  * (WASH-A, LINE-30, …) are only read. They can't be deleted, only retired.
  *
  * beforeAll builds `sample` (a Sample centre that can run SEW-MAIN,
@@ -81,18 +84,22 @@ test.describe('Planning - Work Centres', () => {
     await allure.tms(cu('z941abvb7x'), 'TC-CWC-02 (ClickUp)');
     // Live required set (2026-10-12): the case's list minus Effective from
     // (removed on request, Demo Feedback z941abwdad) plus Centre type
-    // (required since 2026-10-01).
+    // (required since 2026-10-01), minus Centre code (generated on save
+    // since the 2026-10-16 dev deploy).
     test.setTimeout(420_000);
     await workCentreFormPage.open();
-    await test.step('An empty form flags exactly the 8 required fields', async () => {
+    await test.step('An empty form flags exactly the 7 required fields; the code is generated', async () => {
       await workCentreFormPage.create();
       await workCentreFormPage.expectRequiredCount(WORK_CENTRE_REQUIRED.length);
+      await workCentreFormPage.expectCodeGenerated();
     });
     for (const field of WORK_CENTRE_REQUIRED) {
       await test.step(`Empty ${field} blocks Create`, async () => {
-        const code = uniqueCode('QA-WC');
         await workCentreFormPage.open();
-        await workCentreFormPage.fillRequired({ code, name: taggedName(code) }, { except: field });
+        await workCentreFormPage.fillRequired(
+          { name: taggedName(uniqueTag('QA-WC')) },
+          { except: field },
+        );
         expect(await workCentreFormPage.submitCreate()).not.toBe('submitted');
         await workCentreFormPage.expectFieldFlagged(field);
         await workCentreFormPage.expectRequiredCount(1);
@@ -102,18 +109,16 @@ test.describe('Planning - Work Centres', () => {
 
   test('TC-CWC-03 Centre code must be unique, case-insensitively', async ({
     workCentreFormPage,
-    workCentresListPage,
   }) => {
     await allure.tms(cu('z941abvb7y'), 'TC-CWC-03 (ClickUp)');
+    // Dev 2026-10-16: the code is generated on save (WC-0001…) and can't be
+    // typed, so a duplicate (in any case) can't be entered. Checks what
+    // replaces the rule: the code field is locked and each new centre gets
+    // its own upper-case code (`sample` and `bulk` from beforeAll).
     await workCentreFormPage.open();
-    await workCentreFormPage.fillRequired({
-      code: sample.toLowerCase(),
-      name: taggedName(`${sample}-DUP`),
-    });
-    expect(await workCentreFormPage.submitCreate()).not.toBe('submitted');
-    await workCentreFormPage.expectCodeTaken();
-    await workCentresListPage.findRow(sample);
-    await expect.poll(() => workCentresListPage.visibleRowCount()).toBe(1);
+    await workCentreFormPage.expectCodeGenerated();
+    for (const code of [sample, bulk]) expect(code).toMatch(/^WC-\d+$/);
+    expect(bulk, 'each work centre gets its own code').not.toBe(sample);
   });
 
   test('TC-CWC-04 "What it is used for" offers Bulk / Sample and matches the list tab', async ({
@@ -197,13 +202,13 @@ test.describe('Planning - Work Centres', () => {
     workCentresListPage,
   }) => {
     await allure.tms(cu('z941abvb83'), 'TC-CWC-08 (ClickUp)');
-    const code = uniqueCode('QA-WC');
+    const tag = uniqueTag('QA-WC');
     await workCentreFormPage.open();
-    await workCentreFormPage.fillRequired({ code, name: taggedName(code) });
+    await workCentreFormPage.fillRequired({ name: taggedName(tag) });
     await workCentreFormPage.cancel();
     await workCentresListPage.expectLoaded();
-    await workCentresListPage.search(code);
-    await workCentresListPage.expectNoRow(code);
+    await workCentresListPage.search(tag);
+    await workCentresListPage.expectNoRowContaining(tag);
   });
 
   test('TC-CWC-09 Only a user with write permission can create a work centre', async ({
@@ -250,8 +255,9 @@ test.describe('Planning - Work Centres', () => {
     await allure.tms(cu('z941abvb89'), 'TC-EWC-02 (ClickUp)');
     // Area has no options on dev (no layout drawn yet), so it's left alone.
     const code = await createWorkCentre(page);
-    // A work centre's name is at most 96 characters (the full tag + "edited" is longer).
-    const renamed = `QA-AUTO ${code} edited — Planning regression test data`;
+    // A work centre's name is at most 96 characters (the full tag + "edited" is
+    // longer). Keeps the run tag: cleanup finds the record by it.
+    const renamed = `QA-AUTO ${tagOf(code)} edited — Planning regression test data`;
     await openWorkCentre(page, code);
     await workCentreDetailPage.startEditing();
     await workCentreFormPage.expectOnEditPage();
@@ -338,11 +344,13 @@ test.describe('Planning - Work Centres', () => {
     const baseline = await workCentreDetailPage.value('Baseline operators');
     await workCentreDetailPage.startEditing();
     await workCentreFormPage.expectOnEditPage();
-    await workCentreFormPage.setName(taggedName(`${bulk} cancelled`));
+    await workCentreFormPage.setName(
+      `QA-AUTO ${tagOf(bulk)} cancelled — Planning regression test data`,
+    );
     await workCentreFormPage.setBaselineOperators('99');
     await workCentreFormPage.cancel();
     await openWorkCentre(page, bulk);
-    await workCentreDetailPage.expectValue('Name', taggedName(bulk));
+    await workCentreDetailPage.expectValue('Name', nameOf(bulk));
     await workCentreDetailPage.expectValue('Baseline operators', baseline);
   });
 
@@ -392,7 +400,7 @@ test.describe('Planning - Work Centres', () => {
       await workCentresListPage.expectEveryRowMatches(sample);
     });
     await test.step('By name', async () => {
-      await workCentresListPage.search(taggedName(sample).slice(0, 25));
+      await workCentresListPage.search(nameOf(sample).slice(0, 25));
       await workCentresListPage.expectRowVisible(sample);
     });
     await test.step('By capacity model', async () => {

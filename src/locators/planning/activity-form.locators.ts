@@ -18,6 +18,8 @@ export class ActivityFormLocators {
   readonly editActivityButton: Locator;
 
   readonly code: Locator;
+  /** New form, since the 2026-10-16 deploy: the code is generated on save. */
+  readonly codeGeneratedHelp: Locator;
   readonly name: Locator;
   readonly owningDepartment: Locator;
   readonly activityType: Locator;
@@ -57,6 +59,7 @@ export class ActivityFormLocators {
     this.editActivityButton = page.getByRole('button', { name: /^Edit (activity|revision)$/ });
 
     this.code = this.textbox('Activity code');
+    this.codeGeneratedHelp = page.getByText(/Assigned automatically when the record is saved/);
     this.name = this.textbox('Activity name');
     this.owningDepartment = this.combobox('Owning department');
     this.activityType = this.combobox('Activity type');

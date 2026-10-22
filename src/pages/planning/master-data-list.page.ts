@@ -149,6 +149,13 @@ export abstract class MasterDataListPage extends BasePage {
     await expect(this.grid.row(code)).toHaveCount(0, { timeout: WAIT.SERVER });
   }
 
+  /** No row holds `text` anywhere (e.g. a record's name tag, when it has no code yet). */
+  async expectNoRowContaining(text: string): Promise<void> {
+    await expect(this.grid.bodyRows().filter({ hasText: text })).toHaveCount(0, {
+      timeout: WAIT.SERVER,
+    });
+  }
+
   async expectRowContains(code: string, text: string | RegExp): Promise<void> {
     await expect(this.grid.row(code)).toContainText(text, { timeout: WAIT.SERVER });
   }
@@ -174,12 +181,6 @@ export abstract class MasterDataListPage extends BasePage {
       .toEqual([]);
   }
 
-  /**
-   * Searches `term` and returns each of `codes` that has a row, with that
-   * row's text. The search applies after a debounce, so this first waits
-   * until every visible row contains `term` (or the grid is empty) — a read
-   * before that would still see the unfiltered first page.
-   */
   /**
    * For cleanup: the codes of rows whose text holds one of `tags` (a record's
    * unique name tag), after searching `term`. Codes as dev generates them
@@ -208,6 +209,29 @@ export abstract class MasterDataListPage extends BasePage {
     return codes;
   }
 
+  /**
+   * After a create that lands on the list: the code dev generated for the
+   * record whose row holds `tag` (its unique name tag), found by searching
+   * `term` (the tag itself unless the list's search doesn't cover where the
+   * tag is, e.g. a machine's system link).
+   */
+  async codeOf(tag: string, term: string = tag): Promise<string> {
+    await this.expectLoaded();
+    await this.search(term);
+    const row = this.grid.bodyRows().filter({ hasText: tag }).first();
+    await expect(row).toBeVisible({ timeout: WAIT.SERVER });
+    const cells = (await row.getByRole('cell').allInnerTexts()).map((c) => c.trim());
+    const code = cells.find((c) => /^[A-Z][A-Z0-9_]*-\d+$/.test(c));
+    if (!code) throw new Error(`No generated code in row "${cells.join(' | ')}"`);
+    return code;
+  }
+
+  /**
+   * Searches `term` and returns each of `codes` that has a row, with that
+   * row's text. The search applies after a debounce, so this first waits
+   * until every visible row contains `term` (or the grid is empty) — a read
+   * before that would still see the unfiltered first page.
+   */
   async rowTexts(term: string, codes: string[]): Promise<Map<string, string>> {
     await this.search(term);
     const rows = this.grid.bodyRows();

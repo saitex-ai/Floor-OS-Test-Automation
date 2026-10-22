@@ -19,9 +19,11 @@ export interface WorkCentreFieldValues {
   usedFor?: string;
 }
 
-/** The fields an empty create flags as "Required" (2026-10-12). */
+/**
+ * The fields an empty create flags as "Required" (2026-10-12; the code is
+ * generated on save since the 2026-10-16 dev deploy).
+ */
 export const WORK_CENTRE_REQUIRED = [
-  'code',
   'name',
   'owningDepartment',
   'usedFor',
@@ -113,7 +115,6 @@ export class WorkCentreFormPage extends BasePage {
   private control(field: WorkCentreRequiredField): Locator {
     const l = this.locators;
     return {
-      code: l.centreCode,
       name: l.name,
       owningDepartment: l.owningDepartment,
       usedFor: l.usedFor,
@@ -140,8 +141,7 @@ export class WorkCentreFormPage extends BasePage {
     options: { except?: WorkCentreRequiredField } = {},
   ): Promise<void> {
     const skip = (field: WorkCentreRequiredField) => options.except === field;
-    if (!skip('code') && values.code !== undefined)
-      await this.locators.centreCode.fill(values.code);
+    if (values.code !== undefined) await this.locators.centreCode.fill(values.code);
     if (!skip('name')) await this.locators.name.fill(values.name);
     if (!skip('owningDepartment'))
       await this.pick(this.locators.owningDepartment, values.owningDepartment ?? 'Sewing');
@@ -256,6 +256,13 @@ export class WorkCentreFormPage extends BasePage {
 
   async expectCodeTaken(): Promise<void> {
     await expect(this.locators.codeTaken.first()).toBeVisible({ timeout: WAIT.SERVER });
+  }
+
+  /** New form since the 2026-10-16 deploy: the code can't be typed, dev assigns it on save. */
+  async expectCodeGenerated(): Promise<void> {
+    await expect(this.locators.centreCode).toBeDisabled();
+    await expect(this.locators.centreCode).toHaveAttribute('placeholder', 'Auto-generated');
+    await expect(this.locators.codeGeneratedHelp).toBeVisible();
   }
 
   async expectCodeLocked(code: string): Promise<void> {

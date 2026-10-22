@@ -28,8 +28,9 @@ export interface OperationMasterValues {
 /**
  * The fields marked * that block Create (Standard time basis is pre-set, so
  * it can't be empty). Minimum skill grade has no asterisk and is optional.
+ * The code is generated on save since the 2026-10-16 dev deploy.
  */
-export const OPERATION_REQUIRED = ['code', 'name', 'department', 'grade'] as const;
+export const OPERATION_REQUIRED = ['name', 'department', 'grade'] as const;
 export type OperationRequiredField = (typeof OPERATION_REQUIRED)[number] | 'skillGrade';
 
 /**
@@ -227,6 +228,13 @@ export class OperationMasterFormPage extends BasePage {
     await expect(this.locators.codeTaken.first()).toContainText(existingName, {
       timeout: WAIT.SERVER,
     });
+  }
+
+  /** New form since the 2026-10-16 deploy: the code can't be typed, dev assigns it on save. */
+  async expectCodeGenerated(): Promise<void> {
+    await expect(this.locators.code).toBeDisabled();
+    await expect(this.locators.code).toHaveAttribute('placeholder', 'Auto-generated');
+    await expect(this.locators.codeGeneratedHelp).toBeVisible();
   }
 
   async expectCodeLocked(code: string): Promise<void> {

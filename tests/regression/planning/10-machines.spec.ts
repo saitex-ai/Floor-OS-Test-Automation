@@ -11,13 +11,14 @@ import {
   asPersona,
   createMachine,
   createWorkCentre,
+  machineTagFor,
   OTHER_MACHINE_TYPE,
   QA_MACHINE_TYPE,
   openMachine,
   personaCredentials,
   personaSkipReason,
   setupPage,
-  uniqueCode,
+  uniqueTag,
 } from './support/test-data';
 import { cleanUpAfterAll } from './support/cleanup';
 
@@ -30,7 +31,9 @@ import { cleanUpAfterAll } from './support/cleanup';
  * only ever created by this file, on a QA-AUTO work centre it creates;
  * a machine has no name field, so a "QA-AUTO" system link carries the
  * marker, and every QA machine is a "BTK · Bartack" (a type no seed machine
- * uses). Seed machines (WA-M1, DY-M1, …) are only read.
+ * uses). Seed machines (WA-M1, DY-M1, …) are only read. Since the 2026-10-16
+ * deploy dev generates the asset code (MC-0001…); the system link carries a
+ * run-unique tag instead, and the code is read back from the centre's machines.
  *
  * The 2026-10-14 dev deploy replaced the free-text "Machine class" with a
  * "Machine type" picker (the Machine type master). Cases that changed,
@@ -90,23 +93,24 @@ test.describe('Planning - Machines', () => {
     await machineFormPage.create();
     await machineFormPage.expectRequiredCount(MACHINE_REQUIRED.length);
     for (const field of MACHINE_REQUIRED) await machineFormPage.expectFieldFlagged(field);
+    // Dev 2026-10-16: the asset code is generated on save, so it isn't required any more.
+    await machineFormPage.expectCodeGenerated();
   });
 
   test('TC-CM-03 Asset code must be unique, case-insensitively', async ({
+    page,
     machineFormPage,
-    machinesListPage,
   }) => {
     await allure.tms(cu('z941abv8q3'), 'TC-CM-03 (ClickUp)');
+    // Dev 2026-10-16: the asset code is generated on save (MC-0001…) and
+    // can't be typed, so a duplicate (in any case) can't be entered. Checks
+    // what replaces the rule: the code field is locked and each new machine
+    // gets its own upper-case code.
     await machineFormPage.open();
-    await machineFormPage.fillRequired({
-      code: machine.toLowerCase(),
-      machineType: QA_MACHINE_TYPE,
-      workCentre: centre,
-    });
-    expect(await machineFormPage.submitCreate()).not.toBe('submitted');
-    await machineFormPage.expectCodeTaken();
-    await machinesListPage.findRow(machine);
-    await expect.poll(() => machinesListPage.visibleRowCount()).toBe(1);
+    await machineFormPage.expectCodeGenerated();
+    const another = await createMachine(page, centre);
+    for (const code of [machine, another]) expect(code).toMatch(/^MC-\d+$/);
+    expect(another, 'each machine gets its own code').not.toBe(machine);
   });
 
   test('TC-CM-04 Status accepts all four values, each with a distinct badge', async ({
@@ -153,17 +157,16 @@ test.describe('Planning - Machines', () => {
     machinesListPage,
   }) => {
     await allure.tms(cu('z941abv8q7'), 'TC-CM-06 (ClickUp)');
-    const code = uniqueCode('QA-M');
+    // A machine has no code until saved: its system-link tag marks it, and
+    // the centre's machines must not include it.
+    const tag = uniqueTag('QA-M', centre);
     await machineFormPage.open();
-    await machineFormPage.fillRequired({
-      code,
-      machineType: QA_MACHINE_TYPE,
-      workCentre: centre,
-    });
+    await machineFormPage.fillRequired({ machineType: QA_MACHINE_TYPE, workCentre: centre });
+    await machineFormPage.addSystemLink('QA-AUTO', machineTagFor(tag));
     await machineFormPage.cancel();
     await machinesListPage.expectLoaded();
-    await machinesListPage.search(code);
-    await machinesListPage.expectNoRow(code);
+    await machinesListPage.search(centre);
+    await machinesListPage.expectNoRowContaining(tag);
   });
 
   test('TC-CM-07 Only a user with write permission can create a machine', async ({
