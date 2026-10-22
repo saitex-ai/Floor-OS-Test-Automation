@@ -83,7 +83,6 @@ The prototype is the expected behaviour. Tests assert what dev does today in "BU
 | -------------------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [z941abzd34](https://app.clickup.com/t/z941abzd34) | TC:7, 8, 13, 20, 28 (known failures), TC:29 | **Every save is stuck** on "Nothing was saved — Checking whether this customer already exists…" (regression, afternoon of 2026-10-21). Invalid data isn't validated either. |
 | [z941abzd2p](https://app.clickup.com/t/z941abzd2p) | TC:17, 18, 21, 23                           | A missing contact email or customer name isn't asked for; the assistant offers to create the other record alone (Yes / No).                                                 |
-| [z941abzd2q](https://app.clickup.com/t/z941abzd2q) | TC:19                                       | A duplicate company name links the contact to the existing customer.                                                                                                        |
 | [z941abzd2t](https://app.clickup.com/t/z941abzd2t) | TC:20                                       | A duplicate contact email ends with "I found nothing to create on this scan".                                                                                               |
 | [z941abzd2v](https://app.clickup.com/t/z941abzd2v) | TC:22                                       | "save" before a scan gets the generic prompt.                                                                                                                               |
 | [z941abzd2w](https://app.clickup.com/t/z941abzd2w) | TC:24                                       | An unreadable file is reported as "nothing to create" with Start again.                                                                                                     |
@@ -101,6 +100,7 @@ The prototype is the expected behaviour. Tests assert what dev does today in "BU
 
 - TC:1, 2, 4, 5 failed in a headed run only because the shared sign-in step waited 60 s while dev's new shell took longer; with a 90 s wait they pass.
 - TC:9: the CRM Stage pre-fill (Lead) is checked by TC:5; opened via "save" it intermittently still reads "Select" under load, so TC:9 checks the other pre-filled values.
+- TC:19: a duplicate company is flagged and the contact is offered for linking to the existing customer ("…already exists, so the contact will be linked to that customer. Shall I proceed?", Yes / No). Confirmed as expected behaviour.
 - TC:10: changing a field from the chat now works ("Designation set to Head of Sourcing.", and the review form shows it).
 - TC:11: typed details now work as in the prototype ("Got it — I'll use the details you typed…", checks pass, Review & save offered). The assistant may drop the "Playwright" test tag from a typed company name.
 - TC:8: Creation Method isn't shown on the Customer screen, so TC:8 now checks only CRM Stage = Lead and Status = Active.

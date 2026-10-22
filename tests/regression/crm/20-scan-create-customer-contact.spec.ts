@@ -42,7 +42,6 @@ function knownSaveBug(): void {
 
 const BUG = {
   missingEmail: 'https://app.clickup.com/t/z941abzd2p',
-  duplicateCustomer: 'https://app.clickup.com/t/z941abzd2q',
   duplicateEmail: 'https://app.clickup.com/t/z941abzd2t',
   unreadableFile: 'https://app.clickup.com/t/z941abzd2w',
   saveStuck: 'https://app.clickup.com/t/z941abzd34',
@@ -468,11 +467,15 @@ test.describe('CRM - Scan & Create Customer/Contact (Floor OS Assistant)', () =>
     await scanCreatePage.openFromCustomersList();
     await scanCreatePage.upload(card.filePath);
 
-    await test.step(`BUG: the contact is offered for linking to the existing customer (${BUG.duplicateCustomer})`, async () => {
+    // Expected behaviour (confirmed with the team 2026-10-22): an existing
+    // company isn't re-created; the contact is offered for linking to it.
+    await test.step('The existing customer is flagged and linking the contact to it is offered', async () => {
       await scanCreatePage.expectChatLine(
         `Customer ${EXISTING_CUSTOMER_NAME} already exists, so the contact will be linked to that customer. Shall I proceed?`,
         90_000,
       );
+      await expect(scanCreatePage.locators.yesButton).toBeVisible();
+      await expect(scanCreatePage.locators.noButton).toBeVisible();
     });
   });
 
