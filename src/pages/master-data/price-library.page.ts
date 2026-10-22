@@ -10,20 +10,6 @@ export interface PriceRowValues {
 }
 
 /**
- * Thrown by createFreshPriceRecord() when every attempt failed purely on
- * seed data — the item had no mapped supplier, or its (item, supplier) pair
- * was already priced (409). That pair is unique forever and this module has
- * no delete, so the picker's pool runs out over repeated runs; callers skip
- * on this (an unmet data precondition) rather than fail.
- */
-export class PriceLibraryPoolExhaustedError extends Error {
-  constructor(details: string) {
-    super(`No unpriced (item, supplier) pair left in the Item code picker ${details}`);
-    this.name = 'PriceLibraryPoolExhaustedError';
-  }
-}
-
-/**
  * The "Material Price Library" screen — list
  * (/master-data/price-library), create form (/master-data/price-library/new)
  * and per-(item, supplier) detail page
@@ -167,73 +153,6 @@ export class PriceLibraryPage extends BasePage {
   }
 
   /**
-   * Same idea as pickRandomItem(), for the Supplier picker. Not every seeded
-   * item has a mapped supplier (confirmed live: some items' Supplier picker
-   * opens with zero options) — fails fast with a clear, catchable error
-   * instead of a generic 10s timeout, so createFreshPriceRecord() can treat
-   * it the same as a 409 and just try a different item.
-   */
-  async pickRandomSupplier(): Promise<string> {
-    await this.locators.supplierTrigger.click();
-    const hasOptions = await this.locators
-      .firstCmdkOption()
-      .isVisible({ timeout: 6_000 })
-      .catch(() => false);
-    if (!hasOptions) {
-      await this.page.keyboard.press('Escape');
-      throw new Error('No supplier options available for the currently selected item');
-    }
-    const options = this.page.locator('[cmdk-item]');
-    const count = await options.count();
-    const chosen = options.nth(Date.now() % count);
-    const text = (await chosen.textContent()) ?? '';
-    await chosen.click();
-    // Confirms the pick actually "took" — the trigger's own text should no
-    // longer be the unset "Select supplier" placeholder. Confirmed live
-    // this can silently fail to register under rapid repeated navigation
-    // (same race as setStartDateToday()'s own self-check), which otherwise
-    // only surfaces much later and confusingly as confirmAndSave() seeing no
-    // network request at all (blocked by client-side validation instead).
-    const stillUnset = await this.locators.supplierTrigger
-      .getByText('Select supplier', { exact: true })
-      .isVisible()
-      .catch(() => false);
-    if (stillUnset) throw new Error('Supplier pick did not register on the trigger button');
-    return text;
-  }
-
-  /**
-   * Opens the Item code picker and picks a pseudo-random option from
-   * whatever it shows **without typing anything** — confirmed live this
-   * default/unfiltered first page alone lists 30+ real items spanning many
-   * unrelated families (STRAIGHT variants, plate/rivet hardware, buttons,
-   * cartons, other agents' own `TC-Item ...` throwaway fixtures, ...), a
-   * much bigger and more diverse pool than any single keyword search
-   * returns (the picker caps a *filtered* search at 5 results — confirmed
-   * live across several different terms, see createFreshPriceRecord()'s own
-   * doc). Returns nothing: createFreshPriceRecord() reads the item's name
-   * back from the form's own disabled display afterward instead.
-   */
-  private async pickRandomItemUnfiltered(alreadyTried: Set<number>): Promise<void> {
-    await this.locators.itemCodeTrigger.click();
-    await expect(this.locators.firstCmdkOption()).toBeVisible({ timeout: 10_000 });
-    const options = this.page.locator('[cmdk-item]');
-    const count = await options.count();
-    // Random and never the same option twice per createFreshPriceRecord()
-    // call, so its attempts actually cover the pool instead of re-drawing.
-    const untried = [...Array(count).keys()].filter((i) => !alreadyTried.has(i));
-    const index = untried[Math.floor(Math.random() * untried.length)] ?? 0;
-    alreadyTried.add(index);
-    await options.nth(index).click();
-    // Same "did the pick actually register" self-check as pickRandomSupplier().
-    const stillUnset = await this.locators.itemCodeTrigger
-      .getByText('Search items...', { exact: false })
-      .isVisible()
-      .catch(() => false);
-    if (stillUnset) throw new Error('Item pick did not register on the trigger button');
-  }
-
-  /**
    * Waits for the "Item name" display to show the real auto-filled
    * description rather than its own transient "Loading…" placeholder — the
    * auto-fill fetch can still be in flight the instant after an item is
@@ -251,76 +170,45 @@ export class PriceLibraryPage extends BasePage {
   }
 
   /**
-   * Creates a brand-new Price Library record end-to-end, retrying with a
-   * different pseudo-random (item, supplier) pick whenever an attempt fails
-   * — on a real 409 (this pair is already priced), or on an item with no
-   * mapped Supplier at all (confirmed live: common across this seed data) —
-   * until one succeeds or `maxAttempts` is exhausted. This exists because of
-   * a real, confirmed backend constraint: (item, supplier) is permanently
-   * unique once a price record exists for it, and there is no delete
-   * anywhere in this module (see TC:7) — confirmed live not to be a
-   * hypothetical edge case but the single biggest practical obstacle to
-   * writing a repeatable create test here at all. A 409/no-supplier result
-   * is expected, routine retry fodder, not a test failure in its own right;
-   * anything else is surfaced immediately rather than retried blindly.
-   *
-   * Price defaults to "1" when the caller doesn't pass one: since dev
-   * 2026-10-12 the form blocks a save at the pre-filled 0 price ("Price must
-   * be greater than 0", no request sent).
+   * Creates a price record for one specific (item, supplier) pair — the
+   * item found by its Alternate Code + description (what the Item code picker searches
+   * on, confirmed live 2026-10-13; it does not match Item ID or
+   * description) and the supplier by its Vendor Code. Both pickers' options
+   * carry the code in its own text span, so matching on that span exactly
+   * can't pick a look-alike. Price defaults to "1": the form blocks a save
+   * at the pre-filled 0 ("Price must be greater than 0", no request sent).
+   * Returns the raw POST response (201 created, 409 pair already priced).
    */
-  async createFreshPriceRecord(
+  async createPriceRecordFor(
+    item: { alternateCode: string; description: string },
+    vendorCode: string,
     rowValues: PriceRowValues = {},
-    maxAttempts = 25,
-  ): Promise<{ response: Response; itemName: string; supplierName: string }> {
-    const failures: string[] = [];
-    const triedItems = new Set<number>();
-    let dataOnlyFailures = 0;
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      try {
-        if (attempt === 0) {
-          await this.openAddItemForm();
-        } else {
-          await this.locators.cancelLink.click().catch(() => this.open());
-          await this.openAddItemForm();
-        }
+  ): Promise<{ response: Response | null; itemName: string }> {
+    await this.openAddItemForm();
+    await this.pickItemByCode(item.alternateCode, item.description);
+    const itemName = await this.waitForItemNameToLoad();
+    await this.pickSupplierByCode(vendorCode);
+    await this.fillPriceRow(1, { price: '1', ...rowValues });
+    await this.setStartDateToday(1);
+    return { response: await this.confirmAndSave(), itemName };
+  }
 
-        await this.pickRandomItemUnfiltered(triedItems);
-        const itemName = await this.waitForItemNameToLoad();
-        await this.pickRandomSupplier();
-        // The trigger shows just the supplier name — exactly the list's Supplier cell.
-        const supplierName = (await this.locators.supplierTrigger.innerText()).trim();
-        await this.fillPriceRow(1, { price: '1', ...rowValues });
-        await this.setStartDateToday(1);
+  /**
+   * Item code picker: searches `alternateCode` and picks the option whose
+   * code span is exactly it — and, when given, whose name span is exactly
+   * `description` (Alternate Codes aren't unique on their own).
+   */
+  async pickItemByCode(alternateCode: string, description?: string): Promise<void> {
+    await this.locators.itemCodeTrigger.click();
+    await this.locators.cmdkSearchInput.fill(alternateCode);
+    await this.waitForCmdkFilterApplied(alternateCode);
+    await this.locators.cmdkOptionWithCode(alternateCode, description).click({ timeout: 10_000 });
+  }
 
-        const response = await this.confirmAndSave();
-        const status = response?.status();
-        if (status === 201) return { response: response!, itemName, supplierName };
-        if (status !== 409) {
-          throw new Error(`Unexpected Price Library create response: ${status ?? '(no response)'}`);
-        }
-        failures.push(`attempt ${attempt} (item "${itemName}"): 409 conflict`);
-        dataOnlyFailures++;
-      } catch (error) {
-        if ((error as Error).message.startsWith('No supplier options')) dataOnlyFailures++;
-        // Any failure on this attempt (409 conflict, an item with no mapped
-        // supplier, a transient UI hiccup, ...) just means "try a different
-        // (item, supplier) pick next" — not a reason to fail the whole
-        // create outright while attempts remain. The *last* attempts' errors
-        // are what actually get surfaced below if every attempt fails.
-        failures.push(`attempt ${attempt}: ${(error as Error).message}`);
-      }
-    }
-    const summary = `after ${maxAttempts} attempts:\n${failures.join('\n')}`;
-    // Exhausted = most attempts failed on data (no supplier / 409) and none
-    // got an unexpected API response. A few UI hiccups (e.g. the item name
-    // loading slowly) don't change that verdict; an unexpected status does.
-    const unexpectedResponse = failures.some((f) =>
-      f.includes('Unexpected Price Library create response: 5'),
-    );
-    if (!unexpectedResponse && dataOnlyFailures >= maxAttempts * 0.8) {
-      throw new PriceLibraryPoolExhaustedError(summary);
-    }
-    throw new Error(`Could not create a fresh Price Library record ${summary}`);
+  /** Supplier picker: picks the option whose code span is exactly `vendorCode`. */
+  async pickSupplierByCode(vendorCode: string): Promise<void> {
+    await this.locators.supplierTrigger.click();
+    await this.locators.cmdkOptionWithCode(vendorCode).click({ timeout: 10_000 });
   }
 
   /** Fills whichever of Price/Freight/Other/MOQ are given for price row `n`; all default to a pre-filled value, none are required (see TC:2). */

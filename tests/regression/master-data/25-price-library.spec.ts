@@ -1,9 +1,11 @@
 import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/master-data.fixtures';
-import {
-  type PriceLibraryPage,
-  PriceLibraryPoolExhaustedError,
+import type {
+  PriceLibraryPage,
+  PriceRowValues,
 } from '../../../src/pages/master-data/price-library.page';
+import type { ItemMasterPage } from '../../../src/pages/master-data/item-master.page';
+import type { VendorListPage } from '../../../src/pages/master-data/vendor-list.page';
 
 /**
  * Master Data — Price Library ("Material Price Library" screen,
@@ -19,18 +21,17 @@ import {
  * Test-data strategy, worth knowing before touching this file: this
  * module's backend enforces a **permanent** uniqueness constraint on
  * (item, supplier) — confirmed live, a real 409 (TC:7) — and there is no
- * delete anywhere in this module. A hardcoded item code would permanently
- * stop working the first time a create test actually succeeds against it,
- * and confirmed live this isn't hypothetical: the item picker caps results
- * at 5 per search term, and this session's own earlier manual exploration
- * had already primed most of one 5-item family against the single seeded
- * Supplier. Every create-flow test therefore goes through
- * `priceLibraryPage.createFreshPriceRecord()`, which cycles across several
- * distinct, broad search terms and retries on a 409 (or on an item with no
- * mapped supplier) until it finds a pick that actually saves. This is a
- * reasonable engineering trade-off against a real app constraint, not a
- * guarantee against ever exhausting every pool over a very large number of
- * CI reruns — flagged honestly here rather than assumed to be bulletproof.
+ * delete anywhere in this module. The seeded pairs ran out on dev on
+ * 2026-10-12, so every create-flow test now makes its own pair first:
+ * createFreshPriceRecord() below creates a brand-new QA-AUTO-tagged item in
+ * Item Master (unique Alternate Code, created straight as Approved), links
+ * one Approved vendor to it (Supplier tab — Price Library's Supplier picker
+ * only offers an item's default supplier), and then prices exactly that
+ * pair. Every write lands on a record the test created; no existing item
+ * is ever edited, and the pool can't run out. afterEach deletes the
+ * test's own items (confirmed live 2026-10-21 that a priced item can be
+ * deleted); price records have no delete, so they stay on dev, showing the
+ * QA-AUTO description (safe to delete from the backend).
  *
  * Two real, confirmed app gaps are deliberately asserted as-is (not worked
  * around) per this repo's established discipline:
@@ -46,21 +47,66 @@ import {
  * unconfirmed submission mechanism would be inventing behavior, not
  * automating it.
  */
+// Item Master IDs created by the current test; afterEach deletes the unpriced ones.
+const createdItemIds: string[] = [];
 /**
- * createFreshPriceRecord(), but skips (rather than fails) the calling test
- * when the seed data has no unpriced (item, supplier) pair left — an unmet
- * data precondition, not an app defect. Any other error still fails.
+ * Items that got a price record. These are NOT deleted: on dev, deleting
+ * an item leaves its price record Active and pointing at the deleted item
+ * (confirmed 2026-10-21), which is worse than a tagged leftover item.
  */
-async function createFreshOrSkip(
+const pricedItemIds = new Set<string>();
+let itemCounter = 0;
+
+/**
+ * Creates a price record for a brand-new (item, supplier) pair, with no
+ * retries: creates a fresh QA-AUTO item in Item Master, links one random
+ * Approved vendor (from Vendor Master's Approved tab) to it, then prices
+ * exactly that pair in Price Library (ending on the create form's save).
+ */
+async function createFreshPriceRecord(
   priceLibraryPage: PriceLibraryPage,
-  rowValues?: Parameters<PriceLibraryPage['createFreshPriceRecord']>[0],
-): ReturnType<PriceLibraryPage['createFreshPriceRecord']> {
-  try {
-    return await priceLibraryPage.createFreshPriceRecord(rowValues);
-  } catch (error) {
-    if (error instanceof PriceLibraryPoolExhaustedError) test.skip(true, error.message);
-    throw error;
-  }
+  itemMasterPage: ItemMasterPage,
+  vendorListPage: VendorListPage,
+  rowValues: PriceRowValues = {},
+): Promise<{
+  status: number | undefined;
+  itemName: string;
+  supplierName: string;
+  item: { itemId: string; description: string; alternateCode: string };
+  vendorCode: string;
+}> {
+  await vendorListPage.open();
+  await vendorListPage.expectLoaded();
+  const vendors = await vendorListPage.approvedVendors();
+  if (vendors.length === 0) throw new Error('No Approved vendor on Vendor Master');
+  const vendor = vendors[Math.floor(Math.random() * vendors.length)]!;
+
+  // Unique per run and per call: Item Master rejects a duplicate Alternate Code.
+  // The worker index keeps two workers apart within the same millisecond.
+  itemCounter += 1;
+  const alternateCode = `QA-AUTO-PL-${Date.now().toString(36).toUpperCase()}W${test.info().parallelIndex}N${itemCounter}`;
+  const description = `QA-AUTO ${alternateCode} Price Library test item. Safe to delete.`;
+  const itemId = await itemMasterPage.createItem({ alternateCode, description });
+  createdItemIds.push(itemId);
+  const item = { itemId, description, alternateCode };
+
+  await itemMasterPage.linkSupplier(itemId, vendor);
+
+  await priceLibraryPage.open();
+  await priceLibraryPage.expectLoaded();
+  const { response, itemName } = await priceLibraryPage.createPriceRecordFor(
+    item,
+    vendor.code,
+    rowValues,
+  );
+  pricedItemIds.add(itemId);
+  return {
+    status: response?.status(),
+    itemName,
+    supplierName: vendor.name,
+    item,
+    vendorCode: vendor.code,
+  };
 }
 
 test.describe('Master Data - Price Library', () => {
@@ -70,12 +116,39 @@ test.describe('Master Data - Price Library', () => {
     await allure.owner('Master Data QA');
   });
 
-  test('TC:1 Verify successful creation with all fields filled', async ({ priceLibraryPage }) => {
-    // createFreshPriceRecord() can need several retries against this seed
-    // data (most items have no mapped Supplier at all, and the ones that do
-    // are quickly used up — see that method's own doc) — longer than the
-    // dev project's default 60s test timeout comfortably allows.
-    test.setTimeout(200_000);
+  // Best-effort cleanup of this test's own items only. Priced items are
+  // kept (see pricedItemIds). A failed delete is recorded as an annotation,
+  // not raised: the item is QA-AUTO tagged, so a leftover is clearly test data.
+  test.afterEach(async ({ itemMasterPage }) => {
+    while (createdItemIds.length > 0) {
+      const itemId = createdItemIds.pop()!;
+      if (pricedItemIds.delete(itemId)) {
+        test.info().annotations.push({
+          type: 'test data kept',
+          description: `QA-AUTO item ${itemId} has a price record, so it is not deleted (deleting would orphan the record).`,
+        });
+        continue;
+      }
+      try {
+        await itemMasterPage.deleteItemById(itemId);
+      } catch (error) {
+        test.info().annotations.push({
+          type: 'cleanup failed',
+          description: `Could not delete QA-AUTO item ${itemId}: ${String(error).split('\n')[0]}`,
+        });
+      }
+    }
+  });
+
+  test('TC:1 Verify successful creation with all fields filled', async ({
+    priceLibraryPage,
+    itemMasterPage,
+    vendorListPage,
+  }) => {
+    // createFreshPriceRecord() creates an item and links a supplier in Item
+    // Master before creating the price record — longer than the dev
+    // project's default 60s test timeout comfortably allows.
+    test.setTimeout(300_000);
     let itemName = '';
     let supplierName = '';
 
@@ -85,13 +158,18 @@ test.describe('Master Data - Price Library', () => {
     });
 
     await test.step('Create a record with Price/Freight/Other/MOQ/Start date all filled', async () => {
-      const result = await createFreshOrSkip(priceLibraryPage, {
-        price: '12.50',
-        freightCharges: '1.00',
-        otherCharges: '0.50',
-        moq: '250',
-      });
-      expect(result.response.status()).toBe(201);
+      const result = await createFreshPriceRecord(
+        priceLibraryPage,
+        itemMasterPage,
+        vendorListPage,
+        {
+          price: '12.50',
+          freightCharges: '1.00',
+          otherCharges: '0.50',
+          moq: '250',
+        },
+      );
+      expect(result.status).toBe(201);
       ({ itemName, supplierName } = result);
     });
 
@@ -106,8 +184,10 @@ test.describe('Master Data - Price Library', () => {
 
   test('TC:2 Verify successful creation with only required fields', async ({
     priceLibraryPage,
+    itemMasterPage,
+    vendorListPage,
   }) => {
-    test.setTimeout(200_000); // see TC:1's comment on createFreshPriceRecord()'s retries
+    test.setTimeout(300_000); // see TC:1's comment on createFreshPriceRecord()
     let itemName = '';
     let supplierName = '';
 
@@ -117,8 +197,8 @@ test.describe('Master Data - Price Library', () => {
     });
 
     await test.step('Create a record leaving Freight/Other/Currency/MOQ/Customer/End date at their defaults — only Item code/Supplier/Start date/Price touched (Price must be > 0 since 2026-10-12)', async () => {
-      const result = await createFreshOrSkip(priceLibraryPage);
-      expect(result.response.status()).toBe(201);
+      const result = await createFreshPriceRecord(priceLibraryPage, itemMasterPage, vendorListPage);
+      expect(result.status).toBe(201);
       ({ itemName, supplierName } = result);
     });
 
@@ -147,8 +227,10 @@ test.describe('Master Data - Price Library', () => {
 
   test('TC:4 Verify list search by code, description, and supplier', async ({
     priceLibraryPage,
+    itemMasterPage,
+    vendorListPage,
   }) => {
-    test.setTimeout(200_000); // see TC:1's comment on createFreshPriceRecord()'s retries
+    test.setTimeout(300_000); // see TC:1's comment on createFreshPriceRecord()
     let itemName = '';
     let supplierName = '';
     let realItemCode = '';
@@ -157,8 +239,8 @@ test.describe('Master Data - Price Library', () => {
     await test.step('Create a fresh record to search for', async () => {
       await priceLibraryPage.open();
       await priceLibraryPage.expectLoaded();
-      const result = await createFreshOrSkip(priceLibraryPage);
-      expect(result.response.status()).toBe(201);
+      const result = await createFreshPriceRecord(priceLibraryPage, itemMasterPage, vendorListPage);
+      expect(result.status).toBe(201);
       ({ itemName, supplierName } = result);
       await priceLibraryPage.expectSavedAndRedirectedToList();
     });
@@ -169,6 +251,7 @@ test.describe('Master Data - Price Library', () => {
       // file's Notes) that the picker shows an Alternate-Code-style value
       // (e.g. "ALTTHR000003") while the list's own Item Code column shows a
       // different, base code (e.g. "THR000003").
+      await priceLibraryPage.expectRowVisible(itemName, supplierName);
       const cells = await priceLibraryPage.getRowCellTexts(itemName, supplierName);
       // Columns: [checkbox, Item Code, Item, Category, Supplier, Prices, Price Range, Status]
       realItemCode = cells[1] ?? '';
@@ -223,27 +306,28 @@ test.describe('Master Data - Price Library', () => {
 
   test('TC:7 Verify duplicate (Item, Supplier) handling — real bug, zero UI feedback', async ({
     priceLibraryPage,
+    itemMasterPage,
+    vendorListPage,
   }) => {
-    test.setTimeout(200_000); // see TC:1's comment on createFreshPriceRecord()'s retries
-    let itemName = '';
+    test.setTimeout(300_000); // see TC:1's comment on createFreshPriceRecord()
+    let item = { itemId: '', description: '', alternateCode: '' };
+    let vendorCode = '';
 
     await test.step('Create the first record for a given (item, supplier) pair', async () => {
       await priceLibraryPage.open();
       await priceLibraryPage.expectLoaded();
-      const result = await createFreshOrSkip(priceLibraryPage);
-      expect(result.response.status()).toBe(201);
-      itemName = result.itemName;
+      const result = await createFreshPriceRecord(priceLibraryPage, itemMasterPage, vendorListPage);
+      expect(result.status).toBe(201);
+      ({ item, vendorCode } = result);
       await priceLibraryPage.expectSavedAndRedirectedToList();
     });
 
     await test.step('Attempt a second, brand-new record for the exact same pair', async () => {
-      // Re-selecting by the exact item description (not a broad term) finds
-      // the same item just created; seed data confirmed live to map each
-      // item to exactly one Supplier, so the default/first pick reproduces
-      // the same pair deterministically.
+      // Same item (by Alternate Code) and same supplier (by Vendor Code) as
+      // the record just created.
       await priceLibraryPage.openAddItemForm();
-      await priceLibraryPage.pickItem(itemName, itemName);
-      await priceLibraryPage.pickSupplier();
+      await priceLibraryPage.pickItemByCode(item.alternateCode, item.description);
+      await priceLibraryPage.pickSupplierByCode(vendorCode);
       await priceLibraryPage.fillPriceRow(1, { price: '1' });
       await priceLibraryPage.setStartDateToday(1);
     });
@@ -347,13 +431,15 @@ test.describe('Master Data - Price Library', () => {
 
   test('TC:14 Verify there is no success toast on a successful creation either (edge)', async ({
     priceLibraryPage,
+    itemMasterPage,
+    vendorListPage,
   }) => {
-    test.setTimeout(200_000); // see TC:1's comment on createFreshPriceRecord()'s retries
+    test.setTimeout(300_000); // see TC:1's comment on createFreshPriceRecord()
     await priceLibraryPage.open();
     await priceLibraryPage.expectLoaded();
 
-    const result = await createFreshOrSkip(priceLibraryPage);
-    expect(result.response.status()).toBe(201);
+    const result = await createFreshPriceRecord(priceLibraryPage, itemMasterPage, vendorListPage);
+    expect(result.status).toBe(201);
 
     // Confirmed live: no toast of any kind appears on success — only the
     // silent redirect already asserted by expectSavedAndRedirectedToList()

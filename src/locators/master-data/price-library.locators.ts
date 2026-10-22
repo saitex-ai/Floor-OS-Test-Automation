@@ -123,6 +123,23 @@ export class PriceLibraryLocators {
     return this.page.locator('[cmdk-item]').filter({ hasText: name });
   }
 
+  /**
+   * A picker option whose code span reads exactly `code` — each option
+   * renders its code (Alternate Code / Vendor Code) in its own span next
+   * to the name, e.g. "Carton-box" + "CARTON".
+   */
+  cmdkOptionWithCode(code: string, name?: string): Locator {
+    const option = this.page.locator('[cmdk-item]').filter({
+      has: this.page.locator('span', { hasText: new RegExp(`^${escapeRegExp(code)}$`) }),
+    });
+    if (name === undefined) return option;
+    // Alternate Codes aren't unique (confirmed live: GSM406EW26030 is on two
+    // items), so the item picker also needs the name span to be exact.
+    return option.filter({
+      has: this.page.locator('span', { hasText: new RegExp(`^${escapeRegExp(name)}$`) }),
+    });
+  }
+
   firstCmdkOption(): Locator {
     return this.page.locator('[cmdk-item]').first();
   }
