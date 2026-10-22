@@ -123,7 +123,8 @@ export class AlertsLocators {
       .getByRole('main')
       .filter({ has: page.getByRole('link', { name: 'Back to alerts' }) })
       .last();
-    this.userMenuButton = page.getByRole('banner').getByRole('button', { name: /^Open user menu/ });
+    // Not scoped to the banner: module pages have no banner landmark in the new design (2026-10-22).
+    this.userMenuButton = page.getByRole('button', { name: /^Open user menu/ }).first();
 
     // Confirmed against the running app: "Delete this Alert?" with a
     // plain Cancel/Confirm pair — no "type the alert name to confirm"

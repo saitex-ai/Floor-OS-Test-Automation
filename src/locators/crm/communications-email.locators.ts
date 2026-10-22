@@ -100,8 +100,10 @@ export class CommunicationsEmailLocators {
     this.emailRows = this.emailsPanel.getByRole('listitem');
 
     this.notificationsButton = page
-      .getByRole('banner')
-      .getByRole('button', { name: /Notifications/ });
+      // Not scoped to the banner: module pages have no banner landmark in the
+      // new design (2026-10-22). "^" keeps "Control Center Notifications" out.
+      .getByRole('button', { name: /^Notifications/ })
+      .first();
     this.notificationsPanel = page
       .getByRole('dialog')
       .or(page.getByRole('menu'))

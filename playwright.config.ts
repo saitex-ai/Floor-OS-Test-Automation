@@ -87,7 +87,11 @@ export default defineConfig({
   // uat is a shared remote environment with the same cold-start/network
   // characteristics as dev (not a local server) — treat both the same,
   // distinct only from local.
-  timeout: env.testEnv !== 'local' ? 60_000 : 30_000,
+  // Raised from 60 s on 2026-10-22: dev's new shell takes ~35-60 s to
+  // render an authenticated page (saved session or fresh login alike), so a
+  // test that opens a page twice no longer fits in 60 s. Lower it again once
+  // dev's shell start-up is fast.
+  timeout: env.testEnv !== 'local' ? 120_000 : 30_000,
   expect: {
     // Same reasoning as the test timeout above — individual
     // expect(...).toBeVisible() calls need more than 5s when dev/uat's

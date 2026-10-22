@@ -57,6 +57,9 @@ export class CreateCustomerPage extends BasePage {
   async openFromCrmHome(): Promise<void> {
     await this.gotoAuthenticated(CUSTOMERS_LIST_PATH);
     await this.locators.createCustomerEntry.click();
+    // The form loads lazily, and slowly on dev since the 2026-10-22 shell;
+    // wait for it rather than typing into the still-visible list.
+    await expect(this.locators.profileSection).toBeVisible();
   }
 
   async fillProfile(details: CustomerProfileDetails): Promise<void> {

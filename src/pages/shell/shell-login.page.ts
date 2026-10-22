@@ -40,7 +40,9 @@ export class ShellLoginPage extends BasePage {
     // the URL to change. The saved storageState must include that token, or
     // every later context lands back on the welcome page.
     await this.page.waitForURL((url) => !url.pathname.includes('/realms/'));
-    await expect(l.userMenuButton).toBeVisible({ timeout: 30_000 });
+    // 90 s: after "Sign In", dev's new shell takes ~30-60 s to render the
+    // authenticated app (2026-10-22); 30 s made the setup login flaky.
+    await expect(l.userMenuButton).toBeVisible({ timeout: 90_000 });
 
     // Remembered for BasePage.gotoAuthenticated(): if a later context lands
     // on the welcome page (app session gone, Keycloak session still valid),

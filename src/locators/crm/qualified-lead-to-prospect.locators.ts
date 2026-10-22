@@ -41,8 +41,10 @@ export class QualifiedLeadToProspectLocators {
 
   constructor(private readonly page: Page) {
     this.notificationBellButton = page
-      .getByRole('banner')
-      .getByRole('button', { name: /Notifications/ });
+      // Not scoped to the banner: module pages have no banner landmark in the
+      // new design (2026-10-22). "^" keeps "Control Center Notifications" out.
+      .getByRole('button', { name: /^Notifications/ })
+      .first();
 
     this.notificationPanel = page.getByRole('button', { name: 'Notification preferences' });
   }
