@@ -37,7 +37,9 @@ export function secondUserCredentials(envPrefix: string): ModuleCredentials | un
  * as Bob" without ever throwing an error, yet the resulting session was
  * still genuinely Alice throughout — `BasePage.gotoAuthenticated()`'s own
  * doc comment explains why this looks like a successful login with no
- * form: clicking "Sign in" against a still-valid session cookie completes
+ * form: getting past the welcome page (originally a "Sign in" click, since
+ * the 2026-10-22 design a username + Continue) against a still-valid
+ * session cookie completes
  * a real but invisible OIDC round trip, taking a few seconds but never
  * prompting for credentials. That's correct, expected behavior for *that*
  * cached account — the mistake was never clearing it before trying to log
@@ -53,7 +55,7 @@ export async function loginAsUser(
   const page = await context.newPage();
   const login = new ShellLoginPage(page);
   await login.goto('/');
-  await login.locators.signInButton.waitFor({ state: 'visible', timeout: 30_000 });
+  await login.locators.identifierInput.waitFor({ state: 'visible', timeout: 30_000 });
   await login.login(username, password);
   return { page, context, close: () => context.close() };
 }
