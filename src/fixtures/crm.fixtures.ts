@@ -13,10 +13,10 @@ import { KeyMeetingNotesPage } from '../pages/crm/key-meeting-notes.page';
 import { BizDocPage } from '../pages/crm/biz-doc.page';
 import { ScanCreatePage } from '../pages/crm/scan-create.page';
 import { LeadQualificationPage } from '../pages/crm/lead-qualification.page';
+import { ProspectToCustomerConversionPage } from '../pages/crm/prospect-to-customer-conversion.page';
 import { ExternalEventsPage } from '../pages/crm/external-events.page';
 import { AlertsPage } from '../pages/crm/alerts.page';
 import { CustomerCommunicationPage } from '../pages/crm/customer-communication.page';
-import { ProspectToCustomerConversionPage } from '../pages/crm/prospect-to-customer-conversion.page';
 
 interface CrmFixtures {
   crmPage: CrmPage;
@@ -33,12 +33,12 @@ interface CrmFixtures {
   bizDocPage: BizDocPage;
   scanCreatePage: ScanCreatePage;
   leadQualificationPage: LeadQualificationPage;
-  externalEventsPage: ExternalEventsPage;
-  alertsPage: AlertsPage;
-  customerCommunicationPage: CustomerCommunicationPage;
   prospectToCustomerConversionPage: ProspectToCustomerConversionPage;
   /** Same page object on a SECOND browser tab (same context/session) — for cross-view checks. */
   prospectToCustomerConversionSecondTab: ProspectToCustomerConversionPage;
+  externalEventsPage: ExternalEventsPage;
+  alertsPage: AlertsPage;
+  customerCommunicationPage: CustomerCommunicationPage;
 }
 
 /**
@@ -103,6 +103,16 @@ export const test = base.extend<CrmFixtures>({
     await use(new LeadQualificationPage(page));
   },
 
+  prospectToCustomerConversionPage: async ({ page }, use) => {
+    await use(new ProspectToCustomerConversionPage(page));
+  },
+
+  prospectToCustomerConversionSecondTab: async ({ context }, use) => {
+    const secondTab = await context.newPage();
+    await use(new ProspectToCustomerConversionPage(secondTab));
+    await secondTab.close();
+  },
+
   externalEventsPage: async ({ page }, use) => {
     await use(new ExternalEventsPage(page));
   },
@@ -113,16 +123,6 @@ export const test = base.extend<CrmFixtures>({
 
   customerCommunicationPage: async ({ page }, use) => {
     await use(new CustomerCommunicationPage(page));
-  },
-
-  prospectToCustomerConversionPage: async ({ page }, use) => {
-    await use(new ProspectToCustomerConversionPage(page));
-  },
-
-  prospectToCustomerConversionSecondTab: async ({ context }, use) => {
-    const secondTab = await context.newPage();
-    await use(new ProspectToCustomerConversionPage(secondTab));
-    await secondTab.close();
   },
 });
 
