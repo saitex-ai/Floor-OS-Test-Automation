@@ -160,6 +160,60 @@ export class CreateCustomerPage extends BasePage {
     await expect(this.page).toHaveURL(/\/crm\/customers\/[0-9a-f-]+$/);
   }
 
+  async cancel(): Promise<void> {
+    await this.locators.cancelButton.click();
+  }
+
+  /** Matches one of the form's `.crm-error` messages — several can be on screen at once. */
+  async expectFieldError(message: string | RegExp): Promise<void> {
+    await expect(this.page.getByText(message).first()).toBeVisible();
+  }
+
+  /** Exactly one inline error is shown, and it reads "Required" — i.e. only one mandatory field is missing. */
+  async expectOnlyOneRequiredError(): Promise<void> {
+    await expect(this.locators.fieldErrors).toHaveText(['Required']);
+  }
+
+  /**
+   * Confirmed live (2026-10-15): a Customer Name that already exists —
+   * also with different letter case or extra spaces — is a hard block.
+   * The field shows 'A customer named "<existing name>" already exists'
+   * and a "Match in Customer Name" modal offers only Cancel / View
+   * Existing Customer (no "Save anyway"). Nothing is saved.
+   */
+  async expectDuplicateNameBlocked(existingName: string): Promise<void> {
+    await expect(
+      this.locators.fieldErrors.filter({
+        hasText: `A customer named "${existingName}" already exists`,
+      }),
+    ).toBeVisible();
+    await expect(this.locators.duplicateWarningModal).toContainText('Match in Customer Name');
+    await expect(this.locators.saveAnywayButton).toBeHidden();
+    await expect(this.locators.postSaveModal).toBeHidden();
+  }
+
+  async expectDuplicateWarningVisible(): Promise<void> {
+    await expect(this.locators.duplicateWarningModal).toBeVisible();
+  }
+
+  async expectSavedSuccessfully(): Promise<void> {
+    // The toast (sonner) auto-dismisses in a few seconds — real in a normal
+    // run, but too fast to reliably catch once anything slows execution
+    // down (confirmed 2026-09-21: every save failed this exact check under
+    // Playwright's debug/Inspector pacing, even though the save always
+    // actually succeeded — the durable post-save modal, which carries the
+    // same success message, was already on screen). That modal alone is
+    // sufficient proof of success, so it's the only thing asserted here now.
+    await expect(this.locators.postSaveModal).toBeVisible();
+  }
+
+  async expectFormSectionsVisible(): Promise<void> {
+    await expect(this.locators.profileSection).toBeVisible();
+    await expect(this.locators.managementSection).toBeVisible();
+    await expect(this.locators.departmentsSection).toBeVisible();
+    await expect(this.locators.linkContactsSection).toBeVisible();
+  }
+
   // ---- Company multi-select (Company for Customer, Sprint 5) ----
 
   async openCompanyDropdown(): Promise<void> {
@@ -214,59 +268,5 @@ export class CreateCustomerPage extends BasePage {
   async expectNoCompanySelected(): Promise<void> {
     await expect(this.locators.companyChips).toHaveCount(0);
     await expect(this.locators.companyCombobox).toHaveText('Select');
-  }
-
-  async cancel(): Promise<void> {
-    await this.locators.cancelButton.click();
-  }
-
-  /** Matches one of the form's `.crm-error` messages — several can be on screen at once. */
-  async expectFieldError(message: string | RegExp): Promise<void> {
-    await expect(this.page.getByText(message).first()).toBeVisible();
-  }
-
-  /** Exactly one inline error is shown, and it reads "Required" — i.e. only one mandatory field is missing. */
-  async expectOnlyOneRequiredError(): Promise<void> {
-    await expect(this.locators.fieldErrors).toHaveText(['Required']);
-  }
-
-  /**
-   * Confirmed live (2026-10-15): a Customer Name that already exists —
-   * also with different letter case or extra spaces — is a hard block.
-   * The field shows 'A customer named "<existing name>" already exists'
-   * and a "Match in Customer Name" modal offers only Cancel / View
-   * Existing Customer (no "Save anyway"). Nothing is saved.
-   */
-  async expectDuplicateNameBlocked(existingName: string): Promise<void> {
-    await expect(
-      this.locators.fieldErrors.filter({
-        hasText: `A customer named "${existingName}" already exists`,
-      }),
-    ).toBeVisible();
-    await expect(this.locators.duplicateWarningModal).toContainText('Match in Customer Name');
-    await expect(this.locators.saveAnywayButton).toBeHidden();
-    await expect(this.locators.postSaveModal).toBeHidden();
-  }
-
-  async expectDuplicateWarningVisible(): Promise<void> {
-    await expect(this.locators.duplicateWarningModal).toBeVisible();
-  }
-
-  async expectSavedSuccessfully(): Promise<void> {
-    // The toast (sonner) auto-dismisses in a few seconds — real in a normal
-    // run, but too fast to reliably catch once anything slows execution
-    // down (confirmed 2026-09-21: every save failed this exact check under
-    // Playwright's debug/Inspector pacing, even though the save always
-    // actually succeeded — the durable post-save modal, which carries the
-    // same success message, was already on screen). That modal alone is
-    // sufficient proof of success, so it's the only thing asserted here now.
-    await expect(this.locators.postSaveModal).toBeVisible();
-  }
-
-  async expectFormSectionsVisible(): Promise<void> {
-    await expect(this.locators.profileSection).toBeVisible();
-    await expect(this.locators.managementSection).toBeVisible();
-    await expect(this.locators.departmentsSection).toBeVisible();
-    await expect(this.locators.linkContactsSection).toBeVisible();
   }
 }
