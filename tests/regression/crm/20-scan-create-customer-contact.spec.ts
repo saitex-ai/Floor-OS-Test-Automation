@@ -44,7 +44,6 @@ const BUG = {
   missingEmail: 'https://app.clickup.com/t/z941abzd2p',
   duplicateCustomer: 'https://app.clickup.com/t/z941abzd2q',
   duplicateEmail: 'https://app.clickup.com/t/z941abzd2t',
-  saveBeforeScan: 'https://app.clickup.com/t/z941abzd2v',
   unreadableFile: 'https://app.clickup.com/t/z941abzd2w',
   saveStuck: 'https://app.clickup.com/t/z941abzd34',
 };
@@ -535,9 +534,9 @@ test.describe('CRM - Scan & Create Customer/Contact (Floor OS Assistant)', () =>
     await scanCreatePage.openFromCustomersList();
     await scanCreatePage.send('save');
 
-    await test.step(`BUG: the reply is the generic prompt (${BUG.saveBeforeScan})`, async () => {
+    await test.step('The assistant says there is nothing to save yet', async () => {
       await scanCreatePage.expectChatLine(
-        "Pick an option above, or type the contact's details and I'll set them up.",
+        "Nothing to save yet — pick an option to scan, or type the contact's details.",
       );
     });
     await expect(scanCreatePage.locators.contactProfileHeading).toHaveCount(0);
