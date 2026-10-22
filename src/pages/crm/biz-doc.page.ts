@@ -120,4 +120,35 @@ export class BizDocPage extends BasePage {
     const container = this.locators.detailsContainer();
     await expect(this.locators.readOnlyControlButtons(container)).toHaveCount(0);
   }
+
+  /** Waits for the Biz Docs sub-tab's "Loading documents…" placeholder to clear. */
+  async waitForDocumentsLoaded(): Promise<void> {
+    // 60s rather than the default: the tile counts load in a separate
+    // request after the sub-tab renders, and shared dev is slow under
+    // parallel workers — same allowance as BasePage.gotoAuthenticated()'s
+    // 60s. A generous ceiling, not a measured value; it only costs time
+    // when the placeholder never clears (a genuine failure).
+    await this.locators.loadingDocumentsText.waitFor({ state: 'hidden', timeout: 60_000 });
+    await expect(this.locators.ordersTile).toBeVisible();
+  }
+
+  /**
+   * Confirmed current dev behavior (2026-10-15): the Orders tile is a
+   * read-only placeholder — a `note` whose own text says Purchase Orders
+   * isn't available in floorOS yet — and no "Create Order" action exists
+   * on the Biz Docs sub-tab. Orders are created in Master Data → Sales
+   * Order instead, and the tile STILL reads "—" after a Sales Order exists
+   * for the Customer (the "BUG:" steps in
+   * 34-prospect-to-customer-conversion.spec.ts).
+   */
+  async expectOrdersTileIsUnavailablePlaceholder(): Promise<void> {
+    await expect(this.locators.ordersTile).toBeVisible();
+    await expect(this.locators.ordersTile).toHaveAccessibleName(/not available in floorOS yet/i);
+    await expect(this.locators.createOrderButton).toHaveCount(0);
+    // Clicking the tile itself opens nothing either (no dialog, no
+    // Create Order action) — confirmed by diffing the page before/after.
+    await this.locators.ordersTile.click();
+    await expect(this.locators.anyDialog).toHaveCount(0);
+    await expect(this.locators.createOrderButton).toHaveCount(0);
+  }
 }

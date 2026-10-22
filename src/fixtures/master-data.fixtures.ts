@@ -12,6 +12,7 @@ import { CustomerListPage } from '../pages/master-data/customer-list.page';
 import { CustomerFormPage } from '../pages/master-data/customer-form.page';
 import { CustomerSeasonListPage } from '../pages/master-data/customer-season-list.page';
 import { CustomerSeasonFormPage } from '../pages/master-data/customer-season-form.page';
+import { SalesOrderPage } from '../pages/master-data/sales-order.page';
 import { VendorListPage } from '../pages/master-data/vendor-list.page';
 import { VendorFormPage } from '../pages/master-data/vendor-form.page';
 import { GmtInseamPage } from '../pages/master-data/gmt-inseam.page';
@@ -50,6 +51,7 @@ interface MasterDataFixtures {
   customerFormPage: CustomerFormPage;
   customerSeasonListPage: CustomerSeasonListPage;
   customerSeasonFormPage: CustomerSeasonFormPage;
+  salesOrderPage: SalesOrderPage;
   vendorListPage: VendorListPage;
   vendorFormPage: VendorFormPage;
   gmtInseamPage: GmtInseamPage;
@@ -131,6 +133,10 @@ export const test = base.extend<MasterDataFixtures>({
 
   customerSeasonFormPage: async ({ page }, use) => {
     await use(new CustomerSeasonFormPage(page));
+  },
+
+  salesOrderPage: async ({ page }, use) => {
+    await use(new SalesOrderPage(page));
   },
 
   vendorListPage: async ({ page }, use) => {
