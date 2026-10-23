@@ -1,7 +1,7 @@
 import * as allure from 'allure-js-commons';
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../../src/fixtures/crm.fixtures';
-import { devGap, partial } from '../../../src/utils/test-annotations';
+import { partial } from '../../../src/utils/test-annotations';
 import type { CreateCustomerPage } from '../../../src/pages/crm/create-customer.page';
 import {
   SOCIAL_MEDIA_POST_AI_SECTIONS,
@@ -33,6 +33,12 @@ import seed from '../../../src/data/crm/social-media-leads.data.json';
  *
  * Nothing is sent to a social channel: "View on the platform" only opens
  * the post in a new tab, which is closed untouched.
+ *
+ * Known failures (TC:3 capture date, TC:7 View on the platform not
+ * clickable past the Lead stage, TC:10 AI sections not drawing on the
+ * post) assert the story/prototype behaviour and are marked `test.fail()`
+ * with the reason and the ClickUp test case (no bug logged: needs a bug
+ * or a PO decision). The failing check is the last one in each test.
  */
 
 const SEED = seed;
@@ -41,6 +47,11 @@ type SeedKey = 'withPost' | 'noPost';
 const NO_LEAD_STAGE_POST =
   'Dev (2026-10-23) has no Social Media Post Lead at the Lead stage with a captured post; ' +
   'checked on Nudie Jeans, which is already a Qualified Lead.';
+
+/** Marks the test as a known failure: the reason plus the ClickUp test case it is tracked on. */
+function knownFailure(reason: string, clickUpTestCase: string): void {
+  test.fail(true, `${reason} (${clickUpTestCase})`);
+}
 
 /** Opens a seed record's Lead Qualification tab, or skips (naming it) when it's gone or has moved stage. */
 async function openSeed(
@@ -149,7 +160,13 @@ test.describe('CRM - [Origin Type = Social Media Post] Lead Qualification', () =
     socialMediaLeadQualificationPage: lq,
     socialMediaListeningPage: listening,
   }) => {
-    await allure.tms('https://app.clickup.com/t/z941abzjga', 'TC:3 (ClickUp)');
+    const tc = 'https://app.clickup.com/t/z941abzjga';
+    await allure.tms(tc, 'TC:3 (ClickUp)');
+    knownFailure(
+      "Known failure: the story asks for the date the post was captured; dev shows the post's own posted " +
+        'date and stores no capture date. No bug logged; needs a bug or a PO decision',
+      tc,
+    );
 
     const data = await openSeed(lq, 'withPost');
     const post = firstPost(data);
@@ -158,19 +175,14 @@ test.describe('CRM - [Origin Type = Social Media Post] Lead Qualification', () =
       await lq.expectPostAuthorLine(lq.postEntry(0), post);
     });
 
-    await test.step("Dev shows the post's own posted date — there is no separate capture date", async () => {
-      devGap(
-        `The story asks for the date the post was captured; dev shows the post's postedAt (${post.postedAt}) ` +
-          'and stores no separate capture date.',
-      );
-      await expect(lq.social.postMetaLine(lq.postEntry(0))).toContainText(
-        await lq.localDateTime(post.postedAt),
-      );
-    });
-
     await test.step('Same author, handle and channel as on Social Media Listening', async () => {
       await listening.open();
       await listening.expectPostRow(post, SEED.withPost.name);
+    });
+
+    await test.step('The date shown is when the post was captured', async () => {
+      await lq.readSocialLead(SEED.withPost.id);
+      await lq.expectPostShowsCaptureDate(lq.postEntry(0), post);
     });
 
     partial(NO_LEAD_STAGE_POST);
@@ -251,19 +263,18 @@ test.describe('CRM - [Origin Type = Social Media Post] Lead Qualification', () =
     page,
     socialMediaLeadQualificationPage: lq,
   }) => {
-    await allure.tms('https://app.clickup.com/t/z941abzjgh', 'TC:7 (ClickUp)');
+    const tc = 'https://app.clickup.com/t/z941abzjgh';
+    await allure.tms(tc, 'TC:7 (ClickUp)');
+    knownFailure(
+      'Known failure: past the Lead stage the Lead Qualification tab has pointer-events: none, so a user ' +
+        "can't click View on the platform, although viewing the post is not a change. No bug logged; " +
+        'needs a bug or a PO decision',
+      tc,
+    );
 
     const data = await openSeed(lq, 'withPost');
     const post = firstPost(data);
     const crmUrl = page.url();
-
-    await test.step('Dev: past the Lead stage the tab takes no pointer input, so a user cannot click the button', async () => {
-      devGap(
-        'On a Qualified Lead the Lead Qualification tab has pointer-events: none, so "View on the platform" ' +
-          "can't be clicked, although viewing the post is not a change. The button is activated programmatically below.",
-      );
-      await lq.expectTabNonInteractive();
-    });
 
     await test.step('The post opens on its channel in a new tab (closed without interacting)', async () => {
       const popup = await lq.openPostOnPlatform(lq.postEntry(0));
@@ -275,6 +286,10 @@ test.describe('CRM - [Origin Type = Social Media Post] Lead Qualification', () =
       expect(page.url()).toBe(crmUrl);
       await lq.expectPostsCardIsFirstCard();
       await lq.expectFullPostText(lq.postEntry(0), post);
+    });
+
+    await test.step('A user can click View on the platform (the steps above activate it programmatically)', async () => {
+      await lq.expectViewOnPlatformClickable(lq.postEntry(0));
     });
 
     partial(NO_LEAD_STAGE_POST);
@@ -330,7 +345,14 @@ test.describe('CRM - [Origin Type = Social Media Post] Lead Qualification', () =
   test('TC:10 Verify the AI Sections Appear in Order and Draw on the Captured Post', async ({
     socialMediaLeadQualificationPage: lq,
   }) => {
-    await allure.tms('https://app.clickup.com/t/z941abzjgm', 'TC:10 (ClickUp)');
+    const tc = 'https://app.clickup.com/t/z941abzjgm';
+    await allure.tms(tc, 'TC:10 (ClickUp)');
+    knownFailure(
+      "Known failure: the AI sections don't draw on the captured post — Customer Info is the crawl " +
+        'detection summary word for word, and the post\'s topic ("One Wash", rinse) is in no AI section. ' +
+        'No bug logged; needs a bug or a PO decision',
+      tc,
+    );
 
     const data = await openSeed(lq, 'withPost');
     const post = firstPost(data);
@@ -348,17 +370,8 @@ test.describe('CRM - [Origin Type = Social Media Post] Lead Qualification', () =
       );
     });
 
-    await test.step('Dev gap: Customer Info is the crawl detection summary; nothing comes from the post', async () => {
-      devGap(
-        "The story says the AI sections draw on the captured post. On dev, Nudie Jeans' Customer Info is the " +
-          'crawl detection summary word for word, and the post\'s topic ("One Wash", rinse) appears in no AI section.',
-      );
-      const described = (data.crawlDetection?.detectionSummary ?? []).filter(
-        (line) => !/^[a-z ]+ fit: /.test(line),
-      );
-      expect(described.length).toBeGreaterThan(0);
-      await lq.expectCustomerInfoPointers(described);
-      await lq.expectAiSectionsNotMentioning(['One Wash', 'rinse']);
+    await test.step("The sections reflect the captured post's topic (One Wash / rinse)", async () => {
+      await lq.expectAiSectionsMentionAny(['One Wash', 'rinse']);
     });
 
     partial(NO_LEAD_STAGE_POST);
