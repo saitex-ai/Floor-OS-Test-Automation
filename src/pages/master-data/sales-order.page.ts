@@ -27,7 +27,9 @@ export interface NewSalesOrder {
  * "Prospect to Customer Conversion" story
  * (tests/regression/crm/34-prospect-to-customer-conversion.spec.ts).
  * Header-only orders: only Order Type, Customer, Season and Requested Date
- * (defaulted to today) are required.
+ * (defaulted to today) are required; Status defaults to "On Hold" and the
+ * Description (otherwise defaulted to style_fabric_wash) is filled with a
+ * unique value to find the order again.
  */
 export class SalesOrderPage extends BasePage {
   readonly locators: SalesOrderLocators;
@@ -55,13 +57,18 @@ export class SalesOrderPage extends BasePage {
     await l.orderTypeOption(order.type).click();
     await expect(l.orderTypeCombobox).toHaveText(order.type);
 
+    // Inline searches (dev 2026-10-23): the button turns into a search box
+    // in place; suggestions list "<Name> <Code>", and the pick shows as a
+    // button with the same text. Season only offers the picked customer's.
     await l.customerPickerButton.click();
-    await l.pickerSearchInput.fill(order.customerCode);
+    await l.customerSearchInput.fill(order.customerCode);
     await l.pickerOption(order.customerCode).click();
+    await expect(l.pickedValueButton(order.customerCode)).toBeVisible();
 
     await l.seasonPickerButton.click();
-    await l.pickerSearchInput.fill(order.seasonCode);
+    await l.seasonSearchInput.fill(order.seasonCode);
     await l.pickerOption(order.seasonCode).click();
+    await expect(l.pickedValueButton(order.seasonCode)).toBeVisible();
 
     await l.descriptionInput.fill(order.description);
     await l.saveButton.click();
@@ -97,17 +104,26 @@ export class SalesOrderPage extends BasePage {
 
   /**
    * Deletes the one order whose (unique) description is `description`:
-   * ticks its row, clicks the list's Delete, confirms, and waits for the
-   * row to disappear. For tearing down orders a test created itself.
+   * ticks its row, clicks the list's Delete, confirms "Delete sales
+   * order?", and waits for the row to disappear. For tearing down orders a
+   * test created itself. Returns false — deleting nothing — when no such
+   * order is listed (e.g. the test failed before its Save), so the teardown
+   * doesn't report a cleanup failure for an order that never existed.
    */
-  async deleteOrder(description: string): Promise<void> {
+  async deleteOrder(description: string): Promise<boolean> {
     const l = this.locators;
     await this.search(description);
     const row = l.rowByText(description);
-    await expect(row).toHaveCount(1, { timeout: 15_000 });
+    try {
+      await expect(row).toHaveCount(1, { timeout: 15_000 });
+    } catch (error) {
+      if ((await row.count()) === 0) return false;
+      throw error;
+    }
     await l.rowCheckbox(row).check();
     await l.deleteSelectedButton.click();
     await l.confirmDeleteButton().click();
     await expect(row).toHaveCount(0, { timeout: 15_000 });
+    return true;
   }
 }
