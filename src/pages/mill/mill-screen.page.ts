@@ -43,8 +43,14 @@ export abstract class MillScreenPage extends BasePage {
       await this.open();
       return;
     }
-    await this.nav.openNavigationButton.click();
-    await this.nav.link(this.navLabel).click();
+    // New design (2026-10-23): the navigation is an always-open sidebar
+    // (with "Collapse navigation") and there's no "Open navigation" button.
+    // Only open the drawer first when the link isn't already showing.
+    const link = this.nav.link(this.navLabel);
+    if (!(await link.isVisible())) {
+      await this.nav.openNavigationButton.click();
+    }
+    await link.click();
     await this.expectLoaded();
   }
 

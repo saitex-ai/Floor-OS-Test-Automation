@@ -6,3 +6,11 @@
  * assertion keeps the default.
  */
 export const MILL_REMOTE_LOAD_TIMEOUT = 45_000;
+
+/**
+ * The New request popup's "From {source}" list (GET
+ * /api/inventory-mill/requests/sources) took ~25s to render on
+ * devmill.flooros.app on 2026-10-22 — past the 15s default, though the
+ * API answered 200. Used only for that wait.
+ */
+export const MILL_REQUEST_SOURCES_TIMEOUT = 45_000;
