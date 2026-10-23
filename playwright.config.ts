@@ -1,6 +1,6 @@
 import { defineConfig, devices, type Project } from '@playwright/test';
-import { MODULE_IDS } from './src/config/modules';
-import { env } from './src/config/env';
+import { MODULE_IDS, MODULES, type ModuleId } from './src/config/modules';
+import { env, moduleShellBaseUrl } from './src/config/env';
 import { authFile } from './src/fixtures/auth-setup';
 
 /**
@@ -12,6 +12,14 @@ import { authFile } from './src/fixtures/auth-setup';
  * state. Full suites live under tests/regression/<id>/, parallel to the
  * lighter tests/sanity/<id>/ suites below.
  */
+/**
+ * A module's own baseURL — the shared shell URL unless that module has an
+ * `<envPrefix>_<ENV>_APP_SHELL_URL` override (see moduleShellBaseUrl in
+ * src/config/env.ts). Applied to every project of that module (setup,
+ * regression, sanity, smoke) so its login and its tests hit the same host.
+ */
+const baseURLFor = (id: ModuleId): string => moduleShellBaseUrl(MODULES[id]);
+
 const moduleProjects: Project[] = MODULE_IDS.flatMap((id) => {
   const testDir = `./tests/regression/${id}`;
   return [
@@ -19,14 +27,14 @@ const moduleProjects: Project[] = MODULE_IDS.flatMap((id) => {
       name: `${id}-setup`,
       testDir,
       testMatch: /auth\.setup\.ts/,
-      use: { ...devices['Desktop Chrome'] },
+      use: { ...devices['Desktop Chrome'], baseURL: baseURLFor(id) },
     },
     {
       name: id,
       testDir,
       testIgnore: /auth\.setup\.ts/,
       dependencies: [`${id}-setup`],
-      use: { ...devices['Desktop Chrome'], storageState: authFile(id) },
+      use: { ...devices['Desktop Chrome'], baseURL: baseURLFor(id), storageState: authFile(id) },
     },
   ];
 });
@@ -52,7 +60,7 @@ const sanityProjects: Project[] = SANITY_MODULE_IDS.map((id) => ({
   name: `sanity-${id}`,
   testDir: `./tests/sanity/${id}`,
   dependencies: [`${id}-setup`],
-  use: { ...devices['Desktop Chrome'], storageState: authFile(id) },
+  use: { ...devices['Desktop Chrome'], baseURL: baseURLFor(id), storageState: authFile(id) },
 }));
 
 /**
@@ -66,7 +74,7 @@ const smokeProjects: Project[] = MODULE_IDS.map((id) => ({
   name: `smoke-${id}`,
   testDir: `./tests/smoke/${id}`,
   dependencies: [`${id}-setup`],
-  use: { ...devices['Desktop Chrome'], storageState: authFile(id) },
+  use: { ...devices['Desktop Chrome'], baseURL: baseURLFor(id), storageState: authFile(id) },
 }));
 
 /**
@@ -116,8 +124,10 @@ export default defineConfig({
 
   use: {
     // Every module is mounted under the shell (see src/config/modules.ts) —
-    // there is one baseURL for the whole framework, switched local/dev via
-    // TEST_ENV (see src/config/env.ts).
+    // one shared baseURL, switched local/dev/uat via TEST_ENV (see
+    // src/config/env.ts). Each module's projects override it with
+    // baseURLFor() above, which only differs when that module has its own
+    // <MODULE>_<ENV>_APP_SHELL_URL set.
     baseURL: env.shellBaseUrl,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',

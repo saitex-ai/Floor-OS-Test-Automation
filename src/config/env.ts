@@ -79,6 +79,21 @@ export const env = {
 };
 
 /**
+ * The shell URL one module's projects run against. Reads an optional
+ * `<envPrefix>_<LOCAL|DEV|UAT>_APP_SHELL_URL` (e.g. MILL_DEV_APP_SHELL_URL)
+ * and falls back to the shared shell URL above when it's unset — so a
+ * module deployed to its own instance (the mill CR round runs on
+ * https://devmill.flooros.app) can point there without affecting any
+ * other module.
+ */
+export function moduleShellBaseUrl(moduleOrPrefix: ModuleConfig | string): string {
+  const prefix = typeof moduleOrPrefix === 'string' ? moduleOrPrefix : moduleOrPrefix.envPrefix;
+  // `||`, not optional()'s `??`: an empty line copied from .env.example
+  // must fall back too, not become an empty baseURL.
+  return process.env[`${prefix}_${testEnv.toUpperCase()}_APP_SHELL_URL`] || env.shellBaseUrl;
+}
+
+/**
  * Reads `<envPrefix>_USER_<LOCAL|DEV>` / `<envPrefix>_PASSWORD_<LOCAL|DEV>`
  * for the active TEST_ENV. Every module has its own seeded Keycloak test
  * user (per-module, not shared) so each QA's login reflects the

@@ -1,6 +1,7 @@
 import { type Locator, type Page, expect } from '@playwright/test';
 import { MillScreenPage } from './mill-screen.page';
 import { RequestsLocators } from '../../locators/mill/requests.locators';
+import { MILL_REQUEST_SOURCES_TIMEOUT } from './mill-timeouts';
 
 /**
  * Goods request & approval screen (/mill/requests). Owned by the Fabric
@@ -51,7 +52,9 @@ export class RequestsPage extends MillScreenPage {
    */
   async firstPullableSource(): Promise<Locator | null> {
     await expect(this.locators.requestMaterialsCard).toBeVisible();
-    await expect(this.locators.sourceRegions.first().or(this.locators.nothingToPull)).toBeVisible();
+    await expect(this.locators.sourceRegions.first().or(this.locators.nothingToPull)).toBeVisible({
+      timeout: MILL_REQUEST_SOURCES_TIMEOUT,
+    });
     if (await this.locators.nothingToPull.isVisible()) return null;
     return this.locators.sourceRegions.first();
   }

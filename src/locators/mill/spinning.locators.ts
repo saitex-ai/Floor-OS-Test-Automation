@@ -26,10 +26,15 @@ export class SpinningLocators {
   readonly sharesTotalText: Locator;
   readonly sharesNot100Message: Locator;
   readonly createOrderButton: Locator;
+  readonly newMixingOrderDialog: Locator;
 
-  // Yarn output tab → "Production entry" card
+  // Yarn output tab → "Production entry" card (mill CR round, 2026-10:
+  // "Put away & print label" became "Book output", enabled once a doffed
+  // weight is entered), or "No blend on the line" until a laydown is closed.
   readonly productionEntryCard: Locator;
-  readonly putAwayAndPrintButton: Locator;
+  readonly doffedKgInput: Locator;
+  readonly bookOutputButton: Locator;
+  readonly noBlendOnTheLine: Locator;
 
   constructor(page: Page) {
     this.heading = page.getByRole('heading', { level: 1, name: 'Spinning' });
@@ -48,8 +53,11 @@ export class SpinningLocators {
     this.sharesTotalText = page.getByText(/Shares total \d+(\.\d+)?%/);
     this.sharesNot100Message = page.getByText(/The shares total .*not 100%/);
     this.createOrderButton = page.getByRole('button', { name: 'Create order' }).first();
+    this.newMixingOrderDialog = page.getByRole('dialog', { name: 'New mixing order' });
 
     this.productionEntryCard = page.getByRole('heading', { name: 'Production entry' });
-    this.putAwayAndPrintButton = page.getByRole('button', { name: 'Put away & print label' });
+    this.doffedKgInput = page.getByRole('textbox', { name: 'Doffed kg' });
+    this.bookOutputButton = page.getByRole('button', { name: 'Book output' });
+    this.noBlendOnTheLine = page.getByText('No blend on the line');
   }
 }

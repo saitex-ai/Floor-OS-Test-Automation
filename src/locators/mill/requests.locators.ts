@@ -5,19 +5,21 @@ import { type Locator, type Page } from '@playwright/test';
  * (/mill/requests) — no actions or assertions here, see
  * src/pages/mill/requests.page.ts for those.
  *
- * Since the 2026-09 redesign, an approver (mill:requests:approve) sees
- * Approvals (default) / Direct transfer tabs, with "New request" and
- * "Receive goods" as buttons that open a popup dialog — not tabs. The
- * Approvals tab shows a single unified list of requests (Request /
- * Status / For / Transfer to / Raised columns); there is no separate
- * "Cleared" archive.
+ * Since the mill CR round (2026-10) there are no tabs: the request list
+ * is filtered by status pills (All — selected by default — / Pending /
+ * In transit / "+n more"), and "New request", "Receive Goods" and
+ * "Direct transfer" are buttons that open popups.
  */
 export class RequestsLocators {
   readonly heading: Locator;
 
-  // Tabs
-  readonly approvalsTab: Locator;
-  readonly directTransferTab: Locator;
+  // Status filter pills (aria-pressed marks the selected one)
+  readonly allStatusFilter: Locator;
+  readonly pendingStatusFilter: Locator;
+
+  // Popup-opening actions
+  readonly receiveGoodsButton: Locator;
+  readonly directTransferButton: Locator;
 
   // Opens the "New request" popup dialog
   readonly newRequestButton: Locator;
@@ -39,8 +41,11 @@ export class RequestsLocators {
   constructor(private readonly page: Page) {
     this.heading = page.getByRole('heading', { level: 1, name: 'Goods request & approval' });
 
-    this.approvalsTab = page.getByRole('tab', { name: /^Approvals/ });
-    this.directTransferTab = page.getByRole('tab', { name: /^Direct transfer/ });
+    this.allStatusFilter = page.getByRole('button', { name: /^All\s*\d/ });
+    this.pendingStatusFilter = page.getByRole('button', { name: /^Pending\s*\d/ });
+
+    this.receiveGoodsButton = page.getByRole('button', { name: 'Receive Goods' });
+    this.directTransferButton = page.getByRole('button', { name: 'Direct transfer' });
 
     this.newRequestButton = page.getByRole('button', { name: /^New request/i });
     this.newRequestDialog = page.getByRole('dialog');
