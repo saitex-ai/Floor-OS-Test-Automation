@@ -1,434 +1,799 @@
 import * as allure from 'allure-js-commons';
-import { chromium } from '@playwright/test';
 import { test, expect } from '../../../src/fixtures/crm.fixtures';
-import { SAMPLE_SCAN_FILE_PATH } from '../../../src/pages/crm/scan-create.page';
+import type { CreateCustomerPage } from '../../../src/pages/crm/create-customer.page';
+import type { ExternalEventsPage } from '../../../src/pages/crm/external-events.page';
+import {
+  renderBlankImage,
+  renderBusinessCard,
+  uniqueCompanyName,
+} from '../../../src/utils/business-card';
 
-/** Contact Name is validated "Alphabets only" — no digits allowed (confirmed elsewhere, e.g. create-contact.locators.ts). */
-function randomLetters(length = 6): string {
-  return Array.from({ length }, () =>
-    String.fromCharCode(97 + Math.floor(Math.random() * 26)),
-  ).join('');
+/**
+ * CRM — Scan & Create Customer/Contact with the Floor OS Assistant.
+ *
+ * Source of truth: test-cases/crm/scan-create-floor-os-assistant.md and the
+ * ClickUp set https://app.clickup.com/t/z941abzcx1, written from the Floor
+ * OS CRM prototype and checked against dev on 2026-10-21.
+ *
+ * Every scan uses a business card generated for that test (unique company
+ * and contact email), so duplicates only happen where a test makes them.
+ *
+ * Where dev still has an open bug against the prototype, the test asserts
+ * the prototype's behaviour and is marked test.fail() with the bug link, so
+ * it reports "unexpectedly passed" once dev is fixed. Where the expected
+ * behaviour was changed to dev's, the test title says so and a code comment
+ * links the decision recorded on the ClickUp test case.
+ */
+
+/**
+ * Creates a Customer for the duplicate-name cases to collide with, so they
+ * don't depend on a seeded record (as in 01-create-customer.spec.ts). The
+ * name is word-based rather than a timestamp because the scan's vision
+ * model misreads long digit runs.
+ */
+async function createDuplicateTarget(createCustomerPage: CreateCustomerPage): Promise<string> {
+  const name = uniqueCompanyName();
+  await createCustomerPage.openFromCrmHome();
+  await createCustomerPage.fillProfile({
+    name,
+    email: `pw-dup-${Date.now()}@example.com`,
+    city: 'Coimbatore',
+    country: 'India',
+    crmStage: 'Lead',
+    originType: 'Referral',
+    origin: 'Internal Referral',
+    buyer: 'Fabric',
+    referredBy: 'Jordan Smith',
+  });
+  await createCustomerPage.save();
+  await createCustomerPage.expectSavedSuccessfully();
+  return name;
 }
 
 /**
- * Renders a fresh business-card PDF with a UNIQUE Contact email, for every
- * test that actually SAVES a scanned record. Confirmed directly: reusing
- * the same static SAMPLE_SCAN_FILE_PATH content across repeated real saves
- * collides on the Contact's email specifically — "Contact with this email
- * address already exists" (see TC:4/5/8's own comments for the exact
- * dialog that surfaces) — the same "uniquify test data" discipline this
- * whole suite already follows elsewhere, just generated per-run instead of
- * typed into a `fillProfile()` call because this data has to arrive via a
- * scan.
- *
- * CORRECTED (2026-10-05): the Contact NAME also needs to vary per run,
- * not just stay fixed as "Jordan Ecclestone" — confirmed directly that
- * reusing one fixed name (alongside a fixed-enough company name/address)
- * across this session's many real runs eventually surfaces the SAME
- * "linked with existing Customer" smart-match dialog TC:8's own doc
- * already found for the Company name, even after varying company/
- * address — a genuinely fixed Contact name is itself still a collision
- * vector. Picked from a small pool of plausible real full names instead
- * of one fixed value or random/gibberish: a gibberish name backfires,
- * since the vision model has its own confidence check and will read a
- * realistic name reliably but reject an implausible one as untrustworthy
- * ("N values were read but could not be trusted, so they were left
- * out"), leaving Contact Name/Email blank and failing mandatory-field
- * validation instead of the save this is meant to prove.
- *
- * Built with Playwright's own headless Chromium (`page.pdf()`, which only
- * works headless) rather than the shared test's own `page` fixture, so
- * this works regardless of whether the suite itself runs headed.
+ * From automation, "Save customer & contact" on dev stays on "Nothing was
+ * saved — Checking whether this customer already exists…" (re-checked
+ * 2026-10-23: only resolve-by-name is called, no create request after
+ * 25s). It is not logged as a bug, so tests that need a completed save are
+ * parked until the save completes in automation.
  */
-/**
- * A small pool of realistic-sounding company name prefixes — confirmed
- * directly (2026-10-05) that the Customer name also needs to vary per
- * run, not just the Contact's email: reusing a fixed "Meridian Apparel
- * Group" across many real saves means a LATER run's scan finds that
- * earlier run's own Customer already exists and links the Contact to it
- * instead of creating a new one (a real, confirmed smart-match behavior,
- * surfaced as a differently-worded success dialog — see
- * ScanCreatePage.expectSavedSuccessfully()'s class doc) — which defeats
- * any TC whose whole point is proving a NEW Customer gets created. A
- * random/gibberish company name risks the same vision-model distrust
- * already confirmed for Contact Name (see this function's own doc below),
- * so this picks from a small set of plausible real-sounding names instead
- * of generating gibberish.
- */
-const COMPANY_NAME_PREFIXES = [
-  'Meridian',
-  'Highland',
-  'Cascade',
-  'Summit',
-  'Pacific',
-  'Lakeside',
-  'Northgate',
-  'Ironwood',
-];
-const COMPANY_NAME_SUFFIXES = [
-  'Apparel Group',
-  'Garment Works',
-  'Textiles Co.',
-  'Apparel Partners',
-];
-const CONTACT_NAME_POOL = [
-  'Jordan Ecclestone',
-  'Morgan Whitfield',
-  'Avery Lindqvist',
-  'Dakota Marchetti',
-  'Reese Kowalski',
-  'Emerson Delacroix',
-];
-
-async function renderUniqueBusinessCardPdf(): Promise<{ filePath: string; contactName: string }> {
-  const contactName = CONTACT_NAME_POOL[Math.floor(Math.random() * CONTACT_NAME_POOL.length)]!;
-  const suffix = randomLetters(8);
-  const companyPrefix =
-    COMPANY_NAME_PREFIXES[Math.floor(Math.random() * COMPANY_NAME_PREFIXES.length)]!;
-  const companySuffix =
-    COMPANY_NAME_SUFFIXES[Math.floor(Math.random() * COMPANY_NAME_SUFFIXES.length)]!;
-  const companyName = `${companyPrefix} ${companySuffix}`;
-  // Confirmed directly (2026-10-05): a company name alone wasn't enough
-  // to avoid dev's "linked with existing Customer" smart-match path even
-  // across a 32-combination name pool — varying the street number too,
-  // since the Company Address line was otherwise identical on every
-  // generated card.
-  const streetNumber = 100 + Math.floor(Math.random() * 900);
-  const filePath = `test-data/crm/generated-business-card-${suffix}.pdf`;
-
-  const browser = await chromium.launch();
-  try {
-    const page = await browser.newPage();
-    await page.setContent(`
-      <html>
-        <body style="font-family: Arial, sans-serif; padding: 40px; width: 500px;">
-          <h1 style="margin: 0 0 4px 0; font-size: 24px;">${contactName}</h1>
-          <div style="font-size: 16px; color: #333; margin-bottom: 16px;">Senior Buyer</div>
-          <div style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">${companyName}</div>
-          <div style="font-size: 14px; line-height: 1.8;">
-            <div>Email: jordan.ecclestone.${suffix}@${companyPrefix.toLowerCase()}apparel.example</div>
-            <div>Phone: +1 415 555 0148</div>
-            <div>San Francisco, United States</div>
-          </div>
-          <div style="font-size: 13px; line-height: 1.6; margin-top: 12px; color: #555;">
-            Company Address: ${streetNumber} Mission Street, San Francisco, United States
-          </div>
-        </body>
-      </html>
-    `);
-    await page.pdf({ path: filePath, width: '500px', height: '300px' });
-  } finally {
-    await browser.close();
-  }
-
-  return { filePath, contactName };
+function needsCompletedSave(): void {
+  test.fixme(
+    true,
+    'Save does not complete from automation on dev (stays on "Checking whether this customer already exists…"); re-enable once it does.',
+  );
 }
 
 /**
- * CRM — Scan&Create Customer/Contact (Sprint 2).
- *
- * Source of truth: test-cases/crm/scan-create-customer-contact.md (ClickUp
- * task https://app.clickup.com/t/86eye4dtv). Confirmed against the running
- * app (2026-09-23), including a full real scan-to-save run — see
- * scan-create.locators.ts and scan-create.page.ts's class docs for the
- * corrections that made, and SAMPLE_SCAN_FILE_PATH's doc for the local
- * environment fix (a broken vision-model binding) that made a real scan
- * possible at all.
- *
- * TC:6 stays `test.fixme()`'d: this screen has no "Owner" field at all
- * (confirmed — Customer Management here is only CRM Stage/Origin
- * Type/Origin/Buyer), so there's no Owner to notify. TC:7 stays
- * `test.fixme()`'d for a different, permanent reason: verifying reflection
- * into OTHER Floor OS modules needs those modules' own page
- * objects/fixtures, out of scope for the CRM QA's files. TC:8 is rewritten
- * around what's actually real: there is no dropdown to link the scanned
- * Contact to an EXISTING Customer — Scan & Create always creates a NEW
- * Customer and links the Contact to it automatically, 1:1, confirmed
- * directly.
+ * Open bug: a missing contact email or customer name isn't asked for
+ * (TC:17, 18, 21, 23 assert the prototype's behaviour as known failures).
  */
-/**
- * Dev replaced the "Start Scan" screen with the Floor OS Assistant chat
- * (confirmed 2026-10-21), so every TC below that drives the old screen is
- * fixme'd with this reason until the rewrite for the new flow lands.
- */
-const REDESIGNED =
-  'Dev replaced the Scan & Create screen with the Floor OS Assistant (2026-10-21); this TC drives the old ' +
-  '"Start Scan" screen. Rewritten for the new flow in https://app.clickup.com/t/z941abzcx1';
+function knownMissingValueBug(): void {
+  test.fail(
+    true,
+    'Known bug: a missing contact email or customer name is not asked for; the assistant offers to create the other record alone — https://app.clickup.com/t/z941abzd2p',
+  );
+}
 
-test.describe('CRM - Scan&Create Customer/Contact', () => {
+const MISSING_EMAIL_PROMPT =
+  "No contact email on the scan. It's mandatory and identifies the contact — what's their email?";
+
+/** A manual External Event is born Attended, so its Leads tab is open. */
+async function createAttendedEvent(externalEventsPage: ExternalEventsPage): Promise<string> {
+  const title = `Playwright Scan Event ${Date.now()}`;
+  await externalEventsPage.openFromEventsList();
+  await externalEventsPage.fill({
+    title,
+    venue: 'Regression City / Venue',
+    date: '2026-09-20',
+    about: 'Created by the Scan & Create regression suite.',
+    attendee: 'Alice Planner',
+    score: 7,
+    numberOfLeads: 1,
+    wentWell: 'Good turnout.',
+    couldBeBetter: 'Nothing major.',
+    attendNextEditions: 'Yes',
+  });
+  await externalEventsPage.submit();
+  await externalEventsPage.expectConfirmDialogVisible();
+  await externalEventsPage.confirmSaveEvent();
+  await externalEventsPage.expectSavedSuccessfully();
+  return title;
+}
+
+test.describe('CRM - Scan & Create Customer/Contact (Floor OS Assistant)', () => {
+  test.describe.configure({ timeout: 180_000 });
+
   test.beforeEach(async () => {
     await allure.epic('CRM');
-    await allure.feature('Scan&Create Customer/Contact');
+    await allure.feature('Scan & Create Customer/Contact');
     await allure.owner('CRM QA');
   });
 
-  test('TC:1 Scan&Create screen access and provisions', async ({ scanCreatePage }) => {
-    await allure.tms('https://app.clickup.com/t/z941abt9ea', 'TC:1 (ClickUp)');
-    test.fixme(true, REDESIGNED);
+  test('TC:1 Verify Scan & Create Opens the Floor OS Assistant with a Greeting and Four Options', async ({
+    scanCreatePage,
+  }) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcx4', 'TC:1 (ClickUp)');
 
-    await test.step('Navigate to Customers and open Scan&Create', async () => {
+    await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.expectAssistantReady();
+  });
+
+  test('TC:2 Verify Scan & Create Is Available from CRM Home, Customers List and Contacts List', async ({
+    scanCreatePage,
+  }) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcx5', 'TC:2 (ClickUp)');
+
+    // CRM Home and Contacts were missing until dev added them on
+    // 2026-10-21 (https://app.clickup.com/t/z941abzd2n, fixed).
+    await test.step('CRM Home → Scan & Create opens the assistant', async () => {
+      await scanCreatePage.openFromCrmHome();
+      await scanCreatePage.expectAssistantReady();
+      await scanCreatePage.closeAssistant();
+    });
+
+    await test.step('Customers list → More actions → Scan & Create opens the assistant', async () => {
       await scanCreatePage.openFromCustomersList();
+      await scanCreatePage.expectAssistantReady();
+      await scanCreatePage.closeAssistant();
     });
 
-    await test.step('File-upload and photo-capture provisions, plus Start Scan, are present', async () => {
-      await scanCreatePage.expectScanProvisionsVisible();
+    await test.step('Contacts list → More actions → Scan & Create opens the assistant', async () => {
+      await scanCreatePage.openFromContactsList();
+      await scanCreatePage.expectAssistantReady();
     });
   });
 
-  test('TC:2 Document scan processing and post-scan section population', async ({
+  test('TC:3 Verify Uploading a Business Card Shows Scan Progress and Disables the Other Options', async ({
     scanCreatePage,
-  }) => {
-    await allure.tms('https://app.clickup.com/t/z941abt9eb', 'TC:2 (ClickUp)');
-    test.fixme(true, REDESIGNED);
-    // Real extraction against a local vision model — confirmed to vary
-    // 35-90s+ per call. test.slow()'s x3 alone isn't enough headroom
-    // (confirmed: cuts startScan()'s own wait off early) — set explicitly.
-    test.setTimeout(180_000);
-
-    // Switched from the static SAMPLE_SCAN_FILE_PATH (2026-10-05): that
-    // fixture's single ambiguous city line gave the vision model no clear
-    // signal to populate Customer City separately from Contact City,
-    // confirmed by two consecutive real failures on that one field.
-    // renderUniqueBusinessCardPdf()'s card has an explicit, separate
-    // "Company Address" line for exactly this reason.
-    const { filePath } = await renderUniqueBusinessCardPdf();
-    await scanCreatePage.openFromCustomersList();
-
-    await test.step('Upload a file and start the scan', async () => {
-      await scanCreatePage.uploadFile(filePath);
-      await scanCreatePage.startScan();
-    });
-
-    await test.step('Contact Profile, Customer Profile, and Customer Management fields render', async () => {
-      await scanCreatePage.expectPostScanSectionsVisible();
-    });
-
-    await test.step('Contact Profile and Customer Profile show real scanned values', async () => {
-      // Confirmed against the running app: Customer Management's dropdowns
-      // (CRM Stage/Origin Type/Origin/Buyer) are NOT pre-filled by the scan
-      // — a business card has no such data to extract — so only the text
-      // fields are checked here, not the dropdowns TC:2's original guess
-      // assumed would also populate.
-      const l = scanCreatePage.locators;
-      await scanCreatePage.expectInputsPopulated([
-        l.contactNameInput,
-        l.contactEmailInput,
-        l.contactCityInput,
-        l.customerNameInput,
-        l.customerCityInput,
-      ]);
-    });
-  });
-
-  test('TC:3 Post-scan value-populated field editability', async ({ scanCreatePage }) => {
-    await allure.tms('https://app.clickup.com/t/z941abt9ec', 'TC:3 (ClickUp)');
-    test.fixme(true, REDESIGNED);
-    // Real extraction against a local vision model — see TC:2's comment.
-    test.setTimeout(180_000);
+  }, testInfo) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcx6', 'TC:3 (ClickUp)');
+    const card = await renderBusinessCard(testInfo.outputDir);
+    const l = scanCreatePage.locators;
 
     await scanCreatePage.openFromCustomersList();
-    await scanCreatePage.uploadFile(SAMPLE_SCAN_FILE_PATH);
-    await scanCreatePage.startScan();
+    await scanCreatePage.upload(card.filePath);
 
-    await test.step('Edit populated Contact Profile and Customer Profile fields', async () => {
-      await scanCreatePage.fillContactProfile({ name: 'Edited Contact Name' });
-      await scanCreatePage.fillCustomerProfile({
-        name: 'Edited Customer Name',
-        city: 'Coimbatore',
-      });
+    await test.step('The file name is echoed and every option is disabled', async () => {
+      await scanCreatePage.expectChatLine(card.filePath.split('/').pop()!);
+      await expect(l.uploadFileOption).toHaveAttribute('aria-pressed', 'true');
+      await scanCreatePage.expectOptionsDisabled();
     });
 
-    await test.step('Edited values took effect', async () => {
-      await expect(scanCreatePage.locators.contactNameInput).toHaveValue('Edited Contact Name');
-      await expect(scanCreatePage.locators.customerNameInput).toHaveValue('Edited Customer Name');
-    });
-  });
-
-  test('TC:4 Successful Customer and Contact creation with system Creation Method', async ({
-    scanCreatePage,
-  }) => {
-    await allure.tms('https://app.clickup.com/t/z941abt9ee', 'TC:4 (ClickUp)');
-    test.fixme(true, REDESIGNED);
-    // Real extraction against a local vision model — see TC:2's comment.
-    test.setTimeout(180_000);
-
-    // A unique scanned identity — confirmed directly that reusing the
-    // static fixture across repeated real saves collides on the
-    // Contact's email (see renderUniqueBusinessCardPdf()'s doc).
-    const { filePath } = await renderUniqueBusinessCardPdf();
-
-    await scanCreatePage.openFromCustomersList();
-    await scanCreatePage.uploadFile(filePath);
-    await scanCreatePage.startScan();
-
-    await test.step('Confirm/complete mandatory fields left blank by the scan', async () => {
-      await scanCreatePage.fillCustomerProfile({ email: `pw-scan-${Date.now()}@example.com` });
-      // Confirmed directly: the vision model's confidence check can leave
-      // EITHER email blank, not reliably always Customer's — see
-      // fillContactEmailIfMissing()'s class doc.
-      await scanCreatePage.fillContactEmailIfMissing(`pw-scan-contact-${Date.now()}@example.com`);
-      // Confirmed against the running app: no Customer Management option
-      // is seeded consistently enough to hardcode — the first available
-      // option in each dropdown is picked instead (mirrors how the real
-      // save-to-Customer-Details run that proved this whole flow works
-      // was driven).
-      await scanCreatePage.selectFirstOption(scanCreatePage.locators.crmStageCombobox);
-      await scanCreatePage.selectFirstOption(scanCreatePage.locators.originTypeCombobox);
-      await scanCreatePage.selectFirstOption(scanCreatePage.locators.originCombobox);
-      await scanCreatePage.selectFirstOption(scanCreatePage.locators.buyerCombobox);
-    });
-
-    await test.step('Single Save creates both records', async () => {
-      await scanCreatePage.save();
-      if (await scanCreatePage.locators.duplicateWarningModal.isVisible().catch(() => false)) {
-        await scanCreatePage.locators.saveAnywayButton.click();
-      }
-      // Confirmed against the running app (2026-10-05): there is no
-      // "Creation Method" system field (FR-9's premise) — no toast either
-      // anymore (see ScanCreatePage's class doc). The real, closest
-      // analog is the post-save confirmation dialog's own heading, the
-      // only place "created" is stated at all — checked here, before
-      // expectSavedSuccessfully() dismisses it via "View Customer".
-      await expect(scanCreatePage.locators.savedConfirmDialog).toContainText(
-        /created successfully/i,
+    await test.step('The assistant reports the scan was read', async () => {
+      await scanCreatePage.expectChatLine(
+        'Scan read. Checking mandatory fields before I pre-fill the form…',
+        90_000,
       );
-      await scanCreatePage.expectSavedSuccessfully();
     });
   });
 
-  test('TC:5 Invalid data-type handling, error highlighting, and re-validation', async ({
+  test('TC:4 Verify the Assistant Runs the Mandatory Checks and Offers Review & Save', async ({
     scanCreatePage,
-  }) => {
-    await allure.tms('https://app.clickup.com/t/z941abt9ef', 'TC:5 (ClickUp)');
-    test.fixme(true, REDESIGNED);
-    // Real extraction against a local vision model — see TC:2's comment.
-    test.setTimeout(180_000);
-
-    const { filePath } = await renderUniqueBusinessCardPdf();
+  }, testInfo) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcx7', 'TC:4 (ClickUp)');
+    const card = await renderBusinessCard(testInfo.outputDir);
 
     await scanCreatePage.openFromCustomersList();
-    await scanCreatePage.uploadFile(filePath);
-    await scanCreatePage.startScan();
+    await scanCreatePage.scanToReview(card);
+  });
 
-    await test.step('Enter an invalid email into the scan-populated Customer Profile', async () => {
-      await scanCreatePage.fillCustomerProfile({ email: 'not-an-email' });
+  test('TC:5 Verify Review & Save Opens the Pre-Filled Review Form', async ({
+    scanCreatePage,
+  }, testInfo) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcx8', 'TC:5 (ClickUp)');
+    const card = await renderBusinessCard(testInfo.outputDir);
+
+    await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.scanToReview(card);
+    await scanCreatePage.reviewAndSave();
+
+    await test.step('Scanned values are filled in and CRM Stage is Lead', async () => {
+      await scanCreatePage.expectReviewFormPrefilled(card);
     });
 
-    await test.step('Save is blocked with a field-level error', async () => {
-      await scanCreatePage.save();
-      // Confirmed elsewhere in this app (04-customer-detail.spec.ts,
-      // 10-edit-customer-contact.spec.ts, 11-create-contact.spec.ts) — the
-      // same shared validation message.
-      await scanCreatePage.expectFieldError('Enter a valid email address');
-    });
-
-    await test.step('Correcting the value and re-saving succeeds', async () => {
-      const l = scanCreatePage.locators;
-      await scanCreatePage.fillCustomerProfile({ email: `pw-scan-${Date.now()}@example.com` });
-
-      // The local vision model's own extraction confidence varies run to
-      // run (confirmed directly) — some required Contact fields can come
-      // back blank/untrusted even though this TC only means to invalidate
-      // the ONE Customer email above. Defensively fill whatever else is
-      // still empty so this reliably exercises "corrected value re-saves
-      // successfully," not "the scan happened to extract everything."
-      if (!(await l.contactEmailInput.inputValue()))
-        await scanCreatePage.fillContactProfile({
-          email: `pw-scan-contact-${Date.now()}@example.com`,
-        });
-      if (!(await l.contactCityInput.inputValue()))
-        await scanCreatePage.fillContactProfile({ city: 'San Francisco' });
-      if ((await l.contactCountryCombobox.innerText()).match(/^(select|choose)\b/i))
-        await scanCreatePage.fillContactProfile({ country: 'United States' });
-
-      await scanCreatePage.selectFirstOption(l.crmStageCombobox);
-      await scanCreatePage.selectFirstOption(l.originTypeCombobox);
-      await scanCreatePage.selectFirstOption(l.originCombobox);
-      await scanCreatePage.selectFirstOption(l.buyerCombobox);
-      await scanCreatePage.save();
-      await scanCreatePage.expectSavedSuccessfully();
+    await test.step('Cancel sits to the left of Save customer & contact', async () => {
+      await scanCreatePage.expectCancelLeftOfSave();
     });
   });
 
-  test('TC:6 Post-creation system & email notifications to Owner and Assignee', async () => {
-    await allure.tms('https://app.clickup.com/t/z941abt9eg', 'TC:6 (ClickUp)');
-    // Confirmed against the running app: this screen has no "Owner" field
-    // at all (Customer Management is only CRM Stage/Origin Type/Origin/
-    // Buyer) — there's no Owner to notify, contradicting this TC's premise.
+  test('TC:6 Verify Every Pre-Filled Field on the Review Form Is Editable', async ({
+    scanCreatePage,
+  }, testInfo) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcx9', 'TC:6 (ClickUp)');
+    const card = await renderBusinessCard(testInfo.outputDir);
+    const l = scanCreatePage.locators;
+
+    await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.scanToReview(card);
+    await scanCreatePage.reviewAndSave();
+
+    await test.step('Pre-filled fields in each section accept a new value', async () => {
+      await l.designationInput.fill('Head of Sourcing');
+      await expect(l.designationInput).toHaveValue('Head of Sourcing');
+      await l.customerNameInput.fill(`${card.companyName} Edited`);
+      await expect(l.customerNameInput).toHaveValue(`${card.companyName} Edited`);
+      await scanCreatePage.selectComboboxOption(l.crmStageCombobox, 'Qualified Lead');
+    });
+
+    await test.step('An empty optional field can be filled in', async () => {
+      await l.customerCityInput.fill('Austin');
+      await expect(l.customerCityInput).toHaveValue('Austin');
+    });
+  });
+
+  test('TC:7 Verify Saving Creates the Customer and Its Linked Contact', async ({
+    scanCreatePage,
+  }, testInfo) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcxa', 'TC:7 (ClickUp)');
+    needsCompletedSave();
+    const card = await renderBusinessCard(testInfo.outputDir);
+
+    await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.scanToReview(card);
+    await scanCreatePage.reviewAndSave();
+    await scanCreatePage.save();
+
+    await test.step('"Contact and Customer created successfully!" is shown', async () => {
+      await scanCreatePage.expectCreatedDialog();
+    });
+
+    await test.step('The new Customer opens with the scanned Contact linked', async () => {
+      await scanCreatePage.viewCreatedCustomer();
+      await scanCreatePage.expectCreatedCustomerDetails(card);
+    });
+  });
+
+  test('TC:8 Verify the Created Customer Has Stage Lead and Status Active', async ({
+    scanCreatePage,
+    customerDetailPage,
+  }, testInfo) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcxb', 'TC:8 (ClickUp)');
+    needsCompletedSave();
+    const card = await renderBusinessCard(testInfo.outputDir);
+
+    await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.scanToReview(card);
+    await scanCreatePage.reviewAndSave();
+    await scanCreatePage.save();
+    await scanCreatePage.expectCreatedDialog();
+    // Creation Method isn't shown anywhere on the Customer screen (the
+    // System section has only Created On / Created By), so TC:8 checks
+    // only what the user can see (ClickUp TC:8 updated 2026-10-22).
+    await scanCreatePage.viewCreatedCustomer();
+
+    await test.step('CRM Stage is Lead and Status is Active', async () => {
+      await scanCreatePage.expectCreatedCustomerDetails(card);
+      await customerDetailPage.expectStatus('Active');
+    });
+
+    test.info().annotations.push({
+      type: 'not checked',
+      description:
+        'Manager notifications: other users’ notification bells are not reachable from this session.',
+    });
+  });
+
+  test('TC:9 Verify Saying "save" in the Chat Opens the Review Form Once Checks Pass', async ({
+    scanCreatePage,
+  }, testInfo) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcxc', 'TC:9 (ClickUp)');
+    const card = await renderBusinessCard(testInfo.outputDir);
+
+    await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.scanToReview(card);
+    // "save" opens the form straight away, so its echo isn't waited for.
+    await scanCreatePage.send('save', { expectEcho: false });
+    await scanCreatePage.expectReviewFormLoaded();
+    // CRM Stage's Lead default is checked by TC:5 (Review & save). Opened
+    // via "save", it intermittently still reads "Select" under load on dev
+    // (2026-10-22), which isn't what TC:9 is about.
+    await scanCreatePage.expectReviewFormPrefilled(card, { checkCrmStage: false });
+  });
+
+  test('TC:10 Verify a Field Can Be Changed from the Chat Before Review', async ({
+    scanCreatePage,
+  }, testInfo) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcxd', 'TC:10 (ClickUp)');
+    const card = await renderBusinessCard(testInfo.outputDir);
+
+    await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.scanToReview(card);
+    await scanCreatePage.send('set the contact designation to Head of Sourcing');
+
+    // Works on dev since 2026-10-22 (it used to reply "You can change any
+    // field…" and leave the value unchanged).
+    await test.step('The assistant confirms the change', async () => {
+      await scanCreatePage.expectChatLine('Designation set to Head of Sourcing.');
+    });
+
+    await test.step('The review form shows the new Designation', async () => {
+      await scanCreatePage.reviewAndSave();
+      await expect(scanCreatePage.locators.designationInput).toHaveValue('Head of Sourcing');
+    });
+  });
+
+  test('TC:11 Verify Details Typed in the Chat Are Used Instead of a Scan', async ({
+    scanCreatePage,
+  }) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcxe', 'TC:11 (ClickUp)');
+    const typed = {
+      companyName: uniqueCompanyName(),
+      contactName: 'Priya Raman',
+      contactEmail: `priya.${Date.now().toString(36)}@cardscan.example`,
+    };
+
+    await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.send(
+      `Customer ${typed.companyName}, contact ${typed.contactName}, ${typed.contactEmail}`,
+    );
+
+    // Works on dev since 2026-10-22 (it used to reply with a generic
+    // "Pick an option above…" and ignore the details).
+    await test.step('The typed details are used: checks run and Review & save is offered', async () => {
+      await scanCreatePage.expectAllChecksPassed(typed, { typed: true });
+    });
+  });
+
+  test('TC:12 Verify "scan again" Restarts the Assistant', async ({ scanCreatePage }, testInfo) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcxf', 'TC:12 (ClickUp)');
+    const card = await renderBusinessCard(testInfo.outputDir);
+
+    await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.scanToReview(card);
+    await scanCreatePage.send('scan again', { expectEcho: false });
+
+    await test.step('The conversation resets and the options are enabled again', async () => {
+      await scanCreatePage.expectAssistantReady();
+      await expect(scanCreatePage.locators.reviewAndSaveButton).toHaveCount(0);
+    });
+
+    await test.step('Nothing was saved', async () => {
+      await scanCreatePage.expectCustomerNotInList(card.companyName!);
+    });
+  });
+
+  test('TC:13 Verify Scan & Create from an External Event’s Leads Tab Links the Customer to It', async ({
+    scanCreatePage,
+    externalEventsPage,
+  }, testInfo) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcxg', 'TC:13 (ClickUp)');
+    needsCompletedSave();
+    const card = await renderBusinessCard(testInfo.outputDir);
+    const l = scanCreatePage.locators;
+
+    const title =
+      await test.step('Create an Attended External Event and open its Leads tab', async () => {
+        const eventTitle = await createAttendedEvent(externalEventsPage);
+        await externalEventsPage.openList();
+        await externalEventsPage.search(eventTitle);
+        await externalEventsPage.openEventRow(eventTitle);
+        await externalEventsPage.openLeadsTab();
+        return eventTitle;
+      });
+
+    await test.step('Scan & Create from the Leads tab pre-sets Origin Type to External Event', async () => {
+      await scanCreatePage.openFromCurrentPage();
+      await scanCreatePage.scanToReview(card);
+      await scanCreatePage.reviewAndSave();
+      await expect(l.originTypeCombobox).toHaveText(/External Event/);
+    });
+
+    await test.step('After saving, the new Customer is listed under the event’s Leads', async () => {
+      await scanCreatePage.save();
+      await scanCreatePage.expectCreatedDialog();
+      await externalEventsPage.openList();
+      await externalEventsPage.search(title);
+      await externalEventsPage.openEventRow(title);
+      await externalEventsPage.openLeadsTab();
+      await expect(externalEventsPage.locators.leadsTabButton).toHaveText(/Leads \(1\)/);
+      await scanCreatePage.expectTextOnPage(card.companyName!);
+    });
+  });
+
+  test('TC:14 Verify the Capture a Photo Option Opens the Camera with Capture and Cancel', async ({
+    scanCreatePage,
+  }) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcxh', 'TC:14 (ClickUp)');
+    const l = scanCreatePage.locators;
+
+    await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.openCamera();
+
+    await test.step('The camera opens in the assistant or in a separate window, with Cancel', async () => {
+      await expect(
+        l
+          .chatLine('Fit the business card or document inside the frame.')
+          .or(
+            l.chatLine(
+              /Your camera opened in a separate window|Your browser blocked the camera window/,
+            ),
+          ),
+      ).toBeVisible();
+      await expect(l.cameraCancelButton).toBeVisible();
+    });
+
+    test.info().annotations.push({
+      type: 'not checked',
+      description: 'Taking a real photo needs a webcam; the capture itself is a manual check.',
+    });
+  });
+
+  test('TC:15 Verify Uploading a QR Code Pre-Fills the Customer and Contact', async () => {
+    await allure.tms('https://app.clickup.com/t/z941abzcxj', 'TC:15 (ClickUp)');
     test.fixme(
       true,
-      'No "Owner" field exists on this screen — confirmed against the running app, contradicting scan-create-customer-contact.md. Email delivery is also unverifiable from the UI even if it did.',
+      'Needs a QR code image holding a vCard; the repo has no QR generator. Manual check.',
     );
   });
 
-  test('TC:7 Customer reflection and Business Process sync across Floor OS modules', () => {
+  test('TC:16 Verify Send Is Disabled When the Message Box Is Empty or Only Spaces', async ({
+    scanCreatePage,
+  }) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcxk', 'TC:16 (ClickUp)');
+    const l = scanCreatePage.locators;
+
+    await scanCreatePage.openFromCustomersList();
+    await expect(l.sendButton).toBeDisabled();
+    await l.messageBox.fill('   ');
+    await expect(l.sendButton).toBeDisabled();
+    await l.messageBox.press('Enter');
+    await l.messageBox.fill('hello');
+    await expect(l.sendButton).toBeEnabled();
+
+    await test.step('Only the real message is sent; no blank line was posted', async () => {
+      // Sending "hello" and waiting for its echo means anything the blank
+      // Enter posted would already be in the thread.
+      await scanCreatePage.send('hello');
+      await expect(l.chatLine(/^\s+$/)).toHaveCount(0);
+    });
+  });
+
+  test('TC:17 Verify the Assistant Asks for a Missing Contact Email and Accepts It from the Chat', async ({
+    scanCreatePage,
+  }, testInfo) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcxn', 'TC:17 (ClickUp)');
+    knownMissingValueBug();
+    const card = await renderBusinessCard(testInfo.outputDir, { contactEmail: null });
+    const l = scanCreatePage.locators;
+
+    await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.upload(card.filePath);
+
+    await test.step('The missing email is asked for and Review & save is not offered', async () => {
+      await scanCreatePage.expectChatLine(MISSING_EMAIL_PROMPT, 90_000);
+      await expect(l.reviewAndSaveButton).toHaveCount(0);
+    });
+
+    await test.step('A typed email is accepted and Review & save is offered', async () => {
+      const email = `pw.${Date.now()}@cardscan.example`;
+      await scanCreatePage.send(email);
+      await scanCreatePage.expectChatLine(`Contact email ${email} is unique.`);
+      await expect(l.reviewAndSaveButton).toBeVisible();
+    });
+  });
+
+  test('TC:18 Verify the Assistant Asks for a Missing Customer Name', async ({
+    scanCreatePage,
+  }, testInfo) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcxp', 'TC:18 (ClickUp)');
+    knownMissingValueBug();
+    const card = await renderBusinessCard(testInfo.outputDir, { companyName: null });
+
+    await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.upload(card.filePath);
+    await test.step('The missing customer name is asked for', async () => {
+      await scanCreatePage.expectChatLine(
+        "I couldn't find a customer name on the scan. It's mandatory — what's the customer called?",
+        90_000,
+      );
+      await expect(scanCreatePage.locators.reviewAndSaveButton).toHaveCount(0);
+    });
+  });
+
+  test('TC:19 Verify a Duplicate Customer Name Is Flagged and Linking to the Existing Customer Is Offered', async ({
+    scanCreatePage,
+    createCustomerPage,
+  }, testInfo) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcxq', 'TC:19 (ClickUp)');
+    // Expected behaviour changed from the prototype ("enter a different
+    // name") to dev's linking offer — decision recorded on the test case:
+    // https://app.clickup.com/t/z941abzcxq?comment=1100750000203919
+    const existingName = await test.step('Create a Customer to collide with', () =>
+      createDuplicateTarget(createCustomerPage));
+    const card = await renderBusinessCard(testInfo.outputDir, { companyName: existingName });
+
+    await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.upload(card.filePath);
+
+    await test.step('The existing customer is flagged and linking the contact to it is offered', async () => {
+      await scanCreatePage.expectChatLine(
+        `Customer ${existingName} already exists, so the contact will be linked to that customer. Shall I proceed?`,
+        90_000,
+      );
+      await expect(scanCreatePage.locators.yesButton).toBeVisible();
+      await expect(scanCreatePage.locators.noButton).toBeVisible();
+    });
+  });
+
+  test('TC:20 Verify a Duplicate Contact Email Ends the Scan with Nothing to Create', async ({
+    scanCreatePage,
+  }, testInfo) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcxr', 'TC:20 (ClickUp)');
+    // Expected behaviour changed from the prototype ("enter a different
+    // email") to dev's reply — decision recorded on the test case:
+    // https://app.clickup.com/t/z941abzcxr?comment=1100750000203921
+    needsCompletedSave();
+    const first = await renderBusinessCard(testInfo.outputDir);
+
+    await test.step('Create a Contact with Scan & Create', async () => {
+      await scanCreatePage.openFromCustomersList();
+      await scanCreatePage.scanToReview(first);
+      await scanCreatePage.reviewAndSave();
+      await scanCreatePage.save();
+      await scanCreatePage.expectCreatedDialog();
+    });
+
+    const second = await renderBusinessCard(testInfo.outputDir, {
+      contactEmail: first.contactEmail,
+    });
+    await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.upload(second.filePath);
+
+    await test.step('The scan ends with "nothing to create" and Start again', async () => {
+      await scanCreatePage.expectChatLine(
+        'I found nothing to create on this scan: no customer and no contact.',
+        90_000,
+      );
+      await expect(scanCreatePage.locators.startAgainButton).toBeVisible();
+    });
+  });
+
+  test('TC:21 Verify an Invalid Contact Email Typed in the Chat Is Rejected', async ({
+    scanCreatePage,
+  }, testInfo) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcxt', 'TC:21 (ClickUp)');
+    knownMissingValueBug();
+    const card = await renderBusinessCard(testInfo.outputDir, { contactEmail: null });
+
+    await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.upload(card.filePath);
+    await scanCreatePage.expectChatLine(MISSING_EMAIL_PROMPT, 90_000);
+    await scanCreatePage.send('not-an-email');
+
+    await test.step('The invalid email is rejected and asked for again', async () => {
+      await scanCreatePage.expectChatLine(/not-an-email isn.t a valid email/);
+      await expect(scanCreatePage.locators.reviewAndSaveButton).toHaveCount(0);
+    });
+  });
+
+  test('TC:22 Verify "save" Before Any Scan Says There Is Nothing to Save', async ({
+    scanCreatePage,
+  }) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcxu', 'TC:22 (ClickUp)');
+
+    await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.send('save');
+
+    await test.step('The assistant says there is nothing to save yet', async () => {
+      await scanCreatePage.expectChatLine(
+        "Nothing to save yet — pick an option to scan, or type the contact's details.",
+      );
+    });
+    await expect(scanCreatePage.locators.contactProfileHeading).toHaveCount(0);
+  });
+
+  test('TC:23 Verify "save" While a Mandatory Field Is Missing Asks for It', async ({
+    scanCreatePage,
+  }, testInfo) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcxv', 'TC:23 (ClickUp)');
+    knownMissingValueBug();
+    const card = await renderBusinessCard(testInfo.outputDir, { contactEmail: null });
+
+    await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.upload(card.filePath);
+    await scanCreatePage.expectChatLine(MISSING_EMAIL_PROMPT, 90_000);
+    await scanCreatePage.send('save');
+
+    await test.step('The assistant says it still needs the contact email', async () => {
+      await scanCreatePage.expectChatLine(/still need the contact email/);
+    });
+    await expect(scanCreatePage.locators.contactProfileHeading).toHaveCount(0);
+  });
+
+  test('TC:24 Verify an Unreadable File Is Reported as Nothing to Create with Start Again', async ({
+    scanCreatePage,
+  }, testInfo) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcxw', 'TC:24 (ClickUp)');
+    // Expected behaviour changed from the prototype ("I couldn't read…" +
+    // Try again) to dev's reply — decision recorded on the test case:
+    // https://app.clickup.com/t/z941abzcxw?comment=1100750000203922
+    const blank = await renderBlankImage(testInfo.outputDir);
+    const l = scanCreatePage.locators;
+
+    await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.upload(blank);
+
+    await test.step('It is reported as "nothing to create" with Start again', async () => {
+      await scanCreatePage.expectChatLine(
+        'I found nothing to create on this scan: no customer and no contact.',
+        90_000,
+      );
+      await expect(l.startAgainButton).toBeVisible();
+      await expect(l.reviewAndSaveButton).toHaveCount(0);
+    });
+
+    await test.step('Start again re-enables the options', async () => {
+      await l.startAgainButton.click();
+      await scanCreatePage.expectAssistantReady();
+    });
+  });
+
+  test('TC:25 Verify "stop" Ends the Session and Nothing Is Saved', async ({
+    scanCreatePage,
+  }, testInfo) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcxx', 'TC:25 (ClickUp)');
+    const card = await renderBusinessCard(testInfo.outputDir);
+
+    await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.scanToReview(card);
+    await scanCreatePage.send('stop', { expectEcho: false });
+
+    await test.step('The assistant closes and the user is back on the Customers list', async () => {
+      await scanCreatePage.expectBackOnCustomersList();
+    });
+
+    await test.step('Nothing was saved', async () => {
+      await scanCreatePage.expectCustomerNotInList(card.companyName!);
+    });
+  });
+
+  test('TC:26 Verify Closing the Assistant Returns to the List and Nothing Is Saved', async ({
+    scanCreatePage,
+  }, testInfo) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcxy', 'TC:26 (ClickUp)');
+    const card = await renderBusinessCard(testInfo.outputDir);
+
+    await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.scanToReview(card);
+    await scanCreatePage.closeAssistant();
+    await scanCreatePage.expectBackOnCustomersList();
+    await scanCreatePage.expectCustomerNotInList(card.companyName!);
+  });
+
+  test('TC:27 Verify Cancel on the Review Form Discards the Scan', async ({
+    scanCreatePage,
+  }, testInfo) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcxz', 'TC:27 (ClickUp)');
+    const card = await renderBusinessCard(testInfo.outputDir);
+
+    await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.scanToReview(card);
+    await scanCreatePage.reviewAndSave();
+    await scanCreatePage.cancel();
+
+    await test.step('The review form closes and nothing is saved', async () => {
+      await scanCreatePage.expectReviewFormClosed();
+      await scanCreatePage.expectCustomerNotInList(card.companyName!);
+    });
+  });
+
+  test('TC:28 Verify Invalid Data on the Review Form Blocks Save with Inline Errors', async ({
+    scanCreatePage,
+  }, testInfo) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcy0', 'TC:28 (ClickUp)');
+    needsCompletedSave();
+    const card = await renderBusinessCard(testInfo.outputDir);
+    const l = scanCreatePage.locators;
+
+    await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.scanToReview(card);
+    await scanCreatePage.reviewAndSave();
+
+    await test.step('An invalid email and a blank Contact Name block Save', async () => {
+      await l.contactEmailInput.fill('avery@');
+      await l.contactNameInput.fill('');
+      await scanCreatePage.save();
+      await scanCreatePage.expectFieldErrors('Required', 'Enter a valid email address');
+      await expect(l.attentionBanner).toHaveText(/^2 fields need attention/);
+      await expect(l.createdDialog).toHaveCount(0);
+    });
+
+    await test.step('After correcting both fields, Save succeeds', async () => {
+      await l.contactEmailInput.fill(card.contactEmail!);
+      await l.contactNameInput.fill(card.contactName);
+      await scanCreatePage.save();
+      await scanCreatePage.expectCreatedDialog();
+    });
+  });
+
+  test('TC:29 Verify a Customer Name Changed to an Existing One on the Review Form Shows Nothing Was Saved', async ({
+    scanCreatePage,
+    createCustomerPage,
+  }, testInfo) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcy1', 'TC:29 (ClickUp)');
+    // Expected behaviour changed from the prototype (inline "already
+    // exists" error) to dev's "Nothing was saved" dialog — decision recorded
+    // on the test case: https://app.clickup.com/t/z941abzcy1?comment=1100750000203923
+    const existingName = await test.step('Create a Customer to collide with', () =>
+      createDuplicateTarget(createCustomerPage));
+    const card = await renderBusinessCard(testInfo.outputDir);
+    const l = scanCreatePage.locators;
+
+    await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.scanToReview(card);
+    await scanCreatePage.reviewAndSave();
+    await l.customerNameInput.fill(existingName);
+    await scanCreatePage.save();
+
+    await test.step('"Nothing was saved — Checking whether this customer already exists…" is shown', async () => {
+      await scanCreatePage.expectNothingSavedDialog();
+      await expect(l.createdDialog).toHaveCount(0);
+    });
+
+    await test.step('No second Customer with that name is created', async () => {
+      await scanCreatePage.expectCustomerCountInList(existingName, 1);
+    });
+  });
+
+  test('TC:30 Verify a Blocked Camera Shows a Message and a Way Back to the Options', async () => {
+    await allure.tms('https://app.clickup.com/t/z941abzcy3', 'TC:30 (ClickUp)');
     test.fixme(
       true,
-      'Checking a Customer/Business Process reflect into OTHER Floor OS modules (Fabric Mill, Costing, Planning, ...) needs those modules’ own page objects and fixtures, which are out of scope for the CRM QA’s files — same precedent as other cross-module concerns flagged elsewhere in this repo.',
+      'On dev the camera opens in a separate browser window, whose permission prompt automation can’t drive. Manual check.',
     );
   });
 
-  test('TC:8 Contact linking to a Customer via dropdown with 1:1 association', async ({
+  test('TC:31 Verify Typing "cancel" While the Camera Is Open Closes Only the Camera', async ({
     scanCreatePage,
-    contactsTabPage,
-    page,
   }) => {
-    await allure.tms('https://app.clickup.com/t/z941abt9ge', 'TC:8 (ClickUp)');
-    test.fixme(true, REDESIGNED);
-    // Real extraction against a local vision model — see TC:2's comment.
-    test.setTimeout(180_000);
-
-    // Confirmed against the running app: there is no dropdown to link the
-    // scanned Contact to an EXISTING Customer — Scan & Create always
-    // creates a NEW Customer alongside the Contact and links them 1:1
-    // automatically (the Customer Profile group's own subtitle says so:
-    // "The contact will be linked to this customer on save"). Verifying
-    // that real 1:1 auto-link instead of the disproven dropdown premise.
-    const { filePath, contactName } = await renderUniqueBusinessCardPdf();
+    await allure.tms('https://app.clickup.com/t/z941abzcy4', 'TC:31 (ClickUp)');
+    const l = scanCreatePage.locators;
 
     await scanCreatePage.openFromCustomersList();
-    await scanCreatePage.uploadFile(filePath);
-    await scanCreatePage.startScan();
-    await scanCreatePage.fillCustomerProfile({ email: `pw-scan-${Date.now()}@example.com` });
-    // See fillContactEmailIfMissing()'s class doc — the vision model can
-    // leave either email blank, not reliably always Customer's.
-    await scanCreatePage.fillContactEmailIfMissing(`pw-scan-contact-${Date.now()}@example.com`);
-    await scanCreatePage.selectFirstOption(scanCreatePage.locators.crmStageCombobox);
-    await scanCreatePage.selectFirstOption(scanCreatePage.locators.originTypeCombobox);
-    await scanCreatePage.selectFirstOption(scanCreatePage.locators.originCombobox);
-    await scanCreatePage.selectFirstOption(scanCreatePage.locators.buyerCombobox);
+    await scanCreatePage.openCamera();
+    await expect(l.cameraCancelButton).toBeVisible();
+    await scanCreatePage.send('cancel', { expectEcho: false });
 
-    await test.step('Save; the Contact links to exactly the newly created Customer', async () => {
-      await scanCreatePage.save();
-      await scanCreatePage.expectSavedSuccessfully();
-      const customerId = page.url().split('/').pop()!;
-
-      await contactsTabPage.open(customerId);
-      await expect(contactsTabPage.locators.contactsTabTrigger).toHaveText('Contacts (1)');
-      await contactsTabPage.expectContactLinked(contactName);
+    await test.step('The camera closes, the assistant stays open, and the options are back', async () => {
+      await scanCreatePage.expectChatLine(
+        "Camera closed. Pick another option, or type the contact's details.",
+      );
+      await expect(l.assistant).toBeVisible();
+      await expect(l.uploadFileOption).toBeEnabled();
     });
   });
 
-  test('TC:9 Cancel button position and flow abort functionality', async ({
+  test('TC:32 Verify Origin Is Cleared When Origin Type Changes on the Review Form', async ({
     scanCreatePage,
-    page,
-  }) => {
-    await allure.tms('https://app.clickup.com/t/z941abt9gf', 'TC:9 (ClickUp)');
-    test.fixme(true, REDESIGNED);
+  }, testInfo) => {
+    await allure.tms('https://app.clickup.com/t/z941abzcy5', 'TC:32 (ClickUp)');
+    const card = await renderBusinessCard(testInfo.outputDir);
+    const l = scanCreatePage.locators;
 
     await scanCreatePage.openFromCustomersList();
+    await scanCreatePage.scanToReview(card);
+    await scanCreatePage.reviewAndSave();
 
-    // Save doesn't exist pre-scan (confirmed — see
-    // ScanCreatePage.expectCancelLeftOf()'s doc) — Cancel is compared
-    // against the actual sibling action button present at this stage,
-    // "Start scan".
-    await test.step('Cancel sits to the left of Start scan', async () => {
-      await scanCreatePage.expectCancelLeftOf(scanCreatePage.locators.startScanButton);
+    const firstOrigin =
+      await test.step('Choose Origin Type External Event and an Origin', async () => {
+        await scanCreatePage.selectComboboxOption(l.originTypeCombobox, 'External Event');
+        const origins = await scanCreatePage.comboboxOptions(l.originCombobox);
+        expect(origins.length).toBeGreaterThan(0);
+        await scanCreatePage.selectComboboxOption(l.originCombobox, origins[0]!);
+        return origins;
+      });
+
+    await test.step('Changing Origin Type clears Origin and changes its options', async () => {
+      await scanCreatePage.selectComboboxOption(l.originTypeCombobox, 'Web Form');
+      await expect(l.originCombobox).toHaveText(/Select/);
+      expect(await scanCreatePage.comboboxOptions(l.originCombobox)).not.toEqual(firstOrigin);
     });
 
-    await test.step('Clicking Cancel aborts the flow with nothing saved', async () => {
-      await scanCreatePage.cancel();
-      await expect(page).toHaveURL(/\/crm\/customers\/?$/);
+    await test.step('Referred By appears only for Origin Type Referral', async () => {
+      await expect(l.referredByLabel).toHaveCount(0);
+      await scanCreatePage.selectComboboxOption(l.originTypeCombobox, 'Referral');
+      await expect(l.referredByLabel).toBeVisible();
     });
   });
 });

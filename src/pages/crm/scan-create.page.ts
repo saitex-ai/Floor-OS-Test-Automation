@@ -1,87 +1,21 @@
 import { type Locator, type Page, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
 import { ScanCreateLocators } from '../../locators/crm/scan-create.locators';
+import type { BusinessCard } from '../../utils/business-card';
 
-/** Customers list, under the CRM module (confirmed against the running app — see create-customer.page.ts). */
 const CUSTOMERS_LIST_PATH = '/crm/customers';
+const CRM_HOME_PATH = '/crm';
+const CONTACTS_LIST_PATH = '/crm/contacts';
+
+/** Reading the document and running the checks takes ~10-30s on dev. */
+const SCAN_TIMEOUT_MS = 90_000;
+/** The assistant's AI replies to typed messages in a few seconds. */
+const REPLY_TIMEOUT_MS = 30_000;
 
 /**
- * A real sample scan file (a rendered business card) this suite uses to
- * drive Start Scan end to end. Generated with Playwright's own Chromium
- * (`page.pdf()` over a small HTML business card) rather than a checked-in
- * binary asset — cheap to regenerate, and avoids committing an opaque PDF.
- *
- * Confirmed against the running app (2026-09-23): with this file, a real
- * scan reliably extracts all of Contact Name, Designation, Email, Phone,
- * City, Country (Contact side) and Customer Name, City, Country (Customer
- * side) — see scan-create.locators.ts's class doc.
- *
- * Operational note: after many consecutive real vision calls (e.g. running
- * this whole file back to back), the local Ollama server can get into a
- * state where a request never returns at all — confirmed directly, one
- * extraction call sat with no response for 4+ minutes; restarting Ollama
- * (`kill` the `ollama serve` process, then `OLLAMA_HOST=0.0.0.0 ollama
- * serve`) cleared it and the very next run passed normally. Not a code
- * bug — a resource-exhaustion characteristic of a CPU-only local model
- * under sustained back-to-back load.
- *
- * Getting a real scan to complete needed an environment fix, not just a
- * test fixture: `docker/litellm/config.yaml`'s `vision-default` binding
- * (svc-agent-extraction's `vision_complete` always calls this binding by
- * name — `ENABLE_LOCAL_VISION`, referenced only in comments, is not wired
- * up anywhere in code) pointed at a cloud model behind a placeholder
- * `OPENAI_API_KEY` (13 chars, confirmed not real), so every scan failed
- * silently ("No values could be read from this document"). Retargeted
- * that binding onto local Ollama (`qwen2.5vl:7b`) instead — the same
- * fix already applied to `reasoning-local` elsewhere in that file — using
- * litellm's native `ollama_chat/` provider (not the `openai/`+`/v1` shape
- * the other on-prem bindings use), because that's what actually accepts
- * `num_ctx`: the first attempt via `/v1` 400'd with
- * `ContextWindowExceededError` (Ollama's 4096-token default is smaller
- * than one real image+prompt request, confirmed at 5312 tokens). Also
- * raised `services/svc-crm/.env`'s `AGENT_EXTRACTION_TIMEOUT_MS` (default
- * 45s) to 90s — confirmed the local model, even warm, can take longer
- * than 45s on this hardware — with `AGENT_EXTRACTION_PRESIGNED_TTL_MS`
- * raised alongside it to keep svc-crm's own margin assertion satisfied.
+ * CRM Scan & Create with the Floor OS Assistant (see
+ * scan-create.locators.ts for the screen as confirmed on dev, 2026-10-21).
  */
-export const SAMPLE_SCAN_FILE_PATH = 'test-data/crm/sample-business-card.pdf';
-
-/**
- * "Scan&Create Customer/Contact" (CRM, Sprint 2 user story). Owned by the
- * CRM QA.
- *
- * Confirmed against the running app (2026-09-23), including a full real
- * scan-to-save run — see ScanCreateLocators' class doc for the specific
- * corrections that made to the original ClickUp-text guesses, and
- * SAMPLE_SCAN_FILE_PATH's doc above for the environment fix that made a
- * real scan possible at all. `capturePhoto()` still can't be exercised
- * headlessly in this environment (no device camera) — that one action
- * remains a best-guess click only.
- */
-export interface ContactProfileScanDetails {
-  name?: string;
-  designation?: string;
-  email?: string;
-  phone?: string;
-  city?: string;
-  country?: string;
-}
-
-export interface CustomerProfileScanDetails {
-  name?: string;
-  email?: string;
-  city?: string;
-  country?: string;
-}
-
-/** No owner/businessProcess/assignee/referredBy — confirmed against the running app, this screen has none of those fields. */
-export interface CustomerManagementScanDetails {
-  crmStage?: string;
-  originType?: string;
-  origin?: string;
-  buyer?: string;
-}
-
 export class ScanCreatePage extends BasePage {
   readonly locators: ScanCreateLocators;
 
@@ -90,169 +24,212 @@ export class ScanCreatePage extends BasePage {
     this.locators = new ScanCreateLocators(page);
   }
 
-  /** "Scan & Create" lives inside the Customers list's "More actions" dropdown, not as its own button. */
+  // ---------------------------------------------------------------- entry
+
+  /** Customers list → More actions → Scan & Create. */
   async openFromCustomersList(): Promise<void> {
     await this.gotoAuthenticated(CUSTOMERS_LIST_PATH);
     await this.locators.moreActionsButton.click();
     await this.locators.scanCreateMenuItem.click();
+    await expect(this.locators.assistant).toBeVisible();
   }
 
-  /** TC:1 — upload/capture provisions are present before anything is scanned. */
-  async expectScanProvisionsVisible(): Promise<void> {
-    await expect(this.locators.fileUploadInput).toBeAttached();
-    await expect(this.locators.capturePhotoButton).toBeVisible();
-    await expect(this.locators.startScanButton).toBeVisible();
+  /** CRM Home's own "Scan & Create" button (added on dev 2026-10-21). */
+  async openFromCrmHome(): Promise<void> {
+    await this.gotoAuthenticated(CRM_HOME_PATH);
+    await this.locators.scanCreateButton.click();
+    await expect(this.locators.assistant).toBeVisible();
   }
 
-  async uploadFile(filePath: string = SAMPLE_SCAN_FILE_PATH): Promise<void> {
-    await this.locators.fileUploadInput.setInputFiles(filePath);
+  /** Contacts list → More actions → Scan & Create (added on dev 2026-10-21). */
+  async openFromContactsList(): Promise<void> {
+    await this.gotoAuthenticated(CONTACTS_LIST_PATH);
+    await this.locators.moreActionsButton.click();
+    await this.locators.scanCreateMenuItem.click();
+    await expect(this.locators.assistant).toBeVisible();
+  }
+
+  /** The External Event Leads tab's own Scan & Create button. */
+  async openFromCurrentPage(): Promise<void> {
+    await this.locators.scanCreateButton.click();
+    await expect(this.locators.assistant).toBeVisible();
+  }
+
+  // ------------------------------------------------------------ assistant
+
+  async expectAssistantReady(): Promise<void> {
+    const l = this.locators;
+    await expect(l.greeting).toBeVisible();
+    for (const option of [
+      l.uploadFileOption,
+      l.capturePhotoOption,
+      l.uploadQrOption,
+      l.captureQrOption,
+    ]) {
+      await expect(option).toBeEnabled();
+    }
+    await expect(l.messageBox).toHaveAttribute(
+      'placeholder',
+      "Pick an option, or type the contact's details…",
+    );
+    await expect(l.sendButton).toBeDisabled();
   }
 
   /**
-   * Best-guess click only — camera capture cannot be exercised headlessly
-   * in this environment (no device camera), so this makes no claim beyond
-   * "the button exists and is clickable".
+   * "Capture a photo". On dev the camera opens in a separate browser
+   * window when it can't open inside the page; that window is closed
+   * straight away, since no real webcam is available to the tests.
    */
-  async capturePhoto(): Promise<void> {
-    await this.locators.capturePhotoButton.click();
+  async openCamera(): Promise<void> {
+    const popup = this.page
+      .context()
+      .waitForEvent('page', { timeout: 10_000 })
+      .catch(() => null);
+    await this.locators.capturePhotoOption.click();
+    await expect(this.locators.cameraCancelButton).toBeVisible();
+    await (await popup)?.close();
   }
 
-  /**
-   * Confirmed against the running app: a real extraction call against the
-   * local vision model varies 35-90s+ run to run (cold or warm) — well
-   * past Playwright's 5s default expect timeout. 150s matches
-   * AGENT_EXTRACTION_TIMEOUT_MS's own budget (see SAMPLE_SCAN_FILE_PATH's
-   * doc) — callers must set their own `test.setTimeout()` well above
-   * this (test.slow()'s x3 alone isn't enough headroom), or the test's
-   * OWN overall timeout fires first and cuts this wait off early
-   * (confirmed: happened at the default x3 30s = 90s budget).
-   *
-   * A genuine "Scan failed" state (the agent didn't answer in time, or
-   * errored) is a real, distinct outcome — included here so a caller gets
-   * a clear failure message pointing at that heading, not a generic
-   * "neither message appeared" timeout.
-   */
-  async startScan(): Promise<void> {
-    await this.locators.startScanButton.click();
-    await expect(
-      this.locators.scanCompleteMessage
-        .or(this.locators.noValuesReadMessage)
-        .or(this.locators.scanFailedHeading),
-    ).toBeVisible({ timeout: 150_000 });
-    if (await this.locators.scanFailedHeading.isVisible().catch(() => false)) {
-      throw new Error('Scan & Create reported "Scan failed" — see the alert text on screen for why.');
+  /** Upload a file through "Upload a file" (or "Upload a QR code"). */
+  async upload(filePath: string, option: 'file' | 'qr' = 'file'): Promise<void> {
+    const chooser = this.page.waitForEvent('filechooser');
+    await (
+      option === 'file' ? this.locators.uploadFileOption : this.locators.uploadQrOption
+    ).click();
+    await (await chooser).setFiles(filePath);
+  }
+
+  async expectOptionsDisabled(): Promise<void> {
+    const l = this.locators;
+    for (const option of [
+      l.uploadFileOption,
+      l.capturePhotoOption,
+      l.uploadQrOption,
+      l.captureQrOption,
+    ]) {
+      await expect(option).toBeDisabled();
     }
   }
 
-  /** TC:2 — post-scan fields render. There is no `<section>` wrapper (see class doc) — checked via a representative field from each of the three groups instead. */
-  async expectPostScanSectionsVisible(): Promise<void> {
-    await expect(this.locators.contactNameInput).toBeVisible();
-    await expect(this.locators.customerNameInput).toBeVisible();
-    await expect(this.locators.crmStageCombobox).toBeVisible();
+  async expectChatLine(text: string | RegExp, timeout = REPLY_TIMEOUT_MS): Promise<void> {
+    await expect(this.locators.chatLine(text).last()).toBeVisible({ timeout });
+  }
+
+  /** Waits for the scan to be read and every mandatory check to report. */
+  async expectAllChecksPassed(
+    card: Pick<BusinessCard, 'companyName' | 'contactName' | 'contactEmail'>,
+    { typed = false } = {},
+  ): Promise<void> {
+    await this.expectChatLine(
+      typed
+        ? "Got it — I'll use the details you typed. Checking mandatory fields…"
+        : 'Scan read. Checking mandatory fields before I pre-fill the form…',
+      SCAN_TIMEOUT_MS,
+    );
+    // For typed details the assistant may drop our "Playwright " test tag
+    // from the company name (seen on dev 2026-10-22), so accept either form.
+    const company = card.companyName!.replace(/^Playwright /, '');
+    const escaped = company.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    await this.expectChatLine(
+      typed
+        ? new RegExp(`Customer name (Playwright )?${escaped} is unique\\.`)
+        : `Customer name ${card.companyName} is unique.`,
+      SCAN_TIMEOUT_MS,
+    );
+    await this.expectChatLine('CRM stage set to Lead (default).');
+    await this.expectChatLine(`Contact name ${card.contactName} found.`);
+    await this.expectChatLine(`Contact email ${card.contactEmail} is unique.`);
+    await this.expectChatLine(
+      'All mandatory checks passed. Every other field is optional — review the pre-filled form and add anything else before saving.',
+    );
+    await expect(this.locators.passedChecks()).toHaveCount(4);
+    await expect(this.locators.reviewAndSaveButton).toBeVisible();
+    await expect(this.locators.messageBox).toHaveAttribute(
+      'placeholder',
+      'Change a field, ask a question, or say save…',
+    );
+  }
+
+  /** Upload a card and wait until every check has passed. */
+  async scanToReview(card: BusinessCard): Promise<void> {
+    await this.upload(card.filePath);
+    await this.expectAllChecksPassed(card);
   }
 
   /**
-   * TC:2/TC:3 — asserts each given text-input Locator holds SOME value.
-   * Pass the specific post-scan fields the caller wants to check.
+   * Type a message and send it with the Send button. Pass
+   * `expectEcho: false` for commands that close the assistant ("stop").
    */
-  async expectInputsPopulated(inputs: Locator[]): Promise<void> {
-    for (const input of inputs) {
-      await expect(input).not.toHaveValue('');
-    }
+  async send(text: string, { expectEcho = true } = {}): Promise<void> {
+    await this.locators.messageBox.fill(text);
+    await this.locators.sendButton.click();
+    if (expectEcho) await this.expectChatLine(text);
   }
 
-  /** TC:3 — edits a post-scan-populated Contact Profile field to prove it's editable (FR-5). */
-  async fillContactProfile(details: ContactProfileScanDetails): Promise<void> {
+  async closeAssistant(): Promise<void> {
+    await this.locators.closeAssistantButton.click();
+    await expect(this.locators.assistant).toBeHidden();
+  }
+
+  async expectBackOnCustomersList(): Promise<void> {
+    await expect(this.locators.assistant).toBeHidden();
+    await expect(this.page).toHaveURL(/\/crm\/customers$/);
+  }
+
+  // ---------------------------------------------------------- review form
+
+  async reviewAndSave(): Promise<void> {
+    await this.locators.reviewAndSaveButton.click();
+    await this.expectReviewFormLoaded();
+  }
+
+  async expectReviewFormLoaded(): Promise<void> {
     const l = this.locators;
-    if (details.name !== undefined) await l.contactNameInput.fill(details.name);
-    if (details.designation !== undefined) await l.designationInput.fill(details.designation);
-    if (details.email !== undefined) await l.contactEmailInput.fill(details.email);
-    if (details.phone !== undefined) await l.contactPhoneInput.fill(details.phone);
-    if (details.city !== undefined) await l.contactCityInput.fill(details.city);
-    if (details.country !== undefined)
-      await this.selectComboboxOption(l.contactCountryCombobox, details.country);
+    await expect(this.page).toHaveURL(/\/crm\/customers\/scan/);
+    await expect(l.scanCompleteBanner).toBeVisible();
+    await expect(l.contactProfileHeading).toBeVisible();
+    await expect(l.customerProfileHeading).toBeVisible();
+    await expect(l.customerManagementHeading).toBeVisible();
   }
 
-  /**
-   * Confirmed directly (2026-10-05): the vision model's own confidence
-   * check can leave EITHER Contact Email or Customer Email blank
-   * ("1 value was read but could not be trusted, so it was left out") —
-   * which one varies run to run, not reliably always the same field. A
-   * test that only backfills Customer Email assumes Contact Email always
-   * extracts cleanly, which isn't guaranteed. Fills whichever (or both)
-   * came back empty, leaving an already-scanned value untouched.
-   */
-  async fillContactEmailIfMissing(email: string): Promise<void> {
-    if (!(await this.locators.contactEmailInput.inputValue())) {
-      await this.locators.contactEmailInput.fill(email);
-    }
-  }
-
-  /** TC:3/TC:4 — edits post-scan-populated Customer Profile fields (FR-5). */
-  async fillCustomerProfile(details: CustomerProfileScanDetails): Promise<void> {
+  async expectReviewFormPrefilled(
+    card: BusinessCard,
+    { checkCrmStage = true } = {},
+  ): Promise<void> {
     const l = this.locators;
-    if (details.name !== undefined) await l.customerNameInput.fill(details.name);
-    if (details.email !== undefined) await l.customerEmailInput.fill(details.email);
-    if (details.city !== undefined) await l.customerCityInput.fill(details.city);
-    if (details.country !== undefined)
-      await this.selectComboboxOption(l.customerCountryCombobox, details.country);
+    await expect(l.contactNameInput).toHaveValue(card.contactName);
+    await expect(l.designationInput).toHaveValue(card.designation);
+    await expect(l.contactEmailInput).toHaveValue(card.contactEmail!);
+    await expect(l.contactCityInput).toHaveValue('San Francisco');
+    await expect(l.customerNameInput).toHaveValue(card.companyName!);
+    if (checkCrmStage) await expect(l.crmStageCombobox).toHaveText(/Lead/);
   }
 
-  /** TC:4 — selects post-scan Customer Management dropdowns. Confirmed against the running app: exactly CRM Stage/Origin Type/Origin/Buyer exist — no Owner/Business Process/Assignee/Referred By on this screen. */
-  async fillCustomerManagement(details: CustomerManagementScanDetails): Promise<void> {
-    const l = this.locators;
-    if (details.crmStage !== undefined)
-      await this.selectComboboxOption(l.crmStageCombobox, details.crmStage);
-    if (details.originType !== undefined)
-      await this.selectComboboxOption(l.originTypeCombobox, details.originType);
-    if (details.origin !== undefined)
-      await this.selectComboboxOption(l.originCombobox, details.origin);
-    if (details.buyer !== undefined)
-      await this.selectComboboxOption(l.buyerCombobox, details.buyer);
+  async expectCancelLeftOfSave(): Promise<void> {
+    const cancel = await this.locators.cancelButton.boundingBox();
+    const save = await this.locators.saveButton.boundingBox();
+    expect(cancel, 'Cancel button is on screen').not.toBeNull();
+    expect(save, 'Save button is on screen').not.toBeNull();
+    expect(cancel!.x).toBeLessThan(save!.x);
   }
 
-  /** Same shape as CreateCustomerPage's/CreateContactPage's — see those files for why both popup shapes are tried. */
-  private async selectComboboxOption(trigger: Locator, optionText: string | RegExp): Promise<void> {
-    await trigger.click();
-    const inDialog = this.page.getByRole('dialog').last().getByRole('option', { name: optionText });
-    const anywhere = this.page.getByRole('option', { name: optionText });
-    await inDialog.or(anywhere).first().click();
-  }
-
-  /** Selects the FIRST available option for a Customer Management dropdown, whatever it is — used where the real option set isn't seeded/predictable. */
-  async selectFirstOption(combobox: Locator): Promise<string> {
+  async selectComboboxOption(combobox: Locator, name: string): Promise<void> {
     await combobox.click();
-    const option = this.page.getByRole('option').first();
-    const text = await option.innerText();
-    await option.click();
-    return text;
+    await this.locators.option(name).click();
+    await expect(combobox).toHaveText(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
 
-  /**
-   * Confirmed directly (2026-10-05): dev-only required "Company"
-   * combobox — same as CreateCustomerPage.fillProfile()'s handling.
-   * Defensive rather than unconditional so this doesn't change behavior
-   * on an environment where it's genuinely absent. Also confirmed
-   * directly (2026-10-05): this combobox toggles/clears on a second
-   * click rather than re-confirming the same choice (the same quirk
-   * already known elsewhere in this app, e.g.
-   * CustomerDetailPage.clearLastRowAssignee()) — since save() calls this
-   * on every attempt and a TC like TC:5 saves twice (once to trigger
-   * validation, once after correcting), only acting when it's still
-   * showing its "Select" placeholder avoids clearing an already-made
-   * choice out from under a later save.
-   */
-  private async fillCompanyIfPresent(): Promise<void> {
-    const combo = this.locators.customerCompanyCombobox;
-    const isEmpty = (await combo.innerText().catch(() => '')).trim() === 'Select';
-    if (isEmpty) {
-      await combo.click();
-      await this.page.getByRole('option').first().click();
-    }
+  /** The options a combobox currently offers (closes the list afterwards). */
+  async comboboxOptions(combobox: Locator): Promise<string[]> {
+    await combobox.click();
+    // Wait for the list to render, so an empty read can't pass a check.
+    await expect(this.page.getByRole('option').first()).toBeVisible();
+    const options = await this.page.getByRole('option').allInnerTexts();
+    await this.page.keyboard.press('Escape');
+    return options.map((o) => o.trim());
   }
 
   async save(): Promise<void> {
-    await this.fillCompanyIfPresent();
     await this.locators.saveButton.click();
   }
 
@@ -260,56 +237,99 @@ export class ScanCreatePage extends BasePage {
     await this.locators.cancelButton.click();
   }
 
-  /** FR-7 — data-type errors highlighted on the respective fields. */
-  async expectFieldError(message: string | RegExp): Promise<void> {
-    await expect(this.page.getByText(message).first()).toBeVisible();
-  }
-
-  async expectDuplicateWarningVisible(): Promise<void> {
-    await expect(this.locators.duplicateWarningModal).toBeVisible();
+  async expectCreatedDialog(): Promise<void> {
+    await expect(this.locators.createdDialog).toBeVisible({ timeout: REPLY_TIMEOUT_MS });
   }
 
   /**
-   * CORRECTED (2026-10-05, dev): Save DOES open a real confirmation
-   * dialog now ("Contact and Customer created successfully!") — no
-   * `[data-sonner-toast]` appears at all. The page doesn't navigate to
-   * the new Customer's own Details screen until "View Customer" is
-   * clicked from that dialog.
+   * "View Customer" on the success dialog. Returns the new Customer's id
+   * and the Customer record the details screen loads (the oracle for
+   * system fields the screen doesn't show, such as Creation Method).
    */
-  async expectSavedSuccessfully(): Promise<void> {
-    await expect(this.locators.savedConfirmDialog).toBeVisible();
+  async viewCreatedCustomer(): Promise<{ id: string; record: Record<string, unknown> }> {
+    const response = this.page.waitForResponse(
+      (r) =>
+        r.request().method() === 'GET' && /\/customers\/[0-9a-f-]{36}$/.test(r.url()) && r.ok(),
+      { timeout: REPLY_TIMEOUT_MS },
+    );
     await this.locators.viewCustomerButton.click();
-    await expect(this.page).toHaveURL(/\/crm\/customers\/[0-9a-f-]+$/);
+    await expect(this.page).toHaveURL(/\/crm\/customers\/[0-9a-f-]{36}/);
+    const id = this.page.url().match(/\/crm\/customers\/([0-9a-f-]{36})/)![1]!;
+    const record = (await (await response).json()) as Record<string, unknown>;
+    return { id, record };
   }
+
+  /** The new Customer's details: name, stage, and its one linked Contact. */
+  async expectCreatedCustomerDetails(card: BusinessCard): Promise<void> {
+    await expect(
+      this.page.getByRole('heading', { level: 1, name: card.companyName! }),
+    ).toBeVisible();
+    await expect(this.page.getByText(/^CRM Stage$/i).locator('xpath=following::*[1]')).toHaveText(
+      'Lead',
+    );
+    const contactsTab = this.page.getByRole('button', { name: 'Contacts (1)' });
+    await expect(contactsTab).toBeVisible();
+    await contactsTab.click();
+    await expect(this.page.getByText(card.contactName).first()).toBeVisible();
+  }
+
+  /** The review form is gone (Cancel, or anything else that leaves it). */
+  async expectReviewFormClosed(): Promise<void> {
+    await expect(this.locators.saveButton).toBeHidden();
+    await expect(this.page).not.toHaveURL(/\/crm\/customers\/scan/);
+  }
+
+  /** The "Nothing was saved" dialog stays on "Checking whether this customer already exists…". */
+  async expectNothingSavedDialog(): Promise<void> {
+    await expect(this.locators.duplicateCheckDialog).toBeVisible();
+    await expect(this.locators.duplicateCheckDialog).toContainText('Nothing was saved');
+    await expect(this.locators.duplicateCheckDialog).toContainText(
+      'Checking whether this customer already exists…',
+    );
+  }
+
+  async expectTextOnPage(text: string): Promise<void> {
+    await expect(this.page.getByText(text).first()).toBeVisible();
+  }
+
+  async expectFieldErrors(...messages: (string | RegExp)[]): Promise<void> {
+    await expect(this.locators.attentionBanner).toBeVisible();
+    for (const message of messages) {
+      await expect(this.page.getByText(message).first()).toBeVisible();
+    }
+  }
+
+  // ------------------------------------------------------------- results
 
   /**
-   * FR-8 — Cancel sits to the LEFT of its sibling primary action.
-   * Compared via bounding-box x position rather than DOM order, since
-   * visual left/right is what the acceptance criterion actually means
-   * and flex/grid layouts can reorder DOM vs. visual position.
-   *
-   * Pre-scan, "Save" doesn't exist yet (Contact Profile/Customer
-   * Profile/Customer Management only render post-scan) — the only other
-   * action button at that point is "Start scan", so TC:9 compares Cancel
-   * against that instead.
+   * Opens the Customers list and searches for `name`, waiting for the
+   * search request to come back; returns its body text.
    */
-  async expectCancelLeftOf(otherButton: Locator): Promise<void> {
-    const [cancelBox, otherBox] = await Promise.all([
-      this.locators.cancelButton.boundingBox(),
-      otherButton.boundingBox(),
-    ]);
-    expect(cancelBox, 'Cancel button should have a bounding box').not.toBeNull();
-    expect(otherBox, 'Other button should have a bounding box').not.toBeNull();
-    expect(cancelBox!.x).toBeLessThan(otherBox!.x);
+  private async searchCustomersList(name: string): Promise<string> {
+    await this.gotoAuthenticated(CUSTOMERS_LIST_PATH);
+    const searched = this.page.waitForResponse(
+      (r) =>
+        r.ok() &&
+        r.url().includes('/api/crm/customers?') &&
+        new URL(r.url()).searchParams.get('search') === name,
+    );
+    await this.page.getByRole('textbox', { name: 'Search', exact: true }).fill(name);
+    return (await searched).text();
   }
 
-  async openNotificationsPanel(): Promise<void> {
-    await this.locators.notificationsBellButton.click();
-    await expect(this.locators.notificationsPanel).toBeVisible();
+  /** The search API returns no match for `name`, and the list shows no row for it. */
+  async expectCustomerNotInList(name: string): Promise<void> {
+    const body = await this.searchCustomersList(name);
+    expect(body).not.toContain(name);
+    await expect(this.page.getByRole('row').filter({ hasText: name })).toHaveCount(0);
   }
 
-  /** TC:6 — system notification listed under the Notification Bell (email delivery cannot be checked from the UI). */
-  async expectNotificationVisible(text: string): Promise<void> {
-    await expect(this.locators.notificationItem(text)).toBeVisible();
+  /** Exactly `count` rows on the Customers list match `name`. */
+  async expectCustomerCountInList(name: string, count: number): Promise<void> {
+    const body = await this.searchCustomersList(name);
+    expect(body).toContain(name);
+    await expect(this.page.getByRole('row').filter({ hasText: name })).toHaveCount(count, {
+      timeout: 15_000,
+    });
   }
 }

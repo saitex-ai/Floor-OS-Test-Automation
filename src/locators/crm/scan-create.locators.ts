@@ -1,207 +1,139 @@
-import { type Locator, type Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 /**
- * Raw element locators for the "Scan&Create Customer/Contact" screen (CRM,
- * Sprint 2 user story) — no actions or assertions here, see
- * src/pages/crm/scan-create.page.ts for those.
+ * Raw element locators for CRM Scan & Create: the "Floor OS Assistant" chat
+ * and the review form it hands over to.
  *
- * Confirmed against the running app (2026-09-23), including a full,
- * real, reproducible extraction run (real business-card PDF, local
- * vision model — see scan-create.page.ts's class doc for the
- * environment fix that made that possible). Corrections this made to
- * the original ClickUp-text guesses:
- *
- * - "Scan & Create" is a `menuitem` inside the Customers list's "More
- *   actions" dropdown, not a standalone button.
- * - There is NO `<section>`/`<fieldset>` wrapper around the three
- *   post-scan groups (Contact Profile / Customer Profile / Customer
- *   Management) — confirmed directly (a `section` locator query
- *   returned zero matches). It's one flat form, and several field
- *   LABELS are used verbatim in both the Contact Profile and Customer
- *   Profile groups (Email, Phone, Fax, Address, City, State, Postal
- *   Code, Country, LinkedIn, Facebook, Instagram) — the only reliable
- *   way to disambiguate them is DOM order: Contact Profile's fields
- *   render first, so `.nth(0)` is the Contact field and `.nth(1)` is
- *   the Customer one, for every duplicated label.
- * - Customer Management has exactly FOUR dropdowns — CRM Stage, Origin
- *   Type, Origin, Buyer. There is NO Owner, Business Process, Assignee,
- *   or Referred By field anywhere on this screen (unlike manual Create
- *   Customer) — confirmed by reading the full post-scan form.
- * - There is NO "link to an existing Customer" dropdown for the Contact
- *   at all. Scan & Create always creates a NEW Customer alongside the
- *   Contact and links them 1:1 automatically (the Customer Profile
- *   group's own subtitle says exactly this: "The contact will be
- *   linked to this customer on save").
- * - The Save button reads "Save customer & contact", not "Save".
- * - CORRECTED (2026-10-05, dev): Save DOES open a real confirmation
- *   dialog now — `alertdialog "Contact and Customer created
- *   successfully!"` with "Cancel"/"View Customer" buttons — a reversal
- *   of the save-UX pattern previously confirmed here (toast only, no
- *   modal). No `[data-sonner-toast]` appears at all on this screen
- *   anymore; "View Customer" is the real way to reach the new Customer's
- *   own Details screen.
- * - There is NO "Creation Method" system field on the resulting Customer
- *   (its System section is the same Customer Code/Created On/Created
- *   By/Updated On/Updated By shape every other Customer has) — the
- *   confirmation dialog's own text is the closest real analog to FR-9's
- *   intent now.
- * - A failed/timed-out scan renders a distinct "Scan failed" state
- *   (heading + message + "Choose another file"/"Enter the details
- *   manually"/"Try again" buttons), not a silent empty form.
+ * Confirmed against dev (2026-10-21), matching the Floor OS CRM prototype
+ * (crm-forms.jsx: ScanCreate / ScanBot):
+ * - Entry: Customers list → "More actions" → "Scan & Create" (`menuitem`),
+ *   or an External Event's Leads tab → "Scan & Create" (`button`).
+ * - The assistant is a `dialog` named "Floor OS Assistant" with four source
+ *   buttons, a "Message the assistant" textbox and a "Send" button.
+ * - Each mandatory check is its own chat line, marked with an
+ *   `img "Passed"` icon.
+ * - "Review & save" opens the review form at /crm/customers/scan: three
+ *   sections (Contact Profile / Customer Profile / Customer Management)
+ *   and a "Cancel" + "Save customer & contact" footer.
+ * - A successful save opens a dialog "Contact and Customer created
+ *   successfully!" with "Cancel" and "View Customer".
  */
 export class ScanCreateLocators {
-  // Entry point (Customers list). "Scan & Create" is a `menuitem` inside
-  // the list's "More actions" dropdown menu.
+  // Entry points
   readonly moreActionsButton: Locator;
   readonly scanCreateMenuItem: Locator;
+  readonly scanCreateButton: Locator;
 
-  // Upload / capture provisions (FR-1, TC:1)
-  readonly fileUploadInput: Locator;
-  readonly capturePhotoButton: Locator;
-  readonly startScanButton: Locator;
-  readonly scanningIndicator: Locator;
+  // Floor OS Assistant
+  readonly assistant: Locator;
+  readonly closeAssistantButton: Locator;
+  readonly greeting: Locator;
+  readonly uploadFileOption: Locator;
+  readonly capturePhotoOption: Locator;
+  readonly uploadQrOption: Locator;
+  readonly captureQrOption: Locator;
+  readonly messageBox: Locator;
+  readonly sendButton: Locator;
+  readonly reviewAndSaveButton: Locator;
+  readonly startAgainButton: Locator;
+  readonly yesButton: Locator;
+  readonly noButton: Locator;
+  readonly reopenCameraButton: Locator;
+  readonly cameraCancelButton: Locator;
 
-  // Post-scan outcome messages (no `<section>` wrapper exists — see class doc)
-  readonly scanCompleteMessage: Locator;
-  readonly noValuesReadMessage: Locator;
-  readonly scanFailedHeading: Locator;
-  readonly tryAgainButton: Locator;
-  readonly enterManuallyButton: Locator;
-
-  // Contact Profile fields — unique labels, no ambiguity
+  // Review form
+  readonly scanCompleteBanner: Locator;
+  readonly attentionBanner: Locator;
+  readonly contactProfileHeading: Locator;
+  readonly customerProfileHeading: Locator;
+  readonly customerManagementHeading: Locator;
   readonly contactNameInput: Locator;
   readonly designationInput: Locator;
-
-  // Customer Profile fields — unique labels, no ambiguity
-  readonly customerNameInput: Locator;
-
-  // Fields whose LABEL is reused verbatim between Contact Profile and
-  // Customer Profile — disambiguated by DOM order (see class doc).
   readonly contactEmailInput: Locator;
-  readonly customerEmailInput: Locator;
-  readonly contactPhoneInput: Locator;
-  readonly customerPhoneInput: Locator;
   readonly contactCityInput: Locator;
+  readonly customerNameInput: Locator;
   readonly customerCityInput: Locator;
-  readonly contactCountryCombobox: Locator;
-  readonly customerCountryCombobox: Locator;
-
-  // Confirmed directly (2026-10-05): a dev-only required "Company"
-  // combobox, same as CreateCustomerLocators — see that file's class doc.
-  readonly customerCompanyCombobox: Locator;
-
-  // Customer Management dropdowns — exactly these four exist (FR-4's
-  // Owner/Business Process/Assignee/Referred By do not — see class doc).
   readonly crmStageCombobox: Locator;
   readonly originTypeCombobox: Locator;
   readonly originCombobox: Locator;
-  readonly buyerCombobox: Locator;
-
-  // Primary actions
-  readonly saveButton: Locator;
+  readonly referredByLabel: Locator;
   readonly cancelButton: Locator;
+  readonly saveButton: Locator;
 
-  // Duplicate-detection modal (same shape as CreateCustomerLocators —
-  // unconfirmed for THIS screen specifically, kept as the established
-  // fallback shape until a real duplicate scan is exercised).
-  readonly duplicateWarningModal: Locator;
-  readonly saveAnywayButton: Locator;
-  readonly cancelToReviewButton: Locator;
-
-  readonly toast: Locator;
-
-  // Post-save confirmation dialog — see class doc's 2026-10-05 correction.
-  readonly savedConfirmDialog: Locator;
+  // After save
+  readonly createdDialog: Locator;
   readonly viewCustomerButton: Locator;
-
-  // In-app notifications panel (shell-level, shared across every module —
-  // same button BasePage.gotoAuthenticated() and
-  // key-meeting-notes.locators.ts both already key off of)
-  readonly notificationsBellButton: Locator;
-  readonly notificationsPanel: Locator;
+  readonly duplicateCheckDialog: Locator;
 
   constructor(private readonly page: Page) {
     this.moreActionsButton = page.getByRole('button', { name: 'More actions' });
     this.scanCreateMenuItem = page.getByRole('menuitem', { name: 'Scan & Create' });
+    this.scanCreateButton = page.getByRole('button', { name: 'Scan & Create' });
 
-    // Confirmed against the running app: a real (visually hidden) file
-    // input backs the "Upload a file" button. "Capture a photo" and
-    // "Start scan" are the real labels (not "Capture Photo"/"Use Camera"
-    // or exact-case "Start Scan").
-    this.fileUploadInput = page.locator('input[type="file"]');
-    this.capturePhotoButton = page.getByRole('button', { name: /Capture a photo/i });
-    this.startScanButton = page.getByRole('button', { name: /Start scan/i });
-    this.scanningIndicator = page.getByText(/scanning/i);
+    this.assistant = page.getByRole('dialog', { name: 'Floor OS Assistant' });
+    this.closeAssistantButton = this.assistant.getByRole('button', { name: 'Close assistant' });
+    this.greeting = this.assistant.getByText(
+      /^Hi .+ — scan a business card, document or QR code and I'll pre-fill the customer and contact\. You can also just type their details here\.$/,
+    );
+    this.uploadFileOption = this.assistant.getByRole('button', { name: 'Upload a file' });
+    this.capturePhotoOption = this.assistant.getByRole('button', { name: 'Capture a photo' });
+    this.uploadQrOption = this.assistant.getByRole('button', { name: 'Upload a QR code' });
+    this.captureQrOption = this.assistant.getByRole('button', { name: 'Capture a QR code' });
+    this.messageBox = this.assistant.getByRole('textbox', { name: 'Message the assistant' });
+    this.sendButton = this.assistant.getByRole('button', { name: 'Send' });
+    this.reviewAndSaveButton = this.assistant.getByRole('button', { name: 'Review & save' });
+    this.startAgainButton = this.assistant.getByRole('button', { name: 'Start again' });
+    this.yesButton = this.assistant.getByRole('button', { name: 'Yes', exact: true });
+    this.noButton = this.assistant.getByRole('button', { name: 'No', exact: true });
+    this.reopenCameraButton = this.assistant.getByRole('button', {
+      name: /^(Reopen|Open) camera$/,
+    });
+    this.cameraCancelButton = this.assistant.getByRole('button', { name: 'Cancel', exact: true });
 
-    this.scanCompleteMessage = page.getByText(/^Scan complete/i);
-    this.noValuesReadMessage = page.getByText(/No values could be read from this document/i);
-    this.scanFailedHeading = page.getByRole('heading', { name: 'Scan failed' });
-    this.tryAgainButton = page.getByRole('button', { name: 'Try again' });
-    this.enterManuallyButton = page.getByRole('button', { name: 'Enter the details manually' });
-
-    this.contactNameInput = page.getByRole('textbox', { name: 'Contact Name', exact: false });
-    this.designationInput = page.getByRole('textbox', { name: 'Designation', exact: false });
-    this.customerNameInput = page.getByRole('textbox', { name: 'Customer Name', exact: false });
-
-    this.contactEmailInput = page.getByRole('textbox', { name: /^Email/ }).nth(0);
-    this.customerEmailInput = page.getByRole('textbox', { name: /^Email/ }).nth(1);
-    this.contactPhoneInput = page.getByRole('textbox', { name: 'Phone', exact: true }).nth(0);
-    this.customerPhoneInput = page.getByRole('textbox', { name: 'Phone', exact: true }).nth(1);
-    this.contactCityInput = page.getByRole('textbox', { name: /^City/ }).nth(0);
-    this.customerCityInput = page.getByRole('textbox', { name: /^City/ }).nth(1);
-    this.contactCountryCombobox = page.getByRole('combobox', { name: /^Country/ }).nth(0);
-    this.customerCountryCombobox = page.getByRole('combobox', { name: /^Country/ }).nth(1);
-
-    // Exact match: each combobox's accessible name is the bare label (no
-    // asterisk) — confirmed against the running app — so "Origin" and
-    // "Origin Type" don't collide.
-    this.customerCompanyCombobox = page.getByRole('combobox', { name: 'Company', exact: true });
+    this.scanCompleteBanner = page.getByText(
+      /^Scan complete — \d+ fields? (was|were) pre-filled and (is|are) editable\. Review, adjust and save\.$/,
+    );
+    this.attentionBanner = page.getByText(/^\d+ fields? needs? attention/);
+    this.contactProfileHeading = page.getByRole('heading', { name: 'Contact Profile' });
+    this.customerProfileHeading = page.getByRole('heading', { name: 'Customer Profile' });
+    this.customerManagementHeading = page.getByRole('heading', { name: 'Customer Management' });
+    // Both profiles have Email/Phone/City fields; the Contact's come first
+    // on the page and the Customer's second.
+    this.contactNameInput = page.getByRole('textbox', { name: 'Contact Name *' });
+    this.designationInput = page.getByRole('textbox', { name: 'Designation' });
+    this.contactEmailInput = page.getByRole('textbox', { name: 'Email *' });
+    this.contactCityInput = page.getByRole('textbox', { name: 'City', exact: true }).first();
+    this.customerNameInput = page.getByRole('textbox', { name: 'Customer Name *' });
+    this.customerCityInput = page.getByRole('textbox', { name: 'City', exact: true }).nth(1);
     this.crmStageCombobox = page.getByRole('combobox', { name: 'CRM Stage', exact: true });
     this.originTypeCombobox = page.getByRole('combobox', { name: 'Origin Type', exact: true });
     this.originCombobox = page.getByRole('combobox', { name: 'Origin', exact: true });
-    this.buyerCombobox = page.getByRole('combobox', { name: 'Buyer', exact: true });
-
-    this.saveButton = page.getByRole('button', { name: 'Save customer & contact' });
+    this.referredByLabel = page.getByText(/^Referred By/);
     this.cancelButton = page.getByRole('button', { name: 'Cancel', exact: true });
+    this.saveButton = page.getByRole('button', { name: 'Save customer & contact' });
 
-    // Confirmed elsewhere (create-customer.locators.ts) that this app's
-    // confirmation-style modals render as role="alertdialog", not
-    // role="dialog" — accepting either defensively here too. Unconfirmed
-    // for THIS screen specifically — no duplicate scan has been run yet.
-    this.duplicateWarningModal = page
-      .getByRole('dialog')
-      .or(page.getByRole('alertdialog'))
-      .filter({ hasText: /may already exist/i });
-    this.saveAnywayButton = this.duplicateWarningModal.getByRole('button', { name: 'Save anyway' });
-    this.cancelToReviewButton = this.duplicateWarningModal.getByRole('button', {
-      name: 'Cancel to review',
-    });
-
-    this.toast = page.locator('[data-sonner-toast]').first();
-
-    this.savedConfirmDialog = page
+    this.createdDialog = page
       .getByRole('dialog')
       .or(page.getByRole('alertdialog'))
       .filter({ hasText: 'Contact and Customer created successfully!' });
-    this.viewCustomerButton = this.savedConfirmDialog.getByRole('button', { name: 'View Customer' });
-
-    // Scoped to the shell's top banner — same disambiguation
-    // BasePage.gotoAuthenticated() documents (an unscoped "Notifications"
-    // match also hits an unrelated "Control Center Notifications" button
-    // elsewhere on the page).
-    this.notificationsBellButton = page
-      .getByRole('banner')
-      .getByRole('button', { name: /Notifications/ });
-    this.notificationsPanel = page
+    this.viewCustomerButton = this.createdDialog.getByRole('button', { name: 'View Customer' });
+    this.duplicateCheckDialog = page
       .getByRole('dialog')
-      .or(page.getByRole('menu'))
-      .filter({
-        hasText: /Notifications/i,
-      });
+      .or(page.getByRole('alertdialog'))
+      .filter({ hasText: 'Nothing was saved' });
   }
 
-  /** A notification item in the notifications panel, by the text it names. */
-  notificationItem(text: string): Locator {
-    return this.notificationsPanel.getByText(text, { exact: false });
+  /** A chat line in the assistant, by its (partial) text. */
+  chatLine(text: string | RegExp): Locator {
+    return this.assistant.getByText(text);
+  }
+
+  /** The "Passed" ticks next to each passed mandatory check. */
+  passedChecks(): Locator {
+    return this.assistant.getByRole('img', { name: 'Passed' });
+  }
+
+  option(name: string): Locator {
+    return this.page.getByRole('option', { name, exact: true });
   }
 }
