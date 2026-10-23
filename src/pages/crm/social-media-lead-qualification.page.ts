@@ -18,12 +18,6 @@ export interface SocialPost {
   kindCode: string;
   externalId: string;
   postedAt: string;
-  /**
-   * When Social Media Listening captured the post — what the story asks
-   * the Posts card to show. Not returned on dev (2026-10-23), which
-   * stores only the post's own `postedAt`.
-   */
-  capturedAt?: string | null;
   content: {
     author: { name: string; handle: string };
     text: string;
@@ -202,22 +196,17 @@ export class SocialMediaLeadQualificationPage extends LeadQualificationPage {
   }
 
   /**
-   * A user can click "View on the platform" (a trial pointer click: the
-   * button must receive pointer events). Viewing the post is not a change,
-   * so this holds past the Lead stage too.
+   * Past the Lead stage "View on the platform" can't be clicked: the tab
+   * is read-only (`pointer-events: none`), so the button gets no pointer
+   * events. Accepted dev behaviour (2026-10-23, TC:7).
    */
-  async expectViewOnPlatformClickable(entry: Locator): Promise<void> {
-    await entry
-      .getByRole('button', { name: 'View on the platform' })
-      .click({ trial: true, timeout: 15_000 });
-  }
-
-  /** The post's meta line shows the date the post was captured (story), as stored on the post. */
-  async expectPostShowsCaptureDate(entry: Locator, post: SocialPost): Promise<void> {
-    expect(post.capturedAt, 'the post carries no capture date').toBeTruthy();
-    await expect(this.social.postMetaLine(entry)).toContainText(
-      await this.localDateTime(post.capturedAt!),
+  async expectViewOnPlatformNotClickable(entry: Locator): Promise<void> {
+    const button = entry.getByRole('button', { name: 'View on the platform' });
+    await expect(button).toBeVisible();
+    const pointerEvents = await button.evaluate(
+      (el) => el.ownerDocument.defaultView!.getComputedStyle(el).pointerEvents,
     );
+    expect(pointerEvents).toBe('none');
   }
 
   /**
@@ -272,20 +261,16 @@ export class SocialMediaLeadQualificationPage extends LeadQualificationPage {
     for (const title of titles) await this.expectAiSectionWithContent(title);
   }
 
-  /** At least one of these phrases (the captured post's topic) appears in the AI sections. */
-  async expectAiSectionsMentionAny(phrases: string[]): Promise<void> {
-    const pattern = new RegExp(
-      phrases.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'),
-      'i',
-    );
-    await expect
-      .poll(async () => {
-        const texts = await Promise.all(
-          SOCIAL_MEDIA_POST_AI_SECTIONS.map((title) => this.social.aiSection(title).innerText()),
-        );
-        return texts.join('\n');
-      })
-      .toMatch(pattern);
+  /**
+   * Customer Info is the crawler's description of the brand: each
+   * descriptive line of the stored crawl detection (not the "… fit: …"
+   * signals) is shown there (TC:10, accepted dev behaviour 2026-10-23).
+   */
+  async expectCustomerInfoShowsDetection(detectionSummary: string[]): Promise<void> {
+    const described = detectionSummary.filter((line) => !/^[a-z ]+ fit: /.test(line));
+    expect(described.length, 'crawl detection has no descriptive line').toBeGreaterThan(0);
+    const section = this.social.aiSection('Customer Info');
+    for (const line of described) await expect(section).toContainText(line);
   }
 
   async expectOverallCompatibilityScore(): Promise<void> {
