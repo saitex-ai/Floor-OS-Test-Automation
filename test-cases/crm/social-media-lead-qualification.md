@@ -3,7 +3,7 @@
 - **User Story:** [[Origin Type = Social Media Post] Lead Qualification](https://app.clickup.com/t/86eye4dtz) (old version), subtask [Notification to the CRM users that a customer and contact was created as lead based on social media post](https://app.clickup.com/t/86eypejnd)
 - **Test-case set:** [CRM -Sprint -5 - [Origin Type = Social Media Post] Lead Qualification](https://app.clickup.com/t/z941abzjg7) (22 TCs; statuses set from the 2026-10-23 run)
 - **Sources (newest wins):** the ClickUp story; the Floor OS CRM prototype (`crm-leadqual.jsx`, `crm-leadgen.jsx`, `CRM Screen User Stories.html`, 2026-10-14), which is the current version of the story; dev (`https://dev.flooros.app`), explored read-only on 2026-10-23. Expected wording follows dev's current text. Functional points that dev can't show yet are written from the prototype.
-- **Automated in:** [`tests/regression/crm/39-social-media-lead-qualification.spec.ts`](../../tests/regression/crm/39-social-media-lead-qualification.spec.ts) — run on dev 2026-10-23: 16 pass, 3 known failures (`test.fail`: TC:3, TC:7, TC:10), 3 `test.fixme` (TC:12, TC:15, TC:22). See "Run results" below.
+- **Automated in:** [`tests/regression/crm/39-social-media-lead-qualification.spec.ts`](../../tests/regression/crm/39-social-media-lead-qualification.spec.ts) — run on dev 2026-10-23: 19 pass, 3 known failures (`test.fail`: split-out tests for TC:3, TC:7, TC:10), 3 `test.fixme` (TC:12, TC:15, TC:22). See "Run results" below.
 
 ## User story (summary, current version)
 
@@ -75,7 +75,9 @@ exploration; the automated results are under "Run results".
 
 `TEST_ENV=dev npx playwright test tests/regression/crm/39-social-media-lead-qualification.spec.ts --project=crm --workers=2`
 → **16 passed, 3 expected failures (TC:3, TC:7, TC:10), 3 skipped (fixme), 0 unexpected failures**, about 1.6 min. ClickUp: 16 `pass`, 3 `fail`, 3 `skip`;
-Test Run Date 2026-10-23.
+Test Run Date 2026-10-23. After splitting TC:3, 7 and 10 (25 tests): **19 passed,
+3 expected failures (the three "— Known Failure" tests), 3 skipped (fixme), 0
+unexpected failures**, about 1.7 min; ClickUp unchanged.
 
 - **Display TCs (1–7, 9–11, 20, 21)** run read-only on Nudie Jeans and Testing
   Two (`src/data/crm/social-media-leads.data.json`). Both are Qualified Leads,
@@ -83,12 +85,14 @@ Test Run Date 2026-10-23.
   Lead with a captured post. TC:4 checks a 132-character post only (no long post).
 - **Known failures (`test.fail`)** — the test asserts the story/prototype
   behaviour, marked `test.fail(true, '<reason> (<ClickUp TC link>)')` as in
-  the External Event Planning suite, with the failing check last so the
-  earlier checks still run: TC:3 (the date shown is the post's posted date,
+  the External Event Planning suite. Because `test.fail` accepts whichever
+  assertion fails, each is split: the original title is a normal test with
+  the checks dev passes, and a "— Known Failure: …" test (same ClickUp TC)
+  holds only the failing check: TC:3 (the date shown is the post's posted date,
   not a capture date; differences 2), TC:7 (on a Qualified Lead the tab is
   `pointer-events: none`, so a user can't click View on the platform; the
-  test still opens the post programmatically to check the new tab and the
-  CRM tab; differences 6), TC:10 (Customer Info is the crawl detection
+  passing test opens the post from code to check the new tab and the CRM
+  tab; differences 6), TC:10 (Customer Info is the crawl detection
   summary and nothing comes from the post; differences 4). No bug is logged
   for them (needs a bug or a PO decision); ClickUp has them as **fail**.
 - **Write TCs (8, 13, 16–19)** each create their own Lead through Create
