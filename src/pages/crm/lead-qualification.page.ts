@@ -1,4 +1,4 @@
-import { type Page, expect } from '@playwright/test';
+import { type Locator, type Page, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
 import { LeadQualificationLocators } from '../../locators/crm/lead-qualification.locators';
 
@@ -94,6 +94,8 @@ export interface LeadQualificationData {
   crawlDetection?: CrawlDetection | null;
   socialInteractions: { content?: { text?: string } }[];
   conversion: unknown;
+  /** Line locators of the pointers currently enhanced through the AI Chatbot (dev 2026-10-22). */
+  enhancedLocators?: unknown[];
 }
 
 /**
@@ -120,6 +122,33 @@ export const DEV_AI_SECTION_TITLES = [
   "Customer's Product Range",
   'Business Compatibility Report',
 ] as const;
+
+/**
+ * Dev's AI replies took 20–70 s on 2026-10-22 (slow shared env); a reply
+ * that applies an enhancement runs the agent twice. Generous on purpose.
+ */
+export const AI_REPLY_TIMEOUT = 240_000;
+/** After an enhancement/revert the tab re-reads its GET `/lead-qualification` (5–40 s on dev 2026-10-22). */
+const UI_REFRESH_TIMEOUT = 120_000;
+/** The assistant's streaming agent endpoint (POST, server-sent events). */
+const ASSISTANT_RUN_URL = '**/api/assistant/agent/**';
+
+/** A dossier as shown: each AI section's text, and each pointer's text per section. */
+export interface DossierSnapshot {
+  sections: Record<string, string>;
+  pointers: Record<string, string[]>;
+}
+
+/** What the page applied for one refinement (the enhancement POST's request + response) and the AI's reply. */
+export interface EnhancementResult {
+  pointer: string;
+  section: string;
+  previousText: string;
+  newText: string;
+  enhancedAt: string;
+  instruction: string;
+  reply: string;
+}
 
 function isFilled(value: string | undefined): value is string {
   return value !== undefined && value.trim() !== '';
@@ -278,26 +307,53 @@ export class LeadQualificationPage extends BasePage {
    * own GET answers non-2xx. Confirmed on dev (2026-10-21): an unknown id
    * gets a 404 and the screen stays on "Loading customer…" (no tab to click).
    */
-  async tryOpenAndReadQualification(customerId: string): Promise<LeadQualificationData | null> {
+  async tryOpenAndReadQualification(
+    customerId: string,
+    timeout = LQ_READ_TIMEOUT,
+  ): Promise<LeadQualificationData | null> {
     const customer = this.page.waitForResponse(
       (r) => r.request().method() === 'GET' && r.url().endsWith(`/api/crm/customers/${customerId}`),
-      { timeout: LQ_READ_TIMEOUT },
+      { timeout },
     );
-    const qualification = this.page.waitForResponse(
-      (r) =>
-        r.request().method() === 'GET' &&
-        r.url().endsWith(`/customers/${customerId}/lead-qualification`) &&
-        r.ok(),
-      { timeout: LQ_READ_TIMEOUT },
-    );
-    // Only awaited when the record exists — keep a rejected wait from going unhandled.
+    // Body read as soon as the response lands: the tab re-reads this
+    // endpoint, and a later read can find the first body already gone.
+    const qualification = this.page
+      .waitForResponse(
+        (r) =>
+          r.request().method() === 'GET' &&
+          r.url().endsWith(`/customers/${customerId}/lead-qualification`) &&
+          r.ok(),
+        { timeout },
+      )
+      .then((r) => r.json() as Promise<LeadQualificationData>);
+    // Only awaited when the record exists (or when the page loads at all) —
+    // keep a rejected wait from going unhandled.
     qualification.catch(() => undefined);
+    customer.catch(() => undefined);
     await this.gotoAuthenticated(CUSTOMER_DETAIL_PATH(customerId));
     if (!(await customer).ok()) return null;
-    await this.locators.tabButton.click();
-    const data = (await (await qualification).json()) as LeadQualificationData;
-    await expect(this.locators.cardHeadings.first()).toBeVisible();
+    await this.locators.tabButton.click({ timeout });
+    const data = await qualification;
+    await expect(this.locators.cardHeadings.first()).toBeVisible({ timeout });
     return data;
+  }
+
+  /**
+   * tryOpenAndReadQualification(), tried once more when the first attempt
+   * times out. On 2026-10-22 dev's shell sometimes took longer than
+   * gotoAuthenticated()'s fixed 60 s to show the signed-in shell; a second
+   * navigation then loaded normally.
+   */
+  async tryOpenAndReadQualificationPatiently(
+    customerId: string,
+    timeout: number,
+  ): Promise<LeadQualificationData | null> {
+    try {
+      return await this.tryOpenAndReadQualification(customerId, timeout);
+    } catch (e) {
+      if (!String(e).includes('Timeout')) throw e;
+      return this.tryOpenAndReadQualification(customerId, timeout);
+    }
   }
 
   /** Revert buttons on enhanced AI pointers are present and enabled (nothing is clicked). */
@@ -311,10 +367,10 @@ export class LeadQualificationPage extends BasePage {
   }
 
   /** Reload the page and return to the Lead Qualification tab. */
-  async reloadOnTab(): Promise<void> {
+  async reloadOnTab(timeout?: number): Promise<void> {
     await this.page.reload();
-    await this.locators.tabButton.click();
-    await expect(this.locators.cardHeadings.first()).toBeVisible();
+    await this.locators.tabButton.click({ timeout });
+    await expect(this.locators.cardHeadings.first()).toBeVisible({ timeout });
   }
 
   /** The newest submission (the one the form card shows — confirmed: only one card renders even when several are stored). */
@@ -735,5 +791,452 @@ export class LeadQualificationPage extends BasePage {
   /** "Web Crawled" Lead with no detection: no crawl card. */
   async expectNoCrawlCard(): Promise<void> {
     await expect(this.locators.crawlCard).toHaveCount(0);
+  }
+
+  // --- Lead Qualification Chatbot (Sprint 5) -----------------------------
+  // Confirmed on dev 2026-10-22 against the seeded Lead with a dossier —
+  // see LeadQualificationLocators' AI CHATBOT block for the DOM. A targeted
+  // prompt makes the agent call its `crm__lq_enhance_line` tool, which the
+  // page applies with POST `/api/crm/customers/:id/lead-dossier/enhancements`
+  // ({locator, section, previousText, newText, instruction}); "Revert to
+  // the previous wording" posts `.../enhancements/revert`. After either,
+  // the tab re-reads GET `/lead-qualification` before the pointer changes
+  // on screen — on slow dev that alone took 5–40 s.
+
+  async isAssistantButtonShown(): Promise<boolean> {
+    return (await this.locators.assistantButton.count()) > 0;
+  }
+
+  async closeAiChatbot(): Promise<void> {
+    await this.locators.closeAssistantButton.click();
+    await expect(this.locators.aiChatbotPanel).toBeHidden();
+    await expect(this.locators.assistantButton).toBeVisible();
+  }
+
+  /** Panel open with its opening message naming the Lead and every control TC:1 lists. */
+  async expectChatbotOpenedFor(leadName: string): Promise<void> {
+    await expect(this.locators.aiChatbotPanel).toBeVisible();
+    await expect(this.locators.aiChatbotOpeningMessage(leadName)).toBeVisible();
+    await expect(this.locators.aiChatbotOpeningMessage(leadName)).toContainText(
+      'use the markup tool (⌖ on any pointer) to target a specific line',
+    );
+    await expect(this.locators.markupToolButton).toBeVisible();
+    await expect(this.locators.closeAssistantButton).toBeVisible();
+    await expect(this.locators.aiChatbotPromptBox).toBeEditable();
+    await expect(this.locators.aiChatbotPromptBox).toHaveAttribute(
+      'placeholder',
+      'Prompt the AI Chatbot…',
+    );
+    await expect(this.locators.aiChatbotSendButton).toBeVisible();
+  }
+
+  /** Switches the Markup tool to the given state and checks the toggle + hint follow. */
+  async setMarkupTool(on: boolean): Promise<void> {
+    const pressed = (await this.locators.markupToolButton.getAttribute('aria-pressed')) === 'true';
+    if (pressed !== on) await this.locators.markupToolButton.click();
+    await expect(this.locators.markupToolButton).toHaveAttribute('aria-pressed', String(on));
+    if (on) {
+      await expect(this.locators.markupOnHint).toBeVisible();
+    } else {
+      await expect(this.locators.markupOnHint).toBeHidden();
+    }
+  }
+
+  /** No ⌖ target control on any pointer, in any AI section. */
+  async expectNoTargetControls(): Promise<void> {
+    for (const section of DEV_AI_SECTION_TITLES) {
+      await expect(this.locators.pointerTargets(section)).toHaveCount(0);
+    }
+  }
+
+  /**
+   * Every pointer in every AI section has a ⌖ target control. Bullet rows
+   * (`[data-line-locator]`) and Compatibility rows (one per score ring,
+   * minus the "Overall compatibility" ring) are counted from the DOM;
+   * Product Range's pointers are its Most/Least expensive lines (the
+   * category chips and product images aren't pointers).
+   */
+  async expectTargetControlsOnEveryPointer(): Promise<void> {
+    for (const section of DEV_AI_SECTION_TITLES) {
+      const targets = this.locators.pointerTargets(section);
+      const box = this.locators.aiSection(section);
+      if (section === 'Business Compatibility Report') {
+        const rings = await box.getByRole('img', { name: /^Score .* out of 10$/ }).count();
+        await expect(targets).toHaveCount(rings - 1);
+      } else if (section === "Customer's Product Range") {
+        await expect(targets).toHaveCount(2);
+      } else {
+        await expect(targets).toHaveCount(await box.locator('[data-line-locator]').count());
+      }
+      expect(await targets.count(), `"${section}" has no pointers`).toBeGreaterThan(0);
+    }
+  }
+
+  /** Every target control's accessible name — dev uses the section title. */
+  async expectTargetControlsLabelled(): Promise<void> {
+    for (const section of DEV_AI_SECTION_TITLES) {
+      const targets = this.locators.pointerTargets(section);
+      const n = await targets.count();
+      for (let i = 0; i < n; i++) await expect(targets.nth(i)).toHaveAccessibleName(section);
+    }
+  }
+
+  async pointerText(section: string, index: number): Promise<string> {
+    return (await this.locators.pointerRow(section, index).innerText()).replace(/\s+/g, ' ').trim();
+  }
+
+  /**
+   * Snapshot of the dossier as shown: each AI section's full text, and (via
+   * the Markup tool's target rows) each pointer's text. Needs the chatbot
+   * open; leaves the Markup tool off.
+   */
+  async snapshotDossier(): Promise<DossierSnapshot> {
+    const snapshot: DossierSnapshot = { sections: {}, pointers: {} };
+    await this.setMarkupTool(true);
+    for (const section of DEV_AI_SECTION_TITLES) {
+      const n = await this.locators.pointerTargets(section).count();
+      const texts: string[] = [];
+      for (let i = 0; i < n; i++) texts.push(await this.pointerText(section, i));
+      snapshot.pointers[section] = texts;
+    }
+    await this.setMarkupTool(false);
+    snapshot.sections = await this.sectionTexts();
+    return snapshot;
+  }
+
+  async sectionTexts(): Promise<Record<string, string>> {
+    const texts: Record<string, string> = {};
+    for (const section of DEV_AI_SECTION_TITLES) {
+      texts[section] = (await this.locators.aiSection(section).innerText())
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+    return texts;
+  }
+
+  /** Every section reads exactly as in the snapshot, except the ones named. */
+  async expectSectionsUnchanged(snapshot: DossierSnapshot, except: string[] = []): Promise<void> {
+    const now = await this.sectionTexts();
+    for (const section of DEV_AI_SECTION_TITLES) {
+      if (except.includes(section)) continue;
+      expect(now[section], `"${section}" changed`).toBe(snapshot.sections[section]);
+    }
+  }
+
+  async expectNoEnhancedMarkers(): Promise<void> {
+    await expect(this.locators.enhancedPointerMarkers).toHaveCount(0);
+    await expect(this.locators.revertWordingButtons).toHaveCount(0);
+  }
+
+  /**
+   * Targets pointer `index` of `section` with the Markup tool (switched on
+   * first) and checks the target chip. `how`: a mouse click, or Enter /
+   * Space on the focused control. Returns the pointer text the chip shows.
+   */
+  async targetPointer(
+    section: string,
+    index: number,
+    how: 'click' | 'Enter' | 'Space' = 'Enter',
+  ): Promise<string> {
+    await this.setMarkupTool(true);
+    const rowText = await this.pointerText(section, index);
+    const target = this.locators.pointerTargets(section).nth(index);
+    if (how === 'click') {
+      await target.click();
+    } else {
+      await target.focus();
+      await this.page.keyboard.press(how);
+    }
+    return this.expectTargetChip(section, rowText);
+  }
+
+  /**
+   * Exactly one target strip, reading "<Section>: <pointer text>" (for the
+   * Product Range / Compatibility rows the row also carries its label or
+   * score, so the chip's text is checked to be part of `rowText`), with its
+   * clear button; the prompt asks how the line should change. Returns the
+   * chip's pointer text.
+   */
+  async expectTargetChip(section: string, rowText: string): Promise<string> {
+    await expect(this.locators.stopPointingButton).toHaveCount(1);
+    await expect(this.locators.targetChip).toContainText(`${section}: `);
+    const chip = (await this.locators.targetChip.innerText()).replace(/\s+/g, ' ').trim();
+    const pointer = chip.slice(`${section}: `.length);
+    expect(chip.startsWith(`${section}: `), `target chip "${chip}"`).toBe(true);
+    expect(pointer.length).toBeGreaterThan(0);
+    expect(rowText, `target chip "${chip}" names the targeted pointer`).toContain(pointer);
+    await expect(this.locators.aiChatbotPromptBox).toHaveAttribute(
+      'placeholder',
+      'How should this line change?',
+    );
+    return pointer;
+  }
+
+  async expectNoTargetChip(): Promise<void> {
+    await expect(this.locators.stopPointingButton).toHaveCount(0);
+    await expect(this.locators.aiChatbotPromptBox).toHaveAttribute(
+      'placeholder',
+      'Prompt the AI Chatbot…',
+    );
+  }
+
+  async clearTarget(): Promise<void> {
+    await this.locators.stopPointingButton.click();
+    await this.expectNoTargetChip();
+  }
+
+  async typePrompt(text: string): Promise<void> {
+    await this.locators.aiChatbotPromptBox.fill(text);
+  }
+
+  /** Types the prompt and sends it with the Send button or the Enter key. */
+  async sendPrompt(text: string, via: 'button' | 'Enter' = 'button'): Promise<void> {
+    await this.typePrompt(text);
+    if (via === 'button') {
+      await this.locators.aiChatbotSendButton.click();
+    } else {
+      await this.locators.aiChatbotPromptBox.press('Enter');
+    }
+  }
+
+  /**
+   * Waits until `count` replies are in the thread and nothing is pending
+   * (no activity phrase, prompt enabled again). AI replies on dev took
+   * 20–70 s on 2026-10-22, so this allows up to AI_REPLY_TIMEOUT.
+   */
+  async waitForReplies(count: number): Promise<void> {
+    await expect(this.locators.assistantMessages).toHaveCount(count, {
+      timeout: AI_REPLY_TIMEOUT,
+    });
+    await expect(this.locators.activityPhrase).toHaveCount(0, { timeout: AI_REPLY_TIMEOUT });
+    await expect(this.locators.aiChatbotPromptBox).toBeEnabled({ timeout: AI_REPLY_TIMEOUT });
+  }
+
+  /** Sends a prompt and waits for its reply; returns the reply's text. */
+  async askAndWaitForReply(text: string, via: 'button' | 'Enter' = 'button'): Promise<string> {
+    const before = await this.locators.assistantMessages.count();
+    await this.sendPrompt(text, via);
+    await this.waitForReplies(before + 1);
+    return this.locators.assistantMessages.last().innerText();
+  }
+
+  /**
+   * Sends a refinement for the currently targeted pointer, waits for the
+   * page to apply the AI's rewrite (the enhancement POST) and for the reply.
+   */
+  async refineTargetedPointer(prompt: string): Promise<EnhancementResult> {
+    const applied = this.page.waitForResponse(
+      (r) =>
+        r.request().method() === 'POST' &&
+        /\/lead-dossier\/enhancements$/.test(new URL(r.url()).pathname),
+      { timeout: AI_REPLY_TIMEOUT },
+    );
+    applied.catch(() => undefined);
+    const reply = await this.askAndWaitForReply(prompt);
+    const response = await applied;
+    expect(response.ok(), `enhancement POST answered ${response.status()}`).toBe(true);
+    const request = response.request().postDataJSON() as { instruction?: string };
+    const record = (await response.json()) as Omit<EnhancementResult, 'reply' | 'instruction'>;
+    return { ...record, instruction: request.instruction ?? '', reply };
+  }
+
+  /** Counts the enhancement POSTs the page makes from now on (e.g. to prove a prompt didn't refine anything). */
+  trackEnhancementRequests(): () => number {
+    let n = 0;
+    this.page.on('request', (r) => {
+      if (
+        r.method() === 'POST' &&
+        /\/lead-dossier\/enhancements$/.test(new URL(r.url()).pathname)
+      ) {
+        n++;
+      }
+    });
+    return () => n;
+  }
+
+  /**
+   * After a refinement: exactly `markers` "✦ Enhanced" pointer(s) in
+   * `section`, which now shows `newText`, while its other pointers still
+   * read as before.
+   */
+  async expectPointerEnhanced(
+    snapshot: DossierSnapshot,
+    section: string,
+    index: number,
+    newText: string,
+  ): Promise<void> {
+    const box = this.locators.aiSection(section);
+    await expect(this.locators.enhancedMarkersIn(section)).toHaveCount(1, {
+      timeout: UI_REFRESH_TIMEOUT,
+    });
+    await expect(box).toContainText(newText);
+    const others = (snapshot.pointers[section] ?? []).filter((_, i) => i !== index);
+    for (const other of others) await expect(box).toContainText(other, { useInnerText: true });
+  }
+
+  async expectThreadMessages(userTexts: string[]): Promise<void> {
+    await expect(this.locators.userMessages).toHaveText(userTexts);
+  }
+
+  /** Bubble roles top to bottom, e.g. ['user', 'assistant', ...]. */
+  async threadRolesInOrder(): Promise<string[]> {
+    return this.locators.aiChatbotPanel
+      .locator('[data-role="user"], [data-role="assistant"]')
+      .evaluateAll((els) => els.map((e) => e.getAttribute('data-role') ?? ''));
+  }
+
+  /** The target line shown above user prompt `index` (0-based), or null for a general prompt. */
+  async threadTargetOf(index: number): Promise<string | null> {
+    const line = this.locators.threadTargetLineFor(this.locators.userMessages.nth(index));
+    if ((await line.count()) === 0) return null;
+    return (await line.innerText()).replace(/\s+/g, ' ').trim();
+  }
+
+  async threadScrollState(): Promise<{ top: number; height: number; client: number }> {
+    return this.locators.threadViewport.evaluate((el) => ({
+      top: el.scrollTop,
+      height: el.scrollHeight,
+      client: el.clientHeight,
+    }));
+  }
+
+  async scrollThreadToTop(): Promise<void> {
+    await this.locators.threadViewport.evaluate((el) => el.scrollTo({ top: 0 }));
+    await expect.poll(async () => (await this.threadScrollState()).top).toBe(0);
+  }
+
+  /**
+   * The newest message is scrolled into view: the bottom edge of the last
+   * bubble sits inside the thread's visible area. (Dev keeps the content's
+   * 16px bottom padding below it, so "scrollTop at the very end" is not the
+   * criterion.)
+   */
+  async expectThreadScrolledToBottom(): Promise<void> {
+    const last = this.locators.aiChatbotPanel
+      .locator('[data-role="user"], [data-role="assistant"]')
+      .last();
+    await expect
+      .poll(async () => {
+        const view = await this.locators.threadViewport.boundingBox();
+        const msg = await last.boundingBox();
+        if (!view || !msg) return false;
+        const bottom = msg.y + msg.height;
+        return bottom <= view.y + view.height + 1 && bottom >= view.y;
+      })
+      .toBe(true);
+  }
+
+  /** The pending state: activity phrase showing, prompt and Send both unavailable. */
+  async expectReplyPending(): Promise<string> {
+    await expect(this.locators.activityPhrase).toBeVisible();
+    await expect(this.locators.aiChatbotPromptBox).toBeDisabled();
+    await expect(this.locators.aiChatbotSendButton).toBeDisabled();
+    return this.locators.activityPhrase.innerText();
+  }
+
+  /** Makes the assistant's agent request fail at the network layer (nothing reaches the AI service). */
+  async failAssistantRequests(): Promise<void> {
+    await this.page.route(ASSISTANT_RUN_URL, (route) => route.abort('failed'));
+  }
+
+  async restoreAssistantRequests(): Promise<void> {
+    await this.page.unroute(ASSISTANT_RUN_URL);
+  }
+
+  /** Tooltip text of the first "Revert to the previous wording" button (hover). */
+  async revertTooltipText(): Promise<string> {
+    await this.locators.revertWordingButtons.first().hover();
+    const tip = this.page.getByRole('tooltip');
+    await expect(tip).toBeVisible();
+    return (await tip.innerText()).trim();
+  }
+
+  /**
+   * Reverts every enhanced pointer on the tab through "Revert to the
+   * previous wording", one at a time, waiting for each revert POST and for
+   * the screen to drop that marker. Returns the pointer texts (and errors)
+   * it could NOT revert — empty when everything was restored.
+   */
+  async revertAllEnhancements(): Promise<string[]> {
+    const failed: string[] = [];
+    for (let guard = 0; guard < 12; guard++) {
+      const buttons = this.locators.revertWordingButtons;
+      const count = await buttons.count();
+      if (count === 0) break;
+      const row = buttons.first().locator('xpath=..');
+      const label = (await row.innerText()).replace(/\s+/g, ' ').trim();
+      try {
+        const reverted = this.page.waitForResponse(
+          (r) =>
+            r.request().method() === 'POST' &&
+            new URL(r.url()).pathname.endsWith('/lead-dossier/enhancements/revert'),
+          { timeout: UI_REFRESH_TIMEOUT },
+        );
+        await buttons.first().click();
+        const response = await reverted;
+        if (!response.ok()) throw new Error(`revert POST answered ${response.status()}`);
+        await expect(buttons).toHaveCount(count - 1, { timeout: UI_REFRESH_TIMEOUT });
+      } catch (e) {
+        failed.push(`${label} (${String(e).split('\n')[0]})`);
+        break;
+      }
+    }
+    return failed;
+  }
+
+  /**
+   * Keyboard only: from the first target control, Tab moves through every
+   * other target control in page order (no other focus stop in between).
+   */
+  async expectTabMovesThroughTargets(): Promise<void> {
+    const all: Locator[] = [];
+    for (const section of DEV_AI_SECTION_TITLES) {
+      const targets = this.locators.pointerTargets(section);
+      const n = await targets.count();
+      for (let i = 0; i < n; i++) all.push(targets.nth(i));
+    }
+    expect(all.length).toBeGreaterThan(1);
+    await all[0]!.focus();
+    for (const next of all.slice(1)) {
+      await this.page.keyboard.press('Tab');
+      await expect(next).toBeFocused();
+    }
+  }
+
+  /** Still on the Lead Qualification tab with every AI section rendered. */
+  async expectQualificationScreenIntact(): Promise<void> {
+    await expect(this.locators.tabButton).toBeVisible();
+    for (const section of DEV_AI_SECTION_TITLES) {
+      await expect(this.locators.aiSection(section)).toBeVisible();
+    }
+  }
+
+  /** Total "✦ Enhanced" markers on the tab. */
+  async enhancedMarkerCount(): Promise<number> {
+    return this.locators.enhancedPointerMarkers.count();
+  }
+
+  /** Text of every pointer currently marked "✦ Enhanced" (marker's parent line). */
+  async enhancedPointerTexts(): Promise<string[]> {
+    return this.locators.enhancedPointerMarkers.evaluateAll((els) =>
+      els.map((e) => (e.parentElement?.textContent ?? '').replace(/\s+/g, ' ').trim()),
+    );
+  }
+
+  /**
+   * User prompt `index` shows its target "<Section>: <pointer>" above it.
+   * Dev cuts a long pointer short with "…", so the shown text must be the
+   * pointer itself or its start followed by "…".
+   */
+  async expectThreadTarget(index: number, section: string, pointer: string): Promise<void> {
+    const shown = await this.threadTargetOf(index);
+    expect(shown, `prompt ${index + 1} shows its target`).not.toBeNull();
+    expect(shown!.startsWith(`${section}: `), `target line "${shown}"`).toBe(true);
+    const text = shown!.slice(`${section}: `.length);
+    if (text.endsWith('…')) {
+      expect(pointer.startsWith(text.slice(0, -1).trimEnd()), `target line "${shown}"`).toBe(true);
+    } else {
+      expect(text).toBe(pointer);
+    }
   }
 }
