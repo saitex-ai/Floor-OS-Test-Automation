@@ -364,10 +364,6 @@ test.describe('CRM - [Origin Type = Web Crawled] Lead Qualification', () => {
     leadQualificationPage: lq,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abzh4a', 'TC:13 (ClickUp)');
-    test.fixme(
-      true,
-      "Dev run 2026-10-22: the Lead Qualification read for HIMDENIM didn't arrive within 120 s (CRM stuck loading), so the AI Chatbot step never ran. Passed in the earlier probe; re-enable once dev is responsive.",
-    );
 
     await test.step('AI Chatbot opens on a Web Crawled Lead and the Markup tool can be switched on (nothing sent)', async () => {
       await openSeedLead(lq, 'crawled');
@@ -441,10 +437,6 @@ test.describe('CRM - [Origin Type = Web Crawled] Lead Qualification', () => {
     leadQualificationPage: lq,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abzh4d', 'TC:16 (ClickUp)');
-    test.fixme(
-      true,
-      "Dev run 2026-10-22: Create Customer never loaded — the shell sat on its sign-in gate for 60 s while opening /crm/customers, so the test Lead couldn't be created. Not a functional result; re-enable once dev is responsive.",
-    );
     test.slow();
 
     const lead = await createOwnWebCrawledLead(page, createCustomerPage, lq);
@@ -473,10 +465,6 @@ test.describe('CRM - [Origin Type = Web Crawled] Lead Qualification', () => {
     leadQualificationPage: lq,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abzh4e', 'TC:17 (ClickUp)');
-    test.fixme(
-      true,
-      'Dev run 2026-10-22: page.goto /crm/customers failed with net::ERR_NETWORK_CHANGED while creating the test Lead. Not a functional result; re-enable once dev is responsive.',
-    );
     test.slow();
 
     const lead = await createOwnWebCrawledLead(page, createCustomerPage, lq);
@@ -500,10 +488,6 @@ test.describe('CRM - [Origin Type = Web Crawled] Lead Qualification', () => {
     leadQualificationPage: lq,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abzh4f', 'TC:18 (ClickUp)');
-    test.fixme(
-      true,
-      'Dev run 2026-10-22: dev timed out (locator.waitFor 60 s on the shell sign-in gate) while creating the test Lead. Not a functional result; re-enable once dev is responsive.',
-    );
     test.slow();
 
     const lead = await createOwnWebCrawledLead(page, createCustomerPage, lq);
@@ -530,10 +514,6 @@ test.describe('CRM - [Origin Type = Web Crawled] Lead Qualification', () => {
     leadQualificationPage: lq,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abzh4g', 'TC:19 (ClickUp)');
-    test.fixme(
-      true,
-      "Dev run 2026-10-22: the lead-qualification read for CURVJEANS LLC didn't arrive within 120 s, then the shell sign-in gate timed out (60 s). Not a functional result; re-enable once dev is responsive.",
-    );
     test.slow();
 
     await test.step('Crawler-created Lead with no contact: company AI sections, review form and Convert are all there', async () => {
@@ -581,10 +561,6 @@ test.describe('CRM - [Origin Type = Web Crawled] Lead Qualification', () => {
     leadQualificationPage: lq,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abzh4j', 'TC:21 (ClickUp)');
-    test.fixme(
-      true,
-      "Dev run 2026-10-22: twice the Kings Of Indigo page didn't load in time (lead-qualification read > 120 s, then the shell sign-in gate > 60 s). Not a functional result — a manual look on dev showed both no-information messages; re-enable once dev is responsive.",
-    );
 
     const data = await openSeedLead(lq, 'sparse');
 
@@ -610,10 +586,6 @@ test.describe('CRM - [Origin Type = Web Crawled] Lead Qualification', () => {
     leadQualificationPage: lq,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abzh4k', 'TC:22 (ClickUp)');
-    test.fixme(
-      true,
-      'Dev run 2026-10-22: dev timed out (locator.waitFor 60 s on the shell sign-in gate) while creating the test Lead. Not a functional result; re-enable once dev is responsive.',
-    );
     test.slow();
 
     const lead = await createOwnWebCrawledLead(page, createCustomerPage, lq);
