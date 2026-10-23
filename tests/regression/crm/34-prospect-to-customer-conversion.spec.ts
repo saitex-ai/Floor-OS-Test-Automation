@@ -35,6 +35,7 @@ import type {
  * Season a test created is deleted again afterwards — orders first, then
  * the Season (confirmed on dev 2026-10-21: Sales Orders delete from the
  * list's row-select "Delete", Seasons from Edit Season → Delete).
+ * An order the test failed to save is skipped (nothing to delete).
  * Failures there are logged and annotated, never fail the test. The CRM
  * Customers themselves, and the conversion notifications/emails, stay.
  */
@@ -63,7 +64,11 @@ const test = crossModuleTest.extend<{ createdRecords: CreatedRecords }>({
       await test.step(`Teardown: delete Sales Order "${description}"`, async () => {
         try {
           await salesOrderPage.open();
-          await salesOrderPage.deleteOrder(description);
+          if (!(await salesOrderPage.deleteOrder(description))) {
+            console.warn(
+              `Teardown: Sales Order "${description}" was never saved — nothing to delete`,
+            );
+          }
         } catch (error) {
           cleanupFailed(`Sales Order "${description}"`, error);
         }

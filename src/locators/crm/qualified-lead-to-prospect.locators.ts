@@ -35,8 +35,12 @@ export class QualifiedLeadToProspectLocators {
   // "Notification actions", "Notification preferences" buttons, "No
   // notifications yet." text) sits flat in the accessibility tree with no
   // distinguishing container role, so a role=dialog/menu locator never
-  // matches. Using the "Notification preferences" button — only present
-  // once the panel is open — as the open/visible marker instead.
+  // matches. Using the "Notification actions" button — only present once
+  // the panel is open — as the open/visible marker instead. Re-confirmed on
+  // dev (2026-10-23): the redesigned panel dropped "Notification
+  // preferences" and now shows "Notifications", "Notification actions",
+  // All / Unread / Archive tabs, the entries (links) and "View all
+  // notifications".
   readonly notificationPanel: Locator;
 
   constructor(private readonly page: Page) {
@@ -46,7 +50,7 @@ export class QualifiedLeadToProspectLocators {
       .getByRole('button', { name: /^Notifications/ })
       .first();
 
-    this.notificationPanel = page.getByRole('button', { name: 'Notification preferences' });
+    this.notificationPanel = page.getByRole('button', { name: 'Notification actions' });
   }
 
   /**

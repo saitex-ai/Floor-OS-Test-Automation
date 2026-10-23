@@ -3,6 +3,8 @@ import { type Locator, type Page } from '@playwright/test';
 /** Sales Order's Order Type values — SMS is the sample order, BULK the bulk order. */
 export type SalesOrderType = 'SMS' | 'BULK';
 
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /**
  * Raw element locators for Master Data → Sales Order Management → Sales
  * Order (`/master-data/sales-order-management/sales-order`) — no actions or
@@ -21,15 +23,27 @@ export type SalesOrderType = 'SMS' | 'BULK';
  *   via the label's following input — see each locator's note.
  * - Order Type is the dialog's FIRST combobox (default "SMS"); it opens a
  *   `listbox` with `option "SMS"` / `option "BULK"`.
- * - Customer / Season are buttons ("Search customers..." / "Search
- *   seasons...") that open a separate, unnamed `dialog` holding a
- *   `combobox` (type-to-search) and a `listbox "Suggestions"` whose options
- *   read "<Code> <Name>" (customers) or "<Code> <Description> <Code>"
- *   (seasons). A brand-new CRM Prospect is selectable straight away.
+ * - Redesigned on dev (confirmed 2026-10-23): the dialog is now grouped
+ *   into Order (Order Type *, Sample, Requested Date *, Status — default
+ *   "On Hold"), Customer (Customer *, Season *, Customer Brand, Buyer PO
+ *   Nbr, Currency, Order Company, Manufacturing Company) and Product
+ *   (Style / Fabric / Wash Code, Description) sections. Order Type and
+ *   Status are both comboboxes, so Order Type is still the FIRST one.
+ * - Customer / Season are inline search fields: a button ("Search
+ *   customers..." / "Search seasons...") that, once clicked, turns in place
+ *   into a type-to-search combobox (placeholder "Search customers by code
+ *   or name..." / "Search seasons by code or name...") — no separate picker
+ *   dialog any more. Suggestions open in an unnamed popover `dialog` with a
+ *   `listbox "Suggestions"` whose options read "<Name> <Code>" (customers)
+ *   or "<Description> <Code>" (seasons) — the code is now LAST. After a pick
+ *   the field shows a button with that same "<Name> <Code>" text. Season
+ *   only lists the picked customer's seasons. A brand-new CRM Prospect is
+ *   selectable straight away.
  * - Save shows a sonner toast "Sales order created." and closes the dialog.
- * - Deleting (confirmed on dev 2026-10-21): the Edit Sales Order dialog has
- *   no Delete; instead ticking a row's checkbox reveals a list-level
- *   "Delete" button.
+ * - Deleting (confirmed on dev 2026-10-21, unchanged 2026-10-23): the Edit
+ *   Sales Order dialog has no Delete; instead ticking a row's checkbox
+ *   reveals a list-level "Delete" button, which opens `alertdialog "Delete
+ *   sales order?"` (Cancel / Delete); the toast reads "Sales order deleted.".
  */
 export class SalesOrderLocators {
   readonly heading: Locator;
@@ -43,13 +57,14 @@ export class SalesOrderLocators {
   readonly descriptionInput: Locator;
   readonly saveButton: Locator;
 
-  /** The type-to-search combobox inside the open Customer/Season picker popup. */
-  readonly pickerSearchInput: Locator;
+  /** Inline type-to-search inputs, shown once the matching button is clicked. */
+  readonly customerSearchInput: Locator;
+  readonly seasonSearchInput: Locator;
   readonly createdToast: Locator;
 
   /** List-level "Delete" — only rendered while at least one row is ticked. */
   readonly deleteSelectedButton: Locator;
-  /** Confirmation shown after clicking deleteSelectedButton, if any. */
+  /** `alertdialog "Delete sales order?"`, shown after clicking deleteSelectedButton. */
   readonly deleteConfirmDialog: Locator;
 
   constructor(private readonly page: Page) {
@@ -67,7 +82,8 @@ export class SalesOrderLocators {
       .locator('xpath=following::*[self::input or self::textarea][1]');
     this.saveButton = this.dialog.getByRole('button', { name: 'Save', exact: true });
 
-    this.pickerSearchInput = page.getByRole('dialog').last().getByRole('combobox');
+    this.customerSearchInput = this.dialog.getByPlaceholder('Search customers by code or name...');
+    this.seasonSearchInput = this.dialog.getByPlaceholder('Search seasons by code or name...');
     this.createdToast = page.getByText('Sales order created.', { exact: true });
 
     this.deleteSelectedButton = page.getByRole('button', { name: 'Delete', exact: true });
@@ -78,11 +94,16 @@ export class SalesOrderLocators {
     return this.page.getByRole('option', { name: type, exact: true });
   }
 
-  /** A suggestion in the open Customer/Season picker, matched by its leading code. */
+  /** A suggestion in the open Customer/Season search, matched by its trailing code. */
   pickerOption(code: string): Locator {
     return this.page
       .getByRole('listbox', { name: 'Suggestions' })
-      .getByRole('option', { name: new RegExp(`^${code} `) });
+      .getByRole('option', { name: new RegExp(` ${escapeRegExp(code)}$`) });
+  }
+
+  /** The Customer/Season field once a value is picked: a button reading "<Name> <Code>". */
+  pickedValueButton(code: string): Locator {
+    return this.dialog.getByRole('button', { name: new RegExp(` ${escapeRegExp(code)}$`) });
   }
 
   /** The list row for one order, matched by its (unique) description. */
