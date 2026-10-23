@@ -176,14 +176,18 @@ test.describe('CRM - Biz Doc', () => {
     // second, seeded `job.crm-executive` identity.
     const { username, password } = moduleCredentials('CRM_EXECUTIVE');
 
-    // A fresh, storageState-free context — this suite's shared `crm.json`
-    // storage state belongs to the Manager test user (see auth-setup.ts).
-    const executiveContext = await browser.newContext();
+    // A fresh context with an EMPTY storage state — this suite's shared
+    // `crm.json` storage state belongs to the Manager test user (see
+    // auth-setup.ts). In Playwright Test, browser.newContext() inherits the
+    // project's `use` options, storageState included, so without the
+    // explicit empty state the context starts signed in as the Manager.
+    // Since the 2026-10-22 design system the app keeps its session in
+    // localStorage too, so clearing cookies alone is no longer enough: the
+    // welcome page is skipped and the login below has nothing to fill.
+    const executiveContext = await browser.newContext({
+      storageState: { cookies: [], origins: [] },
+    });
     try {
-      // browser.newContext() alone still carries the Manager's live
-      // Keycloak session cookies in this setup — clear explicitly.
-      await executiveContext.clearCookies();
-
       const executivePage = await executiveContext.newPage();
       const loginPage = new ShellLoginPage(executivePage);
       await loginPage.goto('/');

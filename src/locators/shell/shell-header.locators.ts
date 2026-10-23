@@ -25,6 +25,13 @@ export class ShellHeaderLocators {
   readonly changeLanguageButton: Locator;
   readonly languageMenu: Locator;
   readonly userMenuButton: Locator;
+  /**
+   * The menu the user-menu button opens. Since the 2026-10-22 design system
+   * the button itself shows only the user's initials (e.g. "AP"); the full
+   * name, role and email are in this menu ("AP Alice Planner Admin
+   * alice@flooros.dev", confirmed on dev 2026-10-23).
+   */
+  readonly userMenu: Locator;
   readonly accessRestrictedText: Locator;
   readonly body: Locator;
 
@@ -33,6 +40,7 @@ export class ShellHeaderLocators {
     this.languageMenu = page.getByRole('menu', { name: 'Language' });
     // Not scoped to the banner: module pages have no banner landmark in the new design (2026-10-22).
     this.userMenuButton = page.getByRole('button', { name: /^Open user menu/ }).first();
+    this.userMenu = page.getByRole('menu', { name: 'User menu' });
     this.accessRestrictedText = page.getByText(/Access restricted|do not have permission/i);
     this.body = page.locator('body');
   }

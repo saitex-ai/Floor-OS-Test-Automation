@@ -1,4 +1,4 @@
-import { type Page } from '@playwright/test';
+import { type Page, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
 import { ShellHeaderLocators } from '../../locators/shell/shell-header.locators';
 
@@ -22,5 +22,19 @@ export class ShellHeaderPage extends BasePage {
   async changeLanguage(language: 'English' | 'Vietnamese'): Promise<void> {
     await this.locators.changeLanguageButton.click();
     await this.locators.languageOption(language).click();
+  }
+
+  /**
+   * Opens the user menu, reads its summary (initials, full name, role and
+   * email, e.g. "AP Alice Planner Admin alice@flooros.dev") and closes it
+   * again. The menu button alone shows only the initials since 2026-10-22.
+   */
+  async readSignedInUserSummary(): Promise<string> {
+    await this.locators.userMenuButton.click();
+    await expect(this.locators.userMenu).toBeVisible();
+    const summary = (await this.locators.userMenu.innerText()).replace(/\s+/g, ' ').trim();
+    await this.page.keyboard.press('Escape');
+    await expect(this.locators.userMenu).toBeHidden();
+    return summary;
   }
 }
