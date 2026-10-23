@@ -1,9 +1,9 @@
 # CRM — [Origin Type = Social Media Post] Lead Qualification (Sprint 5)
 
 - **User Story:** [[Origin Type = Social Media Post] Lead Qualification](https://app.clickup.com/t/86eye4dtz) (old version), subtask [Notification to the CRM users that a customer and contact was created as lead based on social media post](https://app.clickup.com/t/86eypejnd)
-- **Test-case set:** [CRM -Sprint -5 - [Origin Type = Social Media Post] Lead Qualification](https://app.clickup.com/t/z941abzjg7) (22 TCs, status "to do")
+- **Test-case set:** [CRM -Sprint -5 - [Origin Type = Social Media Post] Lead Qualification](https://app.clickup.com/t/z941abzjg7) (22 TCs; statuses set from the 2026-10-23 run)
 - **Sources (newest wins):** the ClickUp story; the Floor OS CRM prototype (`crm-leadqual.jsx`, `crm-leadgen.jsx`, `CRM Screen User Stories.html`, 2026-10-14), which is the current version of the story; dev (`https://dev.flooros.app`), explored read-only on 2026-10-23. Expected wording follows dev's current text. Functional points that dev can't show yet are written from the prototype.
-- **Automated in:** not automated yet.
+- **Automated in:** [`tests/regression/crm/39-social-media-lead-qualification.spec.ts`](../../tests/regression/crm/39-social-media-lead-qualification.spec.ts) — run on dev 2026-10-23: 19 pass, 3 `test.fixme` (TC:12, TC:15, TC:22). See "Run results" below.
 
 ## User story (summary, current version)
 
@@ -68,8 +68,36 @@ Such a Lead has no captured post, though.
 | TC:22 | CRM Users Notified When a Lead Is Created from a Social Media Post       | Positive | [link](https://app.clickup.com/t/z941abzjh0) | ❓ not verifiable: needs a new capture (from subtask 86eypejnd, written from the prototype)                     |
 
 Legend: ✅ dev matches the expected result; ⚠️ partly checked; ❓ not
-checked on dev, for the reason given. No ClickUp statuses were changed:
-every TC is "to do".
+checked on dev, for the reason given. This column is the manual
+exploration; the automated results are under "Run results".
+
+## Run results (dev, 2026-10-23)
+
+`TEST_ENV=dev npx playwright test tests/regression/crm/39-social-media-lead-qualification.spec.ts --project=crm --workers=2`
+→ **19 passed, 3 skipped (fixme), 0 failed**, about 1.3 min. ClickUp: 19 `pass`, 3 `skip`;
+Test Run Date 2026-10-23.
+
+- **Display TCs (1–7, 9–11, 20, 21)** run read-only on Nudie Jeans and Testing
+  Two (`src/data/crm/social-media-leads.data.json`). Both are Qualified Leads,
+  so TC:1–11 carry a `partial` note: dev has no Lead-stage Social Media Post
+  Lead with a captured post. TC:4 checks a 132-character post only (no long post).
+- **`dev-gap` annotations** (the test asserts what dev does today): TC:3
+  (posted date, not a capture date; differences 2), TC:7 (on a Qualified
+  Lead the tab is `pointer-events: none`, so the button is activated
+  programmatically; differences 6), TC:10 (Customer Info is the crawl
+  detection summary and nothing comes from the post; differences 4).
+- **Write TCs (8, 13, 16–19)** each create their own Lead through Create
+  Customer: "Playwright Regression SocialMedia LQ <timestamp>", Origin Type
+  Social Media Post, Origin Instagram Post, CRM Stage Lead. TC:17 and TC:19
+  save reviews on it, and TC:19 converts it to Qualified Lead. Such a Lead
+  has no post and no AI sections ("No dossier for this account yet"), so
+  TC:13 only opens the AI Chatbot (greeting) and switches on the Markup
+  tool. No enhancement is sent (`partial`).
+- **fixme:** TC:12 (no Lead-stage Social Media Post Lead with a post to refine
+  the Relevancy on), TC:15 (no record with 2+ posts), TC:22 (needs a new
+  capture by Social Media Listening; none on dev during the run).
+- Nothing was sent to a social channel. "View on the platform" opened the
+  Instagram post in a new tab, which was closed untouched.
 
 ## Where dev differs from the prototype / story (for the user to decide — no bugs logged)
 
