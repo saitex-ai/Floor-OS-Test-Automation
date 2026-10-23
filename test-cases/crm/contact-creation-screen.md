@@ -17,7 +17,7 @@
 
 ## Notes for whoever picks this up next
 
-TC:3 → TC:4 → TC:5 are one continuous flow (save with a new Customer name → the prompt → either path from it) — automate as steps within one test, or as an explicit chain, not independent tests. Confirms the real route is `/crm/contacts/new` (TC:2) and the reverse hand-off target is `/crm/customers/new?name=...&contactId=...&contactName=...` (TC:4) — genuinely useful, concrete routing detail not available anywhere else yet. Not yet live-probed against the running app for actual locators/selectors.
+TC:3 → TC:4 → TC:5 are one continuous flow (save with a new Customer name → the prompt → either path from it), automated as one test (TC:3-4-5). **They pass on dev (re-checked 2026-10-23):** the prompt reads "Contact {name} was saved successfully!" / "Proceed to create customer {name}?" with Close, Cancel and "Create customer"; Create customer opens Create Customer with the name and Contact pre-filled, and Cancel lands on the new Contact's Details screen (`/crm/contacts/{uuid}`). Until 2026-09-16 there was no prompt. Confirms the real route is `/crm/contacts/new` (TC:2) and the reverse hand-off target is `/crm/customers/new?name=...&contactId=...&contactName=...` (TC:4) — genuinely useful, concrete routing detail not available anywhere else yet. Not yet live-probed against the running app for actual locators/selectors.
 
 ## Update 2026-10-15 — Contact Name and Email rules
 

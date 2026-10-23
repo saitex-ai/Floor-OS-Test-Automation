@@ -12,15 +12,11 @@ const CREATE_CONTACT_PATH = '/crm/contacts/new';
  * granularities). Owned by the CRM QA.
  *
  * Element locators live in CreateContactLocators (`this.locators`) — this
- * class only holds flows/actions/assertions built on top of them. One
- * behavior worth knowing before touching this file: typing a
- * not-yet-existing Customer name and saving does NOT show a "create this
- * Customer now?" prompt on dev, despite create-contact.md TC:5/TC:6 and
- * contact-creation-screen.md TC:3/4/5 describing one — confirmed
- * directly: the Contact just saves as Unlinked, silently discarding the
- * typed text. Either the feature isn't built yet or there's a different
- * trigger for it than free-typing; flag to the team rather than assume
- * the ClickUp text is wrong.
+ * class only holds flows/actions/assertions built on top of them. Typing
+ * a not-yet-existing Customer name and saving shows a "Proceed to create
+ * customer {name} ?" prompt (create-contact.md TC:5/TC:6,
+ * contact-creation-screen.md TC:3/4/5) — re-checked on dev 2026-10-23;
+ * see enterNewCustomerName().
  */
 export interface ContactProfileDetails {
   name?: string;
@@ -113,6 +109,21 @@ export class CreateContactPage extends BasePage {
       await this.locators.loadMoreCustomersButton.click();
     }
     await option.first().click();
+  }
+
+  /**
+   * Types a Customer name that doesn't exist yet and picks the combobox's
+   * "does not exist ... Will proceed to Customer creation" option, so that
+   * saving offers to create that Customer.
+   */
+  async enterNewCustomerName(customerName: string): Promise<void> {
+    await this.locators.customerNameCombobox.click();
+    await this.locators.customerNameCombobox.fill(customerName);
+    await expect(this.locators.newCustomerOption).toContainText(
+      `The Customer ${customerName} does not exist.`,
+    );
+    await this.locators.newCustomerOption.click();
+    await expect(this.locators.newCustomerHint).toBeVisible();
   }
 
   async save(): Promise<void> {
