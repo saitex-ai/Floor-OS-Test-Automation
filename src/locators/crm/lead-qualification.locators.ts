@@ -109,6 +109,21 @@ export class LeadQualificationLocators {
   readonly revertWordingButtons: Locator;
   readonly customersSearchBox: Locator;
 
+  // --- Lead Qualification Chatbot (Sprint 5) — see the AI CHATBOT block
+  // comment in the constructor below.
+  readonly aiChatbotPanel: Locator;
+  readonly closeAssistantButton: Locator;
+  readonly assistantSizeButton: Locator;
+  readonly aiChatbotIntro: Locator;
+  readonly aiChatbotPromptBox: Locator;
+  readonly aiChatbotSendButton: Locator;
+  readonly stopPointingButton: Locator;
+  readonly targetChip: Locator;
+  readonly threadViewport: Locator;
+  readonly userMessages: Locator;
+  readonly assistantMessages: Locator;
+  readonly activityPhrase: Locator;
+
   constructor(private readonly page: Page) {
     this.tabButton = page.getByRole('button', { name: 'Lead Qualification', exact: true });
 
@@ -206,6 +221,85 @@ export class LeadQualificationLocators {
 
     // Customers list (/crm/customers) search box.
     this.customersSearchBox = page.getByRole('textbox', { name: 'Search', exact: true });
+
+    // AI CHATBOT (Lead Qualification Chatbot, Sprint 5 — confirmed on dev
+    // 2026-10-22 on a Lead with a seeded dossier):
+    // - `<aside role="complementary" aria-label="AI Chatbot">`, floating
+    //   350x520 bottom-right; "Change the assistant's size" docks it to a
+    //   full-height 384px side panel.
+    // - Header buttons "Markup tool" (aria-pressed), "Change the assistant's
+    //   size", "Close the assistant". Under the header: "Want something
+    //   improved? Ask directly, or use the markup tool." — replaced by the
+    //   "Markup on — …" hint while the tool is on.
+    // - Prompt is a <textarea> whose accessible name stays "Prompt the AI
+    //   Chatbot…"; only its placeholder switches to "How should this line
+    //   change?" while a line is targeted. "Send" is disabled while empty
+    //   and both are disabled while a reply is pending.
+    // - Thread (Radix scroll area): user bubbles `[data-role="user"]`,
+    //   replies `[data-role="assistant"]`; a targeted prompt is preceded by
+    //   a <p> "<Section>: <pointer text>". While pending the bubble shows a
+    //   rotating phrase ("Working…", "Writing the answer…") in
+    //   `[data-testid="assistant-activity-phrase"]`.
+    // - Selected target ("chip"): a strip above the prompt with
+    //   "<Section>: <pointer text>" and a "Stop pointing at this line" button.
+    this.aiChatbotPanel = page.getByRole('complementary', { name: 'AI Chatbot' });
+    this.closeAssistantButton = this.aiChatbotPanel.getByRole('button', {
+      name: 'Close the assistant',
+    });
+    this.assistantSizeButton = this.aiChatbotPanel.getByRole('button', {
+      name: "Change the assistant's size",
+    });
+    this.aiChatbotIntro = this.aiChatbotPanel.getByText(
+      'Want something improved? Ask directly, or use the markup tool.',
+    );
+    this.aiChatbotPromptBox = this.aiChatbotPanel.getByRole('textbox');
+    this.aiChatbotSendButton = this.aiChatbotPanel.getByRole('button', {
+      name: 'Send',
+      exact: true,
+    });
+    this.stopPointingButton = this.aiChatbotPanel.getByRole('button', {
+      name: 'Stop pointing at this line',
+    });
+    this.targetChip = this.stopPointingButton.locator('xpath=..');
+    this.threadViewport = this.aiChatbotPanel.locator('[data-radix-scroll-area-viewport]');
+    this.userMessages = this.aiChatbotPanel.locator('[data-role="user"]');
+    this.assistantMessages = this.aiChatbotPanel.locator('[data-role="assistant"]');
+    this.activityPhrase = this.aiChatbotPanel.locator('[data-testid="assistant-activity-phrase"]');
+  }
+
+  /** The chatbot's opening message, which names the Lead. */
+  aiChatbotOpeningMessage(leadName: string): Locator {
+    return this.aiChatbotPanel.getByText(
+      `I generated the qualification sections for ${leadName}. Ask me to refine anything`,
+    );
+  }
+
+  /**
+   * The Markup tool's per-pointer target (⌖) buttons in one AI section —
+   * only rendered while the tool is on; each button's accessible name is
+   * the section title (dev 2026-10-22).
+   */
+  pointerTargets(section: string): Locator {
+    return this.aiSection(section).getByRole('button', { name: section, exact: true });
+  }
+
+  /**
+   * A pointer row, from its target button: button -> `display: contents`
+   * span -> row (works for the bullet rows, Product Range's most/least and
+   * the Compatibility rows alike).
+   */
+  pointerRow(section: string, index: number): Locator {
+    return this.pointerTargets(section).nth(index).locator('xpath=../..');
+  }
+
+  /** "✦ Enhanced" markers inside one AI section. */
+  enhancedMarkersIn(section: string): Locator {
+    return this.aiSection(section).getByText(/^✦ Enhanced/);
+  }
+
+  /** The thread line showing a prompt's target, right before that prompt's bubble (none for a general prompt). */
+  threadTargetLineFor(userMessage: Locator): Locator {
+    return userMessage.locator('xpath=../preceding-sibling::*[1][self::p]');
   }
 
   /** A form-card field's value, located from its label's DOM text (e.g. "Company's name"). */
