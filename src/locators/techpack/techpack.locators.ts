@@ -73,7 +73,10 @@ export class TechpackLocators {
   readonly selectAllRowsCheckbox: Locator;
 
   constructor(private readonly page: Page) {
-    this.heading = page.getByRole('heading', { name: 'TechPacks', level: 1 });
+    // As of the 2026-10-22 design-system release `/techpacks` lands on a
+    // "Dashboard" (summary cards + Production Stages) with the techpack grid
+    // below it; the old "TechPacks" <h1> is gone.
+    this.heading = page.getByRole('heading', { name: 'Dashboard', level: 1 });
 
     this.allTab = page.getByRole('button', { name: /^All \d+/ });
     this.draftTab = page.getByRole('button', { name: /^Draft \d+/ });

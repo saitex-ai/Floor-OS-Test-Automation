@@ -69,16 +69,20 @@ export class CreateTechpackPage extends BasePage {
     this.locators = new CreateTechpackLocators(page);
   }
 
-  /** Navigate to the list, then open the Classic form via the split-button menu. */
+  /**
+   * Load the module landing, then open the Classic form. As of the
+   * 2026-10-22 design-system release the landing is a "Dashboard" whose only
+   * create action, "Create New", goes straight to AI Mode
+   * (`/techpacks/new/copilot`); the "New Techpack" split button and its
+   * Classic menu item are gone. The Classic form itself still works at
+   * `/techpacks/new`, so it is opened by URL.
+   */
   async openFromTechpacksList(): Promise<void> {
     await this.gotoAuthenticated(MODULES['techpack'].path);
     // Same "Loading Techpacks…" bundle-load wait as TechpackPage.expectLoaded()
     // — reproduced twice needing more than 60s on dev, not a one-off fluke.
-    await expect(this.page.getByRole('heading', { name: 'TechPacks', level: 1 })).toBeVisible({
-      timeout: 90_000,
-    });
-    await this.page.getByRole('button', { name: 'More options' }).first().click();
-    await this.page.getByRole('menuitem', { name: /Classic/ }).click();
+    await expect(this.locators.landingHeading).toBeVisible({ timeout: 90_000 });
+    await this.gotoAuthenticated(`${MODULES['techpack'].path}/new`);
     await expect(this.locators.heading).toBeVisible({ timeout: 30_000 });
   }
 
@@ -88,6 +92,18 @@ export class CreateTechpackPage extends BasePage {
   ): Promise<void> {
     await this.locators.fieldTrigger(labelText).click();
     await this.page.getByRole('listbox').last().getByRole('option', { name: optionText }).click();
+    await this.expectListboxClosed();
+  }
+
+  /**
+   * As of the 2026-10-22 design-system release a listbox stays in the DOM for
+   * about 0.4 s after a pick while it fades out (`data-state="closed"`, an
+   * exit animation), so the next field's `listbox().last()` could resolve to
+   * it ("element is not stable", then detached). Wait for it to go before
+   * opening the next field.
+   */
+  private async expectListboxClosed(): Promise<void> {
+    await expect(this.locators.listboxes).toHaveCount(0);
   }
 
   /** Picks whatever the first available option is — dev's seed data is real/messy, so
@@ -97,6 +113,7 @@ export class CreateTechpackPage extends BasePage {
     const firstOption = this.page.getByRole('listbox').last().getByRole('option').first();
     const text = await firstOption.innerText();
     await firstOption.click();
+    await this.expectListboxClosed();
     return text;
   }
 
@@ -128,6 +145,7 @@ export class CreateTechpackPage extends BasePage {
     const pool = usable.length > 0 ? usable : texts.map((text, index) => ({ text, index }));
     const pick = pool[Math.floor(Math.random() * pool.length)]!;
     await options.nth(pick.index).click();
+    await this.expectListboxClosed();
     return pick.text;
   }
 
@@ -152,6 +170,7 @@ export class CreateTechpackPage extends BasePage {
       .then(() => true)
       .catch(() => false);
     await this.page.keyboard.press('Escape');
+    await this.expectListboxClosed();
     return !gotAnOption;
   }
 
@@ -443,7 +462,12 @@ export class CreateTechpackPage extends BasePage {
    * techpack"/stuck-"Opening canvas…" issues legacy seed records show.
    */
   async expectCreatedSuccessfully(): Promise<void> {
-    await expect(this.page).toHaveURL(/\/techpacks\/(canvas\/)?[^/]+$/, { timeout: 30_000 });
+    // As of the 2026-10-22 design-system release a new techpack opens at
+    // /techpacks/view/{id}; the pattern also still accepts the older
+    // /techpacks/{id} and /techpacks/canvas/{id}.
+    await expect(this.page).toHaveURL(/\/techpacks\/(canvas\/|view\/)?[^/]+$/, {
+      timeout: 30_000,
+    });
     await expect(this.page).not.toHaveURL(/\/techpacks\/new$/);
     await expect(this.page.getByText(/^TP\d+-\d+$/).first()).toBeVisible({ timeout: 30_000 });
   }
