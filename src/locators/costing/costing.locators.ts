@@ -6,10 +6,14 @@ import { type Locator, type Page } from '@playwright/test';
  */
 export class CostingLocators {
   readonly heading: Locator;
+  readonly selectScreenHint: Locator;
 
   constructor(page: Page) {
-    // TODO(Costing QA): replace with a locator specific to this
-    // module's landing view once you've confirmed it against the running app.
-    this.heading = page.getByRole('heading', { level: 1 });
+    // The landing's "Costing" title is an <h1> in the 2026-10-22 design
+    // system (it was an <h2> on 2026-10-14), so it's matched by name with the
+    // level left open. A "Costing" button and nav link also exist on the
+    // page — matching the heading role keeps them out.
+    this.heading = page.getByRole('heading', { name: 'Costing', exact: true });
+    this.selectScreenHint = page.getByText('Select a screen from the left navigation.');
   }
 }
