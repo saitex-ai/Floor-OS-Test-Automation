@@ -89,7 +89,9 @@ export class CreateCustomerLocators {
     this.departmentsSection = page.getByText('Departments and Assignees');
     this.linkContactsSection = page.getByRole('heading', { name: 'Link Contacts' });
 
-    this.customerNameInput = page.getByLabel('Customer Name');
+    // A textbox, so it can't match the Customers list's "Resize Customer
+    // Name column" button while the form is still loading.
+    this.customerNameInput = page.getByRole('textbox', { name: /^Customer Name/ });
     this.emailInput = page.getByLabel('Email');
     this.cityInput = page.getByLabel('City');
     // "Country" also substring-matches the "Phone country code" combobox's

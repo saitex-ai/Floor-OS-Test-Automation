@@ -152,14 +152,18 @@ export class LogCommunicationLocators {
       .filter({ hasText: 'Notify Internally' });
     this.notifyManagersCombobox = this.notifyDialog.getByRole('combobox', { name: 'Managers' });
     this.notifyExecutivesCombobox = this.notifyDialog.getByRole('combobox', { name: 'Executives' });
-    this.sendNotificationsButton = this.notifyDialog.getByRole('button', { name: 'Send notifications' });
+    this.sendNotificationsButton = this.notifyDialog.getByRole('button', {
+      name: 'Send notifications',
+    });
     this.notifyValidationError = this.notifyDialog.getByText(
       'Select at least one Manager or Executive',
     );
 
     this.notificationsBellButton = page
-      .getByRole('banner')
-      .getByRole('button', { name: /Notifications/ });
+      // Not scoped to the banner: module pages have no banner landmark in the
+      // new design (2026-10-22). "^" keeps "Control Center Notifications" out.
+      .getByRole('button', { name: /^Notifications/ })
+      .first();
     // Confirmed against the running app: like the popover
     // key-meeting-notes.locators.ts already documents, this panel carries
     // no distinct dialog/menu role — "Inbox" is the one piece of text

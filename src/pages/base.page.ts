@@ -46,10 +46,12 @@ export abstract class BasePage {
     await this.goto(path);
 
     const l = new ShellLoginLocators(this.page);
+    // 90 s, not 60: dev's new shell took ~35-60 s to render an authenticated
+    // page on 2026-10-22 under parallel workers.
     const outcome = await Promise.race([
-      l.identifierInput.waitFor({ state: 'visible', timeout: 60_000 }).then(() => 'gate' as const),
+      l.identifierInput.waitFor({ state: 'visible', timeout: 90_000 }).then(() => 'gate' as const),
       l.userMenuButton
-        .waitFor({ state: 'visible', timeout: 60_000 })
+        .waitFor({ state: 'visible', timeout: 90_000 })
         .then(() => 'authenticated' as const),
     ]);
 

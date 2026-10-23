@@ -31,7 +31,8 @@ export class ShellHeaderLocators {
   constructor(private readonly page: Page) {
     this.changeLanguageButton = page.getByRole('button', { name: /Change language|Đổi ngôn ngữ/i });
     this.languageMenu = page.getByRole('menu', { name: 'Language' });
-    this.userMenuButton = page.getByRole('banner').getByRole('button', { name: /Open user menu/ });
+    // Not scoped to the banner: module pages have no banner landmark in the new design (2026-10-22).
+    this.userMenuButton = page.getByRole('button', { name: /^Open user menu/ }).first();
     this.accessRestrictedText = page.getByText(/Access restricted|do not have permission/i);
     this.body = page.locator('body');
   }

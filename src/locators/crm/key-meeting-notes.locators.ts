@@ -242,13 +242,11 @@ export class KeyMeetingNotesLocators {
     this.sourceInteractionText = page.getByText(/generated from/i);
     this.backToNotesListLink = page.getByText('Back to Key Meeting Notes');
 
-    // Scoped to the shell's top banner — same disambiguation
-    // BasePage.gotoAuthenticated() already documents (an unscoped
-    // "Notifications" match also hits an unrelated "Control Center
-    // Notifications" button elsewhere on the page).
     this.notificationsBellButton = page
-      .getByRole('banner')
-      .getByRole('button', { name: /Notifications/ });
+      // Not scoped to the banner: module pages have no banner landmark in the
+      // new design (2026-10-22). "^" keeps "Control Center Notifications" out.
+      .getByRole('button', { name: /^Notifications/ })
+      .first();
     // Confirmed against the running app: this popover carries no distinct
     // `dialog`/`menu` role at all — its buttons ("Inbox", "Notification
     // actions", "Notification preferences") and content sit flattened
