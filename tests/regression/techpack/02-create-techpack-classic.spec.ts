@@ -13,6 +13,8 @@ import { test, expect } from '../../../src/fixtures/techpack.fixtures';
  * needed here. Verified against dev.flooros.app — see this file's test-case
  * doc for why (local blocks the happy path on unseeded Season data).
  */
+const QA_AUTO_DESCRIPTION =
+  'QA-AUTO — Techpack regression test data (pw-hybrid-framework). Safe to delete.';
 const DUMMY_PDF = {
   name: `playwright-techpack-${Date.now()}.pdf`,
   mimeType: 'application/pdf',
@@ -43,13 +45,26 @@ test.describe('Techpack - New Techpack (Classic)', () => {
   });
 
   test('TC:1 Verify navigation and layout of the Classic New Techpack form', async ({
+    techpackPage,
+    aiModeCopilotPage,
     createTechpackPage,
+    page,
   }) => {
-    await test.step('Open the Classic form from the Techpacks list', async () => {
-      await createTechpackPage.openFromTechpacksList();
+    await test.step('Dashboard › Create New › Add files › More tools › Manual form', async () => {
+      // Since the 2026-10-22 redesign the Dashboard has no "New Techpack ›
+      // Classic" menu; "Create New" opens AI Mode, which links to the form.
+      await techpackPage.open();
+      await techpackPage.expectLoaded();
+      await techpackPage.clickCreateNew();
+      await expect(aiModeCopilotPage.locators.heading).toBeVisible({ timeout: 30_000 });
+      await aiModeCopilotPage.openManualFormFromAddFiles();
     });
 
-    await test.step('All five sections are visible', async () => {
+    await test.step('The form opens with its heading, Back link, Close and five sections', async () => {
+      await expect(page).toHaveURL(/\/techpacks\/new$/);
+      await expect(createTechpackPage.locators.heading).toBeVisible({ timeout: 30_000 });
+      await expect(createTechpackPage.locators.backToTechpacksLink).toBeVisible();
+      await expect(createTechpackPage.locators.closeButton).toBeVisible();
       await createTechpackPage.expectFormSectionsVisible();
     });
   });
@@ -153,6 +168,7 @@ test.describe('Techpack - New Techpack (Classic)', () => {
 
   test('TC:7 Verify successful creation with all required fields and a techpack document', async ({
     createTechpackPage,
+    canvasPage,
     page,
   }) => {
     test.setTimeout(120000);
@@ -165,15 +181,17 @@ test.describe('Techpack - New Techpack (Classic)', () => {
       // same "first" option collides with whatever a previous run
       // already created.
       await createTechpackPage.fillAllRequiredWithRandomAvailable();
+      await createTechpackPage.fillDetails({ description: QA_AUTO_DESCRIPTION });
     });
 
     await test.step('Upload the required techpack document', async () => {
       await createTechpackPage.uploadTechpackFile(DUMMY_PDF);
     });
 
-    await test.step('All 7 fields filled and Create techpack is enabled', async () => {
+    await test.step('All 7 fields filled, "Ready to create", and Create techpack is enabled', async () => {
       const { filled, total } = await createTechpackPage.fieldsFilledCount();
       expect(filled).toBe(total);
+      await expect(createTechpackPage.locators.readyToCreateText).toBeVisible();
       await createTechpackPage.expectCreateEnabled();
     });
 
@@ -187,8 +205,23 @@ test.describe('Techpack - New Techpack (Classic)', () => {
       expect(result).toBe('created');
     });
 
-    await test.step('The techpack is created successfully', async () => {
-      await createTechpackPage.expectCreatedSuccessfully();
+    const code =
+      await test.step('It opens the techpack view: h1 = the new code, with a "created" toast', async () => {
+        await createTechpackPage.expectCreatedSuccessfully();
+        await expect(page).toHaveURL(/\/techpacks\/view\/[^/]+$/);
+        const created = await createTechpackPage.currentTechpackCode();
+        expect(created).toMatch(/^TP\d{6}-\d{6}$/);
+        await expect(page.getByRole('heading', { name: created, level: 1 })).toBeVisible();
+        await expect(createTechpackPage.locators.createdToast).toContainText(
+          `Techpack ${created} created`,
+        );
+        return created;
+      });
+
+    await test.step(`${code} is Open, not Draft (its canvas Details)`, async () => {
+      await canvasPage.gotoCanvasById(createTechpackPage.currentTechpackId());
+      await canvasPage.expectLoaded();
+      expect(await canvasPage.fieldRowText('Status')).toContain('Open');
     });
   });
 
@@ -206,6 +239,7 @@ test.describe('Techpack - New Techpack (Classic)', () => {
     const identity = await test.step('Create a techpack with a random identity', async () => {
       await createTechpackPage.openFromTechpacksList();
       const picked = await createTechpackPage.fillAllRequiredWithRandomAvailable();
+      await createTechpackPage.fillDetails({ description: QA_AUTO_DESCRIPTION });
       await createTechpackPage.uploadTechpackFile(DUMMY_PDF);
       const result = await createTechpackPage.createExpectingResult();
       // On the rare chance this random identity already existed, that IS
@@ -247,7 +281,9 @@ test.describe('Techpack - New Techpack (Classic)', () => {
       if (!value) throw new Error('Expected a picked identity value to be present');
       const normalized = value.replace(/\s+/g, ' ').trim();
       const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      return new RegExp(`^${escaped}$`);
+      // Since the 2026-10-22 redesign the form restores unsaved input on
+      // return, and an option that's already chosen is named "… Selected".
+      return new RegExp(`^${escaped}( Selected)?$`);
     };
 
     await test.step('Attempt to create the exact same identity again', async () => {

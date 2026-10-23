@@ -1,25 +1,33 @@
 import { type Locator, type Page } from '@playwright/test';
 
 /**
- * Techpacks list (the module landing view) — element locators only, see
- * src/pages/techpack/techpack.page.ts for actions/assertions. Confirmed
- * against the real running app (dumped via ariaSnapshot() against both a
- * local `tilt up` stack and dev.flooros.app), not guessed.
+ * Techpack Dashboard (the module landing, `/techpacks`): element locators
+ * only, see src/pages/techpack/techpack.page.ts for actions/assertions.
  *
- * - "New Techpack" is a split button: the main button always opens **AI
- *   Mode** (`/techpacks/new/copilot`, a Saitex AI copilot that extracts
- *   data from an uploaded PDF/Excel); the chevron next to it opens a menu
- *   to explicitly choose "AI Mode" or "Classic" (`/techpacks/new`, a
- *   manual form). See newTechpackDropdown/aiModeMenuItem/classicMenuItem.
- * - Clicking a row navigates to that techpack's canvas
- *   (`/techpacks/canvas/{id}`). As of this writing that route is
- *   noticeably slower to first-render on dev.flooros.app (10-20s+ on a
- *   cold browser profile) than locally, and locally it has intermittently
- *   404'd on `GET /api/techpacks/{id}` for records that are clearly
- *   listed and clickable — see test-cases/techpack/techpack-list.md.
+ * Rewritten 2026-10-23 for the FloorOS design-system release of 2026-10-22,
+ * confirmed live on uat (ARIA dumps, see test-cases/techpack/techpack-list.md):
+ *
+ * - The landing is a "Dashboard": a summary strip, a "Production Stages"
+ *   region (STEP 1-6 buttons that filter the grid) and the techpack grid.
+ * - "Create New" replaced the "New Techpack" split button. It always opens
+ *   AI Mode (`/techpacks/new/copilot`) and has no menu.
+ * - Techpack codes in the grid are buttons, not links, and open
+ *   `/techpacks/view/{id}`.
+ * - Toolbar: Search, Filters (a "Filter" dialog, plus an "Advanced Filters"
+ *   rule builder), Configure columns (a "Columns" dialog), View (a menu:
+ *   List View / Vertical Split / Grid View) and Export. "Toggle cell
+ *   filters" and the split buttons are gone.
+ * - There are two nested <main> elements; the content is the last one.
  */
 export class TechpackLocators {
+  readonly main: Locator;
   readonly heading: Locator;
+  readonly createNewButton: Locator;
+  readonly summaryStrip: Locator;
+
+  // Production Stages (STEP 1-6). Selecting one adds a "Clear" button inside the region.
+  readonly productionStages: Locator;
+  readonly stagesClearButton: Locator;
 
   // Status tabs (label includes a live count, e.g. "Open 11" — match by
   // prefix so the count doesn't need to be hardcoded).
@@ -31,162 +39,205 @@ export class TechpackLocators {
   // Toolbar
   readonly searchInput: Locator;
   readonly filtersButton: Locator;
-  readonly toggleCellFiltersButton: Locator;
-  readonly exportCsvButton: Locator;
   readonly configureColumnsButton: Locator;
-  readonly bestFitColumnsButton: Locator;
-  readonly noSplitButton: Locator;
-  readonly verticalSplitButton: Locator;
-  readonly horizontalSplitButton: Locator;
+  readonly viewButton: Locator;
+  readonly exportButton: Locator;
 
-  // Filters panel (the funnel-icon button — distinct from "Toggle cell
-  // filters", which shows per-column inline inputs instead, see below)
+  // "Filter" dialog
+  readonly filterDialog: Locator;
+  readonly filterApplyButton: Locator;
+  readonly filterClearButton: Locator;
+  readonly advancedFilterButton: Locator;
+  readonly filterChips: Locator;
+  readonly clearAllFiltersButton: Locator;
+
+  // "Advanced Filters" dialog (the rule builder)
+  readonly advancedFilterDialog: Locator;
   readonly addRuleButton: Locator;
-  readonly filterMatchCountText: Locator;
-  readonly applyButton: Locator;
+  readonly noCustomRulesText: Locator;
+  readonly ruleMatchCountText: Locator;
+  readonly removeRuleButton: Locator;
 
-  // Configure columns side panel
-  readonly columnsPanelHeading: Locator;
-  readonly showAllColumnsButton: Locator;
-  readonly hideAllColumnsButton: Locator;
+  // "Columns" dialog
+  readonly columnsDialog: Locator;
+  readonly columnsCounterText: Locator;
+  readonly columnsApplyButton: Locator;
+  readonly columnsResetButton: Locator;
+  readonly columnsShowAllButton: Locator;
+  readonly lockedColumnCheckbox: Locator;
+
+  // "View" menu and its layouts
+  readonly viewMenu: Locator;
+  readonly openTechPackButton: Locator;
+  readonly gridViewCards: Locator;
 
   // Row selection bar
   readonly itemsSelectedText: Locator;
   readonly clearSelectionButton: Locator;
   readonly compareButton: Locator;
 
-  // New Techpack split button
-  readonly newTechpackButton: Locator;
-  readonly newTechpackDropdown: Locator;
-  readonly aiModeMenuItem: Locator;
-  readonly classicMenuItem: Locator;
+  // Pager
+  readonly showingCountText: Locator;
+  readonly pageText: Locator;
+  readonly previousPageButton: Locator;
+  readonly nextPageButton: Locator;
+  readonly rowsPerPageSelect: Locator;
 
   readonly table: Locator;
   readonly columnHeaders: Locator;
   readonly bodyRows: Locator;
-
-  // Filters panel's rule-builder labels
-  readonly filterRulesLabel: Locator;
-  readonly filterAttributeLabel: Locator;
-  readonly filterOperatorContains: Locator;
-  readonly filterValuePlaceholder: Locator;
-  readonly selectAllRowsCheckbox: Locator;
+  /** Every techpack code button in the grid (`TP202610-000131`, `DRAFT/01M5GZWAD0WY`). */
+  readonly codeButtons: Locator;
+  readonly emptyResultText: Locator;
 
   constructor(private readonly page: Page) {
-    // As of the 2026-10-22 design-system release `/techpacks` lands on a
-    // "Dashboard" (summary cards + Production Stages) with the techpack grid
-    // below it; the old "TechPacks" <h1> is gone.
+    this.main = page.getByRole('main').last();
     this.heading = page.getByRole('heading', { name: 'Dashboard', level: 1 });
+    this.createNewButton = this.main.getByRole('button', { name: 'Create New', exact: true });
+    // The strip has no roles of its own: the ARIA tree shows it as one text node.
+    this.summaryStrip = this.main.getByText(/Active packs/);
 
-    this.allTab = page.getByRole('button', { name: /^All \d+/ });
-    this.draftTab = page.getByRole('button', { name: /^Draft \d+/ });
-    this.openTab = page.getByRole('button', { name: /^Open \d+/ });
-    this.approvedTab = page.getByRole('button', { name: /^Approved \d+/ });
+    this.productionStages = this.main.getByRole('region', { name: 'Production Stages' });
+    this.stagesClearButton = this.productionStages.getByRole('button', {
+      name: 'Clear',
+      exact: true,
+    });
 
-    this.searchInput = page.getByRole('textbox', { name: 'Search' });
-    // Two distinct controls, easy to confuse: "Filters" (funnel icon)
-    // opens a rule-builder panel; "Toggle cell filters" (separate icon)
-    // shows per-column inline text inputs under the headers instead —
-    // confirmed live, not guessed, and an unscoped name match on "Filters"
-    // alone is a strict-mode violation since "Toggle cell filters" also
-    // contains that substring.
-    this.filtersButton = page.getByRole('button', { name: 'Filters', exact: true });
-    this.toggleCellFiltersButton = page.getByRole('button', { name: 'Toggle cell filters' });
-    this.exportCsvButton = page.getByRole('button', { name: 'Export CSV' });
-    this.configureColumnsButton = page.getByRole('button', { name: 'Configure columns' });
-    this.bestFitColumnsButton = page.getByRole('button', { name: 'Best-fit columns' });
-    this.noSplitButton = page.getByRole('button', { name: 'No split' });
-    this.verticalSplitButton = page.getByRole('button', { name: 'Vertical split' });
-    this.horizontalSplitButton = page.getByRole('button', { name: 'Horizontal split' });
+    this.allTab = this.main.getByRole('button', { name: /^All \d+/ });
+    this.draftTab = this.main.getByRole('button', { name: /^Draft \d+/ });
+    this.openTab = this.main.getByRole('button', { name: /^Open \d+/ });
+    this.approvedTab = this.main.getByRole('button', { name: /^Approved \d+/ });
 
-    this.addRuleButton = page.getByRole('button', { name: /Add rule/ });
-    this.filterMatchCountText = page.getByText(/techpack match/);
-    // Both the Filters panel and the Configure columns panel have their
-    // own "Apply" button, but never open at the same time in normal use —
-    // safe to keep unscoped as long as tests don't open both at once.
-    this.applyButton = page.getByRole('button', { name: 'Apply', exact: true });
+    this.searchInput = this.main.getByRole('textbox', { name: 'Search' });
+    // "Filters" becomes "Filters (1 applied)" once a filter is applied.
+    this.filtersButton = this.main.getByRole('button', { name: /^Filters/ });
+    this.configureColumnsButton = this.main.getByRole('button', { name: 'Configure columns' });
+    this.viewButton = this.main.getByRole('button', { name: 'View', exact: true });
+    this.exportButton = this.main.getByRole('button', { name: 'Export', exact: true });
 
-    this.columnsPanelHeading = page.getByRole('heading', { name: 'Columns', exact: true });
-    this.showAllColumnsButton = page.getByRole('button', { name: 'Show all' });
-    this.hideAllColumnsButton = page.getByRole('button', { name: 'Hide all' });
+    this.filterDialog = page.getByRole('dialog', { name: 'Filter', exact: true });
+    this.filterApplyButton = this.filterDialog.getByRole('button', { name: 'Apply', exact: true });
+    this.filterClearButton = this.filterDialog.getByRole('button', { name: 'Clear', exact: true });
+    this.advancedFilterButton = this.filterDialog.getByRole('button', { name: 'Advanced Filter' });
+    this.filterChips = this.main.getByRole('button', { name: /^Remove / });
+    this.clearAllFiltersButton = this.main.getByRole('button', { name: 'Clear all', exact: true });
 
-    this.itemsSelectedText = page.getByText(/item(s)? selected/);
+    this.advancedFilterDialog = page.getByRole('dialog', { name: 'Advanced Filters' });
+    this.addRuleButton = this.advancedFilterDialog.getByRole('button', { name: 'Add rule' });
+    this.noCustomRulesText = this.advancedFilterDialog.getByText(/^No custom rules/);
+    this.ruleMatchCountText = this.advancedFilterDialog.getByText(/^\d+ techpacks? match/);
+    this.removeRuleButton = this.advancedFilterDialog.getByRole('button', { name: 'Remove rule' });
+
+    this.columnsDialog = page.getByRole('dialog', { name: 'Columns', exact: true });
+    this.columnsCounterText = this.columnsDialog.getByText(/^\d+\/\d+$/);
+    this.columnsApplyButton = this.columnsDialog.getByRole('button', {
+      name: 'Apply',
+      exact: true,
+    });
+    this.columnsResetButton = this.columnsDialog.getByRole('button', { name: 'Reset to Default' });
+    this.columnsShowAllButton = this.columnsDialog.getByRole('button', { name: 'Show All' });
+    this.lockedColumnCheckbox = this.columnsDialog.getByRole('checkbox', {
+      name: 'Name and Code is always visible',
+    });
+
+    this.viewMenu = page.getByRole('menu', { name: 'View' });
+    this.openTechPackButton = this.main.getByRole('button', { name: 'Open Tech Pack' });
+    // Grid View cards: `button "Select <code>-<rev> <name> <code>"`.
+    this.gridViewCards = this.main.getByRole('button', { name: /^Select (TP|DRAFT)/ });
+
+    // The count ("1") is its own element beside the "item selected" label;
+    // their parent (the selection bar) starts "1 item selected".
+    this.itemsSelectedText = page.getByText(/^items? selected$/).locator('..');
     this.clearSelectionButton = page.getByRole('button', { name: 'Clear selection' });
-    this.compareButton = page.getByRole('button', { name: 'Compare' });
+    this.compareButton = page.getByRole('button', { name: 'Compare', exact: true });
 
-    this.newTechpackButton = page.getByRole('button', { name: 'New Techpack' });
-    // The chevron is a second, separate button right after "New Techpack"
-    // with no accessible name of its own — "More options" is how it's
-    // exposed to the accessibility tree.
-    this.newTechpackDropdown = page.getByRole('button', { name: 'More options' }).first();
-    this.aiModeMenuItem = page.getByRole('menuitem', { name: /AI Mode/ });
-    this.classicMenuItem = page.getByRole('menuitem', { name: /Classic/ });
+    this.showingCountText = this.main.getByText(/^Showing \d+ packs?$/);
+    this.pageText = this.main.getByText(/^\d+ of \d+$/);
+    this.previousPageButton = this.main.getByRole('button', { name: 'Previous page' });
+    this.nextPageButton = this.main.getByRole('button', { name: 'Next page' });
+    this.rowsPerPageSelect = this.main.getByRole('combobox', { name: 'Rows per page' });
 
-    this.table = page.getByRole('table');
-    this.columnHeaders = page.getByRole('columnheader');
+    this.table = this.main.getByRole('table');
+    this.columnHeaders = this.table.getByRole('columnheader');
     this.bodyRows = this.table.locator('tbody').getByRole('row');
-    this.filterRulesLabel = page.getByText('Rules', { exact: true });
-    this.filterAttributeLabel = page.getByText('Attribute');
-    this.filterOperatorContains = page.getByText('contains');
-    // A bare "Value" also matches grid column names ("Style Value Code", ...).
-    this.filterValuePlaceholder = page.getByText('Value...', { exact: true });
-    this.selectAllRowsCheckbox = page.getByRole('checkbox', { name: 'Select all rows' });
+    this.codeButtons = this.table.getByRole('button', { name: /^(TP\d{6}-\d+|DRAFT\/\w+)$/ });
+    this.emptyResultText = this.main.getByText('No results found', { exact: true });
   }
 
-  rowLink(techpackCode: string): Locator {
-    return this.page.getByRole('link', { name: techpackCode, exact: true });
+  /** A techpack's code button in the grid (clicking it opens `/techpacks/view/{id}`). */
+  codeButton(techpackCode: string): Locator {
+    return this.table.getByRole('button', { name: techpackCode, exact: true });
+  }
+
+  /** A Production Stages step, e.g. `productionStage(3)` → "STEP 3 Fitting 5". */
+  productionStage(step: number): Locator {
+    return this.productionStages.getByRole('button', { name: new RegExp(`^STEP ${step} `) });
+  }
+
+  /** One of the "Filter" dialog's three collapsible sections. */
+  filterSection(name: 'General Information' | 'Garment Specifications' | 'System Info'): Locator {
+    return this.filterDialog.getByRole('region', { name });
+  }
+
+  /** The Show/Hide toggle of a "Filter" dialog section. Only one section is open at a time. */
+  filterSectionToggle(
+    name: 'General Information' | 'Garment Specifications' | 'System Info',
+  ): Locator {
+    return this.filterSection(name).getByRole('button', { name: /^(Show|Hide)$/ });
   }
 
   /**
-   * The per-column inline filter input revealed by "Toggle cell filters" —
-   * located from its own placeholder text, e.g. "Filter Techpack Code".
+   * A field in an open "Filter" dialog section. The comboboxes have no
+   * accessible name of their own ("Select"); each one directly follows its
+   * label text, so a field is the first combobox after its label. For the
+   * date fields (Created Date / Approved Date) this is the operator picker.
    */
-  cellFilterInput(columnLabel: string): Locator {
-    return this.page.getByPlaceholder(`Filter ${columnLabel}`);
+  filterField(label: string): Locator {
+    return this.filterDialog
+      .getByText(label, { exact: true })
+      .locator('xpath=following::*[@role="combobox"][1]');
   }
 
-  /**
-   * A column's checkbox in the "Configure columns" panel. Each one carries
-   * its own unambiguous accessible name ("Toggle <label>", or "<label> is
-   * always visible" for the locked Techpack Code column) — confirmed live;
-   * no need for the "find the row from an unlinked label" ancestor-climbing
-   * technique used elsewhere in this module, and climbing just one level
-   * here isn't scoped enough (it matched all 20 columns' checkboxes at once).
-   */
+  /** An option in whichever listbox is open (filter fields, rows-per-page). */
+  listboxOption(name: string | RegExp): Locator {
+    return this.page.getByRole('listbox').last().getByRole('option', { name, exact: true });
+  }
+
+  /** A column's checkbox in the "Columns" dialog ("Toggle <label>"). */
   columnCheckbox(columnLabel: string): Locator {
-    return this.page.getByRole('checkbox', { name: `Toggle ${columnLabel}` });
+    return this.columnsDialog.getByRole('checkbox', { name: `Toggle ${columnLabel}` });
+  }
+
+  /** Every column label in the "Columns" dialog, in list order. */
+  columnsDialogCheckboxes(): Locator {
+    return this.columnsDialog.getByRole('checkbox');
+  }
+
+  /** A "View" menu layout. */
+  viewOption(name: 'List View' | 'Vertical Split' | 'Grid View'): Locator {
+    return this.viewMenu.getByRole('menuitemradio', { name });
+  }
+
+  /** A section heading in the Vertical Split detail pane. */
+  detailPaneSection(
+    name: 'General Information' | 'Garment Specifications' | 'System Info',
+  ): Locator {
+    return this.main.getByRole('heading', { name, level: 3 });
+  }
+
+  /** A row's checkbox, by its code and revision ("Select row TP202610-000131-0"). */
+  rowCheckbox(techpackCode: string, revNo = 0): Locator {
+    return this.table.getByRole('checkbox', { name: `Select row ${techpackCode}-${revNo}` });
   }
 
   /** A row checkbox by 0-based row index (not counting the header "select all" checkbox). */
   rowCheckboxAt(index: number): Locator {
-    return this.page.getByRole('checkbox').nth(index + 1);
+    return this.table.getByRole('checkbox', { name: /^Select row / }).nth(index);
   }
 
-  /**
-   * Whether the split-view detail panel is currently showing (Vertical or
-   * Horizontal split) — its "HEADER" section label is a reliable signal,
-   * absent entirely in "No split"'s plain grid. Deliberately not matching
-   * on the panel's "Open" button text since that string collides with the
-   * "Open" status tab elsewhere on this same screen.
-   *
-   * This renders visibly as all-caps "HEADER" but is almost certainly
-   * lowercase text styled with CSS `text-transform: uppercase` (matching
-   * the visual style of its sibling labels — REVISION/CUSTOMER/SEASON/
-   * TYPE/CREATED, a classic small-caps section-label pattern) — an
-   * `exact: true` match on literal uppercase "HEADER" found zero DOM
-   * matches despite the text being clearly visible on screen in the
-   * failure screenshot, twice in a row under different dev conditions
-   * (ruling out flakiness). Case-insensitive match sidesteps this
-   * regardless of which element actually carries the transform.
-   */
-  detailPanelHeaderLabel(): Locator {
-    return this.page.getByText(/^header$/i);
-  }
-
-  /** Live count badge on a status tab's own locator, e.g. "Open 11" -> the "Open" tab. */
   /** A status tab by its full accessible name, e.g. a translated "Mở 12". */
   statusTabNamed(name: RegExp): Locator {
-    return this.page.getByRole('button', { name });
+    return this.main.getByRole('button', { name });
   }
 
   statusTab(tab: 'All' | 'Draft' | 'Open' | 'Approved'): Locator {

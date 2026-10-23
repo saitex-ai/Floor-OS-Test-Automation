@@ -44,11 +44,10 @@ export class ValidationRulesPage extends BasePage {
     await this.expectLoaded();
   }
 
-  /** TC:1/TC:28's real user path: Techpacks list -> Open navigation -> "Validation rules". */
+  /** TC:1/TC:28's real user path: Techpack Dashboard -> left nav "Validation rules". */
   async openViaTechpackNav(): Promise<void> {
     await this.gotoAuthenticated(MODULES['techpack'].path);
-    await expect(this.locators.techpacksListHeading).toBeVisible({ timeout: 60_000 });
-    await this.locators.openNavigationButton.click();
+    await expect(this.locators.techpackDashboardHeading).toBeVisible({ timeout: 60_000 });
     await expect(this.locators.validationRulesNavLink).toBeVisible({ timeout: 10_000 });
     await this.locators.validationRulesNavLink.click();
     await this.expectLoaded();
@@ -249,16 +248,36 @@ export class ValidationRulesPage extends BasePage {
     return names;
   }
 
+  /**
+   * Closes the rule dialog if it's still open. Since the 2026-10-22 redesign
+   * lifecycle actions (Activate, Disable, Archive) close it by themselves with
+   * a short exit animation, during which its Close button is still in the
+   * DOM but detaches mid-click — so give it a moment to go on its own first.
+   */
   async closeDialog(): Promise<void> {
-    if (await this.locators.ruleDialog.isVisible()) {
-      await this.locators.closeButton.click();
-      await expect(this.locators.ruleDialog).toBeHidden({ timeout: 10_000 });
-    }
+    const closedByItself = await this.locators.ruleDialog
+      .waitFor({ state: 'hidden', timeout: 2_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (closedByItself) return;
+    await this.locators.closeButton.click();
+    await expect(this.locators.ruleDialog).toBeHidden({ timeout: 10_000 });
   }
 
+  /**
+   * Since the 2026-10-22 redesign, Activate / Disable close the Edit dialog
+   * by themselves once the change is saved.
+   */
   async activate(): Promise<void> {
     await this.locators.activateButton.click();
     await expect(this.locators.toast('Validation rule activated')).toBeVisible({ timeout: 20_000 });
+    await expect(this.locators.ruleDialog).toBeHidden({ timeout: 10_000 });
+  }
+
+  async disable(): Promise<void> {
+    await this.locators.disableButton.click();
+    await expect(this.locators.toast(/Validation rule disabled/i)).toBeVisible({ timeout: 20_000 });
+    await expect(this.locators.ruleDialog).toBeHidden({ timeout: 10_000 });
   }
 
   /** Clicks Archive in the Edit dialog and returns once the confirmation is showing. */

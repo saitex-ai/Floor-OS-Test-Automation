@@ -56,6 +56,16 @@ export class AiModeCopilotPage extends BasePage {
   }
 
   /** Click the "Use the manual form" link on the upload screen itself (found 2026-09-25). */
+  /**
+   * The landing's way to the Classic form (2026-10-22 redesign): Add files ›
+   * More tools (a submenu, opened by hover) › Manual form.
+   */
+  async openManualFormFromAddFiles(): Promise<void> {
+    await this.locators.addFilesButton.click();
+    await this.locators.moreToolsMenuItem.hover();
+    await this.locators.manualFormMenuItem.click();
+  }
+
   async useManualForm(): Promise<void> {
     await this.locators.useManualFormLink.click();
   }
