@@ -120,7 +120,6 @@ export class LeadQualificationLocators {
   readonly aiChatbotGreeting: Locator;
   readonly contactsTabButton: Locator;
   readonly overviewTabButton: Locator;
-  readonly createCustomerNameTextbox: Locator;
 
   constructor(private readonly page: Page) {
     this.tabButton = page.getByRole('button', { name: 'Lead Qualification', exact: true });
@@ -251,10 +250,23 @@ export class LeadQualificationLocators {
     // Customer Details tab strip: "Contacts (N)" and "Overview".
     this.contactsTabButton = page.getByRole('button', { name: /^Contacts \(\d+\)$/ });
     this.overviewTabButton = page.getByRole('button', { name: 'Overview', exact: true });
-    // Create Customer form's name box, by role: CreateCustomerLocators'
-    // getByLabel('Customer Name') also matches the Customers list's
-    // "Resize Customer Name column" button while the form is still loading.
-    this.createCustomerNameTextbox = page.getByRole('textbox', { name: 'Customer Name' });
+  }
+
+  /**
+   * One field row on the Customer Details Overview tab, scoped to its
+   * section card (e.g. "Customer Management" → "Origin Type", "System" →
+   * "Created By"): the label `<div>` and its value `<div>` share a parent.
+   * Same DOM as CustomerOverviewEditLocators.fieldRow(); scoped so a
+   * value like "CRM" can't match the CRM module navigation.
+   */
+  overviewFieldRow(section: string, label: string): Locator {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return this.page
+      .locator('section')
+      .filter({ has: this.page.getByRole('heading', { level: 2, name: section, exact: true }) })
+      .getByText(new RegExp(`^${escaped}(\\s*•)?$`))
+      .first()
+      .locator('..');
   }
 
   /** "Unfortunately, no relevant information is available for the <what> online." — an AI section's empty message. */

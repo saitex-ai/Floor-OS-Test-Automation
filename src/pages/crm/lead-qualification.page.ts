@@ -11,6 +11,8 @@ const CUSTOMERS_LIST_PATH = '/crm/customers';
  */
 const LQ_READ_TIMEOUT = 120_000;
 
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /**
  * "Lead Qualification screen" (CRM, Sprint 4 user story). Owned by the
  * CRM QA. Confirmed against the running app (2026-09-25) — see
@@ -574,29 +576,70 @@ export class LeadQualificationPage extends BasePage {
   }
 
   /**
-   * Dev (2026-10-22) renders nothing for the stored crawl detection: no
-   * "Origin"-marked card, and neither the crawled site, the crawl cohort
-   * nor the detection date appear anywhere on the tab. The story wants
-   * all of them on a crawl origin card above the AI sections.
+   * The crawl origin card (story/TC:1): exactly one "Origin"-marked card
+   * that isn't the Web Form card, and it's the first card on the tab,
+   * above Customer Info. Dev (2026-10-23) renders no such card.
    */
-  async expectNoCrawlCardRendered(detection: CrawlDetection): Promise<void> {
-    await expect(this.locators.crawlCard).toHaveCount(0);
-    await expect(this.locators.originCards).toHaveCount(0);
-    const host = new URL(detection.sourceDomain).host;
-    await expect(this.locators.tabRoot).not.toContainText(host);
-    await expect(this.locators.tabRoot).not.toContainText(detection.intentLabel);
-    for (const when of await this.detectionDateRenderings(detection.detectedAt)) {
-      await expect(this.locators.tabRoot).not.toContainText(when);
-    }
+  async expectCrawlCardFirst(): Promise<void> {
+    await expect(this.locators.crawlCard).toHaveCount(1);
+    const title = await this.locators.crawlCard
+      .getByRole('heading', { level: 2 })
+      .first()
+      .innerText();
+    await expect(this.locators.cardHeadings.first()).toHaveText(title);
   }
 
-  /** The matched-signal lines of the summary ("product fit: …") are not shown as written. */
-  async expectDetectionSignalLinesNotShown(detection: CrawlDetection): Promise<void> {
-    const signals = detection.detectionSummary.filter((line) => /^[a-z ]+ fit: /.test(line));
-    expect(signals.length, 'detection has no matched-signal line').toBeGreaterThan(0);
-    for (const line of signals) {
-      await expect(this.locators.tabRoot.getByText(line, { exact: true })).toHaveCount(0);
+  /** The crawl card names the crawled site or the crawl cohort (TC:2). */
+  async expectCrawlCardNamesSource(detection: CrawlDetection): Promise<void> {
+    await expect(this.locators.crawlCard).toHaveCount(1);
+    const host = new URL(detection.sourceDomain).host.replace(/^www\./, '');
+    await expect(this.locators.crawlCard).toContainText(
+      new RegExp(`${escapeRegExp(host)}|${escapeRegExp(detection.intentLabel.trim())}`, 'i'),
+    );
+  }
+
+  /** The crawl card shows the stored detection date, in one of the app's date shapes (TC:3). */
+  async expectCrawlCardDate(detection: CrawlDetection): Promise<void> {
+    await expect(this.locators.crawlCard).toHaveCount(1);
+    const renderings = await this.detectionDateRenderings(detection.detectedAt);
+    await expect(this.locators.crawlCard).toContainText(
+      new RegExp(renderings.map(escapeRegExp).join('|')),
+    );
+  }
+
+  /** Every detection-summary line, incl. the matched signal, is on the crawl card in full (TC:4). */
+  async expectCrawlCardFullSummary(detection: CrawlDetection): Promise<void> {
+    await expect(this.locators.crawlCard).toHaveCount(1);
+    expect(
+      detection.detectionSummary.some((line) => /^[a-z ]+ fit: /.test(line)),
+      'detection has no matched-signal line',
+    ).toBe(true);
+    for (const line of detection.detectionSummary) {
+      await expect(this.locators.crawlCard).toContainText(line);
     }
+    await expect(this.locators.crawlCard.getByText(/^(see|show|read) more$/i)).toHaveCount(0);
+  }
+
+  /** The crawl card says the Lead came from the crawler (TC:9). */
+  async expectCrawlCardSaysCrawler(): Promise<void> {
+    await expect(this.locators.crawlCard).toHaveCount(1);
+    await expect(this.locators.crawlCard).toContainText(/crawl/i);
+  }
+
+  /**
+   * The crawl card is read-only (TC:5): no input, text area, button or
+   * contenteditable on it, and typing into it changes nothing.
+   */
+  async expectCrawlCardReadOnly(): Promise<void> {
+    const card = this.locators.crawlCard;
+    await expect(card).toHaveCount(1);
+    await expect(
+      card.locator('input, textarea, button, [contenteditable=""], [contenteditable="true"]'),
+    ).toHaveCount(0);
+    const before = await card.innerText();
+    await card.getByRole('heading', { level: 2 }).first().click();
+    await this.page.keyboard.type('edited by playwright');
+    await expect(card).toHaveText(before);
   }
 
   /** The detection date in the shapes the app uses elsewhere (e.g. "10/21/2026", "Oct 21, 2026", "21 Oct 2026"). */
@@ -615,8 +658,11 @@ export class LeadQualificationPage extends BasePage {
   async expectAiSectionNotBlank(title: string): Promise<void> {
     const section = this.locators.aiSection(title);
     await expect(section).toHaveCount(1);
-    const text = (await section.innerText()).replace(title, '').trim();
-    expect(text.length, `"${title}" is blank`).toBeGreaterThan(10);
+    await expect
+      .poll(async () => (await section.innerText()).replace(title, '').trim().length, {
+        message: `"${title}" is blank`,
+      })
+      .toBeGreaterThan(10);
   }
 
   /** The AI section shows each of these pointer texts. */
@@ -666,11 +712,27 @@ export class LeadQualificationPage extends BasePage {
     await expect(this.locators.contactsTabButton).toHaveText(`Contacts (${n})`);
   }
 
-  /** Overview tab: Origin Type reads the given label (e.g. "Web Crawled") and the record was created by "CRM" (the crawler). */
+  /**
+   * Overview tab: Customer Management's Origin Type reads the given label
+   * (e.g. "Web Crawled") and System's Created By reads "CRM" (the
+   * crawler). Goes back to the Lead Qualification tab afterwards.
+   */
   async expectOverviewShowsSystemOrigin(originTypeLabel: string): Promise<void> {
     await this.locators.overviewTabButton.click();
-    await expect(this.page.getByText(originTypeLabel, { exact: true }).first()).toBeVisible();
-    await expect(this.page.getByText('CRM', { exact: true }).first()).toBeVisible();
+    await expect(this.locators.overviewFieldRow('Customer Management', 'Origin Type')).toHaveText(
+      new RegExp(`^Origin Type\\s*${escapeRegExp(originTypeLabel)}$`),
+    );
+    await expect(this.locators.overviewFieldRow('System', 'Created By')).toHaveText(
+      /^Created By\s*CRM$/,
+    );
+    await this.locators.tabButton.click();
+    await expect(this.locators.cardHeadings.first()).toBeVisible();
+  }
+
+  /** The saved review row also names who saved it ("Saved by …" / author), separate from the selected Manager (TC:15). */
+  async expectReviewRowShowsAuthor(details: QualificationReview): Promise<void> {
+    const row = this.page.getByText(details.review, { exact: false }).locator('..');
+    await expect(row).toContainText(/\b(saved|reviewed|added|written|recorded) by\b|\bauthor\b/i);
   }
 
   /** The AI Chatbot's opening message on a Lead with AI sections. */
@@ -696,14 +758,5 @@ export class LeadQualificationPage extends BasePage {
   /** "Web Crawled" Lead with no detection: no crawl card. */
   async expectNoCrawlCard(): Promise<void> {
     await expect(this.locators.crawlCard).toHaveCount(0);
-  }
-
-  /**
-   * Waits for the Create Customer form after CreateCustomerPage.openFromCrmHome():
-   * on a slow dev the Customers list is still showing, and typing would land
-   * on its "Resize Customer Name column" button.
-   */
-  async waitForCreateCustomerForm(): Promise<void> {
-    await expect(this.locators.createCustomerNameTextbox).toBeVisible({ timeout: 90_000 });
   }
 }
