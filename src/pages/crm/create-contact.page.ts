@@ -50,6 +50,9 @@ export class CreateContactPage extends BasePage {
   async openFromContactList(): Promise<void> {
     await this.gotoAuthenticated(CONTACTS_LIST_PATH);
     await this.locators.createContactEntry.click();
+    // The form loads lazily, and slowly on dev since the 2026-10-22 shell;
+    // wait for it rather than typing into the still-visible list.
+    await expect(this.locators.contactNameInput).toBeVisible();
   }
 
   /** contact-creation-screen.md TC:1 — Customer→Contact hand-off. */

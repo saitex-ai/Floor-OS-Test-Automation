@@ -87,7 +87,9 @@ export class CreateContactLocators {
       /Customer is fixed by where this form was opened from and cannot be changed\./,
     );
 
-    this.contactNameInput = page.getByLabel('Contact Name');
+    // By role: getByLabel('Contact Name') also matches the Contacts list's
+    // "Resize Contact Name column" button while the form is still loading.
+    this.contactNameInput = page.getByRole('textbox', { name: /^Contact Name/ });
     this.designationInput = page.getByLabel('Designation');
     this.genderCombobox = page.getByRole('combobox', { name: 'Gender' });
     this.emailInput = page.getByLabel('Email');
