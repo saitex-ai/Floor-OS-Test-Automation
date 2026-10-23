@@ -4,6 +4,7 @@ import { test, expect } from '../../../src/fixtures/crm.fixtures';
 import type { CreateCustomerPage } from '../../../src/pages/crm/create-customer.page';
 import type { CreateContactPage } from '../../../src/pages/crm/create-contact.page';
 import type { AlertsPage } from '../../../src/pages/crm/alerts.page';
+import { ShellHeaderPage } from '../../../src/pages/shell/shell-header.page';
 import seed from '../../../src/data/crm/seed-records.data.json';
 
 /**
@@ -27,8 +28,6 @@ import seed from '../../../src/data/crm/seed-records.data.json';
  * (uniquely named "PW Email Alert …"); only those are ever deactivated.
  *
  * Real dev findings (asserted as "BUG:" steps):
- * - TC:4: the Customer popup's empty-To error reads "Select a Customer
- *   email ID", not "Select at least one email address".
  * - TC:7: a deactivated Customer (and its Contact) is still offered in To.
  */
 test.describe('CRM - Email an Alert', () => {
@@ -123,6 +122,7 @@ test.describe('CRM - Email an Alert', () => {
 
   test('TC:1 Verify that selecting valid internal recipients correctly builds the body (including "Impact on SAITEX") and opens Outlook with pre-filled fields', async ({
     alertsPage,
+    page,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abyjby', 'TC:1 (ClickUp)');
     test.slow();
@@ -131,7 +131,8 @@ test.describe('CRM - Email an Alert', () => {
     const alertBefore = await alertsPage.captureAlertDetailText();
     const officialSource = await alertsPage.locators.officialSourceLink.getAttribute('href');
     // Read before the modal opens — the open dialog hides the shell banner from the a11y tree.
-    const userMenuText = await alertsPage.locators.userMenuButton.innerText();
+    // The user-menu button shows only initials since 2026-10-22; the menu has the name + email.
+    const userMenuText = await new ShellHeaderPage(page).signedInUserText();
 
     await test.step('Click Email Alert Internally', async () => {
       await alertsPage.openEmailInternallyDialog();
@@ -141,7 +142,9 @@ test.describe('CRM - Email an Alert', () => {
     await test.step("From shows the logged-in user's name and email, read-only", async () => {
       // Plain text, not a form control — nothing to type into.
       const from = await alertsPage.expectFromIsReadOnly();
-      expect(userMenuText).toContain(from.replace(/ <.*$/, ''));
+      const [, fromName, fromEmail] = from.match(/^(.+) <(.+)>$/) ?? [];
+      expect(userMenuText).toContain(fromName);
+      expect(userMenuText).toContain(fromEmail);
       // Internal popup has no Cc.
       await expect(alertsPage.locators.customerCcCombobox).toHaveCount(0);
     });
@@ -283,14 +286,12 @@ test.describe('CRM - Email an Alert', () => {
       await expect(alertsPage.locators.redirectedToOutlookToast).toBeHidden();
     });
 
-    // BUG (copy mismatch, confirmed on dev 2026-10-15): ClickUp TC:4 expects
-    // "Select at least one email address" (the wording Key Meeting Notes'
-    // "Notify the Customer" popup uses); the Alert Customer popup shows
-    // "Select a Customer email ID" instead. Asserting the real text so the
-    // block itself stays covered — flip once the copy is fixed.
-    await test.step('BUG: inline error reads "Select a Customer email ID", not "Select at least one email address"', async () => {
-      await alertsPage.expectDialogError('Select a Customer email ID');
-      await alertsPage.expectNoDialogError('Select at least one email address');
+    // Fixed on dev (2026-10-23 design-system release): the Customer popup's
+    // empty-To error now reads "Select at least one email address", as
+    // ClickUp TC:4 expects (it used to read "Select a Customer email ID").
+    await test.step('Inline error reads "Select at least one email address"', async () => {
+      await alertsPage.expectDialogError('Select at least one email address');
+      await alertsPage.expectNoDialogError('Select a Customer email ID');
     });
 
     await alertsPage.closeEmailDialog();

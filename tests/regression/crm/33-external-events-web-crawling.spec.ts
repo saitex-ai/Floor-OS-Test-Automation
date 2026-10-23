@@ -16,6 +16,11 @@ import { test, expect } from '../../../src/fixtures/crm.fixtures';
  *   Fashion Show / Other / Sales Summit / Trade Fair, status filtering is
  *   the status tabs, and the date column is "Schedule". Tests read real
  *   values off the live grid instead of hardcoding seed content.
+ * - Design-system release (2026-10-23): Filters is a drawer (Type is
+ *   picked from its "Value..." combobox), applied chips read
+ *   `Type equals "<type>"`, layouts are a "View" menu (List View /
+ *   Vertical Split / Horizontal Split), and the sort icon now shows the
+ *   direction (see ExternalEventsPage.readColumnSortState()).
  * - Column visibility/order, sort and layout are saved per BROWSER in
  *   localStorage ("crm-events-list-prefs-v1"), not per user on the server.
  *   Each Playwright test runs in a fresh browser context, so nothing
@@ -158,7 +163,7 @@ test.describe('CRM - Build External Events List with Web Crawling', () => {
     });
 
     await test.step('Removing the Type filter restores the unfiltered list', async () => {
-      await externalEventsPage.removeFilter(`Type: ${type}`);
+      await externalEventsPage.removeFilter(externalEventsPage.typeFilterLabel(type));
       await expect(l.filtersButton).toHaveAccessibleName('Filters');
       await externalEventsPage.expectPaginationTotal(allTotal);
       await externalEventsPage.selectStatusTab('Attended');
@@ -182,34 +187,32 @@ test.describe('CRM - Build External Events List with Web Crawling', () => {
       values.slice(1).every((v, i) => dir * collator.compare(values[i] ?? '', v) <= 0);
 
     await externalEventsPage.openList();
-    let ascIconClass = '';
+
+    await test.step(`"${column}" starts unsorted: its header shows the two-headed arrow`, async () => {
+      expect(await externalEventsPage.readColumnSortState(column)).toBe('none');
+    });
 
     await test.step(`First click on "${column}" sorts ascending`, async () => {
-      await externalEventsPage.clickColumnSort(column);
+      // Waits for the header icon to turn into the single "ascending" arrow.
+      expect(await externalEventsPage.clickColumnSort(column)).toBe('asc');
       await expect
         .poll(async () => isSorted(await externalEventsPage.readColumnValues(column), 1))
         .toBe(true);
-      // The header's icon switches to the highlighted "active sort" style.
-      await expect(l.columnSortIcon(column)).toHaveClass(/text-ring/);
-      ascIconClass = (await l.columnSortIcon(column).getAttribute('class')) ?? '';
     });
 
     await test.step(`Second click on "${column}" re-sorts descending immediately`, async () => {
-      await externalEventsPage.clickColumnSort(column);
+      // Waits for the header arrow to flip (rotate-180) to "descending".
+      expect(await externalEventsPage.clickColumnSort(column)).toBe('desc');
       await expect
         .poll(async () => isSorted(await externalEventsPage.readColumnValues(column), -1))
         .toBe(true);
-      await expect(l.columnSortIcon(column)).toHaveClass(/text-ring/);
     });
 
-    await test.step('Sort indicator: the same two-headed icon for both directions, highlighted when active', async () => {
-      // The header shows the same "arrow-up-down" icon for ascending and
-      // descending, only highlighted when active. Accepted as-is by the
-      // team (2026-10-15) — not a bug; the row order itself is what TC:4
-      // verifies above.
-      const descIconClass = (await l.columnSortIcon(column).getAttribute('class')) ?? '';
-      expect(ascIconClass).toContain('lucide-arrow-up-down');
-      expect(descIconClass).toBe(ascIconClass);
+    await test.step('Sort indicator: only the sorted column shows a direction arrow; no aria-sort', async () => {
+      // Since the 2026-10-23 design system the icon differs per direction
+      // (see readColumnSortState()); the old "same icon for asc and desc"
+      // note no longer applies. Other columns keep the unsorted icon.
+      expect(await externalEventsPage.readColumnSortState('Type')).toBe('none');
       await expect(l.columnHeader(column)).not.toHaveAttribute('aria-sort', /.+/);
     });
   });
@@ -287,37 +290,38 @@ test.describe('CRM - Build External Events List with Web Crawling', () => {
 
     const expectStatePreserved = async (): Promise<void> => {
       await expect(l.searchInput).toHaveValue(keyword);
-      await expect(l.removeFilterChip(`Type: ${type}`)).toBeVisible();
+      await expect(l.removeFilterChip(externalEventsPage.typeFilterLabel(type))).toBeVisible();
       await expect(l.statusTab('Attended')).toHaveAttribute('aria-pressed', 'true');
       await externalEventsPage.expectPaginationTotal(total);
     };
 
     try {
-      await test.step('Switch to Vertical split — list + preview pane, state kept', async () => {
-        await externalEventsPage.switchLayout('Vertical split');
+      await test.step('Switch to Vertical Split — list + preview pane, state kept', async () => {
+        await externalEventsPage.switchLayout('Vertical Split');
         await expect(l.splitListItem(title)).toHaveAccessibleName(/^Deselect row /);
         await expect(l.splitPreviewHeading).toHaveText(title);
         await expectStatePreserved();
       });
 
-      await test.step('Switch to Horizontal split — table + preview pane, state kept', async () => {
-        await externalEventsPage.switchLayout('Horizontal split');
+      await test.step('Switch to Horizontal Split — table + preview pane, state kept', async () => {
+        await externalEventsPage.switchLayout('Horizontal Split');
         await expect(l.rowCheckbox(title)).toBeChecked();
         await expect(l.splitPreviewHeading).toHaveText(title);
         await expectStatePreserved();
       });
 
-      await test.step('Switch back to No split — plain table, state kept', async () => {
-        await externalEventsPage.switchLayout('No split');
+      await test.step('Switch back to List View — plain table, state kept', async () => {
+        await externalEventsPage.switchLayout('List View');
         await expect(l.splitPreviewHeading).toBeHidden();
         await expect(l.rowCheckbox(title)).toBeChecked();
         await expectStatePreserved();
       });
     } finally {
-      await test.step('Cleanup: back to the default No split layout, filter removed', async () => {
-        await externalEventsPage.switchLayout('No split');
-        if (await l.removeFilterChip(`Type: ${type}`).isVisible()) {
-          await externalEventsPage.removeFilter(`Type: ${type}`);
+      await test.step('Cleanup: back to the default List View layout, filter removed', async () => {
+        await externalEventsPage.switchLayout('List View');
+        const typeFilter = externalEventsPage.typeFilterLabel(type);
+        if (await l.removeFilterChip(typeFilter).isVisible()) {
+          await externalEventsPage.removeFilter(typeFilter);
         }
       });
     }
