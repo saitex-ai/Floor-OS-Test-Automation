@@ -41,9 +41,9 @@ import seed from '../../../src/data/crm/seed-records.data.json';
  * - Dev renders "Business Compatibility Report" and NO "Sales Pitch
  *   Recommendation" card, although the dossier payload carries `pitch`
  *   pointers (TC:10).
- * - No "Manager's review and score saved" / "Review updated" confirmation
- *   (TC:14/15); the empty-edit error reads "A review and a score are both
- *   required" (TC:15).
+ * - The empty-edit error reads "A review and a score are both required"
+ *   (TC:15). The "Manager's review and score saved" / "Review updated"
+ *   confirmations are shown since 2026-10-23 (TC:14/15).
  * - Acknowledgement email isn't traceable from the Lead: Communication >
  *   Emails is empty for an ingested Web Form Lead (TC:19).
  */
@@ -405,8 +405,7 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
     });
 
     await test.step('Each field shows its error and nothing is saved', async () => {
-      // Dev's score error reads "Score out of 10 is required" (ClickUp:
-      // "Score (1–10) required"); the other three match ClickUp.
+      // All four errors match ClickUp, incl. "Score (1–10) required".
       await lq.expectFieldValidationErrors();
       await lq.expectNoReviewsEmptyState();
     });
@@ -435,8 +434,8 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
       await lq.expectReviewFormCleared();
     });
 
-    await test.step('BUG: no "Manager\'s review and score saved" confirmation is shown', async () => {
-      expect(await lq.confirmationAppears('saved')).toBe(false);
+    await test.step('"Manager\'s review and score saved" is confirmed', async () => {
+      expect(await lq.confirmationAppears('saved', 15_000)).toBe(true);
     });
 
     await test.step('The review lists department, manager, score and a timestamp — and survives a reload', async () => {
@@ -478,8 +477,8 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
       expect(await lq.newestReviewSavedTimestamp()).not.toBe(savedAt);
     });
 
-    await test.step('BUG: no "Review updated" confirmation is shown', async () => {
-      expect(await lq.confirmationAppears('updated')).toBe(false);
+    await test.step('"Review updated" is confirmed', async () => {
+      expect(await lq.confirmationAppears('updated', 15_000)).toBe(true);
     });
 
     await test.step('Saving the edit with an empty review is blocked', async () => {
