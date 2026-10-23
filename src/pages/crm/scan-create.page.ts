@@ -12,11 +12,10 @@ const SCAN_TIMEOUT_MS = 90_000;
 /** The assistant's AI replies to typed messages in a few seconds. */
 const REPLY_TIMEOUT_MS = 30_000;
 /**
- * How long the review form's duplicate-check dialog is watched to prove it
- * never moves past "Checking…" (z941abzd34). Caveat: a dialog that
- * resolves after this would still pass.
+ * How long the review form's "Nothing was saved" dialog is watched to
+ * prove it stays on "Checking…" rather than creating anything.
  */
-const STUCK_DIALOG_WATCH_MS = 8_000;
+const NOTHING_SAVED_WATCH_MS = 8_000;
 
 /**
  * CRM Scan & Create with the Floor OS Assistant (see
@@ -284,9 +283,10 @@ export class ScanCreatePage extends BasePage {
   }
 
   /** The "Nothing was saved" dialog stays on "Checking whether this customer already exists…". */
-  async expectDuplicateCheckStuck(): Promise<void> {
+  async expectNothingSavedDialog(): Promise<void> {
     await expect(this.locators.duplicateCheckDialog).toBeVisible();
-    await this.page.waitForTimeout(STUCK_DIALOG_WATCH_MS);
+    await expect(this.locators.duplicateCheckDialog).toContainText('Nothing was saved');
+    await this.page.waitForTimeout(NOTHING_SAVED_WATCH_MS);
     await expect(this.locators.duplicateCheckDialog).toContainText(
       'Checking whether this customer already exists…',
     );

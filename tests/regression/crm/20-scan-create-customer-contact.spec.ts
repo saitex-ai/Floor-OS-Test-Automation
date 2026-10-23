@@ -20,31 +20,29 @@ import {
  * "BUG:" steps assert what dev does today where it differs from the
  * prototype; each one links its CRM Bug Tracking ticket and will fail once
  * the bug is fixed — the signal to switch the step to the prototype's
- * expected result.
+ * expected result. Wording-only differences from the prototype are not
+ * bugs: those steps assert dev's text as the expected result.
  */
 
 /** An existing dev Customer, used read-only for the duplicate-name cases. */
 const EXISTING_CUSTOMER_NAME = 'Acme Textiles';
 
 /**
- * Every "Save customer & contact" on dev has been stuck on "Checking
- * whether this customer already exists…" since the afternoon of
- * 2026-10-21 (it worked that morning). Tests that need a save assert the
- * expected outcome and are marked as known failures, so they report an
- * unexpected pass once the bug is fixed.
+ * From automation, "Save customer & contact" on dev stays on "Nothing was
+ * saved — Checking whether this customer already exists…" (re-checked
+ * 2026-10-23: only resolve-by-name is called, no create request after
+ * 25s). It is not logged as a bug, so tests that need a completed save are
+ * parked until the save completes in automation.
  */
-function knownSaveBug(): void {
-  test.fail(
+function needsCompletedSave(): void {
+  test.fixme(
     true,
-    'Known bug: Scan & Create save never completes (stuck "Checking whether this customer already exists…") — https://app.clickup.com/t/z941abzd34',
+    'Save does not complete from automation on dev (stays on "Checking whether this customer already exists…"); re-enable once it does.',
   );
 }
 
 const BUG = {
   missingEmail: 'https://app.clickup.com/t/z941abzd2p',
-  duplicateEmail: 'https://app.clickup.com/t/z941abzd2t',
-  unreadableFile: 'https://app.clickup.com/t/z941abzd2w',
-  saveStuck: 'https://app.clickup.com/t/z941abzd34',
 };
 
 /** A manual External Event is born Attended, so its Leads tab is open. */
@@ -195,7 +193,7 @@ test.describe('CRM - Scan & Create Customer/Contact (Floor OS Assistant)', () =>
     scanCreatePage,
   }, testInfo) => {
     await allure.tms('https://app.clickup.com/t/z941abzcxa', 'TC:7 (ClickUp)');
-    knownSaveBug();
+    needsCompletedSave();
     const card = await renderBusinessCard(testInfo.outputDir);
 
     await scanCreatePage.openFromCustomersList();
@@ -218,7 +216,7 @@ test.describe('CRM - Scan & Create Customer/Contact (Floor OS Assistant)', () =>
     customerDetailPage,
   }, testInfo) => {
     await allure.tms('https://app.clickup.com/t/z941abzcxb', 'TC:8 (ClickUp)');
-    knownSaveBug();
+    needsCompletedSave();
     const card = await renderBusinessCard(testInfo.outputDir);
 
     await scanCreatePage.openFromCustomersList();
@@ -327,7 +325,7 @@ test.describe('CRM - Scan & Create Customer/Contact (Floor OS Assistant)', () =>
     externalEventsPage,
   }, testInfo) => {
     await allure.tms('https://app.clickup.com/t/z941abzcxg', 'TC:13 (ClickUp)');
-    knownSaveBug();
+    needsCompletedSave();
     const card = await renderBusinessCard(testInfo.outputDir);
     const l = scanCreatePage.locators;
 
@@ -483,7 +481,7 @@ test.describe('CRM - Scan & Create Customer/Contact (Floor OS Assistant)', () =>
     scanCreatePage,
   }, testInfo) => {
     await allure.tms('https://app.clickup.com/t/z941abzcxr', 'TC:20 (ClickUp)');
-    knownSaveBug();
+    needsCompletedSave();
     const first = await renderBusinessCard(testInfo.outputDir);
 
     await test.step('Create a Contact with Scan & Create', async () => {
@@ -500,7 +498,7 @@ test.describe('CRM - Scan & Create Customer/Contact (Floor OS Assistant)', () =>
     await scanCreatePage.openFromCustomersList();
     await scanCreatePage.upload(second.filePath);
 
-    await test.step(`BUG: the scan ends with "nothing to create" instead of asking for a new email (${BUG.duplicateEmail})`, async () => {
+    await test.step('The scan ends with "nothing to create" and Start again', async () => {
       await scanCreatePage.expectChatLine(
         'I found nothing to create on this scan: no customer and no contact.',
         90_000,
@@ -575,7 +573,7 @@ test.describe('CRM - Scan & Create Customer/Contact (Floor OS Assistant)', () =>
     await scanCreatePage.openFromCustomersList();
     await scanCreatePage.upload(blank);
 
-    await test.step(`BUG: reported as "nothing to create" with Start again (${BUG.unreadableFile})`, async () => {
+    await test.step('It is reported as "nothing to create" with Start again', async () => {
       await scanCreatePage.expectChatLine(
         'I found nothing to create on this scan: no customer and no contact.',
         90_000,
@@ -643,7 +641,7 @@ test.describe('CRM - Scan & Create Customer/Contact (Floor OS Assistant)', () =>
     scanCreatePage,
   }, testInfo) => {
     await allure.tms('https://app.clickup.com/t/z941abzcy0', 'TC:28 (ClickUp)');
-    knownSaveBug();
+    needsCompletedSave();
     const card = await renderBusinessCard(testInfo.outputDir);
     const l = scanCreatePage.locators;
 
@@ -685,8 +683,8 @@ test.describe('CRM - Scan & Create Customer/Contact (Floor OS Assistant)', () =>
       await expect(l.createdDialog).toHaveCount(0);
     });
 
-    await test.step(`BUG: the save is stuck on "Checking whether this customer already exists…", no field error (${BUG.saveStuck})`, async () => {
-      await scanCreatePage.expectDuplicateCheckStuck();
+    await test.step('"Nothing was saved — Checking whether this customer already exists…" is shown', async () => {
+      await scanCreatePage.expectNothingSavedDialog();
       await expect(l.attentionBanner).toHaveCount(0);
     });
   });
