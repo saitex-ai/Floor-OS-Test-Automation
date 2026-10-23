@@ -134,7 +134,13 @@ export class CustomerDetailLocators {
 
   /** Every Profile/Management field row is "{Label} • {value}" + its own Edit button. */
   fieldContainer(label: string): Locator {
-    return this.page.getByText(label, { exact: false }).first().locator('..');
+    // Matched on the whole label (with its optional required "•"), so a
+    // label like "Email" can't hit the sidebar's "Email Enquiries" link.
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return this.page
+      .getByText(new RegExp(`^${escaped}(\\s*•)?$`))
+      .first()
+      .locator('..');
   }
 
   confirmActionButton(action: 'Activate' | 'Deactivate'): Locator {

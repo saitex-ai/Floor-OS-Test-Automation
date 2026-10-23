@@ -247,14 +247,11 @@ export class KeyMeetingNotesLocators {
       // new design (2026-10-22). "^" keeps "Control Center Notifications" out.
       .getByRole('button', { name: /^Notifications/ })
       .first();
-    // Confirmed against the running app: this popover carries no distinct
-    // `dialog`/`menu` role at all — its buttons ("Inbox", "Notification
-    // actions", "Notification preferences") and content sit flattened
-    // directly in the banner. "Inbox" is the one thing that only exists
-    // once the popover is open, so it stands in for "the panel is open";
+    // New design (2026-10-23): the notifications popover's footer button
+    // "View all notifications" only exists while it is open.
     // notificationItem() below searches the whole page rather than a
-    // (non-existent) scoped container.
-    this.notificationsPanel = page.getByRole('button', { name: 'Inbox' });
+    // scoped container.
+    this.notificationsPanel = page.getByRole('button', { name: 'View all notifications' });
 
     this.noRecipientsWarning = page.getByText(/no (notification )?recipients configured/i);
 

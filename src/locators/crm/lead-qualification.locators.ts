@@ -119,7 +119,8 @@ export class LeadQualificationLocators {
     this.saveReviewButton = page.getByRole('button', { name: 'Save', exact: true });
     this.departmentSelectError = page.getByText('Select a department', { exact: true });
     this.managerSelectError = page.getByText('Select a manager', { exact: true });
-    this.scoreError = page.getByText('Score out of 10 is required', { exact: true });
+    // Dev's wording since 2026-10-23 (matches ClickUp): "Score (1–10) required".
+    this.scoreError = page.getByText(/^Score \(1.10\) required$/);
     this.reviewError = page.getByText("Manager's review is required", { exact: true });
 
     // "N review(s) saved. Any manager may add another..." / "No reviews

@@ -164,11 +164,11 @@ export class LogCommunicationLocators {
       // new design (2026-10-22). "^" keeps "Control Center Notifications" out.
       .getByRole('button', { name: /^Notifications/ })
       .first();
-    // Confirmed against the running app: like the popover
-    // key-meeting-notes.locators.ts already documents, this panel carries
-    // no distinct dialog/menu role — "Inbox" is the one piece of text
-    // that only exists once it's actually open.
-    this.notificationsPanelOpenMarker = page.getByRole('button', { name: 'Inbox' });
+    // New design (2026-10-23): the notifications popover's footer button
+    // "View all notifications" only exists while it is open.
+    this.notificationsPanelOpenMarker = page.getByRole('button', {
+      name: 'View all notifications',
+    });
     this.notificationsEmptyText = page.getByText('No notifications yet.');
   }
 

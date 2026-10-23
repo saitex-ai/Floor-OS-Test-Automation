@@ -19,8 +19,13 @@ export class ContactDetailPage extends BasePage {
     this.locators = new ContactDetailLocators(page);
   }
 
+  /**
+   * Header (2026-10-23 design): the status is its own badge under the
+   * name, and the subtitle beside the name reads "<Designation> • <Customer>".
+   */
   async expectHeaderSummary(status: 'Active' | 'Inactive', designation: string): Promise<void> {
-    await expect(this.page.getByText(new RegExp(`${status}\\s*${designation}\\s*·`))).toBeVisible();
+    await expect(this.page.getByText(status, { exact: true }).first()).toBeVisible();
+    await expect(this.page.getByText(new RegExp(`^${designation}\\s*[·•]`))).toBeVisible();
   }
 
   async expectLinkedToCustomer(customerName: string): Promise<void> {
