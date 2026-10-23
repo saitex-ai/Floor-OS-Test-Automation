@@ -6,8 +6,10 @@ import { type Locator, type Page } from '@playwright/test';
  * The items table and its dialogs live in BomItemsLocators. No actions or
  * assertions here, see src/pages/bom/bom-detail.page.ts for those.
  *
- * The page has no <h1>: the breadcrumb ("Bill of Materials › {customer} ›
- * {code} · Rev 00") is what identifies it.
+ * The page's <h1> ("{code} · Rev 00") is what identifies it. Before the
+ * 2026-10-22 design-system release there was no <h1> and a breadcrumb
+ * ("Bill of Materials › {customer} › {code} · Rev 00") did that job; the
+ * breadcrumb is gone now.
  *
  * Which lifecycle buttons render is driven by status, item count and
  * revision (confirmed live on uat 2026-10-08, and in the UAT build's
@@ -18,7 +20,7 @@ import { type Locator, type Page } from '@playwright/test';
  */
 export class BomDetailLocators {
   readonly main: Locator;
-  readonly breadcrumb: Locator;
+  readonly title: Locator;
   readonly backButton: Locator;
   readonly refreshButton: Locator;
   readonly openLatestButton: Locator;
@@ -87,8 +89,10 @@ export class BomDetailLocators {
 
   constructor(private readonly page: Page) {
     this.main = page.getByRole('main').first();
-    this.breadcrumb = page.getByRole('navigation', { name: 'Breadcrumb' });
-    this.backButton = page.getByRole('button', { name: 'Back', exact: true });
+    this.title = this.main.getByRole('heading', { level: 1 });
+    // As of the 2026-10-22 design-system release the way back to the list is
+    // a "Bill of Materials" button above the <h1> (it was a "Back" button).
+    this.backButton = this.main.getByRole('button', { name: 'Bill of Materials', exact: true });
     this.refreshButton = page.getByRole('button', { name: 'Refresh', exact: true });
     this.openLatestButton = page.getByRole('button', { name: 'Open latest' });
     this.bomCodeButton = this.main.getByTitle('Search and switch to a different BOM');

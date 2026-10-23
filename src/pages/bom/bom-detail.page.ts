@@ -72,9 +72,9 @@ export class BomDetailPage extends BasePage {
   async expectOpenFor(code: string, revNo?: number): Promise<void> {
     const rev = revNo === undefined ? '\\d+' : String(revNo);
     await expect(this.page).toHaveURL(new RegExp(`${BOM_PATH}/${code}/${rev}$`));
-    await expect(this.locators.breadcrumb).toContainText(code);
+    await expect(this.locators.title).toContainText(code);
     if (revNo !== undefined) {
-      await expect(this.locators.breadcrumb).toContainText(`Rev ${String(revNo).padStart(2, '0')}`);
+      await expect(this.locators.title).toContainText(`Rev ${String(revNo).padStart(2, '0')}`);
     }
     // The header fields render once the detail call resolves.
     await expect(this.locators.main.getByText('Lock Status:')).toBeVisible();
