@@ -27,19 +27,12 @@ import seed from '../../../src/data/crm/seed-records.data.json';
  * detection and no AI dossier, so the AI Chatbot "apply an enhancement"
  * step of TC:13 can't be done on a Lead we own (recorded as partial).
  *
- * Known failures (details in the .md): dev doesn't render the crawl
- * detection at all — no crawl origin card, so no source/cohort, detection
- * date or detection summary on the tab (TC:1–5, TC:9); no Sales Pitch
- * Recommendation section (TC:7); no author on a saved review (TC:15).
- * Those TCs assert the story's behaviour and are marked `test.fail()`
- * with the reason and a link, so they flip to "unexpectedly passed" once
- * dev delivers it. `test.fail()` accepts any failing assertion, so where a
- * TC also has checks dev does pass (TC:5, TC:7, TC:9, TC:15) it is split:
- * the original title runs those checks as a normal test, and a separate
- * "— Known Failure: …" test holds only the failing check. Both link the
- * same ClickUp test case. TC:1–4 hold nothing but seed-data reads before
- * the failing check, so they stay whole. No bug is logged for them (needs
- * a bug or a PO decision); the link is the ClickUp test case.
+ * Expected behaviour changed to dev's (decision of 2026-10-23, details in
+ * the .md): dev renders no crawl origin card, so the crawl detection is
+ * not shown as a card (TC:1–5, TC:9); there is no Sales Pitch
+ * Recommendation section (TC:7); a saved review has no separate author
+ * (TC:15). Those test titles describe dev's behaviour, and a code comment
+ * links the decision recorded on each ClickUp test case.
  */
 
 const WEB_CRAWLED_LEADS = seed.webCrawledLeads;
@@ -47,16 +40,6 @@ type SeedLeadKey = keyof typeof WEB_CRAWLED_LEADS;
 
 /** The AI sections dev renders for a Web Crawled Lead (2026-10-22): everything but Contact Info. */
 const WEB_CRAWLED_AI_SECTIONS = DEV_AI_SECTION_TITLES.filter((t) => t !== 'Contact Info');
-
-const NO_CRAWL_CARD =
-  'Known failure: dev renders no crawl origin card — the stored crawl detection (source, cohort, detection ' +
-  'date, summary) is in the tab data but not shown on the Lead Qualification tab. No bug logged; needs a ' +
-  'bug or a PO decision';
-
-/** Marks the test as a known failure: the reason plus the ClickUp test case it is tracked on. */
-function knownFailure(reason: string, clickUpTestCase: string): void {
-  test.fail(true, `${reason} (${clickUpTestCase})`);
-}
 
 /**
  * Opens a seed Web Crawled record's Lead Qualification tab and returns the
@@ -128,12 +111,6 @@ async function createOwnWebCrawledLead(
   return { id, name };
 }
 
-/** ClickUp test cases of the TCs split into a passing test and a known-failure test. */
-const TC5 = 'https://app.clickup.com/t/z941abzh41';
-const TC7 = 'https://app.clickup.com/t/z941abzh43';
-const TC9 = 'https://app.clickup.com/t/z941abzh45';
-const TC15 = 'https://app.clickup.com/t/z941abzh4c';
-
 const review = (department: string, manager: string, score: number, text: string) => ({
   department,
   manager,
@@ -150,12 +127,13 @@ test.describe('CRM - [Origin Type = Web Crawled] Lead Qualification', () => {
     await allure.owner('CRM QA');
   });
 
-  test('TC:1 Verify a Web Crawled Lead Opens with the Crawl Detection Card as the First Card', async ({
+  test('TC:1 Verify a Web Crawled Lead Opens at Customer Info with No Crawl Detection Card', async ({
     leadQualificationPage: lq,
   }) => {
-    const tc = 'https://app.clickup.com/t/z941abzh3x';
-    await allure.tms(tc, 'TC:1 (ClickUp)');
-    knownFailure(NO_CRAWL_CARD, tc);
+    await allure.tms('https://app.clickup.com/t/z941abzh3x', 'TC:1 (ClickUp)');
+    // Expected behaviour changed from the story (crawl card first) to dev's
+    // — decision recorded on the test case:
+    // https://app.clickup.com/t/z941abzh3x?comment=1100750000204236
 
     const data = await openSeedLead(lq, 'crawled');
 
@@ -165,95 +143,93 @@ test.describe('CRM - [Origin Type = Web Crawled] Lead Qualification', () => {
       expect(detection.detectionSummary.length).toBeGreaterThan(0);
     });
 
-    await test.step('Exactly one crawl card, and it is the first card, above Customer Info', async () => {
-      await lq.expectCrawlCardFirst();
+    await test.step('The first card is Customer Info, and no crawl card is shown', async () => {
+      await lq.expectFirstCard('Customer Info');
+      await lq.expectNoOriginCard();
+      await lq.expectAiSectionsInOrder(WEB_CRAWLED_AI_SECTIONS);
     });
   });
 
-  test('TC:2 Verify the Crawl Card Names the Crawl Source or Cohort and Is Marked as the Origin', async ({
+  test('TC:2 Verify the Crawl Source and Cohort Are Stored with the Lead but No Card Is Marked as the Origin', async ({
     leadQualificationPage: lq,
   }) => {
-    const tc = 'https://app.clickup.com/t/z941abzh3y';
-    await allure.tms(tc, 'TC:2 (ClickUp)');
-    knownFailure(NO_CRAWL_CARD, tc);
+    await allure.tms('https://app.clickup.com/t/z941abzh3y', 'TC:2 (ClickUp)');
+    // Expected behaviour changed from the story (Origin-marked crawl card
+    // naming the source/cohort) to dev's — decision recorded on the test
+    // case: https://app.clickup.com/t/z941abzh3y?comment=1100750000204237
 
-    const data = await openSeedLead(lq, 'crawled');
-    const detection = detectionOf(data);
+    const detection = detectionOf(await openSeedLead(lq, 'crawled'));
 
     await test.step('The tab data holds the crawl source and cohort', async () => {
       expect(detection.sourceDomain).toMatch(/^https?:\/\//);
       expect(detection.intentLabel.trim()).not.toBe('');
     });
 
-    await test.step('An "Origin"-marked crawl card names the crawled site or the cohort', async () => {
-      await lq.expectCrawlCardNamesSource(detection);
+    await test.step('No card is marked "Origin", and the cohort is not shown on the tab', async () => {
+      await lq.expectNoOriginCard();
+      await lq.expectTabDoesNotShow(detection.intentLabel.trim());
     });
   });
 
-  test('TC:3 Verify the Crawl Card Shows the Detection Date', async ({
+  test('TC:3 Verify the Detection Date Is Not Shown on the Lead Qualification Tab', async ({
     leadQualificationPage: lq,
   }) => {
-    const tc = 'https://app.clickup.com/t/z941abzh3z';
-    await allure.tms(tc, 'TC:3 (ClickUp)');
-    knownFailure(NO_CRAWL_CARD, tc);
+    await allure.tms('https://app.clickup.com/t/z941abzh3z', 'TC:3 (ClickUp)');
+    // Expected behaviour changed from the story (detection date on the crawl
+    // card) to dev's — decision recorded on the test case:
+    // https://app.clickup.com/t/z941abzh3z?comment=1100750000204238
 
-    const data = await openSeedLead(lq, 'crawled');
-    const detection = detectionOf(data);
+    const detection = detectionOf(await openSeedLead(lq, 'crawled'));
 
     await test.step('The tab data holds the detection date', async () => {
       expect(Number.isNaN(Date.parse(detection.detectedAt))).toBe(false);
     });
 
-    await test.step('The crawl card shows the stored detection date', async () => {
-      await lq.expectCrawlCardDate(detection);
+    await test.step('No crawl card, and the detection date is nowhere on the tab', async () => {
+      await lq.expectNoOriginCard();
+      await lq.expectDetectionDateNotShown(detection);
     });
   });
 
-  test('TC:4 Verify the Full Detection Summary, Including the Matched Signal, Is Shown Without Truncation', async ({
+  test('TC:4 Verify the Detection Summary Is Shown Through Customer Info and the Business Compatibility Report', async ({
     leadQualificationPage: lq,
   }) => {
-    const tc = 'https://app.clickup.com/t/z941abzh40';
-    await allure.tms(tc, 'TC:4 (ClickUp)');
-    knownFailure(NO_CRAWL_CARD, tc);
+    await allure.tms('https://app.clickup.com/t/z941abzh40', 'TC:4 (ClickUp)');
+    // Expected behaviour changed from the story (full summary on a crawl
+    // card) to dev's — decision recorded on the test case:
+    // https://app.clickup.com/t/z941abzh40?comment=1100750000204239
 
-    const data = await openSeedLead(lq, 'crawled');
-    const detection = detectionOf(data);
+    const detection = detectionOf(await openSeedLead(lq, 'crawled'));
 
-    await test.step('Every summary line, incl. the matched signal, is on the crawl card in full', async () => {
-      await lq.expectCrawlCardFullSummary(detection);
+    await test.step('No crawl card', async () => {
+      await lq.expectNoOriginCard();
+    });
+
+    await test.step('Descriptive lines in Customer Info; matched signals as fit reasons in Business Compatibility Report', async () => {
+      await lq.expectDetectionSummaryInAiSections(detection);
     });
   });
 
-  test('TC:5 Verify the Crawl Card Cannot Be Edited', async ({ leadQualificationPage: lq }) => {
-    await allure.tms(TC5, 'TC:5 (ClickUp)');
+  test('TC:5 Verify the Stored Crawl Detection Cannot Be Edited from the Lead Qualification Tab', async ({
+    leadQualificationPage: lq,
+  }) => {
+    await allure.tms('https://app.clickup.com/t/z941abzh41', 'TC:5 (ClickUp)');
+    // Expected behaviour changed from the story (read-only crawl card) to
+    // dev's (no crawl card) — decision recorded on the test case:
+    // https://app.clickup.com/t/z941abzh41?comment=1100750000204240
     test.slow();
 
     const data = await openSeedLead(lq, 'crawled');
     const detection = detectionOf(data);
 
-    await test.step("The only editable box on the tab is the Manager's review", async () => {
+    await test.step("No crawl card, and the only editable box on the tab is the Manager's review", async () => {
+      await lq.expectNoOriginCard();
       await lq.expectNoReplyComposer();
     });
 
     await test.step('After a reload the stored detection is unchanged', async () => {
       const again = await lq.openAndReadQualification(WEB_CRAWLED_LEADS.crawled.id);
       expect(again.crawlDetection).toEqual(detection);
-    });
-  });
-
-  test('TC:5 Verify the Crawl Card Cannot Be Edited — Known Failure: No Crawl Card Rendered', async ({
-    leadQualificationPage: lq,
-  }) => {
-    await allure.tms(TC5, 'TC:5 (ClickUp)');
-    knownFailure(NO_CRAWL_CARD, TC5);
-    test.slow();
-
-    const detection = detectionOf(await openSeedLead(lq, 'crawled'));
-
-    await test.step('The crawl card is read-only and, after a reload, still shows the full stored summary', async () => {
-      await lq.expectCrawlCardReadOnly();
-      await lq.openAndReadQualification(WEB_CRAWLED_LEADS.crawled.id);
-      await lq.expectCrawlCardFullSummary(detection);
     });
   });
 
@@ -279,10 +255,13 @@ test.describe('CRM - [Origin Type = Web Crawled] Lead Qualification', () => {
     }
   });
 
-  test('TC:7 Verify the AI Sections Open at Customer Info and Appear in Order', async ({
+  test('TC:7 Verify the AI Sections Open at Customer Info and End at the Business Compatibility Report', async ({
     leadQualificationPage: lq,
   }) => {
-    await allure.tms(TC7, 'TC:7 (ClickUp)');
+    await allure.tms('https://app.clickup.com/t/z941abzh43', 'TC:7 (ClickUp)');
+    // Expected behaviour changed from the story (a Sales Pitch
+    // Recommendation section) to dev's — decision recorded on the test case:
+    // https://app.clickup.com/t/z941abzh43?comment=1100750000204241
 
     await openSeedLead(lq, 'crawledRich');
 
@@ -290,25 +269,11 @@ test.describe('CRM - [Origin Type = Web Crawled] Lead Qualification', () => {
       await lq.expectFirstCard('Customer Info');
       await lq.expectAiSectionsInOrder(WEB_CRAWLED_AI_SECTIONS);
       for (const title of WEB_CRAWLED_AI_SECTIONS) await lq.expectAiSectionNotBlank(title);
-      await lq.expectAiSectionAbsent('Contact Info');
     });
-  });
 
-  test('TC:7 Verify the AI Sections Open at Customer Info and Appear in Order — Known Failure: No Sales Pitch Recommendation Section', async ({
-    leadQualificationPage: lq,
-  }) => {
-    await allure.tms(TC7, 'TC:7 (ClickUp)');
-    knownFailure(
-      'Known failure: the story lists a Sales Pitch Recommendation AI section; dev (and the prototype) ' +
-        "don't show one (the dossier's pitch is empty). No bug logged; needs a bug or a PO decision",
-      TC7,
-    );
-
-    await openSeedLead(lq, 'crawledRich');
-
-    await test.step('Sales Pitch Recommendation (not blank) follows the other sections, then the review card', async () => {
-      await lq.expectAiSectionsInOrder([...WEB_CRAWLED_AI_SECTIONS, 'Sales Pitch Recommendation']);
-      await lq.expectAiSectionNotBlank('Sales Pitch Recommendation');
+    await test.step('No Sales Pitch Recommendation (or Contact Info) section: the review card follows the Business Compatibility Report', async () => {
+      await lq.expectAiSectionAbsent('Sales Pitch Recommendation');
+      await lq.expectAiSectionAbsent('Contact Info');
     });
   });
 
@@ -344,35 +309,23 @@ test.describe('CRM - [Origin Type = Web Crawled] Lead Qualification', () => {
     );
   });
 
-  test('TC:9 Verify the Screen Makes Clear the Lead Came from Crawler Detection, Not Inbound Contact', async ({
+  test('TC:9 Verify the Overview Shows the Lead Came from the Crawler and Nothing Implies Inbound Contact', async ({
     leadQualificationPage: lq,
   }) => {
-    await allure.tms(TC9, 'TC:9 (ClickUp)');
+    await allure.tms('https://app.clickup.com/t/z941abzh45', 'TC:9 (ClickUp)');
+    // Expected behaviour changed from the story (a crawl card saying the
+    // Lead came from the crawler) to dev's — decision recorded on the test
+    // case: https://app.clickup.com/t/z941abzh45?comment=1100750000204242
 
     await openSeedLead(lq, 'crawled');
 
-    await test.step('Nothing on the tab implies the prospect contacted SAITEX or was answered', async () => {
+    await test.step('No crawl card on the tab, and nothing implies the prospect contacted SAITEX or was answered', async () => {
+      await lq.expectNoOriginCard();
       await lq.expectNoInboundContactWording();
     });
 
     await test.step('Overview: Origin Type Web Crawled, Created By CRM (the crawler)', async () => {
       await lq.expectOverviewShowsSystemOrigin('Web Crawled');
-    });
-  });
-
-  test('TC:9 Verify the Screen Makes Clear the Lead Came from Crawler Detection, Not Inbound Contact — Known Failure: No Crawl Card Naming the Crawler', async ({
-    leadQualificationPage: lq,
-  }) => {
-    await allure.tms(TC9, 'TC:9 (ClickUp)');
-    knownFailure(
-      `${NO_CRAWL_CARD} — so nothing on the tab says the Lead came from the crawler (only the Overview tab does)`,
-      TC9,
-    );
-
-    await openSeedLead(lq, 'crawled');
-
-    await test.step('The crawl card, marked as the origin, says the Lead was found by the crawler', async () => {
-      await lq.expectCrawlCardSaysCrawler();
     });
   });
 
@@ -472,11 +425,14 @@ test.describe('CRM - [Origin Type = Web Crawled] Lead Qualification', () => {
     });
   });
 
-  test("TC:15 Verify a Saved Manager's Review Is Listed with Department, Reviewer, Score and Timestamp", async ({
+  test("TC:15 Verify a Saved Manager's Review Is Listed with Department, Manager, Score and Timestamp", async ({
     createCustomerPage,
     leadQualificationPage: lq,
   }) => {
-    await allure.tms(TC15, 'TC:15 (ClickUp)');
+    await allure.tms('https://app.clickup.com/t/z941abzh4c', 'TC:15 (ClickUp)');
+    // Expected behaviour changed from the story (a separate review author)
+    // to dev's (the selected Manager is the reviewer) — decision recorded on
+    // the test case: https://app.clickup.com/t/z941abzh4c?comment=1100750000204243
     test.slow();
 
     const lead = await createOwnWebCrawledLead(createCustomerPage);
@@ -494,40 +450,16 @@ test.describe('CRM - [Origin Type = Web Crawled] Lead Qualification', () => {
       await lq.expectReviewFormCleared();
     });
 
-    await test.step('The row shows manager, department, score, timestamp and text — and survives a reload', async () => {
+    await test.step('The row shows manager, department, score, timestamp and text, with no separate author', async () => {
       await lq.expectReviewRowVisible(saved);
+      await lq.expectReviewRowHasNoSeparateAuthor(saved);
       expect(await lq.newestReviewSavedTimestamp()).toMatch(/^Saved \d/);
+    });
+
+    await test.step('The review is still listed after a reload', async () => {
       await lq.reloadOnTab();
       await lq.expectReviewCount(1);
       await lq.expectReviewRowVisible(saved);
-    });
-  });
-
-  test("TC:15 Verify a Saved Manager's Review Is Listed with Department, Reviewer, Score and Timestamp — Known Failure: No Review Author Shown", async ({
-    createCustomerPage,
-    leadQualificationPage: lq,
-  }) => {
-    await allure.tms(TC15, 'TC:15 (ClickUp)');
-    knownFailure(
-      "Known failure: the AC asks for the review's author; dev shows the selected Manager only, with no " +
-        'separate author ("saved by") on the row. No bug logged; needs a bug or a PO decision',
-      TC15,
-    );
-    test.slow();
-
-    // Setup (dev passes this; the TC:15 test above asserts it).
-    const lead = await createOwnWebCrawledLead(createCustomerPage);
-    await lq.openAndReadQualification(lead.id);
-    const saved = review(
-      'Fabric Mill',
-      'Alice Planner',
-      8,
-      'Web Crawled lead review — strong denim fit.',
-    );
-    await lq.submitReview(saved);
-
-    await test.step('The saved row also shows who saved the review (the author)', async () => {
-      await lq.expectReviewRowShowsAuthor(saved);
     });
   });
 

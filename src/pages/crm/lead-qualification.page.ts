@@ -576,70 +576,49 @@ export class LeadQualificationPage extends BasePage {
   }
 
   /**
-   * The crawl origin card (story/TC:1): exactly one "Origin"-marked card
-   * that isn't the Web Form card, and it's the first card on the tab,
-   * above Customer Info. Dev (2026-10-23) renders no such card.
+   * No crawl card (TC:1–5, TC:9, TC:22): no "Origin"-marked card at all —
+   * a Web Crawled Lead has no form card either. Accepted dev behaviour
+   * (2026-10-23); call after the tab has loaded (openAndReadQualification()
+   * waits for the first card).
    */
-  async expectCrawlCardFirst(): Promise<void> {
-    await expect(this.locators.crawlCard).toHaveCount(1);
-    const title = await this.locators.crawlCard
-      .getByRole('heading', { level: 2 })
-      .first()
-      .innerText();
-    await expect(this.locators.cardHeadings.first()).toHaveText(title);
+  async expectNoOriginCard(): Promise<void> {
+    await expect(this.locators.cardHeadings.first()).toBeVisible();
+    await expect(this.locators.originCards).toHaveCount(0);
   }
 
-  /** The crawl card names the crawled site or the crawl cohort (TC:2). */
-  async expectCrawlCardNamesSource(detection: CrawlDetection): Promise<void> {
-    await expect(this.locators.crawlCard).toHaveCount(1);
-    const host = new URL(detection.sourceDomain).host.replace(/^www\./, '');
-    await expect(this.locators.crawlCard).toContainText(
-      new RegExp(`${escapeRegExp(host)}|${escapeRegExp(detection.intentLabel.trim())}`, 'i'),
-    );
+  /** This text appears nowhere on the (loaded) Lead Qualification tab. */
+  async expectTabDoesNotShow(text: string): Promise<void> {
+    await expect(this.locators.cardHeadings.first()).toBeVisible();
+    await expect(this.locators.tabRoot).not.toContainText(text);
   }
 
-  /** The crawl card shows the stored detection date, in one of the app's date shapes (TC:3). */
-  async expectCrawlCardDate(detection: CrawlDetection): Promise<void> {
-    await expect(this.locators.crawlCard).toHaveCount(1);
+  /** The stored detection date appears nowhere on the (loaded) tab, in any of the app's date shapes (TC:3). */
+  async expectDetectionDateNotShown(detection: CrawlDetection): Promise<void> {
+    await expect(this.locators.cardHeadings.first()).toBeVisible();
     const renderings = await this.detectionDateRenderings(detection.detectedAt);
-    await expect(this.locators.crawlCard).toContainText(
+    await expect(this.locators.tabRoot).not.toContainText(
       new RegExp(renderings.map(escapeRegExp).join('|')),
     );
   }
 
-  /** Every detection-summary line, incl. the matched signal, is on the crawl card in full (TC:4). */
-  async expectCrawlCardFullSummary(detection: CrawlDetection): Promise<void> {
-    await expect(this.locators.crawlCard).toHaveCount(1);
-    expect(
-      detection.detectionSummary.some((line) => /^[a-z ]+ fit: /.test(line)),
-      'detection has no matched-signal line',
-    ).toBe(true);
-    for (const line of detection.detectionSummary) {
-      await expect(this.locators.crawlCard).toContainText(line);
-    }
-    await expect(this.locators.crawlCard.getByText(/^(see|show|read) more$/i)).toHaveCount(0);
-  }
-
-  /** The crawl card says the Lead came from the crawler (TC:9). */
-  async expectCrawlCardSaysCrawler(): Promise<void> {
-    await expect(this.locators.crawlCard).toHaveCount(1);
-    await expect(this.locators.crawlCard).toContainText(/crawl/i);
-  }
-
   /**
-   * The crawl card is read-only (TC:5): no input, text area, button or
-   * contenteditable on it, and typing into it changes nothing.
+   * The detection summary reaches the tab through the AI sections (TC:4):
+   * each descriptive line is a Customer Info pointer, in full, and each
+   * matched signal ("product fit: <reason>") shows its reason in Business
+   * Compatibility Report, with the detection's fit score.
    */
-  async expectCrawlCardReadOnly(): Promise<void> {
-    const card = this.locators.crawlCard;
-    await expect(card).toHaveCount(1);
-    await expect(
-      card.locator('input, textarea, button, [contenteditable=""], [contenteditable="true"]'),
-    ).toHaveCount(0);
-    const before = await card.innerText();
-    await card.getByRole('heading', { level: 2 }).first().click();
-    await this.page.keyboard.type('edited by playwright');
-    await expect(card).toHaveText(before);
+  async expectDetectionSummaryInAiSections(detection: CrawlDetection): Promise<void> {
+    const signal = /^[a-z ]+ fit: (.+)$/;
+    const described = detection.detectionSummary.filter((line) => !signal.test(line));
+    const reasons = detection.detectionSummary
+      .map((line) => signal.exec(line)?.[1])
+      .filter((reason): reason is string => !!reason);
+    expect(described.length, 'detection has no descriptive line').toBeGreaterThan(0);
+    expect(reasons.length, 'detection has no matched-signal line').toBeGreaterThan(0);
+    await this.expectAiSectionShowsPointers('Customer Info', described);
+    const compatibility = this.locators.aiSection('Business Compatibility Report');
+    for (const reason of reasons) await expect(compatibility).toContainText(reason);
+    await this.expectCompatibilityFromDetection(detection);
   }
 
   /** The detection date in the shapes the app uses elsewhere (e.g. "10/21/2026", "Oct 21, 2026", "21 Oct 2026"). */
@@ -729,10 +708,16 @@ export class LeadQualificationPage extends BasePage {
     await expect(this.locators.cardHeadings.first()).toBeVisible();
   }
 
-  /** The saved review row also names who saved it ("Saved by …" / author), separate from the selected Manager (TC:15). */
-  async expectReviewRowShowsAuthor(details: QualificationReview): Promise<void> {
+  /**
+   * The saved review row names the selected Manager as the reviewer, with
+   * no separate author ("saved by …") — accepted dev behaviour (TC:15).
+   */
+  async expectReviewRowHasNoSeparateAuthor(details: QualificationReview): Promise<void> {
     const row = this.page.getByText(details.review, { exact: false }).locator('..');
-    await expect(row).toContainText(/\b(saved|reviewed|added|written|recorded) by\b|\bauthor\b/i);
+    await expect(row).toContainText(details.manager);
+    await expect(row).not.toContainText(
+      /\b(saved|reviewed|added|written|recorded) by\b|\bauthor\b/i,
+    );
   }
 
   /** The AI Chatbot's opening message on a Lead with AI sections. */
