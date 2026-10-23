@@ -1,5 +1,6 @@
 import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/crm.fixtures';
+import type { CreateCustomerPage } from '../../../src/pages/crm/create-customer.page';
 import type { ExternalEventsPage } from '../../../src/pages/crm/external-events.page';
 import {
   renderBlankImage,
@@ -17,15 +18,37 @@ import {
  * Every scan uses a business card generated for that test (unique company
  * and contact email), so duplicates only happen where a test makes them.
  *
- * "BUG:" steps assert what dev does today where it differs from the
- * prototype; each one links its CRM Bug Tracking ticket and will fail once
- * the bug is fixed — the signal to switch the step to the prototype's
- * expected result. Wording-only differences from the prototype are not
- * bugs: those steps assert dev's text as the expected result.
+ * Where dev still has an open bug against the prototype, the test asserts
+ * the prototype's behaviour and is marked test.fail() with the bug link, so
+ * it reports "unexpectedly passed" once dev is fixed. Where the expected
+ * behaviour was changed to dev's, the test title says so and a code comment
+ * links the decision recorded on the ClickUp test case.
  */
 
-/** An existing dev Customer, used read-only for the duplicate-name cases. */
-const EXISTING_CUSTOMER_NAME = 'Acme Textiles';
+/**
+ * Creates a Customer for the duplicate-name cases to collide with, so they
+ * don't depend on a seeded record (as in 01-create-customer.spec.ts). The
+ * name is word-based rather than a timestamp because the scan's vision
+ * model misreads long digit runs.
+ */
+async function createDuplicateTarget(createCustomerPage: CreateCustomerPage): Promise<string> {
+  const name = uniqueCompanyName();
+  await createCustomerPage.openFromCrmHome();
+  await createCustomerPage.fillProfile({
+    name,
+    email: `pw-dup-${Date.now()}@example.com`,
+    city: 'Coimbatore',
+    country: 'India',
+    crmStage: 'Lead',
+    originType: 'Referral',
+    origin: 'Internal Referral',
+    buyer: 'Fabric',
+    referredBy: 'Jordan Smith',
+  });
+  await createCustomerPage.save();
+  await createCustomerPage.expectSavedSuccessfully();
+  return name;
+}
 
 /**
  * From automation, "Save customer & contact" on dev stays on "Nothing was
@@ -41,9 +64,19 @@ function needsCompletedSave(): void {
   );
 }
 
-const BUG = {
-  missingEmail: 'https://app.clickup.com/t/z941abzd2p',
-};
+/**
+ * Open bug: a missing contact email or customer name isn't asked for
+ * (TC:17, 18, 21, 23 assert the prototype's behaviour as known failures).
+ */
+function knownMissingValueBug(): void {
+  test.fail(
+    true,
+    'Known bug: a missing contact email or customer name is not asked for; the assistant offers to create the other record alone — https://app.clickup.com/t/z941abzd2p',
+  );
+}
+
+const MISSING_EMAIL_PROMPT =
+  "No contact email on the scan. It's mandatory and identifies the contact — what's their email?";
 
 /** A manual External Event is born Attended, so its Leads tab is open. */
 async function createAttendedEvent(externalEventsPage: ExternalEventsPage): Promise<string> {
@@ -405,34 +438,38 @@ test.describe('CRM - Scan & Create Customer/Contact (Floor OS Assistant)', () =>
     await l.messageBox.fill('   ');
     await expect(l.sendButton).toBeDisabled();
     await l.messageBox.press('Enter');
-    await expect(l.chatLine(/^\s+$/)).toHaveCount(0);
     await l.messageBox.fill('hello');
     await expect(l.sendButton).toBeEnabled();
+
+    await test.step('Only the real message is sent; no blank line was posted', async () => {
+      // Sending "hello" and waiting for its echo means anything the blank
+      // Enter posted would already be in the thread.
+      await scanCreatePage.send('hello');
+      await expect(l.chatLine(/^\s+$/)).toHaveCount(0);
+    });
   });
 
   test('TC:17 Verify the Assistant Asks for a Missing Contact Email and Accepts It from the Chat', async ({
     scanCreatePage,
   }, testInfo) => {
     await allure.tms('https://app.clickup.com/t/z941abzcxn', 'TC:17 (ClickUp)');
+    knownMissingValueBug();
     const card = await renderBusinessCard(testInfo.outputDir, { contactEmail: null });
     const l = scanCreatePage.locators;
 
     await scanCreatePage.openFromCustomersList();
     await scanCreatePage.upload(card.filePath);
 
-    await test.step(`BUG: the email isn't asked for; the assistant offers to create the customer alone (${BUG.missingEmail})`, async () => {
-      await scanCreatePage.expectChatLine(`Customer name ${card.companyName} is unique.`, 90_000);
-      await scanCreatePage.expectChatLine(
-        'I could not identify the contact. Can I proceed creating the customer alone?',
-      );
-      await expect(l.yesButton).toBeVisible();
-      await expect(l.noButton).toBeVisible();
+    await test.step('The missing email is asked for and Review & save is not offered', async () => {
+      await scanCreatePage.expectChatLine(MISSING_EMAIL_PROMPT, 90_000);
+      await expect(l.reviewAndSaveButton).toHaveCount(0);
     });
 
-    await test.step(`BUG: a typed email is not accepted (${BUG.missingEmail})`, async () => {
-      await scanCreatePage.send(`pw.${Date.now()}@cardscan.example`);
-      await scanCreatePage.expectChatLine('Please answer yes or no.');
-      await expect(l.reviewAndSaveButton).toHaveCount(0);
+    await test.step('A typed email is accepted and Review & save is offered', async () => {
+      const email = `pw.${Date.now()}@cardscan.example`;
+      await scanCreatePage.send(email);
+      await scanCreatePage.expectChatLine(`Contact email ${email} is unique.`);
+      await expect(l.reviewAndSaveButton).toBeVisible();
     });
   });
 
@@ -440,36 +477,38 @@ test.describe('CRM - Scan & Create Customer/Contact (Floor OS Assistant)', () =>
     scanCreatePage,
   }, testInfo) => {
     await allure.tms('https://app.clickup.com/t/z941abzcxp', 'TC:18 (ClickUp)');
+    knownMissingValueBug();
     const card = await renderBusinessCard(testInfo.outputDir, { companyName: null });
 
     await scanCreatePage.openFromCustomersList();
     await scanCreatePage.upload(card.filePath);
-    await test.step(`BUG: the name isn't asked for; the assistant offers to create the contact alone (${BUG.missingEmail})`, async () => {
+    await test.step('The missing customer name is asked for', async () => {
       await scanCreatePage.expectChatLine(
-        'I could not identify the customer. Can I proceed creating the contact alone?',
+        "I couldn't find a customer name on the scan. It's mandatory — what's the customer called?",
         90_000,
       );
-      await expect(scanCreatePage.locators.yesButton).toBeVisible();
       await expect(scanCreatePage.locators.reviewAndSaveButton).toHaveCount(0);
     });
   });
 
-  test('TC:19 Verify a Duplicate Customer Name Is Flagged and a New Name Is Asked For', async ({
+  test('TC:19 Verify a Duplicate Customer Name Is Flagged and Linking to the Existing Customer Is Offered', async ({
     scanCreatePage,
+    createCustomerPage,
   }, testInfo) => {
     await allure.tms('https://app.clickup.com/t/z941abzcxq', 'TC:19 (ClickUp)');
-    const card = await renderBusinessCard(testInfo.outputDir, {
-      companyName: EXISTING_CUSTOMER_NAME,
-    });
+    // Expected behaviour changed from the prototype ("enter a different
+    // name") to dev's linking offer — decision recorded on the test case:
+    // https://app.clickup.com/t/z941abzcxq?comment=1100750000203919
+    const existingName = await test.step('Create a Customer to collide with', () =>
+      createDuplicateTarget(createCustomerPage));
+    const card = await renderBusinessCard(testInfo.outputDir, { companyName: existingName });
 
     await scanCreatePage.openFromCustomersList();
     await scanCreatePage.upload(card.filePath);
 
-    // Expected behaviour (confirmed with the team 2026-10-22): an existing
-    // company isn't re-created; the contact is offered for linking to it.
     await test.step('The existing customer is flagged and linking the contact to it is offered', async () => {
       await scanCreatePage.expectChatLine(
-        `Customer ${EXISTING_CUSTOMER_NAME} already exists, so the contact will be linked to that customer. Shall I proceed?`,
+        `Customer ${existingName} already exists, so the contact will be linked to that customer. Shall I proceed?`,
         90_000,
       );
       await expect(scanCreatePage.locators.yesButton).toBeVisible();
@@ -477,10 +516,13 @@ test.describe('CRM - Scan & Create Customer/Contact (Floor OS Assistant)', () =>
     });
   });
 
-  test('TC:20 Verify a Duplicate Contact Email Is Flagged and a New Email Is Asked For', async ({
+  test('TC:20 Verify a Duplicate Contact Email Ends the Scan with Nothing to Create', async ({
     scanCreatePage,
   }, testInfo) => {
     await allure.tms('https://app.clickup.com/t/z941abzcxr', 'TC:20 (ClickUp)');
+    // Expected behaviour changed from the prototype ("enter a different
+    // email") to dev's reply — decision recorded on the test case:
+    // https://app.clickup.com/t/z941abzcxr?comment=1100750000203921
     needsCompletedSave();
     const first = await renderBusinessCard(testInfo.outputDir);
 
@@ -511,18 +553,16 @@ test.describe('CRM - Scan & Create Customer/Contact (Floor OS Assistant)', () =>
     scanCreatePage,
   }, testInfo) => {
     await allure.tms('https://app.clickup.com/t/z941abzcxt', 'TC:21 (ClickUp)');
+    knownMissingValueBug();
     const card = await renderBusinessCard(testInfo.outputDir, { contactEmail: null });
 
     await scanCreatePage.openFromCustomersList();
     await scanCreatePage.upload(card.filePath);
-    await scanCreatePage.expectChatLine(
-      'I could not identify the contact. Can I proceed creating the customer alone?',
-      90_000,
-    );
+    await scanCreatePage.expectChatLine(MISSING_EMAIL_PROMPT, 90_000);
     await scanCreatePage.send('not-an-email');
 
-    await test.step(`BUG: the assistant only asks for yes or no (${BUG.missingEmail})`, async () => {
-      await scanCreatePage.expectChatLine('Please answer yes or no.');
+    await test.step('The invalid email is rejected and asked for again', async () => {
+      await scanCreatePage.expectChatLine(/not-an-email isn.t a valid email/);
       await expect(scanCreatePage.locators.reviewAndSaveButton).toHaveCount(0);
     });
   });
@@ -547,26 +587,27 @@ test.describe('CRM - Scan & Create Customer/Contact (Floor OS Assistant)', () =>
     scanCreatePage,
   }, testInfo) => {
     await allure.tms('https://app.clickup.com/t/z941abzcxv', 'TC:23 (ClickUp)');
+    knownMissingValueBug();
     const card = await renderBusinessCard(testInfo.outputDir, { contactEmail: null });
 
     await scanCreatePage.openFromCustomersList();
     await scanCreatePage.upload(card.filePath);
-    await scanCreatePage.expectChatLine(
-      'I could not identify the contact. Can I proceed creating the customer alone?',
-      90_000,
-    );
+    await scanCreatePage.expectChatLine(MISSING_EMAIL_PROMPT, 90_000);
     await scanCreatePage.send('save');
 
-    await test.step(`BUG: the assistant only asks for yes or no (${BUG.missingEmail})`, async () => {
-      await scanCreatePage.expectChatLine('Please answer yes or no.');
+    await test.step('The assistant says it still needs the contact email', async () => {
+      await scanCreatePage.expectChatLine(/still need the contact email/);
     });
     await expect(scanCreatePage.locators.contactProfileHeading).toHaveCount(0);
   });
 
-  test('TC:24 Verify an Unreadable File Shows an Error and Try Again', async ({
+  test('TC:24 Verify an Unreadable File Is Reported as Nothing to Create with Start Again', async ({
     scanCreatePage,
   }, testInfo) => {
     await allure.tms('https://app.clickup.com/t/z941abzcxw', 'TC:24 (ClickUp)');
+    // Expected behaviour changed from the prototype ("I couldn't read…" +
+    // Try again) to dev's reply — decision recorded on the test case:
+    // https://app.clickup.com/t/z941abzcxw?comment=1100750000203922
     const blank = await renderBlankImage(testInfo.outputDir);
     const l = scanCreatePage.locators;
 
@@ -666,26 +707,32 @@ test.describe('CRM - Scan & Create Customer/Contact (Floor OS Assistant)', () =>
     });
   });
 
-  test('TC:29 Verify a Customer Name Changed to an Existing One on the Review Form Blocks Save', async ({
+  test('TC:29 Verify a Customer Name Changed to an Existing One on the Review Form Shows Nothing Was Saved', async ({
     scanCreatePage,
+    createCustomerPage,
   }, testInfo) => {
     await allure.tms('https://app.clickup.com/t/z941abzcy1', 'TC:29 (ClickUp)');
+    // Expected behaviour changed from the prototype (inline "already
+    // exists" error) to dev's "Nothing was saved" dialog — decision recorded
+    // on the test case: https://app.clickup.com/t/z941abzcy1?comment=1100750000203923
+    const existingName = await test.step('Create a Customer to collide with', () =>
+      createDuplicateTarget(createCustomerPage));
     const card = await renderBusinessCard(testInfo.outputDir);
     const l = scanCreatePage.locators;
 
     await scanCreatePage.openFromCustomersList();
     await scanCreatePage.scanToReview(card);
     await scanCreatePage.reviewAndSave();
-    await l.customerNameInput.fill(EXISTING_CUSTOMER_NAME);
+    await l.customerNameInput.fill(existingName);
     await scanCreatePage.save();
-
-    await test.step('No duplicate Customer is created', async () => {
-      await expect(l.createdDialog).toHaveCount(0);
-    });
 
     await test.step('"Nothing was saved — Checking whether this customer already exists…" is shown', async () => {
       await scanCreatePage.expectNothingSavedDialog();
-      await expect(l.attentionBanner).toHaveCount(0);
+      await expect(l.createdDialog).toHaveCount(0);
+    });
+
+    await test.step('No second Customer with that name is created', async () => {
+      await scanCreatePage.expectCustomerCountInList(existingName, 1);
     });
   });
 

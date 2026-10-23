@@ -77,22 +77,29 @@ Steps and expected results for each case are in ClickUp.
 
 ## Where dev differs from the prototype
 
-The prototype is the expected behaviour for functional differences. Wording-only differences are not bugs; the tests assert dev's text. The only open bug is checked in "BUG:" steps:
+The prototype is the expected behaviour unless a decision changed it.
+
+**Open bug (known failures).** TC:17, 18, 21 and 23 assert the prototype's behaviour and are marked `test.fail()` with the bug link, so they report "unexpectedly passed" once dev is fixed:
 
 | Bug                                                | Test cases        | Dev today                                                                                                                   |
 | -------------------------------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | [z941abzd2p](https://app.clickup.com/t/z941abzd2p) | TC:17, 18, 21, 23 | A missing contact email or customer name isn't asked for; the assistant offers to create the other record alone (Yes / No). |
 
-Accepted as dev's expected behaviour (no bug):
+**Expected behaviour changed to dev's.** The test titles, the ClickUp test cases and the tests describe dev's behaviour. Each decision is a comment on the ClickUp test case, linked from the code:
 
-- TC:20: a duplicate contact email ends with "I found nothing to create on this scan" and Start again.
-- TC:22: "save" before a scan replies "Nothing to save yet — pick an option to scan, or type the contact's details."
-- TC:24: an unreadable file is reported as "nothing to create" with Start again.
-- TC:29: a name changed to an existing customer shows "Nothing was saved — Checking whether this customer already exists…" and nothing is created.
+| Test case | Now expected                                                                                                                              | Decision                                                                 |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| TC:19     | A duplicate customer name offers to link the contact to the existing customer ("…Shall I proceed?" Yes / No).                             | [comment](https://app.clickup.com/t/z941abzcxq?comment=1100750000203919) |
+| TC:20     | A duplicate contact email ends with "I found nothing to create on this scan" and Start again.                                             | [comment](https://app.clickup.com/t/z941abzcxr?comment=1100750000203921) |
+| TC:24     | An unreadable file is reported as "nothing to create" with Start again.                                                                   | [comment](https://app.clickup.com/t/z941abzcxw?comment=1100750000203922) |
+| TC:29     | A name changed to an existing customer shows "Nothing was saved — Checking whether this customer already exists…" and nothing is created. | [comment](https://app.clickup.com/t/z941abzcy1?comment=1100750000203923) |
+
+TC:22's "Nothing to save yet…" reply is a wording difference only.
 
 ## Automation notes
 
 - Every scan uses a business card generated per run, with a unique "Playwright …" company name and contact email. This means the duplicate checks only fire when a test makes them fire on purpose.
+- TC:19 and TC:29 first create their own "Playwright …" Customer to collide with, instead of using a seeded dev record.
 - TC:2 covers all three entry points: CRM Home, Customers list and Contacts list (the last two under More actions). CRM Home and Contacts were added on dev on 2026-10-21, fixing [z941abzd2n](https://app.clickup.com/t/z941abzd2n).
 - **Kept manual:**
   - TC:14, TC:30 and TC:31 need a real webcam or the browser's camera permission prompt.

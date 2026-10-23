@@ -11,11 +11,6 @@ const CONTACTS_LIST_PATH = '/crm/contacts';
 const SCAN_TIMEOUT_MS = 90_000;
 /** The assistant's AI replies to typed messages in a few seconds. */
 const REPLY_TIMEOUT_MS = 30_000;
-/**
- * How long the review form's "Nothing was saved" dialog is watched to
- * prove it stays on "Checking…" rather than creating anything.
- */
-const NOTHING_SAVED_WATCH_MS = 8_000;
 
 /**
  * CRM Scan & Create with the Floor OS Assistant (see
@@ -227,6 +222,8 @@ export class ScanCreatePage extends BasePage {
   /** The options a combobox currently offers (closes the list afterwards). */
   async comboboxOptions(combobox: Locator): Promise<string[]> {
     await combobox.click();
+    // Wait for the list to render, so an empty read can't pass a check.
+    await expect(this.page.getByRole('option').first()).toBeVisible();
     const options = await this.page.getByRole('option').allInnerTexts();
     await this.page.keyboard.press('Escape');
     return options.map((o) => o.trim());
@@ -286,7 +283,6 @@ export class ScanCreatePage extends BasePage {
   async expectNothingSavedDialog(): Promise<void> {
     await expect(this.locators.duplicateCheckDialog).toBeVisible();
     await expect(this.locators.duplicateCheckDialog).toContainText('Nothing was saved');
-    await this.page.waitForTimeout(NOTHING_SAVED_WATCH_MS);
     await expect(this.locators.duplicateCheckDialog).toContainText(
       'Checking whether this customer already exists…',
     );
@@ -305,19 +301,34 @@ export class ScanCreatePage extends BasePage {
 
   // ------------------------------------------------------------- results
 
-  /** Customers list search; whether any row matches `name`. */
-  async expectCustomerNotInList(name: string): Promise<void> {
+  /**
+   * Opens the Customers list and searches for `name`, waiting for the
+   * search request to come back; returns its body text.
+   */
+  private async searchCustomersList(name: string): Promise<string> {
     await this.gotoAuthenticated(CUSTOMERS_LIST_PATH);
+    const searched = this.page.waitForResponse(
+      (r) =>
+        r.ok() &&
+        r.url().includes('/api/crm/customers?') &&
+        new URL(r.url()).searchParams.get('search') === name,
+    );
     await this.page.getByRole('textbox', { name: 'Search', exact: true }).fill(name);
-    await expect(this.page.getByRole('row').filter({ hasText: name })).toHaveCount(0, {
-      timeout: 15_000,
-    });
+    return (await searched).text();
   }
 
-  async expectCustomerInList(name: string): Promise<void> {
-    await this.gotoAuthenticated(CUSTOMERS_LIST_PATH);
-    await this.page.getByRole('textbox', { name: 'Search', exact: true }).fill(name);
-    await expect(this.page.getByRole('row').filter({ hasText: name }).first()).toBeVisible({
+  /** The search API returns no match for `name`, and the list shows no row for it. */
+  async expectCustomerNotInList(name: string): Promise<void> {
+    const body = await this.searchCustomersList(name);
+    expect(body).not.toContain(name);
+    await expect(this.page.getByRole('row').filter({ hasText: name })).toHaveCount(0);
+  }
+
+  /** Exactly `count` rows on the Customers list match `name`. */
+  async expectCustomerCountInList(name: string, count: number): Promise<void> {
+    const body = await this.searchCustomersList(name);
+    expect(body).toContain(name);
+    await expect(this.page.getByRole('row').filter({ hasText: name })).toHaveCount(count, {
       timeout: 15_000,
     });
   }
