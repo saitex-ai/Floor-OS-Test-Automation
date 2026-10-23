@@ -1,7 +1,6 @@
 import * as fs from 'fs';
 import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/techpack.fixtures';
-import { ShellHeaderPage } from '../../../src/pages/shell/shell-header.page';
 
 /**
  * Minimal CSV line splitter — not a full RFC 4180 parser, just enough to
@@ -43,19 +42,60 @@ function parseCsvLine(line: string): string[] {
 }
 
 /**
- * Techpack — Techpacks List.
+ * Techpack — Techpack Dashboard and its grid.
  *
  * Source of truth for these cases: test-cases/techpack/techpack-list.md.
+ * Rewritten 2026-10-23 for the FloorOS design-system release of 2026-10-22
+ * (the "TechPacks" list became a "Dashboard"; see the doc's 2026-10-23
+ * update). TC:8 and TC:12 were retired that day (the "New Techpack" menu and
+ * "Toggle cell filters" are gone) and their numbers are not reused.
+ *
  * No ClickUp test-case tasks exist for this story; cases with a filed ClickUp
- * bug or clarification link to it via allure.tms(). Storage
- * state from auth.setup.ts is already applied via the "techpack" project's
- * dependency — no login needed here.
+ * bug or clarification link to it via allure.tms(). Storage state from
+ * auth.setup.ts is already applied via the "techpack" project's dependency —
+ * no login needed here.
  */
+const QA_AUTO_DESCRIPTION =
+  'QA-AUTO — Techpack regression test data (pw-hybrid-framework). Safe to delete.';
 const DUMMY_PDF = {
   name: `playwright-list-tc10-${Date.now()}.pdf`,
   mimeType: 'application/pdf',
   buffer: Buffer.from('%PDF-1.4\n%%EOF'),
 };
+
+/** The 8 columns the grid shows by default, in order. */
+const DEFAULT_COLUMNS = [
+  'Name and Code',
+  'Rev No',
+  'Stage',
+  'Status',
+  'Techpack Type',
+  'Customer Name',
+  'Company',
+  'Season',
+];
+
+/** The "Columns" dialog's hidden-by-default columns, in list order. */
+const HIDDEN_BY_DEFAULT = [
+  'Style Value Code',
+  'Style Value Desc',
+  'Fabric Value Code',
+  'Fabric Value Desc',
+  'Wash Value Code',
+  'Wash Value Desc',
+  'Product Value Code',
+  'Product Value Desc',
+  'Remark',
+  'Created Date',
+  'Creator',
+  'Mode',
+  'Approved Date',
+  'Approver',
+];
+
+/** The code at the end of a "Name and Code" cell ("3301 Deconstructed Super Slim TP202610-000129"). */
+const codeOf = (nameAndCode: string): string => nameAndCode.trim().split(/\s+/).pop() ?? '';
+
 test.describe('Techpack - Techpacks List', () => {
   test.beforeEach(async () => {
     await allure.epic('Techpack');
@@ -70,12 +110,12 @@ test.describe('Techpack - Techpacks List', () => {
       await techpackPage.open();
     });
 
-    await test.step('Heading, status tabs, and data grid are visible', async () => {
+    await test.step('"Dashboard" heading, status tabs, and data grid are visible', async () => {
       await techpackPage.expectLoaded();
-      await expect(techpackPage.locators.allTab).toBeVisible();
-      await expect(techpackPage.locators.draftTab).toBeVisible();
-      await expect(techpackPage.locators.openTab).toBeVisible();
-      await expect(techpackPage.locators.approvedTab).toBeVisible();
+      await techpackPage.ensureListView();
+      for (const tab of ['All', 'Draft', 'Open', 'Approved'] as const) {
+        await expect(techpackPage.locators.statusTab(tab)).toHaveText(/\d+/);
+      }
       await expect(techpackPage.locators.table).toBeVisible();
     });
   });
@@ -84,6 +124,7 @@ test.describe('Techpack - Techpacks List', () => {
     techpackPage,
   }) => {
     await techpackPage.open();
+    await techpackPage.expectLoaded();
 
     await test.step('Read the count on each status tab', async () => {
       const [all, draft, open, approved] = await Promise.all([
@@ -100,7 +141,7 @@ test.describe('Techpack - Techpacks List', () => {
   });
 
   test('TC:3 Verify selecting the "Open" status tab filters the grid', async ({ techpackPage }) => {
-    await techpackPage.open();
+    await techpackPage.openAndWaitForRows();
 
     await test.step('Click the "Open" tab', async () => {
       await techpackPage.selectTab('Open');
@@ -120,7 +161,7 @@ test.describe('Techpack - Techpacks List', () => {
   test('TC:4 Verify selecting the "Approved" status tab filters the grid', async ({
     techpackPage,
   }) => {
-    await techpackPage.open();
+    await techpackPage.openAndWaitForRows();
 
     await test.step('Click the "Approved" tab', async () => {
       await techpackPage.selectTab('Approved');
@@ -135,79 +176,76 @@ test.describe('Techpack - Techpacks List', () => {
   });
 
   test('TC:5 Verify searching by Techpack Code narrows the grid', async ({ techpackPage }) => {
-    await techpackPage.open();
+    await techpackPage.openAndWaitForRows();
 
     await test.step('Read an existing code from the first row, then search for it', async () => {
-      const firstCode = await techpackPage.locators.table.getByRole('link').first().innerText();
+      const firstCode = await techpackPage.firstCode();
       await techpackPage.search(firstCode);
-      await techpackPage.expectRowVisible(firstCode);
+      await expect
+        .poll(async () => {
+          const codes = await techpackPage.visibleCodes();
+          return codes.length > 0 && codes.every((c) => c === firstCode);
+        })
+        .toBe(true);
     });
   });
 
   test('TC:6 Verify searching for a non-existent code returns no rows', async ({
     techpackPage,
   }) => {
-    await techpackPage.open();
+    await techpackPage.openAndWaitForRows();
 
     await test.step('Search for a code that cannot exist', async () => {
       await techpackPage.search(`NO-SUCH-TECHPACK-${Date.now()}`);
     });
 
-    await test.step('The grid shows zero rows', async () => {
-      await expect(techpackPage.locators.table.getByRole('row')).toHaveCount(1); // header row only
+    await test.step('The grid shows zero rows and the "No results found" state', async () => {
+      await expect(techpackPage.locators.emptyResultText).toBeVisible();
+      await expect(techpackPage.locators.codeButtons).toHaveCount(0);
+      await expect(techpackPage.locators.showingCountText).toHaveText('Showing 0 packs');
     });
   });
 
-  test('TC:7 Verify the "New Techpack" button\'s default action opens AI Mode', async ({
+  test('TC:7 Verify "Create New" opens AI Mode directly', async ({
     techpackPage,
     aiModeCopilotPage,
     page,
   }) => {
     await techpackPage.open();
+    await techpackPage.expectLoaded();
 
-    await test.step('Click the main "New Techpack" button', async () => {
-      await techpackPage.clickNewTechpackDefault();
+    await test.step('"Create New" is a plain button (no dropdown or menu)', async () => {
+      await expect(techpackPage.locators.createNewButton).not.toHaveAttribute('aria-haspopup');
     });
 
-    await test.step('Navigates to the AI Mode copilot', async () => {
+    await test.step('Click "Create New"', async () => {
+      await techpackPage.clickCreateNew();
+    });
+
+    await test.step('Navigates to the AI Mode page', async () => {
       await expect(page).toHaveURL(/\/techpacks\/new\/copilot/);
-      // Corrected 2026-09-25: no "Saitex AI" text actually exists on this
-      // screen (confirmed live via a full ariaSnapshot() dump on both dev
-      // and uat) — the real h1 is "New techpack". See
-      // AiModeCopilotLocators.heading's own note for the full account.
-      await expect(aiModeCopilotPage.locators.heading).toBeVisible();
+      await expect(aiModeCopilotPage.locators.heading).toBeVisible({ timeout: 30_000 });
     });
   });
 
-  test('TC:8 Verify the "New Techpack" dropdown offers both AI Mode and Classic', async ({
+  test('TC:9 Verify the Classic (manual) form is reachable from the Dashboard', async ({
     techpackPage,
-  }) => {
-    await techpackPage.open();
-
-    await test.step('Click the chevron next to "New Techpack"', async () => {
-      await techpackPage.locators.newTechpackDropdown.click();
-    });
-
-    await test.step('Both "AI Mode" and "Classic" options are offered', async () => {
-      await expect(techpackPage.locators.aiModeMenuItem).toBeVisible();
-      await expect(techpackPage.locators.classicMenuItem).toBeVisible();
-    });
-  });
-
-  test('TC:9 Verify choosing "Classic" from the dropdown opens the manual form', async ({
-    techpackPage,
+    aiModeCopilotPage,
     createTechpackPage,
     page,
   }) => {
     await techpackPage.open();
+    await techpackPage.expectLoaded();
 
-    await test.step('Open the dropdown and choose "Classic"', async () => {
-      await techpackPage.startClassicCreate();
+    await test.step('Create New › Add files › More tools › Manual form', async () => {
+      await techpackPage.clickCreateNew();
+      await expect(aiModeCopilotPage.locators.heading).toBeVisible({ timeout: 30_000 });
+      await aiModeCopilotPage.openManualFormFromAddFiles();
     });
 
     await test.step('Navigates to the manual New Techpack form', async () => {
       await expect(page).toHaveURL(/\/techpacks\/new$/);
-      await expect(createTechpackPage.locators.heading).toBeVisible();
+      await expect(createTechpackPage.locators.heading).toBeVisible({ timeout: 30_000 });
     });
   });
 
@@ -229,6 +267,7 @@ test.describe('Techpack - Techpacks List', () => {
     const code = await test.step('Create a fresh techpack to open', async () => {
       await createTechpackPage.openFromTechpacksList();
       await createTechpackPage.fillAllRequiredWithRandomAvailable();
+      await createTechpackPage.fillDetails({ description: QA_AUTO_DESCRIPTION });
       await createTechpackPage.uploadTechpackFile(DUMMY_PDF);
       let result = await createTechpackPage.createExpectingResult();
       for (let i = 0; result === 'duplicate' && i < 3; i++) {
@@ -241,201 +280,75 @@ test.describe('Techpack - Techpacks List', () => {
       return createTechpackPage.currentTechpackCode();
     });
 
-    await test.step("Open the list and click that techpack's row", async () => {
-      await techpackPage.open();
+    await test.step('Open the Dashboard, search for it and click its code', async () => {
+      await techpackPage.openAndWaitForRows();
       await techpackPage.search(code);
-      await techpackPage.openRow(code);
+      await techpackPage.openCode(code);
     });
 
-    await test.step('The canvas loads cleanly', async () => {
-      await expect(page).toHaveURL(/\/techpacks\/(canvas\/)?[^/]+$/);
-      // The canvas bundle + PDF can take well over the default 15s to settle on uat/dev.
-      await expect(canvasPage.locators.loadErrorText).toBeHidden({ timeout: 30000 });
+    await test.step("The techpack's page loads cleanly", async () => {
+      await expect(page).toHaveURL(/\/techpacks\/view\/[^/]+$/, { timeout: 30_000 });
+      await expect(page.getByRole('heading', { name: code, level: 1 })).toBeVisible({
+        timeout: 30_000,
+      });
+      await expect(canvasPage.locators.loadErrorText).toBeHidden();
       await expect(canvasPage.locators.openingCanvasText).toBeHidden({ timeout: 30000 });
     });
   });
 
-  test("TC:11 Verify the Filters panel's rule builder", async ({ techpackPage }) => {
-    await techpackPage.open();
+  test("TC:11 Verify the Filters dialog's sections and fields", async ({ techpackPage }) => {
+    await techpackPage.openAndWaitForRows();
 
-    await test.step('Open the Filters panel', async () => {
-      await techpackPage.locators.filtersButton.click();
-      await expect(techpackPage.locators.filterRulesLabel).toBeVisible();
-      await expect(techpackPage.locators.filterMatchCountText).toBeVisible();
-      await expect(techpackPage.locators.applyButton).toBeVisible();
-    });
-
-    await test.step('"Add rule" reveals an Attribute/operator/Value row', async () => {
-      await techpackPage.locators.addRuleButton.click();
-      await expect(techpackPage.locators.filterAttributeLabel).toBeVisible();
-      await expect(techpackPage.locators.filterOperatorContains).toBeVisible();
-      await expect(techpackPage.locators.filterValuePlaceholder).toBeVisible();
-    });
-  });
-
-  test('TC:12 Verify "Toggle cell filters" reveals per-column inline filter inputs', async ({
-    techpackPage,
-  }) => {
-    await techpackPage.open();
-
-    await test.step('Toggle cell filters on', async () => {
-      await techpackPage.locators.toggleCellFiltersButton.click();
-      await expect(techpackPage.locators.cellFilterInput('Techpack Code')).toBeVisible();
-    });
-
-    await test.step('Typing into a column filter narrows the grid', async () => {
-      const firstCode = await techpackPage.locators.table.getByRole('link').first().innerText();
-      await techpackPage.locators.cellFilterInput('Techpack Code').fill(firstCode);
-      await techpackPage.expectRowVisible(firstCode);
-    });
-  });
-
-  test('TC:13 Verify Configure columns can hide and re-show a column', async ({ techpackPage }) => {
-    await techpackPage.open();
-
-    await test.step('Hide the "Rev No" column', async () => {
-      await techpackPage.locators.configureColumnsButton.click();
-      await techpackPage.locators.columnCheckbox('Rev No').click();
-      await techpackPage.locators.applyButton.click();
-    });
-
-    await test.step('The column header is gone from the grid', async () => {
-      await expect(techpackPage.locators.table.getByText('Rev No', { exact: true })).toHaveCount(0);
-    });
-
-    await test.step('Re-show it', async () => {
-      await techpackPage.locators.configureColumnsButton.click();
-      await techpackPage.locators.columnCheckbox('Rev No').click();
-      await techpackPage.locators.applyButton.click();
-      await expect(techpackPage.locators.table.getByText('Rev No', { exact: true })).toBeVisible();
-    });
-  });
-
-  test("TC:14 Verify the 3 layout modes change the grid's structure", async ({ techpackPage }) => {
-    await techpackPage.open();
-
-    await test.step('Vertical split shows a detail panel', async () => {
-      await techpackPage.locators.verticalSplitButton.click();
-      // The detail panel's own data (not just its shell) can take longer
-      // than the global 15s expect timeout to populate on a slow dev day
-      // — same "dev cold-start is slow" pattern documented elsewhere.
-      await expect(techpackPage.locators.detailPanelHeaderLabel()).toBeVisible({ timeout: 30_000 });
-    });
-
-    await test.step('Horizontal split still shows a detail panel', async () => {
-      await techpackPage.locators.horizontalSplitButton.click();
-      await expect(techpackPage.locators.detailPanelHeaderLabel()).toBeVisible({ timeout: 30_000 });
-    });
-
-    await test.step('No split hides the detail panel', async () => {
-      await techpackPage.locators.noSplitButton.click();
-      await expect(techpackPage.locators.detailPanelHeaderLabel()).toHaveCount(0);
-    });
-  });
-
-  test('TC:15 Verify selecting rows shows a selection bar with "Compare"', async ({
-    techpackPage,
-  }) => {
-    await techpackPage.open();
-
-    await test.step('Select one row', async () => {
-      await techpackPage.locators.rowCheckboxAt(0).click();
-      // The count and the "item(s) selected" label are separate elements
-      // (a numbered badge next to the text, not one combined string) —
-      // confirmed live, so match the label alone rather than "1 item
-      // selected" as one phrase.
-      await expect(techpackPage.locators.itemsSelectedText).toBeVisible();
-      await expect(techpackPage.locators.compareButton).toBeVisible();
-    });
-
-    await test.step('Select a second row', async () => {
-      await techpackPage.locators.rowCheckboxAt(1).click();
-      await expect(techpackPage.locators.itemsSelectedText).toBeVisible();
-    });
-
-    await test.step('Clear selection', async () => {
-      await techpackPage.locators.clearSelectionButton.click();
-      await expect(techpackPage.locators.itemsSelectedText).toHaveCount(0);
-    });
-  });
-
-  test('TC:16 Verify "Export CSV" triggers a real file download', async ({
-    techpackPage,
-    page,
-  }) => {
-    await techpackPage.open();
-
-    await test.step('Click Export CSV', async () => {
-      const downloadPromise = page.waitForEvent('download');
-      await techpackPage.locators.exportCsvButton.click();
-      const download = await downloadPromise;
-      expect(download.suggestedFilename()).toBe('techpacks.csv');
-    });
-  });
-
-  test('TC:17 Verify code format correlates with creation method, not status', async ({
-    techpackPage,
-  }) => {
-    // Corrected 2026-09-28, via live evidence: the DRAFT/<ULID> vs
-    // TP<YYYYMM>-<seq> code format is NOT determined by Draft/Open/
-    // Approved status (this test's original theory, based on 2026-09-25
-    // evidence where every sampled Draft row happened to be AI-Mode-
-    // created). A same-day re-run hit a genuine counter-example: a
-    // freshly Classic-form-created techpack sat in Draft status with a
-    // real `TP202609-000003` code, not a DRAFT/<ULID> one. The real
-    // pattern, per techpack-module.md's own "Creator: copilot" note for
-    // AI-created records: format correlates with **creation method**
-    // instead — Classic's single synchronous "Create techpack" call
-    // gets a real code immediately regardless of status; an AI-Mode
-    // draft not yet finalized uses a placeholder ULID-style code until
-    // some later step assigns a real one. Tests by Creator column
-    // instead of by status tab.
-    // Updated 2026-10-01: Creator now shows a person's name for both
-    // creation methods (no more "copilot" / email values), so the grid's own
-    // "Mode" column (AI / Manual) is what identifies the creation method.
-    await techpackPage.open();
-    await techpackPage.expectLoaded();
-    await techpackPage.selectTab('All');
-
-    const rows = (
-      await test.step('Read Techpack Code, Status and Mode for the visible rows', () =>
-        techpackPage.visibleRows(['Mode', 'Techpack Code', 'Status Name']))
-    ).map((r) => ({ code: r['Techpack Code'], status: r['Status Name'], mode: r['Mode'] }));
-
-    await test.step('AI-Mode drafts use the DRAFT/<code> placeholder format', async () => {
-      const aiDrafts = rows.filter((r) => r.mode === 'AI' && r.status === 'Draft');
-      test.skip(aiDrafts.length === 0, 'No AI-Mode draft visible on the first page of the list');
-      for (const r of aiDrafts) expect(r.code, `AI draft ${r.code}`).toMatch(/^DRAFT\/\w+$/);
-    });
-
-    await test.step('Manual techpacks use the TP<YYYYMM>-<seq> format regardless of status', async () => {
-      const manual = rows.filter((r) => r.mode === 'Manual');
-      expect(manual.length, 'at least one Manual techpack is visible').toBeGreaterThan(0);
-      for (const r of manual)
-        expect(r.code, `Manual ${r.status} row ${r.code}`).toMatch(/^TP\d{6}-\d+$/);
-    });
-  });
-
-  test('TC:18 Verify the current full column set renders (22 headers)', async ({
-    techpackPage,
-  }) => {
-    await techpackPage.open();
-
-    await test.step('All 21 named columns plus the select-row column are present', async () => {
-      // The grid's own header row can render after expectLoaded()'s
-      // heading check resolves (same "bundle loaded, data still
-      // fetching" gap TC:3/TC:4 already work around) — poll rather than
-      // reading once.
-      await expect.poll(() => techpackPage.locators.columnHeaders.count()).toBeGreaterThan(1);
-      const headerTexts = await techpackPage.locators.columnHeaders.allInnerTexts();
-      const expected = [
-        'Techpack Code',
+    await test.step('Open Filters: General Information is open by default', async () => {
+      await techpackPage.openFilters();
+      const l = techpackPage.locators;
+      await expect(l.filterSectionToggle('General Information')).toHaveText('Hide');
+      await expect(l.filterSectionToggle('Garment Specifications')).toHaveText('Show');
+      await expect(l.filterSectionToggle('System Info')).toHaveText('Show');
+      for (const field of [
         'Rev No',
-        'Status Name',
+        'Stage',
+        'Status',
         'Techpack Type',
         'Customer Name',
-        'Company',
-        'Season Name',
+        'Company Name',
+      ]) {
+        await expect(
+          l.filterSection('General Information').getByText(field, { exact: true }),
+        ).toBeVisible();
+      }
+      for (const button of ['Clear', 'Apply', 'Advanced Filter', 'Close']) {
+        await expect(
+          l.filterDialog.getByRole('button', { name: button, exact: true }),
+        ).toBeVisible();
+      }
+    });
+
+    await test.step('Status and Stage offer the expected values', async () => {
+      expect(await techpackPage.filterFieldOptions('Status')).toEqual([
+        'Draft',
+        'Open',
+        'Approved',
+        'Cancelled',
+      ]);
+      expect(await techpackPage.filterFieldOptions('Stage')).toEqual([
+        'Draft',
+        'First proto',
+        'Fitting',
+        'SMS',
+        'TOP',
+        'Approved',
+      ]);
+    });
+
+    await test.step('Garment Specifications: Season and the value code/desc fields', async () => {
+      await techpackPage.expandFilterSection('Garment Specifications');
+      await expect(techpackPage.locators.filterSectionToggle('General Information')).toHaveText(
+        'Show',
+      );
+      const section = techpackPage.locators.filterSection('Garment Specifications');
+      for (const field of [
+        'Season',
         'Style Value Code',
         'Style Value Desc',
         'Fabric Value Code',
@@ -444,188 +357,326 @@ test.describe('Techpack - Techpacks List', () => {
         'Wash Value Desc',
         'Product Value Code',
         'Product Value Desc',
-        'Remark',
-        'Created Date',
-        'Creator',
-        'Mode',
-        'Approved Date',
-        'Approver',
-      ];
-      for (const label of expected) {
-        expect(headerTexts.some((h) => h.startsWith(label))).toBe(true);
+      ]) {
+        await expect(section.getByText(field, { exact: true })).toBeVisible();
       }
     });
+
+    await test.step('System Info: dates (on / before / after / between), Creator, Approver', async () => {
+      await techpackPage.expandFilterSection('System Info');
+      const section = techpackPage.locators.filterSection('System Info');
+      for (const field of ['Created Date', 'Creator', 'Approved Date', 'Approver']) {
+        await expect(section.getByText(field, { exact: true })).toBeVisible();
+      }
+      expect(await techpackPage.filterFieldOptions('Created Date')).toEqual([
+        'on',
+        'before',
+        'after',
+        'between',
+      ]);
+    });
   });
 
-  test("TC:19 Verify Export CSV's own field values match what the on-screen grid resolves, not raw backend identifiers", async ({
-    techpackPage,
-    page,
-  }) => {
-    await allure.tms('https://app.clickup.com/t/z941abxkuq', 'TC:19 bug (ClickUp)');
-    test.setTimeout(60_000);
-    await techpackPage.open();
+  test('TC:13 Verify Configure columns can hide and re-show a column', async ({ techpackPage }) => {
+    await techpackPage.openAndWaitForRows();
 
-    // The Approved tab guarantees a row with BOTH Creator and Approver
-    // populated (Draft/Open rows never have an Approver yet) — needed to
-    // check both fields' resolution, not just one.
-    await techpackPage.selectTab('Approved');
-
-    const { code, onScreen } =
-      await test.step("Read a real Approved row's on-screen resolved values", async () => {
-        const linkCode = await techpackPage.locators.table.getByRole('link').first().innerText();
-        const headerTexts = await techpackPage.locators.columnHeaders.allInnerTexts();
-        const cells = await techpackPage.rowCellTexts(linkCode);
-        const at = (label: string) => cells[headerTexts.findIndex((h) => h.startsWith(label))];
-        return {
-          code: linkCode,
-          onScreen: {
-            customerName: at('Customer Name'),
-            creator: at('Creator'),
-            approver: at('Approver'),
-          },
-        };
+    try {
+      await test.step('Hide the "Rev No" column', async () => {
+        await techpackPage.setColumnsVisible(['Rev No'], false);
       });
 
-    const csvValues = await test.step('Download and parse the CSV export', async () => {
-      const [download] = await Promise.all([
-        page.waitForEvent('download'),
-        techpackPage.locators.exportCsvButton.click(),
-      ]);
-      const filePath = await download.path();
-      if (!filePath) throw new Error('CSV download did not resolve to a local file path');
-      let csvText = fs.readFileSync(filePath, 'utf-8');
-      if (csvText.charCodeAt(0) === 0xfeff) csvText = csvText.slice(1); // strip a leading BOM, seen on a real export
-      csvText = csvText.replace(/\r/g, '');
-      const lines = csvText.split('\n').filter((l) => l.trim().length > 0);
-      const header = parseCsvLine(lines[0] ?? '');
-      const dataLine = lines.slice(1).find((l) => l.startsWith(`${code},`));
-      if (!dataLine) throw new Error(`CSV export has no row for ${code}`);
-      const fields = parseCsvLine(dataLine);
-      const at = (label: string) => fields[header.indexOf(label)];
-      return {
-        customerName: at('Customer Name'),
-        creator: at('Creator'),
-        approver: at('Approver'),
-      };
-    });
+      await test.step('The column header is gone from the grid', async () => {
+        await expect.poll(() => techpackPage.columnHeaderTexts()).not.toContain('Rev No');
+      });
 
-    // Desired/correct behavior: the export's Customer Name/Creator/Approver
-    // should be the exact same human-readable values the grid already
-    // resolves on-screen — never a raw customer code or backend UUID.
-    // expect.soft() on all three so each field's real, individual result is
-    // reported in one run rather than stopping at the first failure (see
-    // 03-create-techpack-ai-mode.spec.ts's TC:8 doc comment for this
-    // repo's "assert correct behavior, let real bugs Fail cleanly"
-    // rationale — this is the same convention applied to 3 fields at once).
-    //
-    // Live, confirmed 2026-09-30 on uat (re-verified same-day, not just
-    // trusting the original 2026-09-29 finding — ClickUp z941abxb3u):
-    // Customer Name reproducibly exports as the raw `CTC0000###` customer
-    // code instead of the resolved name — a real, live, still-open bug.
-    // Creator/Approver, by contrast, did NOT reproduce the raw-UUID version
-    // of this same bug in this same re-check (every row exported a real
-    // human name, e.g. "Alice Planner") — a genuine behavior change since
-    // the original finding, recorded here rather than assumed without
-    // re-checking live.
-    expect
-      .soft(
-        csvValues.customerName,
-        `CSV "Customer Name" should show the resolved name ("${onScreen.customerName}") like the grid does, not a raw customer code — live, confirmed bug (z941abxb3u)`,
-      )
-      .toBe(onScreen.customerName);
-
-    expect
-      .soft(
-        csvValues.creator,
-        'CSV "Creator" should show a human-readable name/email, matching the grid, not a raw backend UUID',
-      )
-      .toBe(onScreen.creator);
-
-    expect
-      .soft(
-        csvValues.approver,
-        'CSV "Approver" should show a human-readable name/email, matching the grid, not a raw backend UUID',
-      )
-      .toBe(onScreen.approver);
+      await test.step('Re-show it', async () => {
+        await techpackPage.setColumnsVisible(['Rev No'], true);
+        await expect.poll(() => techpackPage.columnHeaderTexts()).toContain('Rev No');
+      });
+    } finally {
+      // The column choice survives a reload: never leave it changed.
+      await techpackPage.resetColumns();
+    }
   });
 
-  test("TC:20 Verify switching the shell's language to Vietnamese translates the Techpack module's own chrome, and reverts cleanly", async ({
+  test("TC:14 Verify the View menu's three layouts", async ({ techpackPage, page }) => {
+    await techpackPage.openAndWaitForRows();
+    const l = techpackPage.locators;
+
+    try {
+      await test.step('The menu offers List View (checked), Vertical Split and Grid View', async () => {
+        await l.viewButton.click();
+        await expect(l.viewMenu.getByRole('menuitemradio')).toHaveText([
+          'List View',
+          'Vertical Split',
+          'Grid View',
+        ]);
+        await expect(l.viewOption('List View')).toHaveAttribute('aria-checked', 'true');
+        await page.keyboard.press('Escape');
+      });
+
+      await test.step('Vertical Split: one column beside a detail pane for the first row', async () => {
+        await techpackPage.chooseView('Vertical Split');
+        await expect(l.openTechPackButton).toBeVisible({ timeout: 30_000 });
+        for (const section of [
+          'General Information',
+          'Garment Specifications',
+          'System Info',
+        ] as const) {
+          await expect(l.detailPaneSection(section)).toBeVisible();
+        }
+        await expect.poll(() => techpackPage.columnHeaderTexts()).toEqual(['', 'Name and Code']);
+      });
+
+      await test.step('Grid View: cards, no table', async () => {
+        await techpackPage.chooseView('Grid View');
+        await expect(l.gridViewCards.first()).toBeVisible({ timeout: 30_000 });
+        await expect(l.table).toHaveCount(0);
+      });
+
+      await test.step('List View: the full grid again, no detail pane', async () => {
+        await techpackPage.chooseView('List View');
+        await expect.poll(() => techpackPage.columnHeaderTexts()).toEqual(['', ...DEFAULT_COLUMNS]);
+        await expect(l.openTechPackButton).toHaveCount(0);
+      });
+    } finally {
+      // The View choice survives a reload: always leave it on List View.
+      await techpackPage.ensureListView();
+    }
+  });
+
+  test('TC:15 Verify selecting rows shows a selection bar with "Compare"', async ({
     techpackPage,
-    canvasPage,
-    page,
+  }) => {
+    await techpackPage.openAndWaitForRows();
+
+    await test.step('Select one row', async () => {
+      await techpackPage.locators.rowCheckboxAt(0).click();
+      await expect(techpackPage.locators.itemsSelectedText).toHaveText(/^1\s*item selected/);
+      await expect(techpackPage.locators.compareButton).toBeVisible();
+    });
+
+    await test.step('Select a second row', async () => {
+      await techpackPage.locators.rowCheckboxAt(1).click();
+      await expect(techpackPage.locators.itemsSelectedText).toHaveText(/^2\s*items selected/);
+    });
+
+    await test.step('Clear selection', async () => {
+      await techpackPage.locators.clearSelectionButton.click();
+      await expect(techpackPage.locators.itemsSelectedText).toHaveCount(0);
+    });
+  });
+
+  test('TC:16 Verify "Export" triggers a real file download', async ({ techpackPage }) => {
+    await techpackPage.openAndWaitForRows();
+
+    await test.step('Click Export', async () => {
+      const download = await techpackPage.export();
+      expect(download.suggestedFilename()).toBe('techpacks.csv');
+    });
+  });
+
+  test('TC:17 Verify code format correlates with creation method, not status', async ({
+    techpackPage,
+  }) => {
+    // The DRAFT/<ULID> vs TP<YYYYMM>-<seq> format follows how the techpack
+    // was made, not its status (corrected 2026-09-28): Classic's synchronous
+    // "Create techpack" gets a TP code at once; an AI-Mode draft keeps a
+    // DRAFT/ placeholder until it's submitted ("Open Techpack", 2026-10-22
+    // redesign), and from then on has a TP code even while its status is
+    // still Draft (seen 2026-10-23). The "Mode" column (AI / Manual) tells
+    // the two apart; it's hidden by default since the redesign.
+    await techpackPage.openAndWaitForRows();
+    await techpackPage.selectTab('Draft');
+    await expect
+      .poll(async () => (await techpackPage.visibleStatuses()).every((s) => s === 'Draft'))
+      .toBe(true);
+
+    try {
+      await techpackPage.setColumnsVisible(['Mode'], true);
+      const rows = (
+        await test.step('Read Name and Code, Status and Mode for the Draft rows', () =>
+          techpackPage.visibleRows(['Name and Code', 'Status', 'Mode']))
+      ).map((r) => ({
+        code: codeOf(r['Name and Code'] ?? ''),
+        status: r['Status'],
+        mode: r['Mode'],
+      }));
+
+      await test.step('Every DRAFT/<code> row is an AI-Mode draft', async () => {
+        const placeholders = rows.filter((r) => r.code.startsWith('DRAFT/'));
+        test.skip(placeholders.length === 0, 'No unsubmitted AI-Mode draft on the first page');
+        for (const r of placeholders) {
+          expect(r.code, `${r.code} format`).toMatch(/^DRAFT\/\w+$/);
+          expect(r.mode, `${r.code} Mode`).toBe('AI');
+        }
+      });
+
+      await test.step('Manual techpacks always have a TP<YYYYMM>-<seq> code, even as Draft', async () => {
+        for (const r of rows.filter((x) => x.mode === 'Manual'))
+          expect(r.code, `Manual ${r.status} row ${r.code}`).toMatch(/^TP\d{6}-\d+$/);
+      });
+    } finally {
+      await techpackPage.resetColumns();
+    }
+  });
+
+  test('TC:18 Verify the default column set (8 of 22 shown)', async ({ techpackPage, page }) => {
+    await techpackPage.openAndWaitForRows();
+
+    await test.step('The grid shows the 8 default columns, in order', async () => {
+      // The leading select-row column has no text of its own.
+      await expect.poll(() => techpackPage.columnHeaderTexts()).toEqual(['', ...DEFAULT_COLUMNS]);
+    });
+
+    await test.step('"Configure columns" reads 8/22 and lists the rest unticked', async () => {
+      await techpackPage.openColumns();
+      const l = techpackPage.locators;
+      await expect(l.columnsCounterText).toHaveText('8/22');
+      await expect(l.lockedColumnCheckbox).toBeChecked();
+      await expect(l.lockedColumnCheckbox).toBeDisabled();
+      const state = await techpackPage.columnsDialogState();
+      expect(state.filter((c) => c.checked).map((c) => c.label)).toEqual([
+        'Name and Code',
+        ...DEFAULT_COLUMNS.slice(1).map((c) => (c === 'Company' ? 'Company Name' : c)),
+      ]);
+      expect(state.filter((c) => !c.checked).map((c) => c.label)).toEqual(HIDDEN_BY_DEFAULT);
+      await page.keyboard.press('Escape');
+      await expect(l.columnsDialog).toBeHidden();
+    });
+  });
+
+  test('TC:19 Verify Export writes the visible columns with the same human-readable values as the grid', async ({
+    techpackPage,
+  }) => {
+    await allure.tms('https://app.clickup.com/t/z941abxkuq', 'TC:19 bug (ClickUp)');
+    test.setTimeout(90_000);
+    await techpackPage.openAndWaitForRows();
+
+    // The Approved tab guarantees rows with both Creator and Approver set.
+    await techpackPage.selectTab('Approved');
+    await expect
+      .poll(async () => (await techpackPage.visibleStatuses()).every((s) => s === 'Approved'))
+      .toBe(true);
+
+    try {
+      await test.step('Show Creator and Approver', async () => {
+        await techpackPage.setColumnsVisible(['Creator', 'Approver'], true);
+      });
+
+      const columns = ['Name and Code', 'Stage', 'Customer Name', 'Season', 'Creator', 'Approver'];
+      const onScreen =
+        await test.step("Read the first Approved row's values on screen", async () => {
+          const [row] = await techpackPage.visibleRows(columns);
+          if (!row) throw new Error('No Approved row on screen');
+          return row;
+        });
+
+      const csv = await test.step('Download and parse the export', async () => {
+        const download = await techpackPage.export();
+        expect(download.suggestedFilename()).toBe('techpacks.csv');
+        const filePath = await download.path();
+        if (!filePath) throw new Error('CSV download did not resolve to a local file path');
+        let csvText = fs.readFileSync(filePath, 'utf-8');
+        if (csvText.charCodeAt(0) === 0xfeff) csvText = csvText.slice(1); // strip a leading BOM, seen on a real export
+        const lines = csvText
+          .replace(/\r/g, '')
+          .split('\n')
+          .filter((l) => l.trim().length > 0);
+        const header = parseCsvLine(lines[0] ?? '');
+        const code = codeOf(onScreen['Name and Code'] ?? '');
+        const dataLine = lines.slice(1).find((l) => l.startsWith(`${code},`));
+        if (!dataLine) throw new Error(`CSV export has no row for ${code}`);
+        const fields = parseCsvLine(dataLine);
+        return { header, at: (label: string) => fields[header.indexOf(label)] ?? '' };
+      });
+
+      await test.step('The header is the visible columns, in grid order', async () => {
+        expect(csv.header).toEqual([
+          'Techpack Code',
+          'Rev No',
+          'Stage',
+          'Status',
+          'Techpack Type',
+          'Customer Name',
+          'Company Name',
+          'Season',
+          'Creator',
+          'Approver',
+        ]);
+      });
+
+      await test.step('Every value matches what the grid shows', async () => {
+        // "—" is how the grid shows an empty value.
+        const shown = (label: string) => (onScreen[label] === '—' ? '' : (onScreen[label] ?? ''));
+        // Known bug z941abxkuq: Customer Name exports the raw `CTC…` customer
+        // code instead of the name the grid shows (still seen 2026-10-23).
+        expect
+          .soft(
+            csv.at('Customer Name'),
+            'Customer Name should be the name, not a raw code (z941abxkuq)',
+          )
+          .toBe(shown('Customer Name'));
+        // Open question (2026-10-23, not filed yet): Season exports the season
+        // code (`SS24`) and Stage the enum (`FITTING`), not what the grid shows.
+        expect.soft(csv.at('Season'), 'Season should be the season name').toBe(shown('Season'));
+        expect.soft(csv.at('Stage'), 'Stage should be the stage label').toBe(shown('Stage'));
+        expect.soft(csv.at('Creator'), 'Creator should be a name').toBe(shown('Creator'));
+        expect.soft(csv.at('Approver'), 'Approver should be a name').toBe(shown('Approver'));
+      });
+    } finally {
+      await techpackPage.resetColumns();
+    }
+  });
+
+  test('TC:20 Verify switching the language to Vietnamese in Preferences translates the Techpack Dashboard, and reverts cleanly', async ({
+    techpackPage,
+    shellHeaderPage,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abxb5r', 'TC:20 bug (ClickUp)');
     test.setTimeout(180_000);
-    await techpackPage.open();
+    await techpackPage.openAndWaitForRows();
 
-    // Find a genuinely Manual/Classic-created Open row (not an AI-Mode
-    // draft) up front, before switching language. Live re-check
-    // 2026-09-30 confirmed an AI-Mode-created canvas doesn't expose a
-    // plain "Status" Details field the same li-based way a Classic
-    // canvas does (it uses a differently-shaped Extracted Data panel
-    // instead — see the Techpack QA's working notes), so picking an
-    // arbitrary Open row risks a false "stuck loading" result unrelated
-    // to the actual language bug this case is checking.
-    await techpackPage.selectTab('Open');
-    const code = await test.step('Find a Manual-created Open row', async () => {
-      // One fresh reload if the first read finds none: right after a heavy grid
-      // action (TC:19's CSV export) the grid can briefly show stale rows.
-      for (let attempt = 0; attempt < 2; attempt++) {
-        if (attempt > 0) {
-          await techpackPage.open();
-          await techpackPage.selectTab('Open');
-        }
-        const rows = await techpackPage.visibleRows(['Mode', 'Techpack Code']);
-        const manual = rows.find((r) => (r['Mode'] ?? '').toLowerCase() === 'manual');
-        if (manual?.['Techpack Code']) return manual['Techpack Code'];
-      }
-      throw new Error('No Manual-created Open techpack visible in the list');
-    });
-
-    const shellHeaderPage = new ShellHeaderPage(page);
     let switchedToVietnamese = false;
-
-    // CRITICAL: this drives a shared `alice` uat account other suites also
-    // use — the language MUST be back to English before this test ends,
-    // even if an assertion above fails. Everything after switching runs
-    // inside try/finally for exactly that reason (same convention as the
-    // 2026-09-29 exploration this case is based on).
+    // The language is stored per browser, so this can't leak into other
+    // tests' contexts; it's still always reverted, even if an assertion fails.
     try {
-      await test.step('Switch the shell language to Vietnamese', async () => {
+      await test.step('User menu › Preferences › Tiếng Việt', async () => {
         await shellHeaderPage.changeLanguage('Vietnamese');
         switchedToVietnamese = true;
-        await expect(shellHeaderPage.locators.text('Tài liệu kỹ thuật').first()).toBeVisible({
-          timeout: 15_000,
+      });
+
+      await test.step('The Dashboard translates', async () => {
+        const main = techpackPage.locators.main;
+        await expect(main.getByRole('heading', { name: 'Bảng điều khiển', level: 1 })).toBeVisible({
+          timeout: 60_000,
         });
-      });
-
-      await test.step("The List's heading/tabs/columns and this row's own Status value all translate", async () => {
-        await expect(techpackPage.locators.statusTabNamed(/^Mở \d+/)).toBeVisible();
-        const headerTexts = await techpackPage.locators.columnHeaders.allInnerTexts();
-        const cells = await techpackPage.rowCellTexts(code);
-        const statusCell = cells[headerTexts.findIndex((h) => h.startsWith('Tên trạng thái'))];
-        expect(statusCell, "the List's own Status Name cell for this Open row").toBe('Mở');
-      });
-
-      await test.step('The canvas translates its labels; Details values stay as stored master data', async () => {
-        await techpackPage.locators.rowLink(code).click();
-        const statusRow = canvasPage.locators.fieldRow('Trạng thái');
-        await statusRow.waitFor({ state: 'visible', timeout: 30_000 });
-        // Details-panel values come straight from master data and are
-        // meant to stay in English (confirmed with the dev team
-        // 2026-10-01), so only the label is expected to translate here.
-        await expect(statusRow).toContainText('Open');
-        await expect(canvasPage.locators.fieldRow('Trạng thái khóa')).toBeVisible();
+        await expect(main.getByRole('button', { name: 'Tạo mới', exact: true })).toBeVisible();
+        for (const tab of [/^Tất cả \d+/, /^Bản nháp \d+/, /^Mở \d+/, /^Đã duyệt \d+/]) {
+          await expect(techpackPage.locators.statusTabNamed(tab)).toBeVisible();
+        }
+        for (const button of ['Bộ lọc', 'Cấu hình cột', 'Chế độ xem', 'Xuất']) {
+          await expect(main.getByRole('button', { name: button, exact: true })).toBeVisible();
+        }
+        await expect(techpackPage.locators.searchInput).toHaveAttribute('placeholder', 'Tìm kiếm');
+        await expect.poll(() => techpackPage.columnHeaderTexts()).toContain('Tên và mã');
+        await expect.poll(() => techpackPage.columnHeaderTexts()).toContain('Trạng thái');
+        const statuses = (await techpackPage.visibleRows(['Trạng thái'])).map(
+          (r) => r['Trạng thái'],
+        );
+        expect(statuses.length).toBeGreaterThan(0);
+        for (const s of statuses) expect(['Bản nháp', 'Mở', 'Đã duyệt']).toContain(s);
       });
     } finally {
       await test.step('Switch back to English and confirm a clean revert', async () => {
         if (!switchedToVietnamese) return;
         await shellHeaderPage.changeLanguage('English');
+        await techpackPage.expectLoaded();
         const revertedBodyText = await shellHeaderPage.locators.body.innerText();
         expect(
           revertedBodyText,
           'no leftover Vietnamese text anywhere on the page after reverting to English',
-        ).not.toMatch(/Tài liệu kỹ thuật|Bản nháp|Đã duyệt|Trạng thái|Khách hàng/i);
+        ).not.toMatch(/Bảng điều khiển|Bản nháp|Đã duyệt|Trạng thái|Tạo mới/i);
       });
     }
   });

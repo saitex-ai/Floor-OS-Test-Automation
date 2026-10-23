@@ -63,6 +63,9 @@ import { type Locator, type Page } from '@playwright/test';
  */
 export class AiModeCopilotLocators {
   readonly heading: Locator;
+  readonly addFilesButton: Locator;
+  readonly moreToolsMenuItem: Locator;
+  readonly manualFormMenuItem: Locator;
   readonly subheading: Locator;
   readonly progressStepper: Locator;
   readonly useManualFormLink: Locator;
@@ -98,7 +101,17 @@ export class AiModeCopilotLocators {
   readonly sampleRequestLabel: Locator;
 
   constructor(private readonly page: Page) {
-    this.heading = page.getByRole('heading', { name: 'New techpack', level: 1 });
+    // As of the 2026-10-22 design-system release the AI Mode landing's h1 is
+    // "Got any ideas we could work on today?" (it was "New techpack").
+    this.heading = page.getByRole('heading', {
+      name: 'Got any ideas we could work on today?',
+      level: 1,
+    });
+    // "Add files" (+) opens a menu; "More tools" is a submenu holding
+    // "Manual form" (→ /techpacks/new) and "Upload a tech pack file".
+    this.addFilesButton = page.getByRole('button', { name: 'Add files', exact: true });
+    this.moreToolsMenuItem = page.getByRole('menuitem', { name: /^More tools/ });
+    this.manualFormMenuItem = page.getByRole('menuitem', { name: 'Manual form' });
     this.subheading = page.getByText('Upload the techpack files');
     this.progressStepper = page.getByRole('list', { name: 'Progress' });
     this.useManualFormLink = page.getByRole('link', { name: 'Use the manual form' });

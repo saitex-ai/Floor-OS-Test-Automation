@@ -4,6 +4,7 @@ import { CreateTechpackPage } from '../pages/techpack/create-techpack.page';
 import { AiModeCopilotPage } from '../pages/techpack/ai-mode-copilot.page';
 import { CanvasPage } from '../pages/techpack/canvas.page';
 import { ValidationRulesPage } from '../pages/techpack/validation-rules.page';
+import { ShellHeaderPage } from '../pages/shell/shell-header.page';
 
 interface TechpackFixtures {
   techpackPage: TechpackPage;
@@ -11,6 +12,7 @@ interface TechpackFixtures {
   aiModeCopilotPage: AiModeCopilotPage;
   canvasPage: CanvasPage;
   validationRulesPage: ValidationRulesPage;
+  shellHeaderPage: ShellHeaderPage;
 }
 
 /**
@@ -37,6 +39,11 @@ export const test = base.extend<TechpackFixtures>({
 
   validationRulesPage: async ({ page }, use) => {
     await use(new ValidationRulesPage(page));
+  },
+
+  // Shell-level chrome (user menu, Preferences / language), shared by every module.
+  shellHeaderPage: async ({ page }, use) => {
+    await use(new ShellHeaderPage(page));
   },
 });
 
