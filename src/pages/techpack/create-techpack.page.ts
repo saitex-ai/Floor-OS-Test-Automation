@@ -312,6 +312,25 @@ export class CreateTechpackPage extends BasePage {
     return exists;
   }
 
+  /**
+   * Searches the Customer picker for a Customer by name. An active Customer
+   * is offered; an inactive one isn't ("No customers match.") — confirmed on
+   * dev 2026-10-23. Closes the picker afterwards.
+   */
+  async expectCustomerSelectable(customerName: string, selectable: boolean): Promise<void> {
+    await this.searchComboboxForNewValue('Customer*', customerName);
+    const escaped = customerName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const option = this.locators.comboboxOption(new RegExp(`^${escaped}\\b`));
+    if (selectable) {
+      await expect(option).toHaveCount(1, { timeout: 20_000 });
+    } else {
+      await expect(this.page.getByText('No customers match.')).toBeVisible({ timeout: 20_000 });
+      await expect(option).toHaveCount(0);
+    }
+    await this.page.keyboard.press('Escape');
+    await this.expectListboxClosed();
+  }
+
   async searchComboboxForNewValue(labelText: string, searchText: string): Promise<void> {
     await this.locators.fieldTrigger(labelText).click();
     const listbox = this.page.getByRole('listbox').last();

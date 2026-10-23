@@ -27,6 +27,14 @@ import { type Locator, type Page } from '@playwright/test';
  *   with no search textbox at all — unlike every other combobox in this
  *   app — with real customers ("Acme Textiles", "ACME Apparel", etc.)
  *   and a "Load 15 more" button once you scroll past the first page.
+ * - Typing a name that matches no Customer into that combobox (re-checked
+ *   on dev 2026-10-23) offers a single option "The Customer {name} does
+ *   not exist. Will proceed to Customer creation after this Contact is
+ *   saved." Picking it keeps the name with the hint "This Customer does
+ *   not exist yet — saving will offer to create it, ...". Saving then
+ *   shows the alertdialog "Contact {name} was saved successfully!" /
+ *   "Proceed to create customer {name}?" with Close, Cancel and
+ *   "Create customer" buttons.
  * - A duplicate email is a BLOCKING inline error (confirmed on dev: "This
  *   email address is already used by {Contact} ({Contact Code}). Enter a
  *   different email address to create this Contact.") — not the
@@ -63,9 +71,10 @@ export class CreateContactLocators {
   readonly saveButton: Locator;
   readonly cancelButton: Locator;
 
-  // Provisional — not confirmed locally (blocked, see class doc)
   readonly customersDialog: Locator;
   readonly loadMoreCustomersButton: Locator;
+  readonly newCustomerOption: Locator;
+  readonly newCustomerHint: Locator;
   readonly postSaveCreateCustomerModal: Locator;
   readonly createCustomerButton: Locator;
   readonly postSaveCancelButton: Locator;
@@ -119,8 +128,12 @@ export class CreateContactLocators {
       name: 'Load 15 more',
     });
 
-    // Not confirmed locally — the Customers list never finished loading, so
-    // this flow could never be driven far enough to see the real modal.
+    // A typed name that matches no Customer (see class doc).
+    this.newCustomerOption = page.getByRole('option', { name: /does not exist/ });
+    this.newCustomerHint = page.getByText(/This Customer does not exist yet/);
+
+    // Confirmed on dev (2026-10-23): an alertdialog shown after the Contact
+    // saves with a not-yet-existing Customer name (see class doc).
     this.postSaveCreateCustomerModal = page
       .getByRole('dialog')
       .or(page.getByRole('alertdialog'))

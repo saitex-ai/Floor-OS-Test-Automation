@@ -2,7 +2,7 @@
 
 - **Test-case set:** [CRM - Sprint 1 - activate Customer](https://app.clickup.com/t/90181912927/86eyr7fkc)
 - **Source:** ClickUp, expanded from subtasks 2026-09-16
-- **Automated in:** [`tests/regression/crm/05-activate-customer.spec.ts`](../../tests/regression/crm/05-activate-customer.spec.ts) — TC:1-5/TC:8 confirmed against dev (2026-09-16); TC:6/TC:7 (Master Data/Tech Pack cascade) `test.fixme()`'d per the `fail`-in-ClickUp note below.
+- **Automated in:** [`tests/regression/crm/05-activate-customer.spec.ts`](../../tests/regression/crm/05-activate-customer.spec.ts) — TC:1-5/TC:8 confirmed against dev (2026-09-16); TC:6/TC:7 (Master Data/Tech Pack cascade) re-checked and passing on dev (2026-10-23).
 - **Note:** heavy overlap with `activate-customer-screen.md` (same feature, described at two granularities) — kept as a separate spec per team decision, not merged.
 
 | #    | Test case                                                                         | Steps                                                                                                                                                                           | Expected result                                                                                                                                             | ClickUp                                      |
@@ -18,4 +18,4 @@
 
 ## Notes for whoever picks this up next
 
-TC:6 and TC:7 (cascading into Master Data / Tech Pack) are **marked `fail` in ClickUp** already — these cross-module checks may currently be broken app behavior, not just untested. Confirm with the team before spending time automating them; they may need a bug fix first, or a note that they're expected-fail. TC:1–5 and TC:8 are all confined to the CRM module and don't have that caveat, and are confirmed passing against dev as of 2026-09-16.
+TC:6 and TC:7 (cascading into Master Data / Tech Pack) were marked `fail` in ClickUp; **re-checked on dev 2026-10-23, both work** and are automated (cross-module fixtures). Master Data → Customer Master shows the Customer "Approved" (its active state; the ClickUp text says "Active"), "Inactive" while deactivated, and "Approved" again after reactivation. In Tech Pack → Classic create, the Customer picker offers the Customer while active, says "No customers match." for it while inactive, and offers it again after reactivation. TC:1–5 and TC:8 are all confined to the CRM module and don't have that caveat, and are confirmed passing against dev as of 2026-09-16.

@@ -1,5 +1,5 @@
 import * as allure from 'allure-js-commons';
-import { test, expect } from '../../../src/fixtures/crm.fixtures';
+import { test, expect } from '../../../src/fixtures/cross-module.fixtures';
 import type { CreateCustomerPage } from '../../../src/pages/crm/create-customer.page';
 import type { CustomerDetailPage } from '../../../src/pages/crm/customer-detail.page';
 
@@ -12,7 +12,8 @@ import type { CustomerDetailPage } from '../../../src/pages/crm/customer-detail.
  * has no options, so no Customer can ever be saved there). See
  * customer-detail.page.ts for the confirmed dialog shapes and the real
  * Activation reason list (Negotiation, Sampling, New orders, Seasonal,
- * Business Realignment).
+ * Business Realignment). TC:6/TC:7 check the reactivated Customer in
+ * Master Data and Techpack, so this spec uses the cross-module fixtures.
  */
 test.describe('CRM - Activate Customer', () => {
   test.beforeEach(async () => {
@@ -21,14 +22,15 @@ test.describe('CRM - Activate Customer', () => {
     await allure.owner('CRM QA');
   });
 
-  /** Every test needs an Inactive Customer to open the Activate flow on. */
+  /** Every test needs an Inactive Customer to open the Activate flow on. Returns its name. */
   async function createAndDeactivateCustomer(
     createCustomerPage: CreateCustomerPage,
     customerDetailPage: CustomerDetailPage,
-  ): Promise<void> {
+  ): Promise<string> {
+    const name = `Playwright Test Customer ${Date.now()}`;
     await createCustomerPage.openFromCrmHome();
     await createCustomerPage.fillProfile({
-      name: `Playwright Test Customer ${Date.now()}`,
+      name,
       email: `pw-test-${Date.now()}@example.com`,
       city: 'Coimbatore',
       country: 'India',
@@ -47,6 +49,7 @@ test.describe('CRM - Activate Customer', () => {
       'Setup for Activate Customer test',
     );
     await customerDetailPage.expectStatus('Inactive');
+    return name;
   }
 
   test('TC:1 Verify "Activate" is only offered on an Inactive Customer', async ({
@@ -178,40 +181,66 @@ test.describe('CRM - Activate Customer', () => {
     // create-contact.spec.ts's blocked linkage flow is unblocked.
   });
 
+  // TC:6/TC:7 were test.fixme'd ("marked fail in ClickUp") until
+  // re-checked on dev 2026-10-23: both cascades now work.
   test('TC:6 Verify cascading reactivation in Master Data module', async ({
     createCustomerPage,
     customerDetailPage,
+    customerListPage,
+    page,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abt7a0', 'TC:6 (ClickUp)');
+    const name = await createAndDeactivateCustomer(createCustomerPage, customerDetailPage);
+    const customerUrl = page.url();
 
-    test.fixme(
-      true,
-      'Marked fail in ClickUp — Master Data cascade may currently be broken app behavior, not just untested. Confirm with the team before automating.',
-    );
+    await test.step('While Inactive in CRM, Master Data shows the Customer Inactive', async () => {
+      await customerListPage.open();
+      await customerListPage.expectLoaded();
+      await customerListPage.search(name);
+      await customerListPage.expectRowStatus(name, 'Inactive');
+    });
 
-    await createAndDeactivateCustomer(createCustomerPage, customerDetailPage);
-    await customerDetailPage.activate(['Negotiation'], 'Reactivating after negotiation');
-    // TODO(CRM QA): navigate to Master Data module and confirm the
-    // Customer shows Active there — no Master Data page object exists
-    // yet (out of scope for the CRM QA's ownership boundary too).
+    await test.step('Reactivate the Customer in CRM', async () => {
+      await page.goto(customerUrl);
+      await customerDetailPage.activate(['Negotiation'], 'Reactivating after negotiation');
+      await customerDetailPage.expectStatus('Active');
+    });
+
+    // Master Data's active state is "Approved" (its tabs are Draft /
+    // Approved / Inactive / Rejected); ClickUp calls it "Active".
+    await test.step('Master Data → Customer Master shows the Customer active (Approved) again', async () => {
+      await customerListPage.open();
+      await customerListPage.expectLoaded();
+      await customerListPage.search(name);
+      await customerListPage.expectRowStatus(name, 'Approved');
+    });
   });
 
   test('TC:7 Verify cascading reactivation in Tech Pack module', async ({
     createCustomerPage,
     customerDetailPage,
+    createTechpackPage,
+    page,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abt7a2', 'TC:7 (ClickUp)');
+    const name = await createAndDeactivateCustomer(createCustomerPage, customerDetailPage);
+    const customerUrl = page.url();
 
-    test.fixme(
-      true,
-      'Marked fail in ClickUp — Tech Pack cascade may currently be broken app behavior, not just untested. Confirm with the team before automating.',
-    );
+    await test.step('While Inactive, Tech Pack creation does not offer the Customer', async () => {
+      await createTechpackPage.openFromTechpacksList();
+      await createTechpackPage.expectCustomerSelectable(name, false);
+    });
 
-    await createAndDeactivateCustomer(createCustomerPage, customerDetailPage);
-    await customerDetailPage.activate(['Negotiation'], 'Reactivating after negotiation');
-    // TODO(CRM QA): navigate to Tech Pack module and confirm the
-    // Customer is selectable — no Tech Pack page object exists yet
-    // (out of scope for the CRM QA's ownership boundary too).
+    await test.step('Reactivate the Customer in CRM', async () => {
+      await page.goto(customerUrl);
+      await customerDetailPage.activate(['Negotiation'], 'Reactivating after negotiation');
+      await customerDetailPage.expectStatus('Active');
+    });
+
+    await test.step('Tech Pack creation offers the reactivated Customer for selection', async () => {
+      await createTechpackPage.openFromTechpacksList();
+      await createTechpackPage.expectCustomerSelectable(name, true);
+    });
   });
 
   test('TC:8 Verify cancellation during Customer activation flow', async ({
