@@ -257,7 +257,7 @@ test.describe('CRM - Contacts tab in Customer Details', () => {
     // stays visible; re-enable once the status propagates.
     test.fixme(
       true,
-      'Re-checked on dev 2026-10-23: status does not propagate from Customer to linked Contact. After deactivating the Customer (dialog: "This will also affect 1 linked contact."), the Contact Details screen and Contacts list still show the Contact as Active.',
+      'Re-checked on dev 2026-10-23: status does not propagate from Customer to linked Contact. After deactivating the Customer (dialog: "This will also affect 1 linked contact."), the Contact Details screen and Contacts list still show the Contact as Active. Bug: https://app.clickup.com/t/z941abzkhy',
     );
 
     const { customerId, customerName } = await createTestCustomer(createCustomerPage, page);
