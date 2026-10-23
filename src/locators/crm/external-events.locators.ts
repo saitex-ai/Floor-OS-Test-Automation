@@ -1,4 +1,5 @@
 import { type Locator, type Page } from '@playwright/test';
+import { ShellLoginLocators } from '../shell/shell-login.locators';
 
 /** External Events list, under the CRM module (confirmed against the running app). */
 export const EXTERNAL_EVENTS_LIST_PATH = '/crm/events';
@@ -123,13 +124,14 @@ export class ExternalEventsLocators {
 
   // List screen (Sprint 5 — "Build External Events List with Web Crawling")
   readonly filtersButton: Locator;
-  readonly filterTypeButton: Locator;
-  readonly filterTypeListbox: Locator;
+  readonly filtersDialog: Locator;
+  readonly filterTypeCombobox: Locator;
+  readonly filterSuggestionsListbox: Locator;
   readonly filterApplyButton: Locator;
+  readonly filtersDialogCloseButton: Locator;
   readonly clearAllFiltersButton: Locator;
-  readonly noSplitButton: Locator;
-  readonly verticalSplitButton: Locator;
-  readonly horizontalSplitButton: Locator;
+  readonly viewMenuButton: Locator;
+  readonly viewMenu: Locator;
   readonly splitPreviewHeading: Locator;
   readonly paginationSummary: Locator;
   readonly columnHeaders: Locator;
@@ -208,7 +210,9 @@ export class ExternalEventsLocators {
   readonly eventNotFoundMessage: Locator;
   readonly eventLoadErrorMessage: Locator;
   readonly rowsPerPageCombobox: Locator;
-  readonly signInButton: Locator;
+  /** The pre-auth "Welcome to FloorOS!" gate's "Username or email" box (2026-10-23: replaces the old "Sign in" button). */
+  readonly signInIdentifierInput: Locator;
+  readonly signInContinueButton: Locator;
   readonly ssoPasswordInput: Locator;
 
   constructor(private readonly page: Page) {
@@ -227,18 +231,36 @@ export class ExternalEventsLocators {
     // The Filters toggle's accessible name gains an "(N applied)" suffix
     // once a filter is applied — e.g. "Filters (1 applied)".
     this.filtersButton = page.getByRole('button', { name: /^Filters( \(\d+ applied\))?$/ });
-    // Both the Filters panel's Type dropdown AND the table's Type column
-    // sort button are named "Type" — only the dropdown carries
-    // aria-expanded, which is what disambiguates them.
-    this.filterTypeButton = page
-      .getByRole('button', { name: 'Type', exact: true })
-      .and(page.locator('[aria-expanded]'));
-    this.filterTypeListbox = page.getByRole('listbox', { name: 'Type' });
-    this.filterApplyButton = page.getByRole('button', { name: 'Apply', exact: true });
+    // Design-system release (dev, 2026-10-23): Filters opens a right-hand
+    // "Filters" drawer (a modal dialog) with one unnamed "Value..."
+    // combobox per field under "General Information", plus quick "Type:
+    // Any type"/"Country: All countries" buttons, Clear/Apply and
+    // "Advanced filter". Apply does not close the drawer — its Close does.
+    // The quick "Type" button's checkbox list is portalled OUTSIDE the
+    // modal drawer, so it inherits `pointer-events: none` and a click on
+    // an option never lands (a dev bug, see filterByType()). The General
+    // Information "Type" combobox opens its own dialog with a
+    // "Suggestions" listbox, which does work.
+    this.filtersDialog = page.getByRole('dialog', { name: 'Filters' });
+    this.filterTypeCombobox = this.filtersDialog
+      .getByText('Type', { exact: true })
+      .first()
+      .locator('xpath=following-sibling::*[@role="combobox"][1]');
+    this.filterSuggestionsListbox = page.getByRole('listbox', { name: 'Suggestions' });
+    this.filterApplyButton = this.filtersDialog.getByRole('button', {
+      name: 'Apply',
+      exact: true,
+    });
+    this.filtersDialogCloseButton = this.filtersDialog.getByRole('button', {
+      name: 'Close',
+      exact: true,
+    });
     this.clearAllFiltersButton = page.getByRole('button', { name: 'Clear all', exact: true });
-    this.noSplitButton = page.getByRole('button', { name: 'No split' });
-    this.verticalSplitButton = page.getByRole('button', { name: 'Vertical split' });
-    this.horizontalSplitButton = page.getByRole('button', { name: 'Horizontal split' });
+    // Layouts (2026-10-23): one "View" menu button with "List View" /
+    // "Vertical Split" / "Horizontal Split" menuitemradios (aria-checked),
+    // replacing the old "No split"/"Vertical split"/"Horizontal split" buttons.
+    this.viewMenuButton = page.getByRole('button', { name: 'View', exact: true });
+    this.viewMenu = page.getByRole('menu', { name: 'View' });
     // The split layouts' preview pane titles the selected event as an h3.
     this.splitPreviewHeading = page.getByRole('heading', { level: 3 });
     this.paginationSummary = page.getByText(/^Showing \d+ to \d+ of \d+/);
@@ -351,7 +373,9 @@ export class ExternalEventsLocators {
     this.eventNotFoundMessage = page.getByText('Event not found.', { exact: true });
     this.eventLoadErrorMessage = page.getByText(/^Couldn't load this event\./);
     this.rowsPerPageCombobox = page.getByRole('combobox', { name: 'Rows per page' });
-    this.signInButton = page.getByRole('button', { name: 'Sign in' });
+    const shellLogin = new ShellLoginLocators(page);
+    this.signInIdentifierInput = shellLogin.identifierInput;
+    this.signInContinueButton = shellLogin.continueButton;
     this.ssoPasswordInput = page.locator('input[type="password"]');
   }
 
@@ -388,14 +412,19 @@ export class ExternalEventsLocators {
     return this.page.getByText('Required', { exact: true });
   }
 
-  /** An option in the Filters panel's Type dropdown (e.g. "Trade Fair"). */
-  filterTypeOption(type: string): Locator {
-    return this.filterTypeListbox.getByRole('option', { name: type, exact: true });
+  /** An option in the open filter field's "Suggestions" list (e.g. "Trade Fair"). */
+  filterSuggestion(value: string): Locator {
+    return this.filterSuggestionsListbox.getByRole('option', { name: value, exact: true });
   }
 
-  /** The removable chip shown under the toolbar for an applied filter, e.g. "Type: Trade Fair". */
+  /** The removable chip shown under the toolbar for an applied filter, e.g. `Type equals "Trade Fair"`. */
   removeFilterChip(label: string): Locator {
     return this.page.getByRole('button', { name: `Remove ${label}`, exact: true });
+  }
+
+  /** A layout option in the open "View" menu ("List View", "Vertical Split", "Horizontal Split"). */
+  viewMenuItem(layout: string): Locator {
+    return this.viewMenu.getByRole('menuitemradio', { name: layout, exact: true });
   }
 
   /** A column's header cell, by its visible label (accessible name also carries "Resize <label> column"). */
@@ -410,7 +439,12 @@ export class ExternalEventsLocators {
     return this.columnHeader(label).getByRole('button', { name: label, exact: true });
   }
 
-  /** The sort indicator icon inside a column header's sort button. */
+  /**
+   * The sort indicator icon inside a column header's sort button. Since
+   * 2026-10-23 it is a two-headed arrow (viewBox "0 0 6 10") while the
+   * column is unsorted and a single arrow (viewBox "0 0 10 10") once
+   * sorted, rotated 180° (`rotate-180`) for descending. Still no aria-sort.
+   */
   columnSortIcon(label: string): Locator {
     return this.columnSortButton(label).locator('svg');
   }
@@ -420,12 +454,12 @@ export class ExternalEventsLocators {
     return this.columnsDialog.getByRole('button', { name: `Drag ${columnName}`, exact: true });
   }
 
-  /** A row checkbox in the table layouts (No split / Horizontal split), by its row's Event title. */
+  /** A row checkbox in the table layouts (List View / Horizontal Split), by its row's Event title. */
   rowCheckbox(title: string): Locator {
     return this.eventRow(title).getByRole('checkbox');
   }
 
-  /** A list item in the Vertical split's left-hand list — a button named "Select row <title> …" or "Deselect row <title> …" once checked. */
+  /** A list item in the Vertical Split's left-hand list — a button named "Select row <title> …" or "Deselect row <title> …" once checked. */
   splitListItem(title: string): Locator {
     return this.page.getByRole('button', {
       name: new RegExp(`^(Select|Deselect) row ${escapeRegExp(title)}`),

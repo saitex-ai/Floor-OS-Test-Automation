@@ -71,7 +71,6 @@ export class AlertsLocators {
   readonly alertTitleHeading: Locator;
   /** The detail screen's own inner `main` (the outer app-shell `main` also holds toasts). */
   readonly alertDetailContent: Locator;
-  readonly userMenuButton: Locator;
 
   // Delete confirmation
   readonly deleteConfirmDialog: Locator;
@@ -123,8 +122,6 @@ export class AlertsLocators {
       .getByRole('main')
       .filter({ has: page.getByRole('link', { name: 'Back to alerts' }) })
       .last();
-    // Not scoped to the banner: module pages have no banner landmark in the new design (2026-10-22).
-    this.userMenuButton = page.getByRole('button', { name: /^Open user menu/ }).first();
 
     // Confirmed against the running app: "Delete this Alert?" with a
     // plain Cancel/Confirm pair — no "type the alert name to confirm"
