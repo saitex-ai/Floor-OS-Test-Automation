@@ -1,5 +1,5 @@
 import * as allure from 'allure-js-commons';
-import { test, expect } from '../../../src/fixtures/crm.fixtures';
+import { test, expect } from '../../../src/fixtures/cross-module.fixtures';
 import type { CreateCustomerPage } from '../../../src/pages/crm/create-customer.page';
 
 /**
@@ -10,7 +10,8 @@ import type { CreateCustomerPage } from '../../../src/pages/crm/create-customer.
  * on dev on 2026-09-16 — see customer-detail.page.ts for the confirmed
  * dialog shapes and the real Deactivation reason list (Business
  * misalignment, Payment issues, Low order frequency, Compliance
- * concerns, Unethical).
+ * concerns, Unethical). TC:6/TC:7 check the deactivated Customer in
+ * Master Data and Techpack, so this spec uses the cross-module fixtures.
  */
 test.describe('CRM - Deactivate Customer', () => {
   test.beforeEach(async () => {
@@ -19,11 +20,12 @@ test.describe('CRM - Deactivate Customer', () => {
     await allure.owner('CRM QA');
   });
 
-  /** New Customers save as Active — no setup step needed, unlike Activate. */
-  async function createActiveCustomer(createCustomerPage: CreateCustomerPage): Promise<void> {
+  /** New Customers save as Active — no setup step needed, unlike Activate. Returns its name. */
+  async function createActiveCustomer(createCustomerPage: CreateCustomerPage): Promise<string> {
+    const name = `Playwright Test Customer ${Date.now()}`;
     await createCustomerPage.openFromCrmHome();
     await createCustomerPage.fillProfile({
-      name: `Playwright Test Customer ${Date.now()}`,
+      name,
       email: `pw-test-${Date.now()}@example.com`,
       city: 'Coimbatore',
       country: 'India',
@@ -36,6 +38,7 @@ test.describe('CRM - Deactivate Customer', () => {
     await createCustomerPage.save();
     await createCustomerPage.expectSavedSuccessfully();
     await createCustomerPage.locators.postSaveCancelButton.click();
+    return name;
   }
 
   test('TC:1 Verify visibility of the "Deactivate" button on active Customer profile', async ({
@@ -142,38 +145,55 @@ test.describe('CRM - Deactivate Customer', () => {
     // unblocked.
   });
 
+  // TC:6/TC:7 were test.fixme'd for lack of Master Data/Tech Pack page
+  // objects until 2026-10-23; both cascades work on dev.
   test('TC:6 Verify cascading deactivation of Customer in Master Data module', async ({
     createCustomerPage,
     customerDetailPage,
+    customerListPage,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abt53j', 'TC:6 (ClickUp)');
+    const name = await createActiveCustomer(createCustomerPage);
 
-    test.fixme(
-      true,
-      "No Master Data page object exists yet (out of scope for the CRM QA — a Master Data QA would own that module per this framework's per-module ownership model)",
-    );
+    await test.step('Deactivate the Customer in CRM', async () => {
+      await customerDetailPage.deactivate(['Business misalignment'], 'Customer relocated overseas');
+      await customerDetailPage.expectStatus('Inactive');
+    });
 
-    await createActiveCustomer(createCustomerPage);
-    await customerDetailPage.deactivate(['Business misalignment'], 'Customer relocated overseas');
-    // TODO(CRM QA / Master Data QA): navigate to the Master Data module
-    // and confirm the Customer shows Inactive there.
+    await test.step('Master Data → Customer Master shows the Customer Inactive', async () => {
+      await customerListPage.open();
+      await customerListPage.expectLoaded();
+      await customerListPage.search(name);
+      await customerListPage.expectRowStatus(name, 'Inactive');
+    });
   });
 
   test('TC:7 Verify cascading deactivation of Customer in Tech Pack module', async ({
     createCustomerPage,
     customerDetailPage,
+    createTechpackPage,
+    page,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abt53k', 'TC:7 (ClickUp)');
+    const name = await createActiveCustomer(createCustomerPage);
+    await expect(page).toHaveURL(/\/crm\/customers\/[0-9a-f-]+$/);
+    const customerUrl = page.url();
 
-    test.fixme(
-      true,
-      "No Tech Pack page object exists yet (out of scope for the CRM QA — a Tech Pack QA would own that module per this framework's per-module ownership model)",
-    );
+    await test.step('While Active, Tech Pack creation offers the Customer', async () => {
+      await createTechpackPage.openFromTechpacksList();
+      await createTechpackPage.expectCustomerSelectable(name, true);
+    });
 
-    await createActiveCustomer(createCustomerPage);
-    await customerDetailPage.deactivate(['Business misalignment'], 'Customer relocated overseas');
-    // TODO(CRM QA / Tech Pack QA): navigate to the Tech Pack module and
-    // confirm the Customer is flagged Inactive / hidden from selection.
+    await test.step('Deactivate the Customer in CRM', async () => {
+      await page.goto(customerUrl);
+      await customerDetailPage.deactivate(['Business misalignment'], 'Customer relocated overseas');
+      await customerDetailPage.expectStatus('Inactive');
+    });
+
+    await test.step('Tech Pack creation no longer offers the deactivated Customer', async () => {
+      await createTechpackPage.openFromTechpacksList();
+      await createTechpackPage.expectCustomerSelectable(name, false);
+    });
   });
 
   test('TC:8 Verify cancellation of Customer deactivation flow', async ({
