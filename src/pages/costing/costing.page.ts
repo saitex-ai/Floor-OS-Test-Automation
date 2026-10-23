@@ -25,5 +25,6 @@ export class CostingPage extends BasePage {
   async expectLoaded(): Promise<void> {
     await expect(this.page).toHaveURL(new RegExp(`${MODULES['costing'].path}`));
     await expect(this.locators.heading).toBeVisible();
+    await expect(this.locators.selectScreenHint).toBeVisible();
   }
 }
