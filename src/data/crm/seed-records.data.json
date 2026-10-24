@@ -49,6 +49,38 @@
       "note": "Web Form origin, Lead stage, seeded AI dossier (no form card)."
     }
   },
+  "webCrawledLeads": {
+    "crawled": {
+      "id": "5bead493-4a73-4da4-b7ce-e9a64994f035",
+      "name": "HIMDENIM",
+      "stage": "Lead",
+      "note": "Crawler-created (Created By CRM), crawl detection with matched-signal lines, AI dossier incl. company contact details, 1 captured Instagram post."
+    },
+    "crawledRich": {
+      "id": "290e8672-8809-4609-8042-abfb5f7172b5",
+      "name": "ELV Denim",
+      "stage": "Lead",
+      "note": "Crawler-created, full AI sections incl. public financial data, 2 captured Instagram posts."
+    },
+    "noContact": {
+      "id": "9b6bac45-bd32-4b74-986f-ee09282dd9b0",
+      "name": "CURVJEANS LLC",
+      "stage": "Lead",
+      "note": "Crawler-created, Contacts (0), AI sections on company information only."
+    },
+    "sparse": {
+      "id": "4e6599cc-ae00-4b65-aa72-147440788a5d",
+      "name": "Kings Of Indigo",
+      "stage": "Lead",
+      "note": "Crawler-created, no Customer Info / Financial data (no-information messages)."
+    },
+    "converted": {
+      "id": "1e844e0b-ec0b-4e81-83d9-c8f044df304f",
+      "name": "Testing",
+      "stage": "Qualified Lead",
+      "note": "Origin Type Web Crawled, Qualified Lead, 1 review, seeded AI dossier (no crawl detection)."
+    }
+  },
   "externalEvents": {
     "seededAiEvent": {
       "id": "e5100000-0000-4000-8000-000000000001",
