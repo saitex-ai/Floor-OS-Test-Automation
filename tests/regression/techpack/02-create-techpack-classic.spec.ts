@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/techpack.fixtures';
+import { knownBug } from '../../../src/utils/test-annotations';
 
 /**
  * Techpack — New Techpack (Classic manual form).
@@ -167,6 +168,7 @@ test.describe('Techpack - New Techpack (Classic)', () => {
   });
 
   test('TC:7 Verify successful creation with all required fields and a techpack document', async ({
+    techpackPage,
     createTechpackPage,
     canvasPage,
     page,
@@ -211,13 +213,16 @@ test.describe('Techpack - New Techpack (Classic)', () => {
         await expect(page).toHaveURL(/\/techpacks\/view\/[^/]+$/);
         const created = await createTechpackPage.currentTechpackCode();
         expect(created).toMatch(/^TP\d{6}-\d{6}$/);
-        await expect(page.getByRole('heading', { name: created, level: 1 })).toBeVisible();
+        await expect(techpackPage.locators.techpackHeading(created)).toBeVisible();
         await expect(createTechpackPage.locators.createdToast).toContainText(
           `Techpack ${created} created`,
         );
         return created;
       });
 
+    // Open because every picked value is Approved master data (the random
+    // picks prefer Approved values); one Draft value would leave it Draft
+    // with "Move to Open — Pending approval: <field>".
     await test.step(`${code} is Open, not Draft (its canvas Details)`, async () => {
       await canvasPage.gotoCanvasById(createTechpackPage.currentTechpackId());
       await canvasPage.expectLoaded();
@@ -341,6 +346,7 @@ test.describe('Techpack - New Techpack (Classic)', () => {
     page,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abxb20', 'TC:9 bug (ClickUp)');
+    knownBug('z941abxb20');
     // Confirmed bug, ClickUp z941abxb20 (see test-case doc's own notes):
     // the "Add techpack type" dialog has no client-side length check, so
     // this flow can run all the way to filling the remaining 6 fields,

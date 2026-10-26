@@ -54,6 +54,11 @@ export class ValidationRulesLocators {
   readonly nextPageButton: Locator;
   /** "1 of N" between Previous and Next. */
   readonly pageOfText: Locator;
+  /** Pager controls removed by the 2026-10-22 redesign, kept to check they stay gone. */
+  readonly firstOrLastPageButtons: Locator;
+  readonly jumpToPageInput: Locator;
+  /** The options of the open "Rows per page" listbox. */
+  readonly rowsPerPageOptions: Locator;
 
   // New / Edit rule dialog
   readonly ruleDialog: Locator;
@@ -111,6 +116,9 @@ export class ValidationRulesLocators {
     // Since the 2026-10-22 redesign the pager is Previous / "1 of N" / Next
     // only: First page, Last page and Jump to page are gone.
     this.pageOfText = page.getByText(/^\d+ of \d+$/);
+    this.firstOrLastPageButtons = page.getByRole('button', { name: /^(First|Last) page$/ });
+    this.jumpToPageInput = page.getByRole('textbox', { name: /^Jump to page/ });
+    this.rowsPerPageOptions = page.getByRole('listbox').last().getByRole('option');
 
     this.ruleDialog = page.getByRole('dialog', { name: /^(New|Edit) validation rule$/ });
     this.newRuleDialog = page.getByRole('dialog', { name: 'New validation rule' });

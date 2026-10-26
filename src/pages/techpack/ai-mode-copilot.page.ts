@@ -55,17 +55,18 @@ export class AiModeCopilotPage extends BasePage {
     await expect(this.locators.heading).toBeVisible({ timeout: 30_000 });
   }
 
-  /** Click the "Use the manual form" link on the upload screen itself (found 2026-09-25). */
   /**
    * The landing's way to the Classic form (2026-10-22 redesign): Add files ›
-   * More tools (a submenu, opened by hover) › Manual form.
+   * More tools (a submenu) › Manual form. The submenu is opened by clicking
+   * "More tools", not by hovering, which can close it on the way across.
    */
   async openManualFormFromAddFiles(): Promise<void> {
     await this.locators.addFilesButton.click();
-    await this.locators.moreToolsMenuItem.hover();
+    await this.locators.moreToolsMenuItem.click();
     await this.locators.manualFormMenuItem.click();
   }
 
+  /** Click the "Use the manual form" link on the upload screen itself (found 2026-09-25). */
   async useManualForm(): Promise<void> {
     await this.locators.useManualFormLink.click();
   }

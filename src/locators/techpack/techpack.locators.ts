@@ -89,6 +89,8 @@ export class TechpackLocators {
   /** Every techpack code button in the grid (`TP202610-000131`, `DRAFT/01M5GZWAD0WY`). */
   readonly codeButtons: Locator;
   readonly emptyResultText: Locator;
+  /** Whichever listbox is open (a filter field, rows per page). */
+  readonly openListbox: Locator;
 
   constructor(private readonly page: Page) {
     this.main = page.getByRole('main').last();
@@ -162,11 +164,30 @@ export class TechpackLocators {
     this.bodyRows = this.table.locator('tbody').getByRole('row');
     this.codeButtons = this.table.getByRole('button', { name: /^(TP\d{6}-\d+|DRAFT\/\w+)$/ });
     this.emptyResultText = this.main.getByText('No results found', { exact: true });
+    this.openListbox = page.getByRole('listbox').last();
   }
 
   /** A techpack's code button in the grid (clicking it opens `/techpacks/view/{id}`). */
   codeButton(techpackCode: string): Locator {
     return this.table.getByRole('button', { name: techpackCode, exact: true });
+  }
+
+  /**
+   * A techpack page's <h1>, which is its code (`/techpacks/view/{id}`, where
+   * a code in the grid or a Classic create lands).
+   */
+  techpackHeading(techpackCode: string): Locator {
+    return this.page.getByRole('heading', { name: techpackCode, level: 1 });
+  }
+
+  /** The content area's <h1> by name, e.g. a translated "Bảng điều khiển". */
+  headingNamed(name: string): Locator {
+    return this.main.getByRole('heading', { name, level: 1 });
+  }
+
+  /** A button in the content area by its exact name, e.g. a translated "Tạo mới". */
+  mainButton(name: string): Locator {
+    return this.main.getByRole('button', { name, exact: true });
   }
 
   /** A Production Stages step, e.g. `productionStage(3)` → "STEP 3 Fitting 5". */
@@ -200,7 +221,7 @@ export class TechpackLocators {
 
   /** An option in whichever listbox is open (filter fields, rows-per-page). */
   listboxOption(name: string | RegExp): Locator {
-    return this.page.getByRole('listbox').last().getByRole('option', { name, exact: true });
+    return this.openListbox.getByRole('option', { name, exact: true });
   }
 
   /** A column's checkbox in the "Columns" dialog ("Toggle <label>"). */

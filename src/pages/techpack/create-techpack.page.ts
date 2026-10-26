@@ -142,11 +142,23 @@ export class CreateTechpackPage extends BasePage {
       const lines = text.split('\n').map((l) => l.trim());
       return (lines.length > 1 ? lines[1] : lines[0]) ?? '';
     };
-    const usable = texts
+    // An option's last line is its master-data status ("Approved", "Draft",
+    // …). A techpack is created Open only when every picked value is
+    // Approved; one Draft value leaves it Draft, with "Move to Open — Pending
+    // approval: <field>" (seen on dev 2026-10-26). So prefer Approved values.
+    const statusOf = (text: string) =>
+      text
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .pop() ?? '';
+    const valid = texts
       .map((text, index) => ({ text, index }))
       .filter(({ text }) =>
         labelText !== 'Techpack Type*' ? true : codeOf(text).length <= TECHPACK_TYPE_CODE_MAX,
       );
+    const approved = valid.filter(({ text }) => statusOf(text) === 'Approved');
+    const usable = approved.length > 0 ? approved : valid;
     const pool = usable.length > 0 ? usable : texts.map((text, index) => ({ text, index }));
     const pick = pool[Math.floor(Math.random() * pool.length)]!;
     await options.nth(pick.index).click();
@@ -481,7 +493,6 @@ export class CreateTechpackPage extends BasePage {
     await expect(this.page.getByText(/^TP\d+-\d+$/).first()).toBeVisible({ timeout: 30_000 });
   }
 
-  /** Reads the real Techpack Code off the detail/canvas view right after a successful create(). */
   /** The new techpack's id, from the `/techpacks/view/{id}` URL a create lands on. */
   currentTechpackId(): string {
     const id = this.page.url().match(/\/techpacks\/view\/([^/?#]+)/)?.[1];
@@ -489,6 +500,7 @@ export class CreateTechpackPage extends BasePage {
     return id;
   }
 
+  /** Reads the real Techpack Code off the detail/canvas view right after a successful create(). */
   async currentTechpackCode(): Promise<string> {
     return this.page
       .getByText(/^TP\d+-\d+$/)

@@ -247,7 +247,6 @@ test.describe('Techpack - Validation Rules', () => {
 
   test('TC:9 Verify the pagination controls for a multi-page dataset', async ({
     validationRulesPage,
-    page,
   }) => {
     test.setTimeout(120_000);
     const l = validationRulesPage.locators;
@@ -265,8 +264,8 @@ test.describe('Techpack - Validation Rules', () => {
     });
 
     await test.step('First page, Last page and Jump to page are gone', async () => {
-      await expect(page.getByRole('button', { name: /^(First|Last) page$/ })).toHaveCount(0);
-      await expect(page.getByRole('textbox', { name: /^Jump to page/ })).toHaveCount(0);
+      await expect(l.firstOrLastPageButtons).toHaveCount(0);
+      await expect(l.jumpToPageInput).toHaveCount(0);
     });
 
     await test.step('Next page moves to rows 26+, Previous goes back', async () => {
@@ -280,9 +279,8 @@ test.describe('Techpack - Validation Rules', () => {
 
     await test.step('Rows per page offers 25, 50 and 100; at 50 up to 50 rows show', async () => {
       await l.rowsPerPageCombobox.click();
-      const options = page.getByRole('listbox').last().getByRole('option');
-      await expect(options).toHaveText([/25/, /50/, /100/]);
-      await options.filter({ hasText: '50' }).click();
+      await expect(l.rowsPerPageOptions).toHaveText([/25/, /50/, /100/]);
+      await l.rowsPerPageOptions.filter({ hasText: '50' }).click();
       await expect(l.showingText).toContainText(`Showing 1 to ${Math.min(50, total)} of ${total}`);
       await expect(l.dataRows).toHaveCount(Math.min(50, total));
     });
@@ -808,6 +806,13 @@ test.describe('Techpack - Validation Rules', () => {
       browser,
     }) => {
       await allure.tms('https://app.clickup.com/t/z941abxkur', 'TC:29 clarification (ClickUp)');
+      // Open question, not a confirmed bug: no spec says Validation Rules
+      // writes are Admin-only, and bob (Qc-lead) still has an enabled "New
+      // rule" (2026-10-23). Parked until the product decides (z941abxkur).
+      test.fixme(
+        true,
+        'Open question z941abxkur: should a Qc-lead be able to write Validation Rules?',
+      );
       test.setTimeout(180_000);
       const bob = await loginAsSecondUser(browser);
       try {

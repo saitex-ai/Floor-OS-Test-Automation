@@ -161,6 +161,28 @@ export class TechpackPage extends BasePage {
     await expect(this.locators.productionStage(step)).toHaveAttribute('aria-pressed', 'true');
   }
 
+  /** The stage name on a Production Stages step, e.g. "STEP 3 Fitting 5" -> "Fitting". */
+  async stageName(step: number): Promise<string> {
+    const lines = (await this.locators.productionStage(step).innerText())
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+    return lines[1] ?? '';
+  }
+
+  /**
+   * The Production Stages that currently hold techpacks, in step order. The
+   * Filter dialog's Stage field only offers these (uat has all six; dev had
+   * nothing in SMS / TOP / Approved on 2026-10-26).
+   */
+  async stagesWithTechpacks(): Promise<string[]> {
+    const names: string[] = [];
+    for (let step = 1; step <= 6; step++) {
+      if ((await this.stageCount(step)) > 0) names.push(await this.stageName(step));
+    }
+    return names;
+  }
+
   /** The count on a Production Stages step, e.g. "STEP 3 Fitting 5" -> 5. */
   async stageCount(step: number): Promise<number> {
     const text = (await this.locators.productionStage(step).innerText()).replace(/\s+/g, ' ');
@@ -193,7 +215,7 @@ export class TechpackPage extends BasePage {
   /** The option texts a "Filter" dialog field offers (the listbox shows at most 15). */
   async filterFieldOptions(label: string): Promise<string[]> {
     await this.locators.filterField(label).click();
-    const listbox = this.page.getByRole('listbox').last();
+    const listbox = this.locators.openListbox;
     await expect(listbox.getByRole('option').first()).toBeVisible();
     const options = (await listbox.getByRole('option').allInnerTexts()).map((o) => o.trim());
     await this.page.keyboard.press('Escape');
@@ -204,8 +226,8 @@ export class TechpackPage extends BasePage {
   /** Picks one value in a (multi-select) "Filter" dialog field and closes its listbox. */
   async pickFilterValue(label: string, value: string): Promise<void> {
     await this.locators.filterField(label).click();
-    const listbox = this.page.getByRole('listbox').last();
-    await listbox.getByRole('option', { name: value, exact: true }).click();
+    const listbox = this.locators.openListbox;
+    await this.locators.listboxOption(value).click();
     await this.page.keyboard.press('Escape');
     await expect(listbox).toBeHidden();
   }
@@ -247,7 +269,11 @@ export class TechpackPage extends BasePage {
     await expect(this.locators.columnsDialog).toBeHidden();
   }
 
-  /** Back to the 8 default columns (the column choice survives a reload). */
+  /**
+   * Back to the 8 default columns. The column choice survives a reload, but
+   * it's kept in the browser (localStorage `techpacks-list-prefs-v3`), so a
+   * test's change never reaches another test's fresh context.
+   */
   async resetColumns(): Promise<void> {
     await this.openColumns();
     await this.locators.columnsResetButton.click();
@@ -264,7 +290,10 @@ export class TechpackPage extends BasePage {
     await expect(this.locators.viewMenu).toBeHidden();
   }
 
-  /** The View choice survives a reload, so put it back to List View before list checks. */
+  /**
+   * The View choice survives a reload (in the browser, like the columns), so
+   * make sure of List View before list checks.
+   */
   async ensureListView(): Promise<void> {
     await this.locators.viewButton.click();
     const list = this.locators.viewOption('List View');
