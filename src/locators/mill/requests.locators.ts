@@ -30,7 +30,8 @@ export class RequestsLocators {
   // combobox too (as of 2026-10, was a native <select> as recently as
   // 2026-10-05). The single "From {source}" region for the chosen
   // department's own upstream source has its own material picker
-  // (also a searchable combobox), quantity and Add button.
+  // (also a searchable combobox), a quantity per picked unit and a
+  // "Submit request to {source}" button.
   readonly requestMaterialsCard: Locator;
   readonly requestingDepartmentCombobox: Locator;
   readonly sourceRegions: Locator;
