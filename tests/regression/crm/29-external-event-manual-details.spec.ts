@@ -31,7 +31,7 @@ async function createManualEvent(
   externalEventsPage: ExternalEventsPage,
   overrides: Partial<ExternalEventDetails> = {},
 ): Promise<string> {
-  const title = overrides.title ?? `Regression Manual Details Event ${Date.now()}`;
+  const title = overrides.title ?? `QA-AUTO Regression Manual Details Event ${Date.now()}`;
   await externalEventsPage.openFromEventsList();
   await externalEventsPage.fill({
     title,
@@ -146,7 +146,7 @@ test.describe('CRM - External Events (manual) Details screen', () => {
       await expect(page).toHaveURL(/\/crm\/customers\/new\?eventId=/);
     });
 
-    await test.step('Fill the profile: CRM Stage is Lead and Origin Type is locked to External Event', async () => {
+    await test.step('Fill the profile: CRM Stage is Lead, Origin Type is locked to External Event, Origin stays empty', async () => {
       await createCustomerPage.fillProfile({
         name: customerName,
         email: `pw-leads-${Date.now()}@example.com`,
@@ -154,9 +154,15 @@ test.describe('CRM - External Events (manual) Details screen', () => {
         country: 'India',
         buyer: 'Fabric',
       });
-      await expect(l.crmStageCombobox).toHaveText(/Lead/);
-      await expect(l.originTypeCombobox).toHaveText(/External Event/);
+      await expect(l.crmStageCombobox).toHaveText(/^Lead$/);
+      await expect(l.originTypeCombobox).toHaveText(/^External Event$/);
       await expect(l.originTypeCombobox).toBeDisabled();
+      // Origin is left empty and disabled here, and the Customer still
+      // saves: expected — only Customer Name is mandatory (prototype field
+      // rules, dev 2026-10-26). Decision recorded on the test case:
+      // https://app.clickup.com/t/z941abvg1w?comment=1100750000236468
+      await expect(l.originCombobox).toHaveText(/^Select$/);
+      await expect(l.originCombobox).toBeDisabled();
     });
 
     await test.step('Save creates the Customer', async () => {
@@ -169,8 +175,7 @@ test.describe('CRM - External Events (manual) Details screen', () => {
       await externalEventsPage.search(title);
       await externalEventsPage.openEventRow(title);
       await externalEventsPage.openLeadsTab();
-      await expect(externalEventsPage.locators.leadsTabButton).toHaveText('Leads (1)');
-      await expect(page.getByText(customerName)).toBeVisible();
+      await externalEventsPage.expectLeadListed(customerName, 1);
     });
   });
 

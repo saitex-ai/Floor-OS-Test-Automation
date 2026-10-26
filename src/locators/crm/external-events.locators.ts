@@ -457,4 +457,9 @@ export class ExternalEventsLocators {
       hasNot: this.page.getByRole('cell', { name: 'Other', exact: true }),
     });
   }
+
+  /** A Customer listed on the event's Leads tab, by its (unique) name. */
+  leadEntry(customerName: string): Locator {
+    return this.page.getByText(customerName, { exact: true });
+  }
 }

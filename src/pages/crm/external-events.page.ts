@@ -358,6 +358,12 @@ export class ExternalEventsPage extends BasePage {
     await this.locators.createCustomerLeadLink.click();
   }
 
+  /** The Leads tab shows `count` leads and lists the Customer `customerName`. */
+  async expectLeadListed(customerName: string, count: number): Promise<void> {
+    await expect(this.locators.leadsTabButton).toHaveText(`Leads (${count})`);
+    await expect(this.locators.leadEntry(customerName)).toBeVisible();
+  }
+
   // ---------------------------------------------------------------------
   // List screen (CRM Sprint 5 — "Build External Events List with Web
   // Crawling"). Confirmed against dev (2026-10-15):
