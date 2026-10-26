@@ -7,8 +7,9 @@ import { type Locator, type Page } from '@playwright/test';
  *
  * Since the mill CR round (2026-10) there are no tabs: the request list
  * is filtered by status pills (All — selected by default — / Pending /
- * In transit / "+n more"), and "New request", "Receive Goods" and
- * "Direct transfer" are buttons that open popups.
+ * In transit / "+n more"). "Receive Goods" and "Direct transfer" are
+ * buttons that open popups; "New request" opens its own page,
+ * /mill/requests/new (a popup until 2026-10-26).
  */
 export class RequestsLocators {
   readonly heading: Locator;
@@ -21,11 +22,11 @@ export class RequestsLocators {
   readonly receiveGoodsButton: Locator;
   readonly directTransferButton: Locator;
 
-  // Opens the "New request" popup dialog
+  // Opens the "New request" page (/mill/requests/new)
   readonly newRequestButton: Locator;
-  readonly newRequestDialog: Locator;
+  readonly newRequestHeading: Locator;
 
-  // New request dialog — "Requesting department" is a searchable
+  // New request page — "Requesting department" is a searchable
   // combobox too (as of 2026-10, was a native <select> as recently as
   // 2026-10-05). The single "From {source}" region for the chosen
   // department's own upstream source has its own material picker
@@ -48,7 +49,7 @@ export class RequestsLocators {
     this.directTransferButton = page.getByRole('button', { name: 'Direct transfer' });
 
     this.newRequestButton = page.getByRole('button', { name: /^New request/i });
-    this.newRequestDialog = page.getByRole('dialog');
+    this.newRequestHeading = page.getByRole('heading', { level: 1, name: 'New request' });
 
     this.requestMaterialsCard = page.getByRole('heading', { name: /^Request materials for / });
     this.requestingDepartmentCombobox = page.getByRole('combobox', {
@@ -61,7 +62,7 @@ export class RequestsLocators {
     this.toast = page.locator('[data-sonner-toast]');
   }
 
-  /** The "From {source}" region on the New request popup. */
+  /** The "From {source}" region on the New request page. */
   sourceRegion(source: string): Locator {
     return this.page.getByRole('region', { name: `From ${source}` });
   }
