@@ -1,6 +1,9 @@
 import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/crm.fixtures';
-import type { ExternalEventsPage, ExternalEventDetails } from '../../../src/pages/crm/external-events.page';
+import type {
+  ExternalEventsPage,
+  ExternalEventDetails,
+} from '../../../src/pages/crm/external-events.page';
 
 /**
  * CRM — External Events [created by user manually] Details screen (Sprint 4).
@@ -28,7 +31,7 @@ async function createManualEvent(
   externalEventsPage: ExternalEventsPage,
   overrides: Partial<ExternalEventDetails> = {},
 ): Promise<string> {
-  const title = overrides.title ?? `Regression Manual Details Event ${Date.now()}`;
+  const title = overrides.title ?? `QA-AUTO Regression Manual Details Event ${Date.now()}`;
   await externalEventsPage.openFromEventsList();
   await externalEventsPage.fill({
     title,
@@ -121,20 +124,65 @@ test.describe('CRM - External Events (manual) Details screen', () => {
     });
   });
 
-  test('TC:4 Verify Customer Creation from Leads Tab', async ({ externalEventsPage }) => {
+  test('TC:4 Verify Customer Creation from Leads Tab', async ({
+    externalEventsPage,
+    createCustomerPage,
+    page,
+  }) => {
     await allure.tms('https://app.clickup.com/t/z941abvg1w', 'TC:4 (ClickUp)');
+    const customerName = `Playwright Leads Customer ${Date.now()}`;
+    const l = createCustomerPage.locators;
 
-    await createManualEvent(externalEventsPage);
-    await externalEventsPage.openLeadsTab();
-    await expect(externalEventsPage.locators.createCustomerLeadLink).toBeVisible();
+    const title = await test.step('Create a manual event and open its Leads tab', async () => {
+      const eventTitle = await createManualEvent(externalEventsPage);
+      await externalEventsPage.openLeadsTab();
+      await expect(externalEventsPage.locators.leadsTabButton).toHaveText('Leads (0)');
+      return eventTitle;
+    });
 
-    test.fixme(
-      true,
-      'Confirmed against the running app (2026-09-25): the Leads tab\'s "Create Customer" link correctly pre-links the event (CRM Stage locks to "Lead", Origin Type locks to "External Event"), but the still-mandatory "Origin" combobox on the resulting form is ALSO permanently disabled with no visible way to satisfy it — Save can never succeed through this entry point. A real, confirmed app bug (not a locator/automation gap) — see external-events.locators.ts\'s class doc. Re-enable once Origin is fixed to either auto-fill or become selectable.',
-    );
+    await test.step('Create Customer opens the form pre-linked to the event', async () => {
+      await externalEventsPage.openCreateCustomerFromLeads();
+      await expect(l.profileSection).toBeVisible();
+      await expect(page).toHaveURL(/\/crm\/customers\/new\?eventId=/);
+    });
+
+    await test.step('Fill the profile: CRM Stage is Lead, Origin Type is locked to External Event, Origin stays empty', async () => {
+      await createCustomerPage.fillProfile({
+        name: customerName,
+        email: `pw-leads-${Date.now()}@example.com`,
+        city: 'Coimbatore',
+        country: 'India',
+        buyer: 'Fabric',
+      });
+      await expect(l.crmStageCombobox).toHaveText(/^Lead$/);
+      await expect(l.originTypeCombobox).toHaveText(/^External Event$/);
+      await expect(l.originTypeCombobox).toBeDisabled();
+      // Origin is left empty and disabled here, and the Customer still
+      // saves: expected — only Customer Name is mandatory (prototype field
+      // rules, dev 2026-10-26). Decision recorded on the test case:
+      // https://app.clickup.com/t/z941abvg1w?comment=1100750000236468
+      await expect(l.originCombobox).toHaveText(/^Select$/);
+      await expect(l.originCombobox).toBeDisabled();
+    });
+
+    await test.step('Save creates the Customer', async () => {
+      await createCustomerPage.save();
+      await createCustomerPage.expectSavedSuccessfully();
+    });
+
+    await test.step("The new Customer is listed on the event's Leads tab", async () => {
+      await externalEventsPage.openList();
+      await externalEventsPage.search(title);
+      await externalEventsPage.openEventRow(title);
+      await externalEventsPage.openLeadsTab();
+      await externalEventsPage.expectLeadListed(customerName, 1);
+    });
   });
 
-  test('TC:5 Verify Audit History Tracking (System section)', async ({ externalEventsPage, page }) => {
+  test('TC:5 Verify Audit History Tracking (System section)', async ({
+    externalEventsPage,
+    page,
+  }) => {
     await allure.tms('https://app.clickup.com/t/z941abvg1x', 'TC:5 (ClickUp)');
 
     const title = await createManualEvent(externalEventsPage);

@@ -15,14 +15,14 @@
 
 ## Test cases
 
-| #    | Test case                                                       | Steps                                                                                     | Expected result                                                                                              | ClickUp                                      | Automated                | Verified locally |
-| ---- | -----------------------------------------------------------------| --------------------------------------------------------------------------------------------| ----------------------------------------------------------------------------------------------------------- | --------------------------------------------- | -------------------------- | ------------------ |
-| TC:1 | Verify Overview Tab Display                                      | 1. Open a manually-created event.<br>2. Inspect the Overview tab.                            | Core event details and System fields (created/updated timestamps + acting user) render accurately.           | [link](https://app.clickup.com/t/z941abvg1e) | ✅                        | ✅ passing         |
-| TC:2 | Verify Status Update to "Attended" Unlocks Tabs                  | 1. (Corrected — see Notes) Verify a freshly-created manual event's state.                    | The event is already Attended, with Feedback Form/Leads immediately reachable — no lock/unlock transition exists for this creation path. | [link](https://app.clickup.com/t/z941abvg1f) | ✅ (corrected, see Notes) | ✅ passing         |
-| TC:3 | Verify Feedback Form Completion                                   | 1. Click the Feedback Form tab.                                                              | The feedback submitted at creation renders correctly and is already saved (read-only — see Notes).            | [link](https://app.clickup.com/t/z941abvg1g) | ✅ (corrected, see Notes) | ✅ passing         |
-| TC:4 | Verify Customer Creation from Leads Tab                           | 1. Open the Leads tab.<br>2. Click Create Customer.<br>3. Fill in customer details and save. | A new Customer record is generated and associated with this event, appearing in its linked lead list.        | [link](https://app.clickup.com/t/z941abvg1w) | ⚠️ `test.fixme()`         | ❌ blocked (see Notes) |
-| TC:5 | Verify Audit History Tracking                                     | 1. Navigate to the audit/history trail section of the event.                                 | Every status change, edit, or feedback submission is logged with timestamp and acting user (partial — see Notes). | [link](https://app.clickup.com/t/z941abvg1x) | ✅ (partial, see Notes)   | ✅ passing         |
-| TC:6 | Prevent Access to Feedback and Leads When Un-Attended              | 1. Open an un-attended event's Details screen.<br>2. Attempt to access Feedback Form/Leads.  | Feedback completion and lead creation are blocked, with an explanatory message.                                | [link](https://app.clickup.com/t/z941abvg1y) | ⚠️ `test.fixme()`         | ⏭️ unreachable state (see Notes) |
+| #    | Test case                                             | Steps                                                                                        | Expected result                                                                                                                          | ClickUp                                      | Automated                 | Verified locally                 |
+| ---- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ------------------------- | -------------------------------- |
+| TC:1 | Verify Overview Tab Display                           | 1. Open a manually-created event.<br>2. Inspect the Overview tab.                            | Core event details and System fields (created/updated timestamps + acting user) render accurately.                                       | [link](https://app.clickup.com/t/z941abvg1e) | ✅                        | ✅ passing                       |
+| TC:2 | Verify Status Update to "Attended" Unlocks Tabs       | 1. (Corrected — see Notes) Verify a freshly-created manual event's state.                    | The event is already Attended, with Feedback Form/Leads immediately reachable — no lock/unlock transition exists for this creation path. | [link](https://app.clickup.com/t/z941abvg1f) | ✅ (corrected, see Notes) | ✅ passing                       |
+| TC:3 | Verify Feedback Form Completion                       | 1. Click the Feedback Form tab.                                                              | The feedback submitted at creation renders correctly and is already saved (read-only — see Notes).                                       | [link](https://app.clickup.com/t/z941abvg1g) | ✅ (corrected, see Notes) | ✅ passing                       |
+| TC:4 | Verify Customer Creation from Leads Tab               | 1. Open the Leads tab.<br>2. Click Create Customer.<br>3. Fill in customer details and save. | A new Customer record is generated and associated with this event, appearing in its linked lead list.                                    | [link](https://app.clickup.com/t/z941abvg1w) | ✅ automated              | ✅ pass (2026-10-23)             |
+| TC:5 | Verify Audit History Tracking                         | 1. Navigate to the audit/history trail section of the event.                                 | Every status change, edit, or feedback submission is logged with timestamp and acting user (partial — see Notes).                        | [link](https://app.clickup.com/t/z941abvg1x) | ✅ (partial, see Notes)   | ✅ passing                       |
+| TC:6 | Prevent Access to Feedback and Leads When Un-Attended | 1. Open an un-attended event's Details screen.<br>2. Attempt to access Feedback Form/Leads.  | Feedback completion and lead creation are blocked, with an explanatory message.                                                          | [link](https://app.clickup.com/t/z941abvg1y) | ⚠️ `test.fixme()`         | ⏭️ unreachable state (see Notes) |
 
 4/6 TCs confirmed passing for real (TC:2/TC:3 rewritten to test the
 corrected, real behavior rather than the original premise), against a
@@ -58,22 +58,15 @@ TC:2/TC:3 (the real To Attend → Attended transition).
   suite — the state itself doesn't exist in this app for this creation
   path.
 
-**TC:4 — a genuine, confirmed app bug, not a locator/automation gap.**
-The Leads tab's "Scan & Create"/"Create Customer" actions render as real
-`<a href>` **links** (role `link`, not `button` — worth flagging as a
-Playwright locator trap for anyone touching this screen next), each
-correctly deep-linking to `/crm/customers/new`/`/crm/customers/scan` with
-`eventId`/`eventName`/`eventType` query params. Opening "Create Customer"
-this way correctly pre-locks **CRM Stage → "Lead"** and **Origin Type →
-"External Event"** — but the still-**mandatory "Origin" combobox is ALSO
-permanently disabled**, with no visible way to populate or unlock it
-(confirmed directly: waited 3s, inspected its `disabled` state, no
-loading/async-fill ever resolves it). Since Origin is required but can
-never be set, **Save can never succeed through this entry point** in this
-environment. The test opens the link and confirms it's reachable, then
-`test.fixme()`s the actual save with this bug spelled out in the reason —
-re-enable once Origin is fixed to either auto-fill from the event context
-or become genuinely selectable.
+**TC:4 — works on dev (re-checked 2026-10-23).** The Leads tab's
+"Scan & Create"/"Create Customer" actions render as real `<a href>`
+**links** (role `link`, not `button`), deep-linking to
+`/crm/customers/new`/`/crm/customers/scan` with `eventId`/`eventName`/
+`eventType` query params. Opening "Create Customer" this way sets **CRM
+Stage → "Lead"** and locks **Origin Type → "External Event"**. Origin
+stays disabled and unset, but it no longer blocks Save (it did on
+2026-09-25): the Customer is created and listed on the event's Leads tab,
+which the test checks end to end.
 
 **TC:5 is partial, honest coverage.** This screen has **no separate
 audit-trail/history tab or per-change log anywhere** — confirmed by
@@ -94,9 +87,3 @@ difference between how that script's `.innerText()` call resolved styles
 and how Playwright's own test runner does. Always confirm exact casing
 through the actual `npx playwright test` run, not just an ad hoc script,
 before hardcoding a string assertion.
-
-Before trusting a pass/fail from `29-external-event-manual-details.spec.ts`
-on a different environment, first check whether the TC:4 Origin-field bug
-has been fixed (if so, un-`fixme` it and complete the real save-and-verify
-flow) and update this note the same way `create-contact.md` and
-`create-customer.md` were updated after their own first live runs.

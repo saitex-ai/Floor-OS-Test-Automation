@@ -99,14 +99,10 @@ const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/
  *   locator trap), each a plain `<a href>` to the existing
  *   `/crm/customers/scan`/`/crm/customers/new` routes with `eventId`/
  *   `eventName`/`eventType` query params. Confirmed directly: the
- *   resulting Create Customer form pre-locks CRM Stage to "Lead" and
- *   Origin Type to "External Event" — but ALSO locks the still-required
- *   "Origin" combobox in a permanently disabled state with no visible
- *   way to satisfy it (confirmed after a 3s wait and inspecting its
- *   `disabled` state directly), which blocks Save from ever succeeding
- *   through this entry point. This is a genuine, confirmed app gap, not
- *   a locator guess — see external-events.page.ts's class doc and
- *   test-cases/crm/external-event-manual-details.md's Notes.
+ *   resulting Create Customer form pre-sets CRM Stage to "Lead" and
+ *   locks Origin Type to "External Event"; Origin stays disabled and
+ *   unset, but no longer blocks Save (re-checked on dev 2026-10-23: the
+ *   Customer saves and is listed on the event's Leads tab).
  */
 export class ExternalEventsLocators {
   readonly createEventButton: Locator;
@@ -460,5 +456,10 @@ export class ExternalEventsLocators {
     return this.tableRows().filter({
       hasNot: this.page.getByRole('cell', { name: 'Other', exact: true }),
     });
+  }
+
+  /** A Customer listed on the event's Leads tab, by its (unique) name. */
+  leadEntry(customerName: string): Locator {
+    return this.page.getByText(customerName, { exact: true });
   }
 }

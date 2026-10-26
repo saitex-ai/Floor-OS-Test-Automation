@@ -353,9 +353,15 @@ export class ExternalEventsPage extends BasePage {
     await expect(body).toContainText(/updated by/i);
   }
 
-  /** TC:4 — opens the event's own "Create Customer" lead-capture link from its Leads tab (pre-links eventId via query params). Does NOT complete the save — see class doc: the resulting form's "Origin" field is confirmed permanently disabled while still required, blocking Save through this entry point in this environment. */
+  /** TC:4 — opens the event's own "Create Customer" lead-capture link from its Leads tab (pre-links eventId via query params). */
   async openCreateCustomerFromLeads(): Promise<void> {
     await this.locators.createCustomerLeadLink.click();
+  }
+
+  /** The Leads tab shows `count` leads and lists the Customer `customerName`. */
+  async expectLeadListed(customerName: string, count: number): Promise<void> {
+    await expect(this.locators.leadsTabButton).toHaveText(`Leads (${count})`);
+    await expect(this.locators.leadEntry(customerName)).toBeVisible();
   }
 
   // ---------------------------------------------------------------------
