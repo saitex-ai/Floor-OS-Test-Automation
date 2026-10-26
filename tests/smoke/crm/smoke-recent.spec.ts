@@ -56,14 +56,22 @@ test.describe('CRM Smoke — Recent', () => {
   });
 
   test('Create Contact: linking to an existing Customer succeeds', async ({
+    createCustomerPage,
     createContactPage,
   }) => {
+    // Its own Customer to link to, rather than a seeded dev record.
+    const customerName = `Playwright Smoke Contact Customer ${Date.now()}`;
+    await createCustomerPage.openFromCrmHome();
+    await createCustomerPage.fillProfile({ name: customerName, skipCompany: true });
+    await createCustomerPage.save();
+    await createCustomerPage.expectSavedSuccessfully();
+
     await createContactPage.openFromContactList();
     await createContactPage.fillProfile({
       name: 'Playwright Smoke Contact',
       email: `pw-smoke-contact-${Date.now()}@example.com`,
     });
-    await createContactPage.linkToCustomer('Acme Textiles');
+    await createContactPage.linkToCustomer(customerName);
     await createContactPage.save();
     await expect(createContactPage.locators.toast).toBeVisible();
   });

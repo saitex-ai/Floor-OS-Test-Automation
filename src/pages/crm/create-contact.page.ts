@@ -100,7 +100,14 @@ export class CreateContactPage extends BasePage {
    */
   async linkToCustomer(customerName: string): Promise<void> {
     await this.locators.customerNameCombobox.click();
+    // Type the name to filter the list: a new Customer isn't on the first
+    // pages, so paging alone ("Load 15 more") may never reach it.
+    await this.locators.customerNameCombobox.fill(customerName);
     const option = this.locators.customerOption(customerName);
+    await option
+      .first()
+      .waitFor({ state: 'visible', timeout: 15_000 })
+      .catch(() => {});
     for (let attempt = 0; attempt < 10; attempt++) {
       if (
         await option
