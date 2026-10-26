@@ -1,5 +1,6 @@
 import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/crm.fixtures';
+import { randomLetters } from '../../../src/utils/test-data';
 
 /**
  * CRM — Contacts tab in Customer Details screen (Sprint 2).
@@ -12,12 +13,6 @@ import { test, expect } from '../../../src/fixtures/crm.fixtures';
  * linking goes through a "Contacts to link" combobox (not a separate
  * dialog trigger), and a linked Contact is "Delink"ed (not "Unlink"ed).
  */
-/** Contact Name is validated "Alphabets only" — no digits allowed, so timestamps can't be used for uniqueness there. */
-function randomLetters(length = 8): string {
-  return Array.from({ length }, () =>
-    String.fromCharCode(97 + Math.floor(Math.random() * 26)),
-  ).join('');
-}
 
 test.describe('CRM - Contacts tab in Customer Details', () => {
   test.beforeEach(async () => {

@@ -45,6 +45,17 @@ export class CustomerDetailPage extends BasePage {
     this.locators = new CustomerDetailLocators(page);
   }
 
+  /** The open Customer's id, from the Detail URL (`/crm/customers/<id>`). */
+  async currentCustomerId(): Promise<string> {
+    await expect(this.page).toHaveURL(/\/crm\/customers\/[0-9a-f-]+$/);
+    return new URL(this.page.url()).pathname.split('/').pop()!;
+  }
+
+  /** Opens a Customer's Detail screen by id. */
+  async openById(customerId: string): Promise<void> {
+    await this.gotoAuthenticated(`/crm/customers/${customerId}`);
+  }
+
   async expectStatus(status: 'Active' | 'Inactive'): Promise<void> {
     await expect(this.page.getByText(new RegExp(`Status\\s*${status}`))).toBeVisible();
   }

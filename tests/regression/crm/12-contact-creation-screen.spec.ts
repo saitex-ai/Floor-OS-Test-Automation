@@ -1,5 +1,6 @@
 import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/crm.fixtures';
+import { randomLetters } from '../../../src/utils/test-data';
 
 /**
  * CRM — Contact Creation Screen (Sprint 1).
@@ -18,15 +19,11 @@ import { test, expect } from '../../../src/fixtures/crm.fixtures';
  * view — see each test for specifics.
  */
 /**
- * Contact Name is validated "Alphabets only", so a timestamp can't make it
- * unique; random letters do, so the prompt checks can tell this run's
- * Contact from earlier "Playwright Test Contact" ones.
+ * A unique "Playwright Test Contact <letters>" name, so the prompt checks
+ * can tell this run's Contact from earlier ones (Contact Name is letters only).
  */
 function uniqueContactName(): string {
-  const letters = Array.from({ length: 8 }, () =>
-    String.fromCharCode(97 + Math.floor(Math.random() * 26)),
-  ).join('');
-  return `Playwright Test Contact ${letters}`;
+  return `Playwright Test Contact ${randomLetters()}`;
 }
 
 test.describe('CRM - Contact Creation Screen', () => {

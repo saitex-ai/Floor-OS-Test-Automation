@@ -325,9 +325,9 @@ export class CreateTechpackPage extends BasePage {
    */
   async expectCustomerSelectable(customerName: string, selectable: boolean): Promise<void> {
     await this.locators.fieldTrigger('Customer*').click();
-    const listbox = this.page.getByRole('listbox').last();
+    const listbox = this.locators.openListbox();
     await expect(listbox.getByRole('option').first()).toBeVisible({ timeout: 30_000 });
-    await this.page.locator('[cmdk-input], input[type="text"]').last().fill(customerName);
+    await this.locators.comboboxSearchInput().fill(customerName);
     const escaped = customerName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const option = listbox.getByRole('option', { name: new RegExp(`^${escaped}\\b`) });
     if (selectable) {

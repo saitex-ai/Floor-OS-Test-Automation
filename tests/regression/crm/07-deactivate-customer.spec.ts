@@ -151,12 +151,10 @@ test.describe('CRM - Deactivate Customer', () => {
     createCustomerPage,
     customerDetailPage,
     customerListPage,
-    page,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abt53j', 'TC:6 (ClickUp)');
     const name = await createActiveCustomer(createCustomerPage);
-    await expect(page).toHaveURL(/\/crm\/customers\/[0-9a-f-]+$/);
-    const customerUrl = page.url();
+    const customerId = await customerDetailPage.currentCustomerId();
 
     // Master Data's active state is "Approved"; checking it first proves
     // the Inactive read below is a change, not the Customer's initial state.
@@ -168,7 +166,7 @@ test.describe('CRM - Deactivate Customer', () => {
     });
 
     await test.step('Deactivate the Customer in CRM', async () => {
-      await page.goto(customerUrl);
+      await customerDetailPage.openById(customerId);
       await customerDetailPage.deactivate(['Business misalignment'], 'Customer relocated overseas');
       await customerDetailPage.expectStatus('Inactive');
     });
@@ -185,12 +183,10 @@ test.describe('CRM - Deactivate Customer', () => {
     createCustomerPage,
     customerDetailPage,
     createTechpackPage,
-    page,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abt53k', 'TC:7 (ClickUp)');
     const name = await createActiveCustomer(createCustomerPage);
-    await expect(page).toHaveURL(/\/crm\/customers\/[0-9a-f-]+$/);
-    const customerUrl = page.url();
+    const customerId = await customerDetailPage.currentCustomerId();
 
     await test.step('While Active, Tech Pack creation offers the Customer', async () => {
       await createTechpackPage.openFromTechpacksList();
@@ -198,7 +194,7 @@ test.describe('CRM - Deactivate Customer', () => {
     });
 
     await test.step('Deactivate the Customer in CRM', async () => {
-      await page.goto(customerUrl);
+      await customerDetailPage.openById(customerId);
       await customerDetailPage.deactivate(['Business misalignment'], 'Customer relocated overseas');
       await customerDetailPage.expectStatus('Inactive');
     });

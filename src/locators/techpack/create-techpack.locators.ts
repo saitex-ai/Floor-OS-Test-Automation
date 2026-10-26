@@ -166,6 +166,16 @@ export class CreateTechpackLocators {
     return this.page.getByRole('option', { name });
   }
 
+  /** The most recently opened combobox listbox (pickers render one at a time). */
+  openListbox(): Locator {
+    return this.page.getByRole('listbox').last();
+  }
+
+  /** The type-to-search box of the open combobox (a cmdk input). */
+  comboboxSearchInput(): Locator {
+    return this.page.locator('[cmdk-input], input[type="text"]').last();
+  }
+
   /** Text anywhere on the form, e.g. an uploaded file's name. */
   text(content: string): Locator {
     return this.page.getByText(content);

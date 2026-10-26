@@ -1,5 +1,6 @@
 import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/crm.fixtures';
+import { randomLetters } from '../../../src/utils/test-data';
 
 /**
  * CRM — Contact List (Sprint 1).
@@ -16,13 +17,6 @@ import { test, expect } from '../../../src/fixtures/crm.fixtures';
  * seeded names. TC:11 is still skipped: it needs a Contact Details page
  * object, which doesn't exist yet — out of scope for this pass.
  */
-
-/** Contact Name is validated "Alphabets only" — no digits allowed, so timestamps can't be used for uniqueness there. */
-function randomLetters(length = 8): string {
-  return Array.from({ length }, () =>
-    String.fromCharCode(97 + Math.floor(Math.random() * 26)),
-  ).join('');
-}
 
 test.describe('CRM - Contact List', () => {
   test.beforeEach(async () => {
