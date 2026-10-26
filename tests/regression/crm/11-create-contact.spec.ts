@@ -13,6 +13,18 @@ import { test, expect } from '../../../src/fixtures/crm.fixtures';
  * dev 2026-10-23. TC:10 is `test.fixme()`'d — marked `fail` in ClickUp,
  * no confirmed audit view.
  */
+/**
+ * Contact Name is validated "Alphabets only", so a timestamp can't make it
+ * unique; random letters do, so the prompt checks can tell this run's
+ * Contact from earlier "Playwright Test Contact" ones.
+ */
+function uniqueContactName(): string {
+  const letters = Array.from({ length: 8 }, () =>
+    String.fromCharCode(97 + Math.floor(Math.random() * 26)),
+  ).join('');
+  return `Playwright Test Contact ${letters}`;
+}
+
 test.describe('CRM - Create Contact', () => {
   test.beforeEach(async () => {
     await allure.epic('CRM');
@@ -123,7 +135,7 @@ test.describe('CRM - Create Contact', () => {
     // test.fixme since 2026-09-16, when the typed name was dropped and the
     // Contact saved Unlinked. Accepting only opens Create Customer; the
     // Customer itself is not saved here.
-    const contactName = 'Playwright Test Contact';
+    const contactName = uniqueContactName();
     const newCustomerName = `Playwright Prompt Customer ${Date.now()}`;
     const modal = createContactPage.locators.postSaveCreateCustomerModal;
 

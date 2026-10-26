@@ -17,6 +17,18 @@ import { test, expect } from '../../../src/fixtures/crm.fixtures';
  * re-checked and enabled on dev 2026-10-23; TC:7 needs a confirmed audit
  * view — see each test for specifics.
  */
+/**
+ * Contact Name is validated "Alphabets only", so a timestamp can't make it
+ * unique; random letters do, so the prompt checks can tell this run's
+ * Contact from earlier "Playwright Test Contact" ones.
+ */
+function uniqueContactName(): string {
+  const letters = Array.from({ length: 8 }, () =>
+    String.fromCharCode(97 + Math.floor(Math.random() * 26)),
+  ).join('');
+  return `Playwright Test Contact ${letters}`;
+}
+
 test.describe('CRM - Contact Creation Screen', () => {
   test.beforeEach(async () => {
     await allure.epic('CRM');
@@ -105,11 +117,18 @@ test.describe('CRM - Contact Creation Screen', () => {
     // since 2026-09-16, when the typed name was dropped). Each path saves
     // its own Contact; accepting only opens Create Customer, it doesn't
     // save a Customer.
-    const contactName = 'Playwright Test Contact';
     const modal = createContactPage.locators.postSaveCreateCustomerModal;
 
-    /** TC:3 — save a Contact with a non-existent Customer name; returns that name. */
-    async function saveWithNewCustomerName(): Promise<string> {
+    /**
+     * TC:3 — save a new Contact with a non-existent Customer name; returns
+     * both names. Each call uses its own Contact name, so the second call's
+     * toast check can't pass on the first call's toast.
+     */
+    async function saveWithNewCustomerName(): Promise<{
+      contactName: string;
+      newCustomerName: string;
+    }> {
+      const contactName = uniqueContactName();
       const newCustomerName = `Playwright Prompt Customer ${Date.now()}`;
       await createContactPage.openFromContactList();
       await createContactPage.enterNewCustomerName(newCustomerName);
@@ -129,10 +148,10 @@ test.describe('CRM - Contact Creation Screen', () => {
       await expect(modal).toContainText(`Proceed to create customer ${newCustomerName}?`);
       await expect(createContactPage.locators.postSaveCancelButton).toBeVisible();
       await expect(createContactPage.locators.createCustomerButton).toBeVisible();
-      return newCustomerName;
+      return { contactName, newCustomerName };
     }
 
-    const newCustomerName = await test.step(
+    const { contactName, newCustomerName } = await test.step(
       'Non-existent Customer name: save shows a toast and the create-Customer prompt',
       saveWithNewCustomerName,
     );
@@ -149,11 +168,11 @@ test.describe('CRM - Contact Creation Screen', () => {
     });
 
     await test.step("Cancel on the prompt: it closes on the new Contact's Details screen", async () => {
-      await saveWithNewCustomerName();
+      const second = await saveWithNewCustomerName();
       await createContactPage.locators.postSaveCancelButton.click();
       await expect(modal).toBeHidden();
       await expect(page).toHaveURL(/\/crm\/contacts\/[0-9a-f-]{36}$/);
-      await expect(page.getByRole('heading', { level: 1, name: contactName })).toBeVisible();
+      await expect(page.getByRole('heading', { level: 1, name: second.contactName })).toBeVisible();
     });
   });
 

@@ -151,11 +151,24 @@ test.describe('CRM - Deactivate Customer', () => {
     createCustomerPage,
     customerDetailPage,
     customerListPage,
+    page,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abt53j', 'TC:6 (ClickUp)');
     const name = await createActiveCustomer(createCustomerPage);
+    await expect(page).toHaveURL(/\/crm\/customers\/[0-9a-f-]+$/);
+    const customerUrl = page.url();
+
+    // Master Data's active state is "Approved"; checking it first proves
+    // the Inactive read below is a change, not the Customer's initial state.
+    await test.step('While Active in CRM, Master Data shows the Customer Approved', async () => {
+      await customerListPage.open();
+      await customerListPage.expectLoaded();
+      await customerListPage.search(name);
+      await customerListPage.expectRowStatus(name, 'Approved');
+    });
 
     await test.step('Deactivate the Customer in CRM', async () => {
+      await page.goto(customerUrl);
       await customerDetailPage.deactivate(['Business misalignment'], 'Customer relocated overseas');
       await customerDetailPage.expectStatus('Inactive');
     });
