@@ -464,21 +464,13 @@ export class LeadQualificationPage extends BasePage {
     await expect(this.locators.revertWordingButtons).toHaveCount(count);
   }
 
-  /**
-   * Waits a few seconds for a confirmation that ClickUp expects but dev
-   * doesn't show — returns whether it ever appeared (a toast can vanish,
-   * so a single instant snapshot isn't enough).
-   */
-  async confirmationAppears(which: 'saved' | 'updated', timeout = 4_000): Promise<boolean> {
+  /** The "Manager's review and score saved" / "Review updated" confirmation is shown. */
+  async expectConfirmation(which: 'saved' | 'updated'): Promise<void> {
     const target =
       which === 'saved'
         ? this.locators.reviewSavedConfirmation
         : this.locators.reviewUpdatedConfirmation;
-    return target
-      .first()
-      .waitFor({ state: 'visible', timeout })
-      .then(() => true)
-      .catch(() => false);
+    await expect(target.first()).toBeVisible();
   }
 
   /** After a successful Save the new-review form resets to its placeholders. */

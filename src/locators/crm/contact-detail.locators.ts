@@ -37,6 +37,7 @@ import { type Locator, type Page } from '@playwright/test';
  */
 export class ContactDetailLocators {
   readonly nameHeading: Locator;
+  readonly header: Locator;
   readonly toast: Locator;
   readonly profileSection: Locator;
   readonly editProfileButton: Locator;
@@ -45,6 +46,12 @@ export class ContactDetailLocators {
 
   constructor(private readonly page: Page) {
     this.nameHeading = page.getByRole('heading', { level: 1 });
+    // The page header: the nearest ancestor of the name heading that also
+    // holds the status badge (2026-10-23 design: badge under the name,
+    // "<Designation> • <Customer>" subtitle beside it).
+    this.header = this.nameHeading.locator(
+      'xpath=ancestor::*[.//*[normalize-space()="Active" or normalize-space()="Inactive"]][1]',
+    );
     this.toast = page.locator('[data-sonner-toast]').first();
 
     this.profileSection = page.getByRole('heading', { name: 'Contact Profile' }).locator('..');

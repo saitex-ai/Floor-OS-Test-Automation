@@ -19,7 +19,9 @@ import { test, expect } from '../../../src/fixtures/crm.fixtures';
 
 /** Contact Name is validated "Alphabets only" — no digits allowed, so timestamps can't be used for uniqueness there. */
 function randomLetters(length = 8): string {
-  return Array.from({ length }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join('');
+  return Array.from({ length }, () =>
+    String.fromCharCode(97 + Math.floor(Math.random() * 26)),
+  ).join('');
 }
 
 test.describe('CRM - Contact List', () => {
@@ -119,6 +121,7 @@ test.describe('CRM - Contact List', () => {
       await contactListPage.openFilters();
       await expect(contactListPage.locators.statusFilterButton).toBeVisible();
       await expect(contactListPage.locators.countryFilterButton).toBeVisible();
+      await contactListPage.openAdvancedFilter();
       await expect(contactListPage.locators.addRuleButton).toBeVisible();
     });
 
@@ -184,19 +187,19 @@ test.describe('CRM - Contact List', () => {
     await allure.tms('https://app.clickup.com/t/z941abt52b', 'TC:8 (ClickUp)');
     await contactListPage.open();
 
-    await test.step('Switch to Vertical split', async () => {
-      await contactListPage.selectLayout('Vertical split');
-      await contactListPage.expectLayoutSelected('Vertical split');
+    await test.step('Switch to Vertical Split', async () => {
+      await contactListPage.selectLayout('Vertical Split');
+      await contactListPage.expectLayoutSelected('Vertical Split');
     });
 
-    await test.step('Switch to Horizontal split', async () => {
-      await contactListPage.selectLayout('Horizontal split');
-      await contactListPage.expectLayoutSelected('Horizontal split');
+    await test.step('Switch to Horizontal Split', async () => {
+      await contactListPage.selectLayout('Horizontal Split');
+      await contactListPage.expectLayoutSelected('Horizontal Split');
     });
 
-    await test.step('Switch back to No split', async () => {
-      await contactListPage.selectLayout('No split');
-      await contactListPage.expectLayoutSelected('No split');
+    await test.step('Switch back to List View', async () => {
+      await contactListPage.selectLayout('List View');
+      await contactListPage.expectLayoutSelected('List View');
     });
   });
 

@@ -84,7 +84,7 @@ test.describe('CRM - Contact Detail', () => {
 
     await test.step('Identity header, status badge, and linked Customer are all visible', async () => {
       await expect(contactDetailPage.locators.nameHeading).toHaveText(contactName);
-      await contactDetailPage.expectHeaderSummary('Active', 'Buyer');
+      await contactDetailPage.expectHeaderSummary('Active', 'Buyer', customerName);
       await contactDetailPage.expectLinkedToCustomer(customerName);
     });
   });

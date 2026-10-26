@@ -6,9 +6,9 @@ import { type Locator, type Page } from '@playwright/test';
  * those. Confirmed against the real running screen (dumped via
  * ariaSnapshot() against a local `tilt up` stack).
  *
- * The layout switcher's real labels are "No split" / "Vertical split" /
- * "Horizontal split" — not "Table / Split / Stacked" as the ClickUp
- * test-case text loosely describes them.
+ * Layouts (2026-10-23 design): a "View" menu with "List View" /
+ * "Vertical Split" / "Horizontal Split" radio items, replacing the old
+ * "No split" / "Vertical split" / "Horizontal split" buttons.
  */
 export class ContactListLocators {
   readonly heading: Locator;
@@ -23,13 +23,12 @@ export class ContactListLocators {
   readonly filtersButton: Locator;
   readonly toggleCellFiltersButton: Locator;
   readonly configureColumnsButton: Locator;
-  readonly noSplitButton: Locator;
-  readonly verticalSplitButton: Locator;
-  readonly horizontalSplitButton: Locator;
+  readonly viewMenuButton: Locator;
   readonly createContactButton: Locator;
   readonly moreActionsButton: Locator;
 
   // Filters panel (opens inline below the toolbar, not a dialog)
+  readonly advancedFilterButton: Locator;
   readonly addRuleButton: Locator;
   readonly statusFilterButton: Locator;
   readonly countryFilterButton: Locator;
@@ -60,14 +59,14 @@ export class ContactListLocators {
     this.filtersButton = page.getByRole('button', { name: 'Filters', exact: true });
     this.toggleCellFiltersButton = page.getByRole('button', { name: 'Toggle cell filters' });
     this.configureColumnsButton = page.getByRole('button', { name: 'Configure columns' });
-    this.noSplitButton = page.getByRole('button', { name: 'No split' });
-    this.verticalSplitButton = page.getByRole('button', { name: 'Vertical split' });
-    this.horizontalSplitButton = page.getByRole('button', { name: 'Horizontal split' });
+    this.viewMenuButton = page.getByRole('button', { name: 'View', exact: true });
     this.createContactButton = page.getByRole('button', { name: 'Create Contact' });
     // exact: true — the Columns dialog also has "More actions for <column>"
     // buttons per row, which would otherwise substring-match this one.
     this.moreActionsButton = page.getByRole('button', { name: 'More actions', exact: true });
 
+    // "Add rule" sits in the Filters panel's collapsed "Advanced filter" part.
+    this.advancedFilterButton = page.getByRole('button', { name: 'Advanced filter' });
     this.addRuleButton = page.getByRole('button', { name: 'Add rule' });
     // getByRole('button', { name: 'Status' }) also matches the table's own
     // Status column sort button (confirmed: strict-mode violation). This
@@ -119,4 +118,11 @@ export class ContactListLocators {
   contactRow(contactName: string): Locator {
     return this.dataRows.filter({ hasText: contactName }).first();
   }
+
+  /** A layout option in the open "View" menu. */
+  layoutOption(layout: ContactListLayout): Locator {
+    return this.page.getByRole('menuitemradio', { name: layout, exact: true });
+  }
 }
+
+export type ContactListLayout = 'List View' | 'Vertical Split' | 'Horizontal Split';

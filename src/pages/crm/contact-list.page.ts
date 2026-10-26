@@ -1,6 +1,9 @@
 import { type Page, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
-import { ContactListLocators } from '../../locators/crm/contact-list.locators';
+import {
+  ContactListLocators,
+  type ContactListLayout,
+} from '../../locators/crm/contact-list.locators';
 
 /** Contact List, under the CRM module (confirmed against the running app). */
 const CONTACTS_LIST_PATH = '/crm/contacts';
@@ -31,6 +34,14 @@ export class ContactListPage extends BasePage {
     await this.locators.filtersButton.click();
   }
 
+  /** Expands the Filters panel's "Advanced filter" part, where custom rules live. */
+  async openAdvancedFilter(): Promise<void> {
+    const toggle = this.locators.advancedFilterButton;
+    // It's a toggle: only click when collapsed, so an already-open section stays open.
+    if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  }
+
   async openConfigureColumns(): Promise<void> {
     await this.locators.configureColumnsButton.click();
     await expect(this.locators.columnsDialog).toBeVisible();
@@ -42,26 +53,16 @@ export class ContactListPage extends BasePage {
     await button.click();
   }
 
-  async selectLayout(layout: 'No split' | 'Vertical split' | 'Horizontal split'): Promise<void> {
-    const l = this.locators;
-    const button = {
-      'No split': l.noSplitButton,
-      'Vertical split': l.verticalSplitButton,
-      'Horizontal split': l.horizontalSplitButton,
-    }[layout];
-    await button.click();
+  async selectLayout(layout: ContactListLayout): Promise<void> {
+    await this.locators.viewMenuButton.click();
+    await this.locators.layoutOption(layout).click();
   }
 
-  async expectLayoutSelected(
-    layout: 'No split' | 'Vertical split' | 'Horizontal split',
-  ): Promise<void> {
-    const l = this.locators;
-    const button = {
-      'No split': l.noSplitButton,
-      'Vertical split': l.verticalSplitButton,
-      'Horizontal split': l.horizontalSplitButton,
-    }[layout];
-    await expect(button).toHaveAttribute('aria-pressed', 'true');
+  /** Reopens the View menu, checks `layout` is the selected item, and closes it. */
+  async expectLayoutSelected(layout: ContactListLayout): Promise<void> {
+    await this.locators.viewMenuButton.click();
+    await expect(this.locators.layoutOption(layout)).toHaveAttribute('aria-checked', 'true');
+    await this.page.keyboard.press('Escape');
   }
 
   async selectContactRow(contactName: string): Promise<void> {

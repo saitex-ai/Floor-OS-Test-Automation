@@ -2,6 +2,8 @@ import { type Page, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
 import { ContactDetailLocators } from '../../locators/crm/contact-detail.locators';
 
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /**
  * Contact Detail screen (CRM, Sprint 1 — customer-detail.md, despite its
  * filename/ClickUp task name being about the Contact screen, not the
@@ -19,8 +21,22 @@ export class ContactDetailPage extends BasePage {
     this.locators = new ContactDetailLocators(page);
   }
 
-  async expectHeaderSummary(status: 'Active' | 'Inactive', designation: string): Promise<void> {
-    await expect(this.page.getByText(new RegExp(`${status}\\s*${designation}\\s*·`))).toBeVisible();
+  /**
+   * Header (2026-10-23 design): the status is its own badge under the
+   * name, and the subtitle beside the name reads "<Designation> • <Customer>".
+   * Both are checked inside the header only.
+   */
+  async expectHeaderSummary(
+    status: 'Active' | 'Inactive',
+    designation: string,
+    customerName?: string,
+  ): Promise<void> {
+    const header = this.locators.header;
+    await expect(header.getByText(status, { exact: true })).toBeVisible();
+    const customer = customerName ? escapeRegExp(customerName) : '\\S';
+    await expect(
+      header.getByText(new RegExp(`^${escapeRegExp(designation)}\\s*[·•]\\s*${customer}`)),
+    ).toBeVisible();
   }
 
   async expectLinkedToCustomer(customerName: string): Promise<void> {

@@ -46,7 +46,9 @@ export class QualifiedLeadToProspectLocators {
       .getByRole('button', { name: /^Notifications/ })
       .first();
 
-    this.notificationPanel = page.getByRole('button', { name: 'Notification preferences' });
+    // New design (2026-10-23): the notifications popover's footer button
+    // "View all notifications" only exists while it is open.
+    this.notificationPanel = page.getByRole('button', { name: 'View all notifications' });
   }
 
   /**

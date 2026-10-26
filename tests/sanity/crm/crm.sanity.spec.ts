@@ -218,7 +218,7 @@ test.describe.serial('CRM Sanity', () => {
     await allure.feature('Contact Detail');
     const { customerName, contactName } = await createLinkedContact();
     await expect(contactDetailPage.locators.nameHeading).toHaveText(contactName);
-    await contactDetailPage.expectHeaderSummary('Active', 'Buyer');
+    await contactDetailPage.expectHeaderSummary('Active', 'Buyer', customerName);
     await contactDetailPage.expectLinkedToCustomer(customerName);
   });
 

@@ -41,9 +41,9 @@ import seed from '../../../src/data/crm/seed-records.data.json';
  * - Dev renders "Business Compatibility Report" and NO "Sales Pitch
  *   Recommendation" card, although the dossier payload carries `pitch`
  *   pointers (TC:10).
- * - No "Manager's review and score saved" / "Review updated" confirmation
- *   (TC:14/15); the empty-edit error reads "A review and a score are both
- *   required" (TC:15).
+ * - The empty-edit error reads "A review and a score are both required"
+ *   (TC:15). The "Manager's review and score saved" / "Review updated"
+ *   confirmations are shown since 2026-10-23 (TC:14/15).
  * - Acknowledgement email isn't traceable from the Lead: Communication >
  *   Emails is empty for an ingested Web Form Lead (TC:19).
  */
@@ -405,8 +405,7 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
     });
 
     await test.step('Each field shows its error and nothing is saved', async () => {
-      // Dev's score error reads "Score out of 10 is required" (ClickUp:
-      // "Score (1–10) required"); the other three match ClickUp.
+      // All four errors match ClickUp, incl. "Score (1–10) required".
       await lq.expectFieldValidationErrors();
       await lq.expectNoReviewsEmptyState();
     });
@@ -429,14 +428,11 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
       review: `Web Form lead review ${Date.now()} — strong fit for the denim programme.`,
     };
 
-    await test.step('Save a review; the form clears', async () => {
+    await test.step('Save a review: "Manager\'s review and score saved" is confirmed and the form clears', async () => {
       await lq.submitReview(review);
+      await lq.expectConfirmation('saved');
       await lq.expectReviewCount(1);
       await lq.expectReviewFormCleared();
-    });
-
-    await test.step('BUG: no "Manager\'s review and score saved" confirmation is shown', async () => {
-      expect(await lq.confirmationAppears('saved')).toBe(false);
     });
 
     await test.step('The review lists department, manager, score and a timestamp — and survives a reload', async () => {
@@ -470,16 +466,13 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
     await lq.expectReviewRowVisible(review);
     const savedAt = await lq.newestReviewSavedTimestamp();
 
-    await test.step('Edit the review text and score; the row updates in place with a refreshed timestamp', async () => {
+    await test.step('Edit the review text and score: "Review updated" is confirmed and the row updates in place with a refreshed timestamp', async () => {
       const updated = { score: 9, review: `Edited Web Form review ${Date.now()}` };
       await lq.editMostRecentReview(updated);
+      await lq.expectConfirmation('updated');
       await lq.expectReviewCount(1);
       await lq.expectReviewRowVisible({ ...review, ...updated });
       expect(await lq.newestReviewSavedTimestamp()).not.toBe(savedAt);
-    });
-
-    await test.step('BUG: no "Review updated" confirmation is shown', async () => {
-      expect(await lq.confirmationAppears('updated')).toBe(false);
     });
 
     await test.step('Saving the edit with an empty review is blocked', async () => {
