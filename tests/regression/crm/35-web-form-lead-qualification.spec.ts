@@ -428,14 +428,11 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
       review: `Web Form lead review ${Date.now()} — strong fit for the denim programme.`,
     };
 
-    await test.step('Save a review; the form clears', async () => {
+    await test.step('Save a review: "Manager\'s review and score saved" is confirmed and the form clears', async () => {
       await lq.submitReview(review);
+      await lq.expectConfirmation('saved');
       await lq.expectReviewCount(1);
       await lq.expectReviewFormCleared();
-    });
-
-    await test.step('"Manager\'s review and score saved" is confirmed', async () => {
-      expect(await lq.confirmationAppears('saved', 15_000)).toBe(true);
     });
 
     await test.step('The review lists department, manager, score and a timestamp — and survives a reload', async () => {
@@ -469,16 +466,13 @@ test.describe('CRM - [Origin Type = Web Form] Lead Qualification', () => {
     await lq.expectReviewRowVisible(review);
     const savedAt = await lq.newestReviewSavedTimestamp();
 
-    await test.step('Edit the review text and score; the row updates in place with a refreshed timestamp', async () => {
+    await test.step('Edit the review text and score: "Review updated" is confirmed and the row updates in place with a refreshed timestamp', async () => {
       const updated = { score: 9, review: `Edited Web Form review ${Date.now()}` };
       await lq.editMostRecentReview(updated);
+      await lq.expectConfirmation('updated');
       await lq.expectReviewCount(1);
       await lq.expectReviewRowVisible({ ...review, ...updated });
       expect(await lq.newestReviewSavedTimestamp()).not.toBe(savedAt);
-    });
-
-    await test.step('"Review updated" is confirmed', async () => {
-      expect(await lq.confirmationAppears('updated', 15_000)).toBe(true);
     });
 
     await test.step('Saving the edit with an empty review is blocked', async () => {

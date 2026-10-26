@@ -36,8 +36,10 @@ export class ContactListPage extends BasePage {
 
   /** Expands the Filters panel's "Advanced filter" part, where custom rules live. */
   async openAdvancedFilter(): Promise<void> {
-    await this.locators.advancedFilterButton.click();
-    await expect(this.locators.advancedFilterButton).toHaveAttribute('aria-expanded', 'true');
+    const toggle = this.locators.advancedFilterButton;
+    // It's a toggle: only click when collapsed, so an already-open section stays open.
+    if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
   }
 
   async openConfigureColumns(): Promise<void> {
