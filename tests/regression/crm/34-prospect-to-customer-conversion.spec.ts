@@ -35,6 +35,7 @@ import type {
  * Season a test created is deleted again afterwards — orders first, then
  * the Season (confirmed on dev 2026-10-21: Sales Orders delete from the
  * list's row-select "Delete", Seasons from Edit Season → Delete).
+ * An order the test failed to save is skipped (nothing to delete).
  * Failures there are logged and annotated, never fail the test. The CRM
  * Customers themselves, and the conversion notifications/emails, stay.
  */
@@ -46,44 +47,49 @@ interface CreatedRecords {
 }
 
 const test = crossModuleTest.extend<{ createdRecords: CreatedRecords }>({
-  createdRecords: async (
-    { salesOrderPage, customerSeasonListPage, customerSeasonFormPage },
-    use,
-    testInfo,
-  ) => {
-    const created: CreatedRecords = { orderDescriptions: [], seasonCodes: [] };
-    await use(created);
+  // Own timeout for the teardown, so a slow test body (dev under load)
+  // can't leave no time to delete what it created.
+  createdRecords: [
+    async ({ salesOrderPage, customerSeasonListPage, customerSeasonFormPage }, use, testInfo) => {
+      const created: CreatedRecords = { orderDescriptions: [], seasonCodes: [] };
+      await use(created);
 
-    const cleanupFailed = (what: string, error: unknown): void => {
-      const description = `Teardown could not delete ${what}: ${String(error).split('\n')[0]}`;
-      console.warn(description);
-      testInfo.annotations.push({ type: 'cleanup failed', description });
-    };
-    for (const description of created.orderDescriptions) {
-      await test.step(`Teardown: delete Sales Order "${description}"`, async () => {
-        try {
-          await salesOrderPage.open();
-          await salesOrderPage.deleteOrder(description);
-        } catch (error) {
-          cleanupFailed(`Sales Order "${description}"`, error);
-        }
-      });
-    }
-    for (const seasonCode of created.seasonCodes) {
-      await test.step(`Teardown: delete Customer Season ${seasonCode}`, async () => {
-        try {
-          await customerSeasonListPage.open();
-          await customerSeasonListPage.search(seasonCode);
-          await customerSeasonListPage.openEdit(seasonCode);
-          await customerSeasonFormPage.clickDelete();
-          await customerSeasonFormPage.confirmDelete();
-          await customerSeasonFormPage.expectDeletedSuccessfully();
-        } catch (error) {
-          cleanupFailed(`Customer Season ${seasonCode}`, error);
-        }
-      });
-    }
-  },
+      const cleanupFailed = (what: string, error: unknown): void => {
+        const description = `Teardown could not delete ${what}: ${String(error).split('\n')[0]}`;
+        console.warn(description);
+        testInfo.annotations.push({ type: 'cleanup failed', description });
+      };
+      for (const description of created.orderDescriptions) {
+        await test.step(`Teardown: delete Sales Order "${description}"`, async () => {
+          try {
+            await salesOrderPage.open();
+            if (!(await salesOrderPage.deleteOrder(description))) {
+              const note = `Sales Order "${description}" was never saved — nothing to delete`;
+              console.warn(`Teardown: ${note}`);
+              testInfo.annotations.push({ type: 'cleanup skipped', description: note });
+            }
+          } catch (error) {
+            cleanupFailed(`Sales Order "${description}"`, error);
+          }
+        });
+      }
+      for (const seasonCode of created.seasonCodes) {
+        await test.step(`Teardown: delete Customer Season ${seasonCode}`, async () => {
+          try {
+            await customerSeasonListPage.open();
+            await customerSeasonListPage.search(seasonCode);
+            await customerSeasonListPage.openEdit(seasonCode);
+            await customerSeasonFormPage.clickDelete();
+            await customerSeasonFormPage.confirmDelete();
+            await customerSeasonFormPage.expectDeletedSuccessfully();
+          } catch (error) {
+            cleanupFailed(`Customer Season ${seasonCode}`, error);
+          }
+        });
+      }
+    },
+    { timeout: 180_000 },
+  ],
 });
 
 interface ConversionFixtures {
