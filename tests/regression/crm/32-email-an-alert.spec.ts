@@ -142,7 +142,9 @@ test.describe('CRM - Email an Alert', () => {
     await test.step("From shows the logged-in user's name and email, read-only", async () => {
       // Plain text, not a form control — nothing to type into.
       const from = await alertsPage.expectFromIsReadOnly();
-      const [, fromName, fromEmail] = from.match(/^(.+) <(.+)>$/) ?? [];
+      const match = from.match(/^(.+) <(.+@.+)>$/);
+      expect(match, `From should read "Name <email>", got "${from}"`).not.toBeNull();
+      const [, fromName = '', fromEmail = ''] = match!;
       expect(userMenuText).toContain(fromName);
       expect(userMenuText).toContain(fromEmail);
       // Internal popup has no Cc.

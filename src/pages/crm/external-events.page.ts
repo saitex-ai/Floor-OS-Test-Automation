@@ -133,10 +133,28 @@ export class ExternalEventsPage extends BasePage {
    * rows immediately after this without a settle wait can catch the grid
    * mid-transition and return the wrong row/order (same debounce-race
    * class as search()'s wait, below).
+   *
+   * Waits for the refetch instead of a fixed settle: the tab is pressed and
+   * the grid total ("Showing … of N") equals the tab's own badge count
+   * (the badges re-scope to any applied filter, so this holds with a
+   * filter too). A fixed 600 ms stopped being enough on dev (2026-10-26,
+   * 141 events): TC:12/TC:13 read the All rows under a pressed To Attend tab.
    */
   async selectStatusTab(name: 'All' | 'Planning' | 'To Attend' | 'Attended'): Promise<void> {
-    await this.locators.statusTab(name).click();
-    await this.page.waitForTimeout(600);
+    const tab = this.locators.statusTab(name);
+    await tab.click();
+    await expect(tab).toHaveAttribute('aria-pressed', 'true');
+    await expect
+      .poll(
+        async () => {
+          const expected = await this.readStatusTabCount(name);
+          if (expected === 0) return (await this.locators.dataRows.count()) === 0;
+          if (!(await this.locators.paginationSummary.isVisible())) return false;
+          return (await this.readPaginationTotal()) === expected;
+        },
+        { message: `grid total should match the "${name}" tab count`, timeout: 15_000 },
+      )
+      .toBe(true);
   }
 
   async selectOverflowStatusTab(name: 'Not Attending' | 'Elapsed'): Promise<void> {
@@ -477,7 +495,7 @@ export class ExternalEventsPage extends BasePage {
   }
 
   /**
-   * Removes one applied filter via its chip's "x" (e.g. "Type: Trade Fair").
+   * Removes one applied filter via its chip's "x" (e.g. `Type equals "Trade Fair"`, see typeFilterLabel()).
    * The unfiltered rows can come from the grid's cache with no request, and
    * the rows left may legitimately look the same, so there's no generic
    * table change to wait for here — callers that read the table next poll
@@ -593,12 +611,24 @@ export class ExternalEventsPage extends BasePage {
     await this.applyColumns();
   }
 
+  /**
+   * Opens the toolbar's "View" menu. The button is a toggle, so it is only
+   * clicked while the menu is closed (e.g. a cleanup after a step that
+   * failed with the menu still open).
+   */
+  async openViewMenu(): Promise<void> {
+    if (!(await this.locators.viewMenu.isVisible())) {
+      await this.locators.viewMenuButton.click();
+    }
+    await expect(this.locators.viewMenu).toBeVisible();
+  }
+
   /** Picks a layout from the toolbar's "View" menu (2026-10-23 design system). */
   async switchLayout(layout: EventsListLayout): Promise<void> {
-    await this.locators.viewMenuButton.click();
+    await this.openViewMenu();
     await this.locators.viewMenuItem(layout).click();
     await expect(this.locators.viewMenu).toBeHidden();
-    await this.locators.viewMenuButton.click();
+    await this.openViewMenu();
     await expect(this.locators.viewMenuItem(layout)).toHaveAttribute('aria-checked', 'true');
     await this.page.keyboard.press('Escape');
     await expect(this.locators.viewMenu).toBeHidden();
