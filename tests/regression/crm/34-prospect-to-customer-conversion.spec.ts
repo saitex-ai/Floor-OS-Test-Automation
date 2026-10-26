@@ -47,48 +47,49 @@ interface CreatedRecords {
 }
 
 const test = crossModuleTest.extend<{ createdRecords: CreatedRecords }>({
-  createdRecords: async (
-    { salesOrderPage, customerSeasonListPage, customerSeasonFormPage },
-    use,
-    testInfo,
-  ) => {
-    const created: CreatedRecords = { orderDescriptions: [], seasonCodes: [] };
-    await use(created);
+  // Own timeout for the teardown, so a slow test body (dev under load)
+  // can't leave no time to delete what it created.
+  createdRecords: [
+    async ({ salesOrderPage, customerSeasonListPage, customerSeasonFormPage }, use, testInfo) => {
+      const created: CreatedRecords = { orderDescriptions: [], seasonCodes: [] };
+      await use(created);
 
-    const cleanupFailed = (what: string, error: unknown): void => {
-      const description = `Teardown could not delete ${what}: ${String(error).split('\n')[0]}`;
-      console.warn(description);
-      testInfo.annotations.push({ type: 'cleanup failed', description });
-    };
-    for (const description of created.orderDescriptions) {
-      await test.step(`Teardown: delete Sales Order "${description}"`, async () => {
-        try {
-          await salesOrderPage.open();
-          if (!(await salesOrderPage.deleteOrder(description))) {
-            console.warn(
-              `Teardown: Sales Order "${description}" was never saved — nothing to delete`,
-            );
+      const cleanupFailed = (what: string, error: unknown): void => {
+        const description = `Teardown could not delete ${what}: ${String(error).split('\n')[0]}`;
+        console.warn(description);
+        testInfo.annotations.push({ type: 'cleanup failed', description });
+      };
+      for (const description of created.orderDescriptions) {
+        await test.step(`Teardown: delete Sales Order "${description}"`, async () => {
+          try {
+            await salesOrderPage.open();
+            if (!(await salesOrderPage.deleteOrder(description))) {
+              const note = `Sales Order "${description}" was never saved — nothing to delete`;
+              console.warn(`Teardown: ${note}`);
+              testInfo.annotations.push({ type: 'cleanup skipped', description: note });
+            }
+          } catch (error) {
+            cleanupFailed(`Sales Order "${description}"`, error);
           }
-        } catch (error) {
-          cleanupFailed(`Sales Order "${description}"`, error);
-        }
-      });
-    }
-    for (const seasonCode of created.seasonCodes) {
-      await test.step(`Teardown: delete Customer Season ${seasonCode}`, async () => {
-        try {
-          await customerSeasonListPage.open();
-          await customerSeasonListPage.search(seasonCode);
-          await customerSeasonListPage.openEdit(seasonCode);
-          await customerSeasonFormPage.clickDelete();
-          await customerSeasonFormPage.confirmDelete();
-          await customerSeasonFormPage.expectDeletedSuccessfully();
-        } catch (error) {
-          cleanupFailed(`Customer Season ${seasonCode}`, error);
-        }
-      });
-    }
-  },
+        });
+      }
+      for (const seasonCode of created.seasonCodes) {
+        await test.step(`Teardown: delete Customer Season ${seasonCode}`, async () => {
+          try {
+            await customerSeasonListPage.open();
+            await customerSeasonListPage.search(seasonCode);
+            await customerSeasonListPage.openEdit(seasonCode);
+            await customerSeasonFormPage.clickDelete();
+            await customerSeasonFormPage.confirmDelete();
+            await customerSeasonFormPage.expectDeletedSuccessfully();
+          } catch (error) {
+            cleanupFailed(`Customer Season ${seasonCode}`, error);
+          }
+        });
+      }
+    },
+    { timeout: 180_000 },
+  ],
 });
 
 interface ConversionFixtures {

@@ -120,8 +120,14 @@ export class SalesOrderPage extends BasePage {
       if ((await row.count()) === 0) return false;
       throw error;
     }
-    await l.rowCheckbox(row).check();
-    await l.deleteSelectedButton.click();
+    // The list can re-render (e.g. another order saved meanwhile) and drop
+    // the row selection, hiding Delete again — so retry tick → Delete until
+    // the confirm dialog is up, rather than waiting on one click forever.
+    await expect(async () => {
+      await l.rowCheckbox(row).check({ timeout: 5_000 });
+      await l.deleteSelectedButton.click({ timeout: 5_000 });
+      await expect(l.deleteConfirmDialog).toBeVisible({ timeout: 5_000 });
+    }).toPass({ timeout: 60_000 });
     await l.confirmDeleteButton().click();
     await expect(row).toHaveCount(0, { timeout: 15_000 });
     return true;
