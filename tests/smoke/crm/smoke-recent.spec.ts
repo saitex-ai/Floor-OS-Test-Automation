@@ -38,20 +38,15 @@ test.describe('CRM Smoke — Recent', () => {
     });
   });
 
+  // Only the mandatory fields are filled: Customer Name for a Customer,
+  // Contact Name and Email for a Contact (dev and prototype, 2026-10-26).
   test('Create Customer: successful creation without a linked Contact', async ({
     createCustomerPage,
   }) => {
     await createCustomerPage.openFromCrmHome();
     await createCustomerPage.fillProfile({
       name: `Playwright Smoke Customer ${Date.now()}`,
-      email: `pw-smoke-${Date.now()}@example.com`,
-      city: 'Coimbatore',
-      country: 'India',
-      crmStage: 'Lead',
-      originType: 'Referral',
-      origin: 'Internal Referral',
-      buyer: 'Fabric',
-      referredBy: 'Jordan Smith',
+      skipCompany: true,
     });
     await createCustomerPage.save();
     if (await createCustomerPage.locators.duplicateWarningModal.isVisible()) {
@@ -66,10 +61,7 @@ test.describe('CRM Smoke — Recent', () => {
     await createContactPage.openFromContactList();
     await createContactPage.fillProfile({
       name: 'Playwright Smoke Contact',
-      designation: 'Buyer',
       email: `pw-smoke-contact-${Date.now()}@example.com`,
-      city: 'Coimbatore',
-      country: 'India',
     });
     await createContactPage.linkToCustomer('Acme Textiles');
     await createContactPage.save();

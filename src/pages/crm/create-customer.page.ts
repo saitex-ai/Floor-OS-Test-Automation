@@ -180,6 +180,17 @@ export class CreateCustomerPage extends BasePage {
   }
 
   /**
+   * An empty form's Save: Customer Name is the only mandatory field (dev and
+   * prototype, 2026-10-26), so it is the single "Required" error and the
+   * only field marked invalid.
+   */
+  async expectOnlyCustomerNameRequired(): Promise<void> {
+    await this.expectOnlyOneRequiredError();
+    await expect(this.locators.customerNameInput).toHaveAttribute('aria-invalid', 'true');
+    await expect(this.locators.saveButton).toBeVisible();
+  }
+
+  /**
    * Confirmed live (2026-10-15): a Customer Name that already exists —
    * also with different letter case or extra spaces — is a hard block.
    * The field shows 'A customer named "<existing name>" already exists'

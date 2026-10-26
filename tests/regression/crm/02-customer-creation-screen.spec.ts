@@ -74,28 +74,34 @@ test.describe('CRM - Customer Creation Screen', () => {
       await createCustomerPage.save();
     });
 
-    await test.step('Save is blocked with inline "Required" errors', async () => {
-      await expect(createCustomerPage.locators.saveButton).toBeVisible();
-      await createCustomerPage.expectFieldError(/required/i);
+    await test.step('Save is blocked: only Customer Name is flagged "Required"', async () => {
+      await createCustomerPage.expectOnlyCustomerNameRequired();
     });
   });
 
-  test('TC:3 Verify conditionally mandatory field validation at save time', async ({
+  test('TC:3 Verify Referred By Shows Only for Origin Type Referral and Is Optional', async ({
     createCustomerPage,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abt7ag', 'TC:3 (ClickUp)');
+    // Only Customer Name is mandatory (prototype crm.jsx field rules and dev,
+    // 2026-10-26); Referred By is an optional field shown for Referral only.
+    const l = createCustomerPage.locators;
     await createCustomerPage.openFromCrmHome();
 
-    await test.step('Set Origin Type = Referral, leave "Referred By" blank', async () => {
-      await createCustomerPage.fillProfile({ originType: 'Referral' });
+    await test.step('Referred By is hidden until Origin Type = Referral', async () => {
+      await expect(l.referredByInput).toHaveCount(0);
+      await createCustomerPage.fillProfile({
+        name: `Playwright Referral Optional ${Date.now()}`,
+        originType: 'Referral',
+        origin: 'Internal Referral',
+        skipCompany: true,
+      });
+      await expect(l.referredByInput).toBeVisible();
     });
 
-    await test.step('Click Save', async () => {
+    await test.step('Saving with Referred By left blank creates the Customer', async () => {
       await createCustomerPage.save();
-    });
-
-    await test.step('Save is blocked: "Referred By" is required for this Origin Type', async () => {
-      await createCustomerPage.expectFieldError(/required/i);
+      await createCustomerPage.expectSavedSuccessfully();
     });
   });
 
