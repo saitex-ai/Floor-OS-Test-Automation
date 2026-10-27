@@ -337,7 +337,10 @@ export class CreateTechpackPage extends BasePage {
     await this.locators.fieldTrigger(labelText).click();
     const listbox = this.page.getByRole('listbox').last();
     await listbox.waitFor({ state: 'visible', timeout: 20_000 });
-    const searchBox = this.page.locator('[cmdk-input], input[type="text"]').last();
+    // The picker's own search box is the only cmdk input; since the
+    // 2026-10-26 deploy the form has more text inputs, so a generic
+    // "last text input" lands on an Operations field instead.
+    const searchBox = this.page.locator('[cmdk-input]').last();
     await searchBox.fill(searchText);
   }
 

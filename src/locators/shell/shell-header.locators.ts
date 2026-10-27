@@ -11,8 +11,8 @@ import { type Locator, type Page } from '@playwright/test';
  *
  * As of the 2026-10-22 design-system release (confirmed live on uat,
  * 2026-10-23) there is no "Change language" button any more. Language is a
- * pair of buttons on the Preferences page (user menu › Preferences,
- * `/preferences`):
+ * pair of buttons on the Preferences page (`/preferences`, reached from the
+ * user menu's "Preferences", or "Account settings" on uat since 2026-10-26):
  *
  *   - group "Language":
  *     - button "English" [pressed]
@@ -40,7 +40,11 @@ export class ShellHeaderLocators {
       .getByRole('button', { name: /^(Open user menu|Mở menu người dùng)/ })
       .first();
     this.userMenu = page.getByRole('menu', { name: /^(User menu|Menu người dùng)$/ });
-    this.preferencesMenuItem = page.getByRole('menuitem', { name: /^(Preferences|Tùy chọn)$/ });
+    // The user menu's way to /preferences: "Preferences" (dev), renamed
+    // "Account settings" on uat by the 2026-10-26 deploy.
+    this.preferencesMenuItem = page.getByRole('menuitem', {
+      name: /^(Preferences|Account settings|Tùy chọn|Cài đặt tài khoản)$/,
+    });
     this.preferencesHeading = page.getByRole('heading', {
       name: /^(Preferences|Tùy chọn)$/,
       level: 1,
