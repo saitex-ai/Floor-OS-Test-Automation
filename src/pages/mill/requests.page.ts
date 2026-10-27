@@ -69,6 +69,11 @@ export class RequestsPage extends MillScreenPage {
   async enterFirstUnit(source: Locator, quantity: string): Promise<void> {
     await source.getByRole('combobox').first().click();
     await this.locators.comboboxOptions.first().click();
+    await this.setFirstUnitQuantity(source, quantity);
+  }
+
+  /** Changes the quantity of the unit already picked by enterFirstUnit(), without picking another. */
+  async setFirstUnitQuantity(source: Locator, quantity: string): Promise<void> {
     await source.getByRole('textbox').first().fill(quantity);
   }
 
