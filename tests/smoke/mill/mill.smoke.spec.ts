@@ -222,8 +222,9 @@ test.describe('Fabric Mill Smoke', () => {
     test('SM-MILL-13: Goods requests loads with the All filter selected and New request, Receive Goods and Direct transfer actions', async () => {
       const l = requestsPage.locators;
       await requestsPage.openViaNav();
-      // Mill CR round (2026-10): no tabs — status filter pills, with New
-      // request / Receive Goods / Direct transfer as popup buttons.
+      // Mill CR round (2026-10): no tabs — status filter pills. Receive Goods
+      // and Direct transfer open popups; New request opens its own page,
+      // /mill/requests/new (since 2026-10-26).
       await expect(l.allStatusFilter).toHaveAttribute('aria-pressed', 'true');
       await expect(l.pendingStatusFilter).toHaveAttribute('aria-pressed', 'false');
       await expect(l.newRequestButton).toBeVisible();
@@ -241,6 +242,11 @@ test.describe('Fabric Mill Smoke', () => {
       await requestsPage.enterFirstUnit(source!, '0');
       await expect(l.valueAboveZeroHint).toBeVisible();
       await expect(requestsPage.submitRequestButton(source!)).toBeDisabled();
+      // Positive control: a valid quantity clears the hint and enables Submit,
+      // so the disabled state above is caused by the zero. Nothing is submitted.
+      await requestsPage.setFirstUnitQuantity(source!, '1');
+      await expect(l.valueAboveZeroHint).toBeHidden();
+      await expect(requestsPage.submitRequestButton(source!)).toBeEnabled();
     });
   });
 });
