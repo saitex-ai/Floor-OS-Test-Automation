@@ -240,7 +240,7 @@ test.describe('Fabric Mill Smoke', () => {
       test.skip(!source, 'Nothing on dev is pullable for Preparation');
       await requestsPage.enterFirstUnit(source!, '0');
       await expect(l.valueAboveZeroHint).toBeVisible();
-      await expect(requestsPage.addButton(source!)).toBeDisabled();
+      await expect(requestsPage.submitRequestButton(source!)).toBeDisabled();
     });
   });
 });

@@ -21,10 +21,11 @@ export class RequestsPage extends MillScreenPage {
     return this.locators.heading;
   }
 
-  /** Opens the "New request" popup dialog from wherever it is on this screen. */
+  /** Opens the "New request" page (/mill/requests/new) from the request list. */
   async openNewRequestForm(): Promise<void> {
     await this.locators.newRequestButton.click();
-    await expect(this.locators.newRequestDialog).toBeVisible();
+    await expect(this.page).toHaveURL(/\/mill\/requests\/new$/);
+    await expect(this.locators.newRequestHeading).toBeVisible();
   }
 
   /**
@@ -71,7 +72,12 @@ export class RequestsPage extends MillScreenPage {
     await source.getByRole('textbox').first().fill(quantity);
   }
 
-  addButton(source: Locator): Locator {
-    return source.getByRole('button', { name: 'Add', exact: true });
+  /**
+   * The region's "Submit request to {source}" button. Since the New request
+   * page (2026-10-26) a picked unit goes straight onto the request, so this
+   * replaces the old per-unit "Add" button.
+   */
+  submitRequestButton(source: Locator): Locator {
+    return source.getByRole('button', { name: /^Submit request to / });
   }
 }
