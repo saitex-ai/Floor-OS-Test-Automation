@@ -2,7 +2,6 @@ import * as fs from 'fs';
 import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/techpack.fixtures';
 import { knownBug, openQuestion, partial } from '../../../src/utils/test-annotations';
-import { env } from '../../../src/config/env';
 
 /**
  * Minimal CSV line splitter — not a full RFC 4180 parser, just enough to
@@ -69,6 +68,9 @@ const DUMMY_PDF = {
   mimeType: 'application/pdf',
   buffer: Buffer.from('%PDF-1.4\n%%EOF'),
 };
+
+/** The six Production Stages, in step order. */
+const PRODUCTION_STAGES = ['Draft', 'First proto', 'Fitting', 'SMS', 'TOP', 'Approved'];
 
 /** The 8 columns the grid shows by default, in order. */
 const DEFAULT_COLUMNS = [
@@ -303,9 +305,6 @@ test.describe('Techpack - Techpacks List', () => {
 
   test("TC:11 Verify the Filters dialog's sections and fields", async ({ techpackPage }) => {
     await techpackPage.openAndWaitForRows();
-    // Stage only offers the stages that currently hold techpacks (all six on
-    // uat; dev had none in SMS / TOP / Approved on 2026-10-26).
-    const stagesWithTechpacks = await techpackPage.stagesWithTechpacks();
 
     await test.step('Open Filters: General Information is open by default', async () => {
       await techpackPage.openFilters();
@@ -339,8 +338,13 @@ test.describe('Techpack - Techpacks List', () => {
         'Approved',
         'Cancelled',
       ]);
-      expect(stagesWithTechpacks.length).toBeGreaterThan(0);
-      expect(await techpackPage.filterFieldOptions('Stage')).toEqual(stagesWithTechpacks);
+      // Which stages are offered depends on the data (uat offered all six; dev
+      // offered Draft, First proto, Fitting while Production Stages counted
+      // techpacks only in Draft, 2026-10-26), so check it's a non-empty,
+      // in-order subset of the six.
+      const stageOptions = await techpackPage.filterFieldOptions('Stage');
+      expect(stageOptions.length).toBeGreaterThan(0);
+      expect(stageOptions).toEqual(PRODUCTION_STAGES.filter((s) => stageOptions.includes(s)));
     });
 
     await test.step('Garment Specifications: Season and the value code/desc fields', async () => {
@@ -544,10 +548,11 @@ test.describe('Techpack - Techpacks List', () => {
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abxkuq', 'TC:19 bug (ClickUp)');
     // Known bug z941abxkuq: Customer Name exports the raw `CTC…` customer
-    // code instead of the name the grid shows. Still seen on uat 2026-10-26;
-    // dev exported the name that day (fixed there, not deployed to uat yet).
-    if (env.testEnv !== 'dev') knownBug('z941abxkuq');
-    test.setTimeout(90_000);
+    // code instead of the name the grid shows (uat and dev, 2026-10-26). It
+    // shows for some customers and not others, so every row on the page is
+    // checked, not just the first.
+    knownBug('z941abxkuq');
+    test.setTimeout(120_000);
     await techpackPage.openAndWaitForRows();
 
     // The Approved tab guarantees rows with both Creator and Approver set.
@@ -560,12 +565,22 @@ test.describe('Techpack - Techpacks List', () => {
       await techpackPage.setColumnsVisible(['Creator', 'Approver'], true);
     });
 
-    const columns = ['Name and Code', 'Stage', 'Customer Name', 'Season', 'Creator', 'Approver'];
-    const onScreen = await test.step("Read the first Approved row's values on screen", async () => {
-      const [row] = await techpackPage.visibleRows(columns);
-      if (!row) throw new Error('No Approved row on screen');
-      return row;
+    const columns = [
+      'Name and Code',
+      'Rev No',
+      'Stage',
+      'Customer Name',
+      'Season',
+      'Creator',
+      'Approver',
+    ];
+    const onScreen = await test.step('Read every Approved row on screen', async () => {
+      const rows = await techpackPage.visibleRows(columns);
+      expect(rows.length).toBeGreaterThan(0);
+      return rows;
     });
+    const keyOf = (row: Record<string, string>) =>
+      `${codeOf(row['Name and Code'] ?? '')}/${row['Rev No'] ?? ''}`;
 
     const csv = await test.step('Download and parse the export', async () => {
       const download = await techpackPage.export();
@@ -579,11 +594,13 @@ test.describe('Techpack - Techpacks List', () => {
         .split('\n')
         .filter((l) => l.trim().length > 0);
       const header = parseCsvLine(lines[0] ?? '');
-      const code = codeOf(onScreen['Name and Code'] ?? '');
-      const dataLine = lines.slice(1).find((l) => l.startsWith(`${code},`));
-      if (!dataLine) throw new Error(`CSV export has no row for ${code}`);
-      const fields = parseCsvLine(dataLine);
-      return { header, at: (label: string) => fields[header.indexOf(label)] ?? '' };
+      const records = new Map<string, Record<string, string>>();
+      for (const line of lines.slice(1)) {
+        const fields = parseCsvLine(line);
+        const record = Object.fromEntries(header.map((h, i) => [h, fields[i] ?? '']));
+        records.set(`${record['Techpack Code']}/${record['Rev No']}`, record);
+      }
+      return { header, records };
     });
 
     await test.step('The header is the visible columns, in grid order', async () => {
@@ -601,23 +618,33 @@ test.describe('Techpack - Techpacks List', () => {
       ]);
     });
 
-    await test.step('Every value matches what the grid shows', async () => {
+    await test.step('Every row on screen is in the export, with the values the grid shows', async () => {
+      const missing = onScreen.map(keyOf).filter((key) => !csv.records.has(key));
+      expect.soft(missing, 'rows on screen that are missing from the export').toEqual([]);
       // "—" is how the grid shows an empty value.
-      const shown = (label: string) => (onScreen[label] === '—' ? '' : (onScreen[label] ?? ''));
+      const shown = (row: Record<string, string>, label: string) =>
+        row[label] === '—' ? '' : (row[label] ?? '');
+      const mismatches = (label: string) =>
+        onScreen.flatMap((row) => {
+          const record = csv.records.get(keyOf(row));
+          if (!record || record[label] === shown(row, label)) return [];
+          return [`${keyOf(row)}: exported "${record[label]}", grid "${shown(row, label)}"`];
+        });
       expect
         .soft(
-          csv.at('Customer Name'),
+          mismatches('Customer Name'),
           'Customer Name should be the name, not a raw code (z941abxkuq)',
         )
-        .toBe(shown('Customer Name'));
-      expect.soft(csv.at('Creator'), 'Creator should be a name').toBe(shown('Creator'));
-      expect.soft(csv.at('Approver'), 'Approver should be a name').toBe(shown('Approver'));
+        .toEqual([]);
+      expect.soft(mismatches('Creator'), 'Creator should be a name').toEqual([]);
+      expect.soft(mismatches('Approver'), 'Approver should be a name').toEqual([]);
       // Not filed yet (2026-10-23): Season exports the season code (`SS24`)
       // and Stage the enum (`FITTING`). Recorded, not asserted.
       for (const label of ['Season', 'Stage']) {
-        if (csv.at(label) !== shown(label)) {
+        const differing = mismatches(label);
+        if (differing.length > 0) {
           openQuestion(
-            `Export writes ${label} as "${csv.at(label)}" where the grid shows "${shown(label)}"`,
+            `Export writes ${label} differently from the grid for ${differing.length} of ${onScreen.length} rows, e.g. ${differing[0]}`,
           );
         }
       }

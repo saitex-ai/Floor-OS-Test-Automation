@@ -161,28 +161,6 @@ export class TechpackPage extends BasePage {
     await expect(this.locators.productionStage(step)).toHaveAttribute('aria-pressed', 'true');
   }
 
-  /** The stage name on a Production Stages step, e.g. "STEP 3 Fitting 5" -> "Fitting". */
-  async stageName(step: number): Promise<string> {
-    const lines = (await this.locators.productionStage(step).innerText())
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean);
-    return lines[1] ?? '';
-  }
-
-  /**
-   * The Production Stages that currently hold techpacks, in step order. The
-   * Filter dialog's Stage field only offers these (uat has all six; dev had
-   * nothing in SMS / TOP / Approved on 2026-10-26).
-   */
-  async stagesWithTechpacks(): Promise<string[]> {
-    const names: string[] = [];
-    for (let step = 1; step <= 6; step++) {
-      if ((await this.stageCount(step)) > 0) names.push(await this.stageName(step));
-    }
-    return names;
-  }
-
   /** The count on a Production Stages step, e.g. "STEP 3 Fitting 5" -> 5. */
   async stageCount(step: number): Promise<number> {
     const text = (await this.locators.productionStage(step).innerText()).replace(/\s+/g, ' ');
