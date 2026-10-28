@@ -31,12 +31,37 @@ export class BomItemsPage extends BasePage {
   async itemIds(): Promise<string[]> {
     return this.locators.itemRows.evaluateAll((trs) =>
       trs.map((tr) => {
-        const cells = [...tr.querySelectorAll('td')].map((td) => td.textContent?.trim() ?? '');
+        // <td> or, since uat's 2026-10-26 deploy, role="cell" elements.
+        const cells = [...tr.querySelectorAll('td, [role="cell"]')].map(
+          (td) => td.textContent?.trim() ?? '',
+        );
         // The code cell can also carry an "Edited" badge after its text.
         const code = cells.find((c) => /^[A-Z]{3}\d{7}/.test(c)) ?? '';
         return code.slice(0, 10);
       }),
     );
+  }
+
+  /**
+   * Expects a change to be refused with `message`, shown either as a "Not
+   * Allowed" dialog (uat since its 2026-10-26 deploy; it's dismissed with
+   * OK) or as a toast (dev, and uat on 2026-10-23).
+   */
+  async expectRefused(message: string): Promise<void> {
+    const toast = this.locators.toasts.filter({ hasText: message });
+    await expect(this.locators.notAllowedDialog.or(toast).first()).toContainText(message);
+    if (await this.locators.notAllowedDialog.isVisible()) {
+      await this.locators.notAllowedOkButton.click();
+      await expect(this.locators.notAllowedDialog).toBeHidden();
+    }
+  }
+
+  /**
+   * Whether a line control can't be changed: disabled, or (since uat's
+   * 2026-10-26 deploy) a `role="checkbox"` span marked aria-readonly.
+   */
+  async isReadOnly(control: Locator): Promise<boolean> {
+    return (await control.isDisabled()) || (await control.getAttribute('aria-readonly')) === 'true';
   }
 
   async expectItemPresent(inventoryId: string): Promise<void> {
@@ -82,8 +107,11 @@ export class BomItemsPage extends BasePage {
     await expect(this.locators.addInventoryFooter).toContainText(/of \d+/i, {
       timeout: INVENTORY_SEARCH_TIMEOUT,
     });
+    // A result row's own checkbox ("Select FAB0000002"), not the header's "Select all visible items".
     await expect(
-      this.locators.addInventoryDialog.locator('tbody').getByRole('row').first(),
+      this.locators.addInventoryDialog
+        .getByRole('checkbox', { name: /^Select [A-Z]{3}\d+/ })
+        .first(),
     ).toBeVisible({
       timeout: INVENTORY_SEARCH_TIMEOUT,
     });
@@ -143,6 +171,54 @@ export class BomItemsPage extends BasePage {
     await this.selectInventoryForReview(inventoryIds);
     await this.confirmReview(inventoryIds.length);
     for (const id of inventoryIds) await this.expectItemPresent(id);
+  }
+
+  /**
+   * Gives every line whose Supplier reads "(required)" the first active
+   * vendor, and returns how many it changed. Costing Approve is refused
+   * (409 LIFECYCLE_BLOCKED, "missingVendor") while any line has no supplier
+   * — an intended readiness rule, first seen on dev 2026-10-26. Where no
+   * line reads "(required)" this does nothing. Picking a vendor saves the
+   * line at once.
+   */
+  async assignSuppliersWhereRequired(): Promise<number> {
+    const required = this.locators.supplierRequiredButtons;
+    let changed = 0;
+    for (; changed < 10 && (await required.count()) > 0; changed++) {
+      const saved = this.page.waitForResponse(
+        (res) =>
+          res.request().method() === 'POST' && /\/items\/[^/]+$/.test(new URL(res.url()).pathname),
+        { timeout: 30_000 },
+      );
+      await required.first().click();
+      await expect(this.locators.supplierDialog).toBeVisible();
+      // Active vendors only. The dialog opens with inactive vendors included
+      // (dev, 2026-10-28); clicking the switch's label turns that off. The
+      // first time, that reloads the list (GET …/vendors?includeInactive=false);
+      // after that the app reuses the list it already has and sends nothing,
+      // so wait for the reload only if one starts.
+      if (await this.locators.includeInactiveVendorsSwitch.isChecked()) {
+        const reload = this.page
+          .waitForRequest((req) => /\/vendors\?includeInactive=false/.test(req.url()), {
+            timeout: 3_000,
+          })
+          .then((req) => req.response())
+          .catch(() => null);
+        await this.locators.includeInactiveVendorsLabel.click();
+        await expect(this.locators.includeInactiveVendorsSwitch).not.toBeChecked();
+        const response = await reload;
+        if (response) expect(response.ok(), 'loading the active vendors').toBe(true);
+      }
+      await expect(this.locators.includeInactiveVendorsSwitch).not.toBeChecked();
+      // The vendor list opens expanded; open it only if it isn't.
+      if (!(await this.locators.supplierOptions.first().isVisible())) {
+        await this.locators.supplierCombobox.click();
+      }
+      await this.locators.supplierOptions.first().click();
+      expect((await saved).ok(), 'saving the supplier on the line').toBe(true);
+      await expect(this.locators.supplierDialog).toBeHidden();
+    }
+    return changed;
   }
 
   // ---- Delete ----
@@ -275,11 +351,6 @@ export class BomItemsPage extends BasePage {
   async switchSplitType(inventoryId: string, type: BomSplitType): Promise<void> {
     await this.clickCheckbox(inventoryId, type);
     await expect.poll(() => this.activeSplitTypes(inventoryId)).toEqual([type]);
-  }
-
-  async dismissNotAllowed(): Promise<void> {
-    await this.locators.notAllowedDialog.getByRole('button').first().click();
-    await expect(this.locators.notAllowedDialog).toBeHidden();
   }
 
   async openPickCountry(inventoryId: string): Promise<void> {

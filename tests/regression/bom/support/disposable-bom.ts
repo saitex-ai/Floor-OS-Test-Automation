@@ -1,9 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { type Page, expect } from '@playwright/test';
-import { CreateTechpackPage } from '../../../../src/pages/techpack/create-techpack.page';
-import { CanvasPage } from '../../../../src/pages/techpack/canvas.page';
-import { BomListPage } from '../../../../src/pages/bom/bom-list.page';
+import { type Page, test } from '@playwright/test';
+import { createApprovedTechpack as createApprovedTechpackViaTechpack } from '../../../../src/fixtures/cross-module.helpers';
+import { BomListPage, CreateBomError } from '../../../../src/pages/bom/bom-list.page';
 
 /**
  * Test data for the BOM suite. A BOM can only be created for an Approved
@@ -17,7 +16,8 @@ import { BomListPage } from '../../../../src/pages/bom/bom-list.page';
  * instead. Confirmed live on uat 2026-10-08: the whole chain takes ~45s.
  *
  * This is the one place the BOM suite drives Techpack screens, and only
- * as setup — through Techpack's own page objects, never its locators.
+ * as setup — through createApprovedTechpack() in
+ * src/fixtures/cross-module.helpers.ts, never Techpack's pages directly.
  */
 
 /**
@@ -35,50 +35,45 @@ const SAMPLE_PDF = path.join(__dirname, '..', '..', 'techpack', 'fixtures', 'sam
 /** Generous budget for the whole setup chain, for callers' hooks. */
 export const DISPOSABLE_BOM_TIMEOUT = 420_000;
 
-/**
- * Creates a fresh Classic techpack and approves it. A fresh record's
- * Functions menu doesn't always offer Approve straight away (see
- * CanvasPage.approveTechpack()), so this tries up to 3 fresh techpacks.
- */
+/** A fresh Classic techpack, approved on its canvas, tagged as BOM test data. Returns its code. */
 export async function createApprovedTechpack(page: Page): Promise<string> {
-  const create = new CreateTechpackPage(page);
-  const canvas = new CanvasPage(page);
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    await create.openFromTechpacksList();
-    await create.fillAllRequiredWithRandomAvailable();
-    await create.fillDetails({ description: TEST_DATA_TAG });
-    await create.uploadTechpackFile({
+  return createApprovedTechpackViaTechpack(page, {
+    description: TEST_DATA_TAG,
+    document: {
       name: 'sample-techpack.pdf',
       mimeType: 'application/pdf',
       buffer: fs.readFileSync(SAMPLE_PDF),
-    });
-    expect(await create.createExpectingResult()).toBe('created');
-    await create.expectCreatedSuccessfully();
-    const code = await create.currentTechpackCode();
-    if ((await canvas.approveTechpack()) === 'approved') {
-      await expect
-        .poll(async () => (await canvas.fieldRowText('Status')).split('\n').pop()!.trim(), {
-          timeout: 30_000,
-        })
-        .toBe('Approved');
-      return code;
-    }
-  }
-  throw new Error('Could not approve a fresh techpack in 3 attempts');
+    },
+  });
 }
 
 /**
  * Builds a disposable BOM: an approved techpack, then "New BOM" for it.
  * Leaves the page on the new BOM's detail page (rev 0, Open, no items)
  * and returns its techpack code.
+ *
+ * Create BOM has answered 500 INTERNAL_ERROR now and then on uat under 2
+ * workers (2026-10-27, 2026-10-28; the second created nothing), so this
+ * setup step tries once more after a server error and records it in the
+ * report. 02-create-bom.spec.ts tests Create BOM itself without a retry.
  */
 export async function createDisposableBom(page: Page): Promise<string> {
   const code = await createApprovedTechpack(page);
   const list = new BomListPage(page);
-  await list.open();
-  await list.openNewBomDialog();
-  await list.openTechpackPicker();
-  await list.pickTechpack(code);
-  await list.createBom(code);
-  return code;
+  for (let attempt = 1; ; attempt++) {
+    await list.open();
+    await list.openNewBomDialog();
+    await list.openTechpackPicker();
+    await list.pickTechpack(code);
+    try {
+      await list.createBom(code);
+      return code;
+    } catch (error) {
+      if (attempt > 1 || !(error instanceof CreateBomError) || error.status < 500) throw error;
+      test.info().annotations.push({
+        type: 'setup retry',
+        description: `${error.message} (retried once)`,
+      });
+    }
+  }
 }

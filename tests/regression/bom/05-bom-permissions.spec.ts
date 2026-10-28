@@ -60,9 +60,9 @@ test.describe.serial('BOM - Permissions (second user)', () => {
 
   test('TC:1 Verify a non-admin (Qc-lead) user can open the BOM list', async () => {
     await bobList.open();
-    await expect(new ShellHeaderPage(bob.page).locators.userMenuButton).toContainText(
-      credentials!.username,
-      { ignoreCase: true },
+    // The user-menu button shows initials only; the name is in the opened menu.
+    expect((await new ShellHeaderPage(bob.page).signedInUserText()).toLowerCase()).toContain(
+      credentials!.username.toLowerCase(),
     );
     await bobList.searchFor(code);
   });

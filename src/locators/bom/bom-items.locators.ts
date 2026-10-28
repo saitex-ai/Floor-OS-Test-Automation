@@ -23,6 +23,22 @@ export type BomSplitType =
 export class BomItemsLocators {
   readonly itemsTable: Locator;
   readonly itemRows: Locator;
+  /**
+   * A line's Supplier cell reads "(required)" when it has no supplier (dev,
+   * 2026-10-26). Costing Approve is refused for a BOM with such lines.
+   */
+  readonly supplierRequiredButtons: Locator;
+  /** The "Not Allowed" dialog (uat since 2026-10-26; dev shows a toast instead). */
+  readonly notAllowedDialog: Locator;
+  readonly notAllowedOkButton: Locator;
+  /** Open toasts (the shell's "Notifications" live region). */
+  readonly toasts: Locator;
+  // "Select a supplier" dialog (a line's Supplier cell)
+  readonly supplierDialog: Locator;
+  readonly supplierCombobox: Locator;
+  readonly includeInactiveVendorsSwitch: Locator;
+  readonly includeInactiveVendorsLabel: Locator;
+  readonly supplierOptions: Locator;
   readonly categoryRows: Locator;
   readonly emptyState: Locator;
   readonly itemsFilter: Locator;
@@ -61,7 +77,6 @@ export class BomItemsLocators {
   readonly editLineReasonError: Locator;
 
   readonly deleteLineDialog: Locator;
-  readonly notAllowedDialog: Locator;
   readonly countryDialog: Locator;
 
   // Split details / thread items / bulk paste / copy dialogs
@@ -80,14 +95,19 @@ export class BomItemsLocators {
 
   constructor(private readonly page: Page) {
     this.itemsTable = page.getByRole('main').getByRole('table').first();
-    this.itemColumnHeaders = this.itemsTable.locator('thead').getByRole('columnheader');
+    // Since uat's 2026-10-26 deploy the items table's rows sit in role
+    // "rowgroup" elements, not <thead>/<tbody>, so rows are found by role
+    // and content only: an item row is one with an "Item-level split"
+    // checkbox, a category row is named "<category> N line(s)".
+    this.itemColumnHeaders = this.itemsTable.getByRole('columnheader');
     this.itemRows = this.itemsTable
-      .locator('tbody')
       .getByRole('row')
       .filter({ has: page.getByRole('checkbox', { name: 'Item-level split' }) });
-    this.categoryRows = this.itemsTable
-      .locator('tbody')
-      .getByRole('row', { name: /^.+ \d+ lines?$/ });
+    this.supplierRequiredButtons = this.itemRows.getByRole('button', {
+      name: '(required)',
+      exact: true,
+    });
+    this.categoryRows = this.itemsTable.getByRole('row', { name: /^.+ \d+ lines?$/ });
     this.emptyState = page.getByText('No items in this BOM');
     this.itemsFilter = page.getByRole('textbox', { name: 'Filter items, suppliers, codes…' });
 
@@ -142,10 +162,25 @@ export class BomItemsLocators {
     this.uomOptions = page.getByRole('listbox').getByRole('option');
 
     this.deleteLineDialog = page.getByRole('dialog', { name: 'Delete line' });
-    this.notAllowedDialog = page
-      .getByRole('alertdialog', { name: 'Not Allowed' })
-      .or(page.getByRole('dialog', { name: 'Not Allowed' }));
     this.countryDialog = page.getByRole('dialog', { name: /Select a country/ });
+    this.notAllowedDialog = page
+      .getByRole('dialog')
+      .filter({ has: page.getByRole('heading', { name: 'Not Allowed' }) });
+    this.notAllowedOkButton = this.notAllowedDialog.getByRole('button', {
+      name: 'OK',
+      exact: true,
+    });
+    this.toasts = page.getByRole('region', { name: /^Notifications/ }).getByRole('listitem');
+    this.supplierDialog = page.getByRole('dialog', { name: 'Select a supplier' });
+    this.supplierCombobox = this.supplierDialog.getByRole('combobox').first();
+    this.includeInactiveVendorsSwitch = this.supplierDialog.getByRole('switch', {
+      name: 'Include inactive vendors',
+    });
+    // The switch is a visually hidden input; its visible label is what toggles it.
+    this.includeInactiveVendorsLabel = this.supplierDialog.getByText('Include inactive vendors', {
+      exact: true,
+    });
+    this.supplierOptions = this.supplierDialog.getByRole('option');
 
     this.splitDetailsDialog = page.getByRole('dialog', { name: 'Split details' });
     this.splitDetailsDeleteButton = this.splitDetailsDialog.getByRole('button', {
@@ -214,9 +249,9 @@ export class BomItemsLocators {
     return this.itemRow(inventoryId).getByRole('textbox');
   }
 
-  /** The "—" shown in place of "Pick country" on a THD (thread) line. */
+  /** The country cell of a line that can't be destination-split: "—", or "-" since uat's 2026-10-26 deploy. */
   rowNoCountryCell(inventoryId: string): Locator {
-    return this.itemRow(inventoryId).getByRole('cell', { name: '—', exact: true });
+    return this.itemRow(inventoryId).getByRole('cell', { name: /^[—-]$/ });
   }
 
   rowPickCountryButton(inventoryId: string): Locator {
@@ -225,12 +260,9 @@ export class BomItemsLocators {
 
   /** The "Add Inventory Item" picker's row for one inventory code. */
   inventoryOptionRow(inventoryId: string): Locator {
-    return this.addInventoryDialog
-      .locator('tbody')
-      .getByRole('row')
-      .filter({
-        has: this.page.getByRole('checkbox', { name: `Select ${inventoryId}`, exact: true }),
-      });
+    return this.addInventoryDialog.getByRole('row').filter({
+      has: this.page.getByRole('checkbox', { name: `Select ${inventoryId}`, exact: true }),
+    });
   }
 
   inventoryOptionCheckbox(inventoryId: string): Locator {
@@ -240,9 +272,16 @@ export class BomItemsLocators {
     });
   }
 
-  /** A thread line's row in the "Thread items" workspace. */
+  /**
+   * A thread line's select checkbox in the "Thread items" workspace. Since
+   * uat's 2026-10-26 deploy it's named by row number ("Select row 01"), so
+   * the row is found by its code cell.
+   */
   threadItemCheckbox(inventoryId: string): Locator {
-    return this.threadItemsDialog.getByRole('checkbox', { name: `Select ${inventoryId}` });
+    return this.threadItemsDialog
+      .getByRole('row')
+      .filter({ has: this.page.getByRole('cell', { name: inventoryId, exact: true }) })
+      .getByRole('checkbox', { name: /^Select (row \d+|THD)/ });
   }
 
   /** One option in the open UOM select. */
@@ -252,8 +291,6 @@ export class BomItemsLocators {
 
   /** A category header row in the items table, e.g. "Fabric 1 line". */
   categoryRow(category: string): Locator {
-    return this.itemsTable
-      .locator('tbody')
-      .getByRole('row', { name: new RegExp(`^${category} \\d+ lines?$`) });
+    return this.itemsTable.getByRole('row', { name: new RegExp(`^${category} \\d+ lines?$`) });
   }
 }
