@@ -234,10 +234,13 @@ export class ExternalEventsLocators {
     // "Advanced filter". Apply does not close the drawer — its Close does.
     // The quick "Type" button's checkbox list is portalled OUTSIDE the
     // modal drawer, so it inherits `pointer-events: none` and a click on
-    // an option never lands (a dev bug, see filterByType()). The General
-    // Information "Type" combobox opens its own dialog with a
-    // "Suggestions" listbox, which does work.
+    // an option never lands (see filterByType()). The General Information
+    // "Type" combobox opens its own dialog with a "Suggestions" listbox,
+    // which does work.
     this.filtersDialog = page.getByRole('dialog', { name: 'Filters' });
+    // The drawer's comboboxes have no accessible name and their label text
+    // isn't associated with them (getByLabel finds nothing), so the "Type"
+    // one is found as the label's next combobox sibling.
     this.filterTypeCombobox = this.filtersDialog
       .getByText('Type', { exact: true })
       .first()

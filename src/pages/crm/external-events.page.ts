@@ -473,8 +473,8 @@ export class ExternalEventsPage extends BasePage {
    * confirmed on dev (2026-10-23) that the quick button's checkbox list is
    * portalled outside the modal drawer with `pointer-events: none`, so a
    * mouse click on any of its options does nothing (and Enter only closes
-   * it). That is a real dev bug, reported separately; the combobox is the
-   * drawer's working path to the same filter.
+   * it). The combobox is the drawer's working path to the same filter, so
+   * the tests use it (the quick button's behaviour is not logged as a bug).
    */
   async filterByType(type: string): Promise<void> {
     await this.openFiltersPanel();
