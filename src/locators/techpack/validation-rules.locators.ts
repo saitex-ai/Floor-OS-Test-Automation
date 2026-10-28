@@ -31,8 +31,8 @@ export class ValidationRulesLocators {
   readonly heading: Locator;
 
   // Techpack module nav drawer (for TC:1/TC:28)
-  readonly techpacksListHeading: Locator;
-  readonly openNavigationButton: Locator;
+  /** The Techpack module landing's <h1>, "Dashboard" since the 2026-10-22 redesign. */
+  readonly techpackDashboardHeading: Locator;
   readonly validationRulesNavLink: Locator;
 
   // List toolbar
@@ -50,11 +50,15 @@ export class ValidationRulesLocators {
   // Pagination
   readonly showingText: Locator;
   readonly rowsPerPageCombobox: Locator;
-  readonly firstPageButton: Locator;
   readonly previousPageButton: Locator;
   readonly nextPageButton: Locator;
-  readonly lastPageButton: Locator;
+  /** "1 of N" between Previous and Next. */
+  readonly pageOfText: Locator;
+  /** Pager controls removed by the 2026-10-22 redesign, kept to check they stay gone. */
+  readonly firstOrLastPageButtons: Locator;
   readonly jumpToPageInput: Locator;
+  /** The options of the open "Rows per page" listbox. */
+  readonly rowsPerPageOptions: Locator;
 
   // New / Edit rule dialog
   readonly ruleDialog: Locator;
@@ -87,9 +91,12 @@ export class ValidationRulesLocators {
   constructor(private readonly page: Page) {
     this.heading = page.getByRole('heading', { name: 'Validation rules', level: 1 });
 
-    this.techpacksListHeading = page.getByRole('heading', { name: 'TechPacks', level: 1 });
-    this.openNavigationButton = page.getByRole('button', { name: 'Open navigation' });
-    this.validationRulesNavLink = page.getByRole('link', { name: 'Validation rules', exact: true });
+    this.techpackDashboardHeading = page.getByRole('heading', { name: 'Dashboard', level: 1 });
+    // The module's left nav is docked open since the 2026-10-22 redesign
+    // (there is no "Open navigation" button any more).
+    this.validationRulesNavLink = page
+      .getByRole('complementary', { name: 'Techpacks' })
+      .getByRole('link', { name: 'Validation rules', exact: true });
 
     this.moreTabsButton = page.getByRole('button', { name: /^\+\d+ more$/ });
     this.filterInput = page.getByPlaceholder('Filter by id, name or description');
@@ -104,11 +111,14 @@ export class ValidationRulesLocators {
 
     this.showingText = page.getByText(/Showing \d+ to \d+ of \d+/);
     this.rowsPerPageCombobox = page.getByRole('combobox', { name: 'Rows per page' });
-    this.firstPageButton = page.getByRole('button', { name: 'First page' });
     this.previousPageButton = page.getByRole('button', { name: 'Previous page' });
     this.nextPageButton = page.getByRole('button', { name: 'Next page' });
-    this.lastPageButton = page.getByRole('button', { name: 'Last page' });
+    // Since the 2026-10-22 redesign the pager is Previous / "1 of N" / Next
+    // only: First page, Last page and Jump to page are gone.
+    this.pageOfText = page.getByText(/^\d+ of \d+$/);
+    this.firstOrLastPageButtons = page.getByRole('button', { name: /^(First|Last) page$/ });
     this.jumpToPageInput = page.getByRole('textbox', { name: /^Jump to page/ });
+    this.rowsPerPageOptions = page.getByRole('listbox').last().getByRole('option');
 
     this.ruleDialog = page.getByRole('dialog', { name: /^(New|Edit) validation rule$/ });
     this.newRuleDialog = page.getByRole('dialog', { name: 'New validation rule' });

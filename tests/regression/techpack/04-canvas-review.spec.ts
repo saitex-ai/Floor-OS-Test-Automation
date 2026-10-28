@@ -521,10 +521,10 @@ test.describe('Techpack - Canvas Review (Force Release + Approve)', () => {
         '',
       );
 
-      await techpackPage.open();
-      await techpackPage.expectLoaded();
+      // A code opens the techpack's view page; Approve lives on its canvas.
+      await techpackPage.openAndWaitForRows();
       await techpackPage.search(techpackCode);
-      await techpackPage.openRow(techpackCode);
+      await canvasPage.gotoCanvasById(await techpackPage.openCodeAndReadId(techpackCode));
       await canvasPage.expectLoaded();
 
       const creatorName = (await canvasPage.fieldRowText('Creator')).split('\n').pop()!.trim();

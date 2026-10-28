@@ -135,13 +135,30 @@ export class CreateTechpackPage extends BasePage {
     // uat's Techpack Type master data holds codes over the server's 20-char
     // limit (some real, some left by TC:9's bug repro) that Create always
     // rejects — never pick those here; TC:9 covers that bug on purpose.
-    const usable = texts
+    // Since the 2026-10-22 redesign an option's lines are name, code, name,
+    // status ("PW TC9 …\nPWTC9…XXXX\nPW TC9 …\nApproved"), so the code is
+    // the second line.
+    const codeOf = (text: string) => {
+      const lines = text.split('\n').map((l) => l.trim());
+      return (lines.length > 1 ? lines[1] : lines[0]) ?? '';
+    };
+    // An option's last line is its master-data status ("Approved", "Draft",
+    // …). A techpack is created Open only when every picked value is
+    // Approved; one Draft value leaves it Draft, with "Move to Open — Pending
+    // approval: <field>" (seen on dev 2026-10-26). So prefer Approved values.
+    const statusOf = (text: string) =>
+      text
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .pop() ?? '';
+    const valid = texts
       .map((text, index) => ({ text, index }))
       .filter(({ text }) =>
-        labelText !== 'Techpack Type*'
-          ? true
-          : (text.split('\n')[0] ?? '').trim().length <= TECHPACK_TYPE_CODE_MAX,
+        labelText !== 'Techpack Type*' ? true : codeOf(text).length <= TECHPACK_TYPE_CODE_MAX,
       );
+    const approved = valid.filter(({ text }) => statusOf(text) === 'Approved');
+    const usable = approved.length > 0 ? approved : valid;
     const pool = usable.length > 0 ? usable : texts.map((text, index) => ({ text, index }));
     const pick = pool[Math.floor(Math.random() * pool.length)]!;
     await options.nth(pick.index).click();
@@ -303,7 +320,11 @@ export class CreateTechpackPage extends BasePage {
    */
   async selectExistingValue(labelText: string, code: string): Promise<boolean> {
     await this.searchComboboxForNewValue(labelText, code);
-    const option = this.locators.comboboxOption(new RegExp(`^${code}`)).first();
+    // Since the 2026-10-22 redesign an option is named "<name> <code> <name>
+    // <status>" (e.g. "PRODUCTION TECH PACK BULK PRODUCTION TECH PACK
+    // Approved"), so the code is matched as a whole word, not at the start.
+    const escaped = code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const option = this.locators.comboboxOption(new RegExp(`(^|\\s)${escaped}(\\s|$)`)).first();
     const exists = await option
       .waitFor({ state: 'visible', timeout: 10_000 })
       .then(() => true)
@@ -316,7 +337,10 @@ export class CreateTechpackPage extends BasePage {
     await this.locators.fieldTrigger(labelText).click();
     const listbox = this.page.getByRole('listbox').last();
     await listbox.waitFor({ state: 'visible', timeout: 20_000 });
-    const searchBox = this.page.locator('[cmdk-input], input[type="text"]').last();
+    // The picker's own search box is the only cmdk input; since the
+    // 2026-10-26 deploy the form has more text inputs, so a generic
+    // "last text input" lands on an Operations field instead.
+    const searchBox = this.page.locator('[cmdk-input]').last();
     await searchBox.fill(searchText);
   }
 
@@ -470,6 +494,13 @@ export class CreateTechpackPage extends BasePage {
     });
     await expect(this.page).not.toHaveURL(/\/techpacks\/new$/);
     await expect(this.page.getByText(/^TP\d+-\d+$/).first()).toBeVisible({ timeout: 30_000 });
+  }
+
+  /** The new techpack's id, from the `/techpacks/view/{id}` URL a create lands on. */
+  currentTechpackId(): string {
+    const id = this.page.url().match(/\/techpacks\/view\/([^/?#]+)/)?.[1];
+    if (!id) throw new Error(`Not on a techpack view page: ${this.page.url()}`);
+    return id;
   }
 
   /** Reads the real Techpack Code off the detail/canvas view right after a successful create(). */
