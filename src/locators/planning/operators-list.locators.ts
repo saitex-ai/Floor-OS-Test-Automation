@@ -16,4 +16,12 @@ export class OperatorsListLocators {
     this.heading = page.getByRole('heading', { name: 'Operators & Qualifications', level: 1 });
     this.newButton = page.getByRole('button', { name: 'New', exact: true });
   }
+
+  /**
+   * Of `rows`, the profiles whose employee record resolves. A profile whose
+   * employee can't be found reads "Operator unavailable" in place of the name.
+   */
+  resolvedRows(rows: Locator): Locator {
+    return rows.filter({ hasNotText: 'Operator unavailable' });
+  }
 }

@@ -31,12 +31,17 @@ export class OperatorProfilePage extends BasePage {
     await expect(this.page).toHaveURL(/\/edit$/, { timeout: WAIT.NAVIGATION });
   }
 
-  /** The edit form's qualifications table ends in an "Add a qualification" row. */
+  /** The edit form's step 2, opened from the step list (not step 1's "Save & continue"). */
+  async openQualificationsStep(): Promise<void> {
+    await this.locators.qualificationsStep.click();
+  }
+
+  /** Step 2's qualifications table ends in an "Add a qualification" row. */
   async expectAddQualificationRow(): Promise<void> {
     await expect(this.locators.addQualificationButton).toBeVisible({ timeout: WAIT.PAGE_LOAD });
     await expect(this.locators.newRowActivity).toBeVisible();
     await expect(this.locators.newRowTask).toBeVisible();
-    await expect(this.locators.saveChangesButton).toBeVisible();
+    await expect(this.locators.doneButton).toBeVisible();
   }
 
   /** Leaves the edit form without saving and lands back on the read-only profile. */

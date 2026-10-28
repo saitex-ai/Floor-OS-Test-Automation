@@ -20,6 +20,7 @@ export class CalendarFormLocators {
   readonly activeSwitch: Locator;
   readonly versionField: Locator;
   readonly createButton: Locator;
+  readonly doneButton: Locator;
   readonly saveButton: Locator;
   readonly cancelButton: Locator;
   /** "Saving rewrites this calendar. …" / a "saves as a new version" notice on edit. */
@@ -37,7 +38,11 @@ export class CalendarFormLocators {
     this.timeZoneWarning = page.getByText(/Different zone from its parent/);
     this.activeSwitch = page.getByRole('switch', { name: 'Active' });
     this.versionField = page.getByRole('textbox', { name: 'Version' });
-    this.createButton = page.getByRole('button', { name: 'Create calendar' });
+    // Since the 2026-10-28 dev deploy the form is in two steps: step 1's
+    // "Save & continue" creates the calendar, and "Done" on step 2 (working
+    // week and entries) opens it.
+    this.createButton = page.getByRole('button', { name: 'Save & continue' });
+    this.doneButton = page.getByRole('button', { name: 'Done', exact: true });
     this.saveButton = page.getByRole('button', { name: 'Save changes' });
     this.cancelButton = page.getByRole('button', { name: 'Cancel' });
     this.saveNotice = page.getByText(/^(Saving|Saves)\b/);
