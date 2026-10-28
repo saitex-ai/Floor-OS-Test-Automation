@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/techpack.fixtures';
 import { knownBug, openQuestion, partial } from '../../../src/utils/test-annotations';
+import { env, type TestEnv } from '../../../src/config/env';
 
 /**
  * Minimal CSV line splitter — not a full RFC 4180 parser, just enough to
@@ -104,6 +105,19 @@ const HIDDEN_BY_DEFAULT = [
 
 /** The code at the end of a "Name and Code" cell ("3301 Deconstructed Super Slim TP202610-000129"). */
 const codeOf = (nameAndCode: string): string => nameAndCode.trim().split(/\s+/).pop() ?? '';
+
+/**
+ * TC:19's pinned record per environment: a long-standing Approved techpack
+ * whose customer has a name in master data, so its export row always shows
+ * z941abxkuq while the bug is open. (The export writes the stored customer
+ * code for every row; a row only looks right when the grid has no name to
+ * show either, e.g. dev's SEED-DEMO-001 "LEVI". Checked on every Approved
+ * row on 2026-10-28: uat 161/161 differ, dev 159/163.)
+ */
+const EXPORT_BUG_TECHPACK: Partial<Record<TestEnv, string>> = {
+  uat: 'TP202610-000228', // ARIAT INTERNATIONAL → exports CTC0000157
+  dev: 'TP202610-000038', // Fast Retailing (Uniqlo) → exports CTC0000007
+};
 
 test.describe('Techpack - Techpacks List', () => {
   test.beforeEach(async () => {
@@ -547,11 +561,12 @@ test.describe('Techpack - Techpacks List', () => {
     techpackPage,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abxkuq', 'TC:19 bug (ClickUp)');
-    // Known bug z941abxkuq: Customer Name exports the raw `CTC…` customer
-    // code instead of the name the grid shows (uat and dev, 2026-10-26). It
-    // shows for some customers and not others, so every row on the page is
-    // checked, not just the first.
-    knownBug('z941abxkuq');
+    // Known bug z941abxkuq: Customer Name exports the stored customer code
+    // (`CTC…`) instead of the name the grid shows (uat and dev). The test is
+    // pinned to a record that always shows it (EXPORT_BUG_TECHPACK), so the
+    // expected failure doesn't depend on which rows are on the first page.
+    const pinned = EXPORT_BUG_TECHPACK[env.testEnv];
+    test.skip(!pinned, `No pinned techpack for ${env.testEnv}: add one to EXPORT_BUG_TECHPACK`);
     test.setTimeout(120_000);
     await techpackPage.openAndWaitForRows();
 
@@ -581,6 +596,34 @@ test.describe('Techpack - Techpacks List', () => {
     });
     const keyOf = (row: Record<string, string>) =>
       `${codeOf(row['Name and Code'] ?? '')}/${row['Rev No'] ?? ''}`;
+
+    // Export ignores the search box (it still writes every Approved row), so
+    // searching only brings the pinned record into the grid to read it.
+    const pinnedRow =
+      await test.step(`Read the pinned techpack ${pinned} from the grid`, async () => {
+        await techpackPage.search(pinned!);
+        await expect
+          .poll(
+            async () => {
+              const codes = await techpackPage.visibleCodes();
+              return codes.length > 0 && codes.every((c) => c === pinned);
+            },
+            {
+              message: `${pinned} should be on the Approved tab (EXPORT_BUG_TECHPACK); pick another if it's gone`,
+            },
+          )
+          .toBe(true);
+        const [row] = await techpackPage.visibleRows(columns);
+        expect(
+          row?.['Customer Name'],
+          `${pinned} should show a customer name, not a code`,
+        ).not.toMatch(/^(CTC\d+|—)?$/);
+        return row!;
+      });
+
+    // Marked only now, so a missing or changed pinned record fails as a real
+    // failure instead of passing for the known bug.
+    knownBug('z941abxkuq');
 
     const csv = await test.step('Download and parse the export', async () => {
       const download = await techpackPage.export();
@@ -616,6 +659,17 @@ test.describe('Techpack - Techpacks List', () => {
         'Creator',
         'Approver',
       ]);
+    });
+
+    await test.step(`The pinned techpack ${pinned} exports its customer's name (z941abxkuq)`, async () => {
+      const record = csv.records.get(keyOf(pinnedRow));
+      expect(record, `${keyOf(pinnedRow)} should be in the export`).toBeDefined();
+      expect
+        .soft(
+          record?.['Customer Name'],
+          'Customer Name should be the name, not a raw code (z941abxkuq)',
+        )
+        .toBe(pinnedRow['Customer Name']);
     });
 
     await test.step('Every row on screen is in the export, with the values the grid shows', async () => {
