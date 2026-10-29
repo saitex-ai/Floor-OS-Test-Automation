@@ -77,7 +77,12 @@ export class WorkCentreFormLocators {
     this.status = page.getByRole('combobox', { name: 'Status', exact: true });
     this.effectiveDateLabels = page.getByText(/^Effective (from|to)\b/);
     this.centreTypeHelp = page.getByText(/^The class of centre/);
-    this.createButton = page.getByRole('button', { name: 'Create work centre' });
+    // Since the 2026-10-28 dev deploy a centre type with stations (e.g. Sewing
+    // lines) adds a second step: step 1's button turns from "Create work
+    // centre" into "Save & continue", which creates it and opens Stations.
+    this.createButton = page.getByRole('button', {
+      name: /^(Create work centre|Save & continue)$/,
+    });
     this.saveButton = page.getByRole('button', { name: 'Save changes' });
     this.cancelButton = page.getByRole('button', { name: 'Cancel' });
     this.saveNotice = page.getByText(/^(Saving|Saves)\b/);

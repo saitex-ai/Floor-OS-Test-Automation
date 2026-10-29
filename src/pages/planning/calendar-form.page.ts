@@ -122,7 +122,7 @@ export class CalendarFormPage extends BasePage {
     await this.locators.name.fill(name);
   }
 
-  /** Smoke: just clicks Create — see expectCreatedSuccessfully(). */
+  /** Smoke: just clicks step 1's "Save & continue" — see expectCreatedSuccessfully(). */
   async create(): Promise<void> {
     await this.locators.createButton.click();
   }
@@ -148,18 +148,24 @@ export class CalendarFormPage extends BasePage {
   }
 
   /**
-   * Real toast text confirmed live: "Calendar created." A successful
-   * create also navigates straight to the new calendar's own detail page
-   * at /planning/master-data/calendars/<code> (the code, not a UUID) —
-   * checked here too since it's a stronger signal than the toast alone.
-   * Returns the code from that URL — generated on save since the 2026-10-16
-   * dev deploy, so callers usually don't know it in advance.
+   * Step 1's "Save & continue" created it. Toast confirmed live (2026-10-28):
+   * "Calendar created. Add its working week and entries next."
    */
-  async expectCreatedSuccessfully(code?: string): Promise<string> {
+  async expectCreatedSuccessfully(): Promise<void> {
     await expect(this.page.getByText('Calendar created.')).toBeVisible({ timeout: 15_000 });
-    await expect(this.page).toHaveURL(
-      new RegExp(`/planning/master-data/calendars/${code ?? '(?!new$)[^/]+'}$`),
-    );
+  }
+
+  /**
+   * "Done" on step 2 opens the new calendar's own page at
+   * /planning/master-data/calendars/<code> (the code, not a UUID). Returns
+   * that code — generated on save since the 2026-10-16 dev deploy, so callers
+   * usually don't know it in advance.
+   */
+  async finish(): Promise<string> {
+    await this.locators.doneButton.click();
+    await expect(this.page).toHaveURL(/\/planning\/master-data\/calendars\/(?!new$)[^/]+$/, {
+      timeout: WAIT.NAVIGATION,
+    });
     return new URL(this.page.url()).pathname.split('/').pop()!;
   }
 

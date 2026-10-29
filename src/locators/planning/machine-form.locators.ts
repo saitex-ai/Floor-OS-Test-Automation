@@ -46,7 +46,9 @@ export class MachineFormLocators {
     this.addSystemLinkButton = page.getByRole('button', { name: 'Add system link' });
     this.systemInputs = page.getByRole('textbox', { name: 'System', exact: true });
     this.identifierInputs = page.getByRole('textbox', { name: 'Identifier there', exact: true });
-    this.createButton = page.getByRole('button', { name: 'Create machine' });
+    // Since the 2026-10-28 dev deploy the form is in two steps: step 1's
+    // "Save & continue" creates the machine, then step 2 (maintenance windows) opens.
+    this.createButton = page.getByRole('button', { name: 'Save & continue' });
     this.saveButton = page.getByRole('button', { name: 'Save changes' });
     this.cancelButton = page.getByRole('button', { name: 'Cancel' });
     this.dialog = page.getByRole('dialog');
