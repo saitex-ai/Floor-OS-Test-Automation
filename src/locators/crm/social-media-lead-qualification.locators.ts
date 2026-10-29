@@ -38,6 +38,10 @@ export class SocialMediaLeadQualificationLocators {
   readonly scoreRequiredError: Locator;
   readonly overviewTabButton: Locator;
   readonly aiChatbotGreeting: Locator;
+  /** Any comment/message/reply/send/compose button on the tab (none expected). */
+  readonly composerButtons: Locator;
+  /** Create Customer's "Customer Name" field (the form has loaded). */
+  readonly createCustomerNameInput: Locator;
 
   constructor(private readonly page: Page) {
     this.tabRoot = page.locator('#lead-qualification-tab-root');
@@ -68,6 +72,10 @@ export class SocialMediaLeadQualificationLocators {
     this.scoreRequiredError = page.getByText(/^Score (\(1.10\) required|out of 10 is required)$/);
     this.overviewTabButton = page.getByRole('button', { name: 'Overview', exact: true });
     this.aiChatbotGreeting = page.getByText(/^I generated the qualification sections for /);
+    this.composerButtons = this.tabRoot.getByRole('button', {
+      name: /comment|message|reply|send|respond|compose/i,
+    });
+    this.createCustomerNameInput = page.getByRole('textbox', { name: /^Customer Name/ });
   }
 
   /** The n-th captured post's initials avatar. */
@@ -89,9 +97,18 @@ export class SocialMediaLeadQualificationLocators {
     return entry.locator('[data-line-locator$="/relevancy"]');
   }
 
-  /** The reasoning text inside the Relevancy block (after the "Relevancy" label). */
+  /** The "Relevancy" label pill at the start of the Relevancy block. */
+  relevancyLabel(entry: Locator): Locator {
+    return this.relevancyBlock(entry).locator(':scope > span', { hasText: /^Relevancy$/ });
+  }
+
+  /**
+   * The reasoning text inside the Relevancy block: its last child span,
+   * after the "Relevancy" label. (Since 2026-10-29 dev renders an empty
+   * `display: contents` span before the label, so it isn't the 2nd span.)
+   */
   relevancyText(entry: Locator): Locator {
-    return this.relevancyBlock(entry).locator(':scope > span').nth(1);
+    return this.relevancyBlock(entry).locator(':scope > span').last();
   }
 
   /** The post text: the <div> right before the Relevancy block. */

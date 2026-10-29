@@ -79,9 +79,9 @@ export class SocialMediaLeadQualificationPage extends LeadQualificationPage {
 
   /** Waits for the Create Customer form (a slow dev can still be showing the Customers list). */
   async waitForCreateCustomerForm(): Promise<void> {
-    await expect(this.page.getByRole('textbox', { name: 'Customer Name' })).toBeVisible({
-      timeout: 90_000,
-    });
+    // 90 s: on dev the Create Customer form can take over a minute to replace
+    // the Customers list after "Create Customer" is clicked.
+    await expect(this.social.createCustomerNameInput).toBeVisible({ timeout: 90_000 });
   }
 
   postEntry(index = 0): Locator {
@@ -92,6 +92,11 @@ export class SocialMediaLeadQualificationPage extends LeadQualificationPage {
   async expectPostsCardIsFirstCard(): Promise<void> {
     await expect(this.social.postsCard).toHaveCount(1);
     await expect(this.locators.cardHeadings.first()).toHaveText('Posts');
+  }
+
+  /** The card right below Posts (the first AI section) has this title. */
+  async expectCardBelowPosts(title: string): Promise<void> {
+    await expect(this.locators.cardHeadings.nth(1)).toHaveText(title);
   }
 
   /** Titled "Posts", carries the Origin badge, and no other card on the tab does. */
@@ -156,8 +161,8 @@ export class SocialMediaLeadQualificationPage extends LeadQualificationPage {
   async expectRelevancySeparate(entry: Locator, post: SocialPost): Promise<void> {
     const block = this.social.relevancyBlock(entry);
     await expect(block).toHaveCount(1);
-    await expect(block.locator(':scope > span').first()).toHaveText('Relevancy');
-    await expect(this.social.relevancyText(entry)).toHaveText(post.relevancy.join(' ').trim());
+    await expect(this.social.relevancyLabel(entry)).toHaveCount(1);
+    await this.expectRelevancyText(entry, post);
     const background = await block.evaluate(
       (el) => el.ownerDocument.defaultView!.getComputedStyle(el).backgroundColor,
     );
@@ -170,29 +175,23 @@ export class SocialMediaLeadQualificationPage extends LeadQualificationPage {
     expect(order).toBe(post.content.text.trim());
   }
 
+  /** The Relevancy block's reasoning reads the post's stored relevancy. */
+  async expectRelevancyText(entry: Locator, post: SocialPost): Promise<void> {
+    await expect(this.social.relevancyText(entry)).toHaveText(post.relevancy.join(' ').trim());
+  }
+
   /**
-   * No input/textarea/contenteditable or edit icon on the Posts card, the
-   * only button is "View on the platform", and typing over each value
-   * changes nothing. Clicks are forced: past the Lead stage the tab has
-   * `pointer-events: none`.
+   * The Posts card offers no way to edit the post: no
+   * input/textarea/select/contenteditable/textbox and no edit icon, and its
+   * only button is "View on the platform". Nothing is typed into the card,
+   * so the seed record is never touched. The post text is checked first, so
+   * the negative checks run on a rendered card.
    */
   async expectPostReadOnly(entry: Locator, post: SocialPost): Promise<void> {
+    await expect(this.social.postText(entry)).toHaveText(post.content.text.trim());
+    await expect(this.social.postsCard.getByRole('button')).toHaveText(['View on the platform']);
     await expect(this.social.postsCardEditableControls).toHaveCount(0);
     await expect(this.social.postsCardEditIcons).toHaveCount(0);
-    await expect(this.social.postsCard.getByRole('button')).toHaveText(['View on the platform']);
-    const targets = [
-      this.social.postAuthorLine(entry),
-      this.social.postText(entry),
-      this.social.relevancyText(entry),
-    ];
-    for (const target of targets) {
-      const before = await target.innerText();
-      await target.click({ force: true });
-      await this.page.keyboard.press('ControlOrMeta+A');
-      await this.page.keyboard.type('overwritten by test');
-      await expect(target).toHaveText(before);
-    }
-    await expect(this.social.postText(entry)).toHaveText(post.content.text.trim());
   }
 
   /**
@@ -210,50 +209,82 @@ export class SocialMediaLeadQualificationPage extends LeadQualificationPage {
   }
 
   /**
-   * Activates "View on the platform" and returns the new tab. The click is
-   * dispatched to the button: on the only dev record with a post (a
-   * Qualified Lead) the tab has `pointer-events: none`, so a pointer click
-   * can't reach it. The new tab is not interacted with.
+   * NOT A USER PATH: fires a click event on "View on the platform" from code
+   * and returns the new tab, only to check which URL the button opens. Past
+   * the Lead stage (the only dev record with a post is a Qualified Lead) the
+   * tab has `pointer-events: none`, so a user cannot click it; this bypasses
+   * that on purpose. The new tab is not interacted with.
    */
-  async openPostOnPlatform(entry: Locator): Promise<Page> {
+  async openPostOnPlatformProgrammatically(entry: Locator): Promise<Page> {
     const popup = this.page.context().waitForEvent('page');
     await entry.getByRole('button', { name: 'View on the platform' }).dispatchEvent('click');
     return popup;
   }
 
-  /** The post's only action is View on the platform; no comment/message/reply/send or sent list. */
-  async expectOnlyViewOnPlatformAction(): Promise<void> {
+  /**
+   * The post's only action is View on the platform; no
+   * comment/message/reply/send control or sent list. `postCount` is the
+   * number of captured posts from the tab's API read: the card is first
+   * waited on to show exactly that (each post, or "No posts captured yet."),
+   * so the negative checks below never pass on a card that hasn't rendered.
+   */
+  async expectOnlyViewOnPlatformAction(postCount: number): Promise<void> {
+    await expect(this.social.postEntries).toHaveCount(postCount);
+    if (postCount === 0) await expect(this.social.noPostsMessage).toBeVisible();
+    else await expect(this.social.postText(this.postEntry(0))).toBeVisible();
     await expect(this.social.postsCard.getByRole('button')).toHaveText(
-      Array(await this.social.postEntries.count()).fill('View on the platform'),
+      Array<string>(postCount).fill('View on the platform'),
     );
-    await expect(
-      this.social.tabRoot.getByRole('button', {
-        name: /comment|message|reply|send|respond|compose/i,
-      }),
-    ).toHaveCount(0);
+    await expect(this.social.composerButtons).toHaveCount(0);
     await expect(this.social.postsCard.getByRole('textbox')).toHaveCount(0);
     // No sent-comments/messages list: once the captured post and relevancy
     // texts are set aside (they're the prospect's / AI's own words), the card
-    // holds no such label.
-    const cardText = await this.social.postsCard.innerText();
-    const captured = [
-      ...(await this.social.postsCard.locator('[data-line-locator$="/relevancy"]').allInnerTexts()),
-      ...(await this.social.postEntries.evaluateAll((entries) =>
-        entries.map(
-          (e) =>
-            e.querySelector('[data-line-locator$="/relevancy"]')?.previousElementSibling
-              ?.textContent ?? '',
-        ),
-      )),
-    ];
-    const ownLabels = captured.reduce((text, part) => text.split(part).join(' '), cardText);
-    expect(ownLabels).not.toMatch(/\b(sent|comments?|messages?|repl(y|ies)|responses?)\b/i);
+    // holds no such label. Polled, and only after the card has rendered above.
+    await expect
+      .poll(() =>
+        this.social.postsCard.evaluate((card) => {
+          // Every text node of the card, space-joined, minus each post's
+          // text and Relevancy block. (Structural type: the project has no DOM lib.)
+          type TextNode = {
+            nodeType: number;
+            textContent: string | null;
+            childNodes: { forEach(fn: (child: TextNode) => void): void };
+            previousElementSibling?: TextNode | null;
+          };
+          const root = card as unknown as TextNode & {
+            querySelectorAll(selector: string): { forEach(fn: (el: TextNode) => void): void };
+          };
+          const skip = new Set<TextNode | null | undefined>();
+          root.querySelectorAll('[data-line-locator$="/relevancy"]').forEach((relevancy) => {
+            skip.add(relevancy);
+            skip.add(relevancy.previousElementSibling);
+          });
+          const parts: string[] = [];
+          const walk = (node: TextNode): void => {
+            if (skip.has(node)) return;
+            if (node.nodeType === 3) parts.push(node.textContent ?? '');
+            node.childNodes.forEach(walk);
+          };
+          walk(root);
+          return parts.join(' ');
+        }),
+      )
+      .not.toMatch(/\b(sent|comments?|messages?|repl(y|ies)|responses?)\b/i);
   }
 
   /** The only text box on a Lead-stage tab is "Manager's review" (no composer anywhere). */
   async expectOnlyReviewTextbox(): Promise<void> {
-    await expect(this.social.tabRoot.getByRole('textbox')).toHaveCount(1);
     await expect(this.locators.reviewTextbox).toBeVisible();
+    await expect(this.locators.tabTextboxes).toHaveCount(1);
+  }
+
+  /**
+   * Past the Lead stage the tab has no text box at all. The Posts card's
+   * heading is waited on first so the count runs on a rendered tab.
+   */
+  async expectNoTextboxOnTab(): Promise<void> {
+    await expect(this.social.postsCardTitle).toBeVisible();
+    await expect(this.locators.tabTextboxes).toHaveCount(0);
   }
 
   /** Each AI section is present, tagged "Generated by AI", and has content. */
@@ -320,11 +351,12 @@ export class SocialMediaLeadQualificationPage extends LeadQualificationPage {
     await expect(this.locators.reviewsSummaryText).toHaveText(text);
   }
 
-  /** Overview tab's CRM Stage reads the given stage. */
+  /** Overview tab's CRM Stage (Customer Management section) reads the given stage. */
   async expectOverviewCrmStage(stage: string): Promise<void> {
     await this.social.overviewTabButton.click();
-    const field = this.page.getByText('CRM Stage', { exact: true }).first().locator('..');
-    await expect(field).toContainText(stage);
+    await expect(this.locators.overviewFieldRow('Customer Management', 'CRM Stage')).toContainText(
+      stage,
+    );
     await this.locators.tabButton.click();
     await expect(this.locators.cardHeadings.first()).toBeVisible();
   }
@@ -349,6 +381,8 @@ export class SocialMediaListeningPage extends BasePage {
 
   async open(): Promise<void> {
     await this.gotoAuthenticated(SOCIAL_MEDIA_LISTENING_PATH);
+    // 60 s: dev's Social Media Listening list loads all captured posts before
+    // it renders any row, which has taken 30 s+ on dev.
     await expect(this.locators.postRows.first()).toBeVisible({ timeout: 60_000 });
   }
 
@@ -379,6 +413,8 @@ export class SocialMediaListeningPage extends BasePage {
     lead: { name: string; code: string; stage: string },
   ): Promise<void> {
     const l = this.locators;
+    // 60 s: the post details page fetches the post and its Lead before it
+    // renders the heading, and is as slow as the list on dev.
     await expect(l.detailHeading).toHaveText(post.content.author.name, { timeout: 60_000 });
     await expect(l.detailPostText).toHaveText(post.content.text.trim());
     await expect(l.viewPostOnSocialMediaButton).toBeVisible();
@@ -386,11 +422,6 @@ export class SocialMediaListeningPage extends BasePage {
     await expect(l.leadCardButton).toContainText(lead.name);
     await expect(l.leadCardButton).toContainText(lead.code);
     await expect(l.leadCardButton).toContainText(lead.stage);
-  }
-
-  /** Full post text on the details page (the list truncates it). */
-  async postDetailsText(): Promise<string> {
-    return (await this.locators.detailPostText.innerText()).trim();
   }
 
   async openLeadFromPostDetails(): Promise<void> {

@@ -17,9 +17,10 @@ the social channel, which opens in a new tab and leaves CRM intact.
 The prototype and the current story have **removed** the comment and
 message-the-author composers that the old ClickUp version had. There is no
 Contact Info section, because no individual contacted SAITEX. The AI
-sections open at Customer Info and draw on the captured post. They can be
-refined with the AI Chatbot markup tool, and so can the relevancy
-reasoning. No web form or crawl detection sections appear. With no post,
+sections open at Customer Info and describe the brand from its crawl
+detection (the story said they draw on the captured post; changed to
+dev's behaviour on 2026-10-23, see TC:10). They can be refined with the AI
+Chatbot markup tool, and so can the relevancy reasoning. No web form or crawl detection sections appear. With no post,
 the card reads "No posts captured yet."
 
 Managers record reviews and scores. Convert to Qualified Lead is blocked
@@ -49,34 +50,43 @@ Such a Lead has no captured post, though.
 | TC:3  | Each Post Shows Author, Handle, Channel and Posted Date                  | Positive | [link](https://app.clickup.com/t/z941abzjga) | ✅ "@nudiejeans · Instagram · 10/21/2026, 12:36:46 PM" (posted date; accepted 2026-10-23)                                                   |
 | TC:4  | Complete Post Text Without Truncation                                    | Positive | [link](https://app.clickup.com/t/z941abzjgc) | ⚠️ only a short post available; long-text truncation not checked                                                                            |
 | TC:5  | Relevancy Reasoning Shown Separately from the Post Text                  | Positive | [link](https://app.clickup.com/t/z941abzjgd) | ✅ separate "Relevancy" block                                                                                                               |
-| TC:6  | Captured Post and Metadata Cannot Be Edited                              | Negative | [link](https://app.clickup.com/t/z941abzjgg) | ✅ no inputs/edit icons on the card (checked on a read-only Qualified Lead only)                                                            |
+| TC:6  | Captured Post and Metadata Cannot Be Edited                              | Negative | [link](https://app.clickup.com/t/z941abzjgg) | ✅ no inputs/edit icons on the card, nothing typed into it (checked on a read-only Qualified Lead only)                                     |
 | TC:7  | View on the Platform Opens a New Tab; Not Clickable Past the Lead Stage  | Positive | [link](https://app.clickup.com/t/z941abzjgh) | ✅ opened https://www.instagram.com/p/DdoS-7nCn1R/ in a new tab; CRM URL unchanged; not clickable on a Qualified Lead (accepted 2026-10-23) |
 | TC:8  | No Comment or Message Action on the Post                                 | Negative | [link](https://app.clickup.com/t/z941abzjgj) | ✅ only "View on the platform"                                                                                                              |
 | TC:9  | No Contact Info; AI Sections Start at Customer Info                      | Negative | [link](https://app.clickup.com/t/z941abzjgk) | ✅ (the dossier does hold contact info; the UI hides it)                                                                                    |
 | TC:10 | AI Sections in Order, Describing the Brand from Its Crawl Detection      | Positive | [link](https://app.clickup.com/t/z941abzjgm) | ✅ order; Customer Info is the crawl detection's description of the brand (accepted 2026-10-23)                                             |
 | TC:11 | No Web Form or Crawl Detection Section                                   | Negative | [link](https://app.clickup.com/t/z941abzjgn) | ✅ (Nudie Jeans has a stored crawl detection, not rendered)                                                                                 |
 | TC:12 | Relevancy Reasoning Refined with the AI Chatbot Markup Tool              | Positive | [link](https://app.clickup.com/t/z941abzjgp) | ❓ not verified: no Lead-stage Social Media Post Lead with a post; the Relevancy block does carry a markup hook                             |
-| TC:13 | AI Section Pointer Refined and Marked Enhanced                           | Positive | [link](https://app.clickup.com/t/z941abzjgq) | ❓ chatbot + Markup tool open on a Lead-stage record; enhancement not sent (read-only)                                                      |
+| TC:13 | AI Chatbot Opens and the Markup Tool Can Be Switched On                  | Positive | [link](https://app.clickup.com/t/z941abzjgq) | ⚠️ chatbot + Markup tool open on a Lead this spec creates; refining a pointer / "✦ Enhanced" not checked (`partial`)                        |
 | TC:14 | Posts Card States No Posts Captured                                      | Edge     | [link](https://app.clickup.com/t/z941abzjgr) | ✅ "No posts captured yet." (Testing Two)                                                                                                   |
 | TC:15 | Every Captured Post Listed When There Are Several                        | Edge     | [link](https://app.clickup.com/t/z941abzjgt) | ❓ no record with 2+ posts (prototype: GANNI)                                                                                               |
-| TC:16 | Manager's Review and Score Mandatory Field Validation                    | Negative | [link](https://app.clickup.com/t/z941abzjgu) | ❓ not run (no Lead-stage SMP Lead; wording from the Web Crawled set, 2026-10-22)                                                           |
-| TC:17 | Saved Review Listed with Department, Manager, Score, Timestamp           | Positive | [link](https://app.clickup.com/t/z941abzjgv) | ✅ existing rows read on Nudie Jeans; saving not done (read-only)                                                                           |
+| TC:16 | Manager's Review and Score Mandatory Field Validation                    | Negative | [link](https://app.clickup.com/t/z941abzjgu) | ✅ automated on a Lead this spec creates: blank Save shows the four field errors, nothing saved                                             |
+| TC:17 | Saved Review Listed with Department, Manager, Score, Timestamp           | Positive | [link](https://app.clickup.com/t/z941abzjgv) | ✅ automated on a Lead this spec creates: two reviews saved, listed and kept after a reload                                                 |
 | TC:18 | Conversion Blocked Until a Review Exists                                 | Negative | [link](https://app.clickup.com/t/z941abzjgw) | ✅ Convert disabled with no reviews (seen on a Lead-stage "Social Media" Lead)                                                              |
-| TC:19 | Converts to Qualified Lead After a Review                                | Positive | [link](https://app.clickup.com/t/z941abzjgx) | ❓ not run (convert is a write)                                                                                                             |
+| TC:19 | Converts to Qualified Lead After a Review                                | Positive | [link](https://app.clickup.com/t/z941abzjgx) | ✅ automated on a Lead this spec creates: review saved, converted, Qualified Lead in the header and on Overview (no post on it: `partial`)  |
 | TC:20 | Read-Only After the Lead Leaves the Lead Stage                           | Edge     | [link](https://app.clickup.com/t/z941abzjgy) | ✅ Nudie Jeans: no form/Save/Convert, no Assistant button, tab dimmed                                                                       |
-| TC:21 | Lead Opens on Lead Qualification from Its Post on Social Media Listening | Positive | [link](https://app.clickup.com/t/z941abzjgz) | ⚠️ post details show the Lead card; the click-through to the Lead was not run                                                               |
+| TC:21 | Lead Opens on Lead Qualification from Its Post on Social Media Listening | Positive | [link](https://app.clickup.com/t/z941abzjgz) | ✅ automated: post details show the Lead card; clicking it opens Nudie Jeans' Lead Qualification tab with the same post                     |
 | TC:22 | CRM Users Notified When a Lead Is Created from a Social Media Post       | Positive | [link](https://app.clickup.com/t/z941abzjh0) | ❓ not verifiable: needs a new capture (from subtask 86eypejnd, written from the prototype)                                                 |
 
 Legend: ✅ dev matches the expected result; ⚠️ partly checked; ❓ not
 checked on dev, for the reason given. This column is the manual
-exploration; the automated results are under "Run results".
+exploration of 2026-10-23, updated with what the automation now covers;
+the automated results are under "Run results".
 
-## Run results (dev, 2026-10-23)
+## Run results (dev, 2026-10-29)
 
 `TEST_ENV=dev npx playwright test tests/regression/crm/39-social-media-lead-qualification.spec.ts --project=crm --workers=2`
-→ after the expected behaviour of TC:3, TC:7 and TC:10 was changed to dev's (22 tests):
-**19 passed, 3 skipped (fixme: TC:12, TC:15, TC:22), 0 failed**, about 1.1 min. ClickUp:
-19 `pass` (TC:3, 7 and 10 set to `pass` on 2026-10-23), 3 `skip`; Test Run Date 2026-10-23.
+→ after the PR #38 review changes (22 tests):
+**19 passed, 3 skipped (fixme: TC:12, TC:15, TC:22), 0 failed**, about 1.2 min.
+The first run on 2026-10-29 failed TC:5 and TC:20: dev now renders an empty
+`display: contents` span at the start of the Relevancy block, so the
+reasoning is no longer its 2nd span. The locator now takes the block's last
+span (UI-only change, not a bug). ClickUp: 19 `pass`, 3 `skip`, unchanged
+from 2026-10-23.
+
+Earlier run (2026-10-23), after the expected behaviour of TC:3, TC:7 and
+TC:10 was changed to dev's: 19 passed, 3 skipped; TC:3, 7 and 10 set to
+`pass`, Test Run Date 2026-10-23.
 
 - **Display TCs (1–7, 9–11, 20, 21)** run read-only on Nudie Jeans and Testing
   Two (`src/data/crm/social-media-leads.data.json`). Both are Qualified Leads,
@@ -84,16 +94,22 @@ exploration; the automated results are under "Run results".
   Lead with a captured post. TC:4 checks a 132-character post only (no long post).
 - **TC:3, TC:7, TC:10** test dev's accepted behaviour (see below): TC:3 checks
   the posted date on the post; TC:7 checks that View on the platform gets no
-  pointer events on a Qualified Lead, then opens the post from code to check
-  the new tab and the CRM tab; TC:10 checks that Customer Info shows the
+  pointer events on a Qualified Lead, then (not a user path) fires the click
+  from code only to check the link target and that the CRM tab stays; TC:10 checks that Customer Info shows the
   crawl detection's description of the brand.
 - **Write TCs (8, 13, 16–19)** each create their own Lead through Create
   Customer: "Playwright Regression SocialMedia LQ <timestamp>", Origin Type
   Social Media Post, Origin Instagram Post, CRM Stage Lead. TC:17 and TC:19
   save reviews on it, and TC:19 converts it to Qualified Lead. Such a Lead
   has no post and no AI sections ("No dossier for this account yet"), so
-  TC:13 only opens the AI Chatbot (greeting) and switches on the Markup
-  tool. No enhancement is sent (`partial`).
+  TC:13 (renamed "Verify the AI Chatbot Opens and the Markup Tool Can Be
+  Switched On" on 2026-10-29) only opens the AI Chatbot (greeting) and
+  switches on the Markup tool. No enhancement is sent (`partial`).
+- **Read-only on seed records:** TC:6 only checks that the Posts card has no
+  editable control or edit icon; nothing is typed into Nudie Jeans' post.
+  Seed-data preconditions (post, relevancy, contact info, crawl detection,
+  reviews) are `test.skip` checks, so a changed seed record skips the test
+  with a reason instead of failing it.
 - **fixme:** TC:12 (no Lead-stage Social Media Post Lead with a post to refine
   the Relevancy on), TC:15 (no record with 2+ posts), TC:22 (needs a new
   capture by Social Media Listening; none on dev during the run).
