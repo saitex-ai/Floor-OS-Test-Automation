@@ -1,5 +1,7 @@
 import { type Locator, type Page, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
+import { moduleCredentials } from '../../config/env';
+import { MODULES } from '../../config/modules';
 import {
   ExternalEventsLocators,
   EXTERNAL_EVENTS_LIST_PATH,
@@ -131,10 +133,28 @@ export class ExternalEventsPage extends BasePage {
    * rows immediately after this without a settle wait can catch the grid
    * mid-transition and return the wrong row/order (same debounce-race
    * class as search()'s wait, below).
+   *
+   * Waits for the refetch instead of a fixed settle: the tab is pressed and
+   * the grid total ("Showing … of N") equals the tab's own badge count
+   * (the badges re-scope to any applied filter, so this holds with a
+   * filter too). A fixed 600 ms stopped being enough on dev (2026-10-26,
+   * 141 events): TC:12/TC:13 read the All rows under a pressed To Attend tab.
    */
   async selectStatusTab(name: 'All' | 'Planning' | 'To Attend' | 'Attended'): Promise<void> {
-    await this.locators.statusTab(name).click();
-    await this.page.waitForTimeout(600);
+    const tab = this.locators.statusTab(name);
+    await tab.click();
+    await expect(tab).toHaveAttribute('aria-pressed', 'true');
+    await expect
+      .poll(
+        async () => {
+          const expected = await this.readStatusTabCount(name);
+          if (expected === 0) return (await this.locators.dataRows.count()) === 0;
+          if (!(await this.locators.paginationSummary.isVisible())) return false;
+          return (await this.readPaginationTotal()) === expected;
+        },
+        { message: `grid total should match the "${name}" tab count`, timeout: 15_000 },
+      )
+      .toBe(true);
   }
 
   async selectOverflowStatusTab(name: 'Not Attending' | 'Elapsed'): Promise<void> {
@@ -370,11 +390,13 @@ export class ExternalEventsPage extends BasePage {
   // - Free-text search matches Event title, Type and the Schedule/venue
   //   text (case-insensitive, partial) — NOT Status, Created By or the
   //   event's id.
-  // - "Filters" opens an inline panel with Type + Country dropdowns and an
-  //   explicit Apply; an applied filter shows as a removable chip
-  //   ("Type: Trade Fair") and the status tab counts re-scope to it.
-  //   Status filtering is the status tabs themselves.
+  // - "Filters" opens a "Filters" drawer (design-system release,
+  //   2026-10-23) with an explicit Apply; an applied filter shows as a
+  //   removable chip (`Type equals "Trade Fair"`) and the status tab
+  //   counts re-scope to it. Status filtering is the status tabs themselves.
   // - Sorting cycles asc -> desc -> asc (never back to unsorted).
+  // - Layouts are picked from the "View" menu (List View / Vertical Split /
+  //   Horizontal Split) since 2026-10-23.
   // - Column visibility/order, sort, and layout ("viewMode") are persisted
   //   per BROWSER in localStorage key "crm-events-list-prefs-v1" — not
   //   server-side. Every Playwright test gets a fresh context, so nothing
@@ -422,34 +444,48 @@ export class ExternalEventsPage extends BasePage {
     await expect.poll(() => this.readPaginationTotal(), { timeout: 15_000 }).toBe(expected);
   }
 
+  /** The Filters drawer. Since 2026-10-23 the toolbar button's aria-pressed means "filters applied", not "panel open". */
   async openFiltersPanel(): Promise<void> {
-    if ((await this.locators.filtersButton.getAttribute('aria-pressed')) !== 'true') {
+    if (!(await this.locators.filtersDialog.isVisible())) {
       await this.locators.filtersButton.click();
     }
-    await expect(this.locators.filterTypeButton).toBeVisible();
+    await expect(this.locators.filterTypeCombobox).toBeVisible();
   }
 
   async closeFiltersPanel(): Promise<void> {
-    if ((await this.locators.filtersButton.getAttribute('aria-pressed')) === 'true') {
-      await this.locators.filtersButton.click();
+    if (await this.locators.filtersDialog.isVisible()) {
+      await this.locators.filtersDialogCloseButton.click();
     }
-    await expect(this.locators.filterTypeButton).toBeHidden();
+    await expect(this.locators.filtersDialog).toBeHidden();
+  }
+
+  /** The applied-filter chip label for a Type filter (2026-10-23 wording). */
+  typeFilterLabel(type: string): string {
+    return `Type equals "${type}"`;
   }
 
   /**
-   * Filters panel -> Type dropdown -> pick one type -> Apply, then collapses
-   * the panel and waits for the server-side refetch to land: every visible
-   * row is of `type` (pick a type some row in the current view has).
+   * Filters drawer -> General Information "Type" field -> pick one type ->
+   * Apply -> Close, then waits for the server-side refetch to land: every
+   * visible row is of `type` (pick a type some row in the current view has).
+   *
+   * Uses the "Value..." combobox, not the quick "Type: Any type" button:
+   * confirmed on dev (2026-10-23) that the quick button's checkbox list is
+   * portalled outside the modal drawer with `pointer-events: none`, so a
+   * mouse click on any of its options does nothing (and Enter only closes
+   * it). The combobox is the drawer's working path to the same filter, so
+   * the tests use it (the quick button's behaviour is not logged as a bug).
    */
   async filterByType(type: string): Promise<void> {
     await this.openFiltersPanel();
-    await this.locators.filterTypeButton.click();
-    await this.locators.filterTypeOption(type).click();
-    await this.page.keyboard.press('Escape');
-    await expect(this.locators.filterTypeListbox).toBeHidden();
+    await this.locators.filterTypeCombobox.click();
+    await this.locators.filterSuggestion(type).click();
+    await this.locators.filterTypeCombobox.press('Escape');
+    await expect(this.locators.filterSuggestionsListbox).toBeHidden();
+    await expect(this.locators.filterTypeCombobox).toContainText(type);
     await this.locators.filterApplyButton.click();
-    await expect(this.locators.removeFilterChip(`Type: ${type}`)).toBeVisible();
     await this.closeFiltersPanel();
+    await expect(this.locators.removeFilterChip(this.typeFilterLabel(type))).toBeVisible();
     await expect
       .poll(async () => {
         const rows = await this.locators.dataRows.count();
@@ -459,7 +495,7 @@ export class ExternalEventsPage extends BasePage {
   }
 
   /**
-   * Removes one applied filter via its chip's "x" (e.g. "Type: Trade Fair").
+   * Removes one applied filter via its chip's "x" (e.g. `Type equals "Trade Fair"`, see typeFilterLabel()).
    * The unfiltered rows can come from the grid's cache with no request, and
    * the rows left may legitimately look the same, so there's no generic
    * table change to wait for here — callers that read the table next poll
@@ -472,13 +508,27 @@ export class ExternalEventsPage extends BasePage {
 
   /**
    * Clicks a column header's sort button once (asc on first click, then
-   * toggles asc/desc) and waits for the header's sort icon to show the
-   * active state. Sorting is server-side; callers poll the row order they
+   * toggles asc/desc) and waits for the header's sort icon to show that
+   * direction. Sorting is server-side; callers poll the row order they
    * expect (a first click on the default-order column changes no rows).
    */
-  async clickColumnSort(label: string): Promise<void> {
+  async clickColumnSort(label: string): Promise<'asc' | 'desc'> {
+    const before = await this.readColumnSortState(label);
     await this.locators.columnSortButton(label).click();
-    await expect(this.locators.columnSortIcon(label)).toHaveClass(/text-ring/);
+    const expected = before === 'asc' ? 'desc' : 'asc';
+    await expect.poll(() => this.readColumnSortState(label)).toBe(expected);
+    return expected;
+  }
+
+  /**
+   * A column's sort state as its header icon shows it (dev, 2026-10-23): a
+   * two-headed arrow (viewBox "0 0 6 10") = unsorted; a single arrow
+   * (viewBox "0 0 10 10") = sorted, rotated 180° for descending.
+   */
+  async readColumnSortState(label: string): Promise<'none' | 'asc' | 'desc'> {
+    const icon = this.locators.columnSortIcon(label);
+    if ((await icon.getAttribute('viewBox')) !== '0 0 10 10') return 'none';
+    return /\brotate-180\b/.test((await icon.getAttribute('class')) ?? '') ? 'desc' : 'asc';
   }
 
   async openColumnsDialog(): Promise<void> {
@@ -545,7 +595,12 @@ export class ExternalEventsPage extends BasePage {
     await expect(this.locators.columnsDialog).toBeHidden();
   }
 
-  /** Confirmed directly: "Reset to default" applies immediately (Apply goes back to disabled) — only Close is needed afterward. */
+  /**
+   * "Reset to default" then Apply. Since the 2026-10-23 design system the
+   * Columns dialog's Apply is always enabled (it no longer goes back to
+   * disabled after Reset) and Reset leaves the dialog open, so Apply is
+   * clicked to commit and close it.
+   */
   async resetColumnsToDefault(): Promise<void> {
     // Tolerate being called with the dialog still open (e.g. from a
     // cleanup block after a failed step).
@@ -553,19 +608,30 @@ export class ExternalEventsPage extends BasePage {
       await this.openColumnsDialog();
     }
     await this.locators.resetColumnsButton.click();
-    await expect(this.locators.applyColumnsButton).toBeDisabled();
-    await this.locators.closeColumnsDialogButton.click();
-    await expect(this.locators.columnsDialog).toBeHidden();
+    await this.applyColumns();
   }
 
-  async switchLayout(layout: 'No split' | 'Vertical split' | 'Horizontal split'): Promise<void> {
-    const button = {
-      'No split': this.locators.noSplitButton,
-      'Vertical split': this.locators.verticalSplitButton,
-      'Horizontal split': this.locators.horizontalSplitButton,
-    }[layout];
-    await button.click();
-    await expect(button).toHaveAttribute('aria-pressed', 'true');
+  /**
+   * Opens the toolbar's "View" menu. The button is a toggle, so it is only
+   * clicked while the menu is closed (e.g. a cleanup after a step that
+   * failed with the menu still open).
+   */
+  async openViewMenu(): Promise<void> {
+    if (!(await this.locators.viewMenu.isVisible())) {
+      await this.locators.viewMenuButton.click();
+    }
+    await expect(this.locators.viewMenu).toBeVisible();
+  }
+
+  /** Picks a layout from the toolbar's "View" menu (2026-10-23 design system). */
+  async switchLayout(layout: EventsListLayout): Promise<void> {
+    await this.openViewMenu();
+    await this.locators.viewMenuItem(layout).click();
+    await expect(this.locators.viewMenu).toBeHidden();
+    await this.openViewMenu();
+    await expect(this.locators.viewMenuItem(layout)).toHaveAttribute('aria-checked', 'true');
+    await this.page.keyboard.press('Escape');
+    await expect(this.locators.viewMenu).toBeHidden();
   }
 
   /** Ticks one row's checkbox in a table layout. */
@@ -872,22 +938,34 @@ export class ExternalEventsPage extends BasePage {
     await this.goto(path);
   }
 
-  /** The FloorOS "Sign in" gate is shown and no event data is rendered. */
+  /**
+   * The FloorOS "Welcome to FloorOS!" sign-in gate is shown and no event
+   * data is rendered. Since 2026-10-22 the gate asks for "Username or
+   * email" + Continue instead of showing a "Sign in" button.
+   */
   async expectSignInGateWithoutEventData(eventTitle: string | RegExp): Promise<void> {
-    await expect(this.locators.signInButton).toBeVisible({ timeout: 30_000 });
+    await expect(this.locators.signInIdentifierInput).toBeVisible({ timeout: 30_000 });
     await expect(this.page.getByText(eventTitle)).toHaveCount(0);
     await expect(this.locators.sectionHeading('System')).toHaveCount(0);
   }
 
-  /** Clicking Sign in without a session goes to the Keycloak (SSO) credential form. */
+  /**
+   * Signing in without a session goes to the Keycloak (SSO) credential
+   * form: the two-step login (username + Continue) used by
+   * ShellLoginPage.login(), stopping at Keycloak's password prompt.
+   */
   async expectSignInLeadsToSsoLogin(): Promise<void> {
-    await this.locators.signInButton.click();
+    await this.locators.signInIdentifierInput.fill(moduleCredentials(MODULES.crm).username);
+    await this.locators.signInContinueButton.click();
     await expect(this.page).toHaveURL(/\/auth\/realms\/[^/]+\/protocol\/openid-connect\/auth/, {
       timeout: 30_000,
     });
     await expect(this.locators.ssoPasswordInput).toBeVisible();
   }
 }
+
+/** The "View" menu's layout options (2026-10-23 design system). */
+export type EventsListLayout = 'List View' | 'Vertical Split' | 'Horizontal Split';
 
 export type EventStatusTab =
   'All' | 'Planning' | 'To Attend' | 'Attended' | 'Not Attending' | 'Elapsed';
