@@ -12,7 +12,11 @@ import type { CreateCustomerPage } from '../../../src/pages/crm/create-customer.
  * auth.setup.ts is already applied via the "crm" project's dependency —
  * no login needed here.
  */
-/** Every mandatory Customer field filled with valid values; pass a name (or override) per test. */
+/**
+ * A full, valid Customer profile; pass a name (or override) per test. Only
+ * Customer Name is mandatory (dev and prototype, 2026-10-26) — the rest are
+ * optional fields filled to exercise them.
+ */
 function validProfile(name?: string) {
   const stamp = Date.now();
   return {
@@ -66,15 +70,16 @@ test.describe('CRM - Create Customer', () => {
     createCustomerPage,
   }) => {
     await allure.tms('https://app.clickup.com/t/86eyqvatv', 'TC:2 (ClickUp)');
+    // Only Customer Name is mandatory — QA decision recorded on the test case:
+    // https://app.clickup.com/t/86eyqvatv?comment=1100750000251303
     await createCustomerPage.openFromCrmHome();
 
     await test.step('Leave mandatory fields empty and click Save', async () => {
       await createCustomerPage.save();
     });
 
-    await test.step('Save is blocked with inline "Required" errors', async () => {
-      await expect(createCustomerPage.locators.saveButton).toBeVisible(); // still on the form, not navigated away
-      await createCustomerPage.expectFieldError(/required/i);
+    await test.step('Save is blocked: only Customer Name is flagged "Required"', async () => {
+      await createCustomerPage.expectOnlyCustomerNameRequired();
     });
   });
 
@@ -344,7 +349,7 @@ test.describe('CRM - Create Customer', () => {
     await allure.tms('https://app.clickup.com/t/z941abyt4j', 'TC:12 (ClickUp)');
     await createCustomerPage.openFromCrmHome();
 
-    await test.step('Fill every mandatory field except Customer Name and save', async () => {
+    await test.step('Fill every other field except Customer Name and save', async () => {
       await createCustomerPage.fillProfile(validProfile());
       await createCustomerPage.save();
     });

@@ -21,8 +21,8 @@ const CUSTOMERS_LIST_PATH = '/crm/customers';
  *   a plain listbox popup with no `dialog` wrapper, not a search-combobox
  *   like Country's. selectComboboxOption() tries both shapes.
  * - "Referred By" is a text field that only appears once Origin Type is
- *   set to "Referral" (matches the user story's acceptance criteria: a
- *   referral-source field is conditionally required on that value).
+ *   set to "Referral". It is optional: only Customer Name is mandatory
+ *   (QA decision 2026-10-29, recorded on ClickUp z941abt7ag).
  */
 export interface CustomerProfileDetails {
   name?: string;
@@ -69,8 +69,10 @@ export class CreateCustomerPage extends BasePage {
     if (details.city !== undefined) await l.cityInput.fill(details.city);
     if (details.country !== undefined)
       await this.selectComboboxOption(l.countryCombobox, details.country);
-    // Confirmed directly (2026-10-01): dev-only required field, absent on
-    // local — see CreateCustomerLocators' class doc. Defensive rather than
+    // Company is optional (QA decision 2026-10-29, ClickUp z941abx7dk); it
+    // is still picked by default so created Customers look realistic, and
+    // `skipCompany` leaves it empty. Absent on local — see
+    // CreateCustomerLocators' class doc. Defensive rather than
     // unconditional so this doesn't change behavior on an environment
     // where it's genuinely absent. Checks it's still showing "Select"
     // (not just visible) before acting — confirmed directly (2026-10-05,
@@ -177,6 +179,17 @@ export class CreateCustomerPage extends BasePage {
   /** Exactly one inline error is shown, and it reads "Required" — i.e. only one mandatory field is missing. */
   async expectOnlyOneRequiredError(): Promise<void> {
     await expect(this.locators.fieldErrors).toHaveText(['Required']);
+  }
+
+  /**
+   * An empty form's Save: Customer Name is the only mandatory field (dev and
+   * prototype, 2026-10-26), so it is the single "Required" error and the
+   * only field marked invalid.
+   */
+  async expectOnlyCustomerNameRequired(): Promise<void> {
+    await this.expectOnlyOneRequiredError();
+    await expect(this.locators.customerNameInput).toHaveAttribute('aria-invalid', 'true');
+    await expect(this.locators.saveButton).toBeVisible();
   }
 
   /**

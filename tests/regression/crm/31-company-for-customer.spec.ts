@@ -19,8 +19,8 @@ import type { CustomerProfileDetails } from '../../../src/pages/crm/create-custo
  * - TC:3: multiple companies can be selected; the Detail read view shows
  *   them as one comma-separated list, which is the intended display
  *   (confirmed with the team 2026-10-15).
- * - TC:4 BUG: a Customer still saves with NO Company selected (ClickUp bug
- *   z941abx9aw is marked done but is not fixed on dev).
+ * - TC:4: Company is optional — a Customer saves with no Company selected
+ *   (QA decision 2026-10-29; bug z941abx9aw closed as not a bug).
  * - TC:6 is fixme: Customer Detail has no Audit History / Activity log.
  */
 test.describe('CRM - Company for Customer', () => {
@@ -149,7 +149,7 @@ test.describe('CRM - Company for Customer', () => {
     });
   });
 
-  test('TC:4 Attempt to Save Customer without Selecting a Company', async ({
+  test('TC:4 Verify a Customer Can Be Saved Without Selecting a Company', async ({
     createCustomerPage,
     customerDetailPage,
   }) => {
@@ -159,19 +159,14 @@ test.describe('CRM - Company for Customer', () => {
 
     await createCustomerPage.openFromCrmHome();
 
-    await test.step('Fill every other mandatory field, leave Company blank', async () => {
+    // Company is optional — QA decision recorded on the test case:
+    // https://app.clickup.com/t/z941abx7dk?comment=1100750000251306
+    await test.step('Fill the other fields, leave Company blank', async () => {
       await createCustomerPage.fillProfile({ ...profile, skipCompany: true });
       await createCustomerPage.expectNoCompanySelected();
     });
 
-    // BUG (confirmed on dev 2026-10-15): expected the save to be blocked
-    // with an inline "At least one Company must be selected" error on the
-    // Company field. Actual: no validation at all — the Customer is
-    // created ("was created successfully!" modal) and its Company is
-    // empty. ClickUp bug z941abx9aw ("Customer Record Can Be Created
-    // Without Selecting a Mandatory Company") is marked done but the fix
-    // is not on dev. Flip this to expectFieldError(...) once it lands.
-    await test.step('BUG: Save is NOT blocked — the Customer is created with no Company', async () => {
+    await test.step('Save creates the Customer, with no Company', async () => {
       await createCustomerPage.saveAndOpenDetail();
       await expect(customerDetailPage.locators.nameHeading).toHaveText(profile.name!);
       await customerDetailPage.expectCompanyReadValue('');

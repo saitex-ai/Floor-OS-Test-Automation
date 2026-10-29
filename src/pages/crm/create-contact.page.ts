@@ -90,29 +90,18 @@ export class CreateContactPage extends BasePage {
   }
 
   /**
-   * Confirmed on dev: unlike every other combobox in this app, the
-   * Customers popup is a plain paginated `listbox` with no search
-   * textbox at all — just options ("Acme Textiles CTC0000306 · Qualified
-   * Lead", etc.) and a "Load 15 more" button once you scroll past the
-   * first page. Only click "Load 15 more" if the target isn't visible
-   * yet (it wasn't stuck "Loading customers…" forever on local — that
-   * was a zero-customers-seeded local environment, not a broken popup).
+   * Links the Contact to an existing Customer: types the name into the
+   * Customer Name combobox, which filters the Customers list, then picks
+   * that Customer's own option ("<Name> <Code> · <Stage>"). The option is
+   * matched from the start of its name, so the "The Customer <name> does
+   * not exist…" create-new option can't be picked by mistake.
    */
   async linkToCustomer(customerName: string): Promise<void> {
     await this.locators.customerNameCombobox.click();
+    await this.locators.customerNameCombobox.fill(customerName);
     const option = this.locators.customerOption(customerName);
-    for (let attempt = 0; attempt < 10; attempt++) {
-      if (
-        await option
-          .first()
-          .isVisible()
-          .catch(() => false)
-      )
-        break;
-      if (!(await this.locators.loadMoreCustomersButton.isVisible().catch(() => false))) break;
-      await this.locators.loadMoreCustomersButton.click();
-    }
-    await option.first().click();
+    await expect(option).toBeVisible({ timeout: 15_000 });
+    await option.click();
   }
 
   async save(): Promise<void> {
