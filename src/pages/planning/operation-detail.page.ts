@@ -3,6 +3,8 @@ import { BasePage } from '../base.page';
 import { OperationDetailLocators } from '../../locators/planning/operation-detail.locators';
 import { detailValue } from '../../locators/planning/form-field.locators';
 import { becomesUsable, expectAbsentOrDisabled } from './master-data-list.page';
+import { InlineTable } from './inline-table';
+import { pressDone } from './form-submit';
 import { WAIT } from './waits';
 import { ensureRoute } from './navigation';
 
@@ -15,15 +17,19 @@ export interface AllowanceRowValues {
 
 /**
  * An operation's detail page: read-only summary, "Edit operation", and
- * the Allowances grid ("Allowances (N) — X% applied, added not
- * compounded"). Owned by the Planning QA. The URL carries the code.
+ * the read-only Allowances grid. Since the 2026-10-28 dev deploy
+ * allowances are added and edited on step 2 of Edit operation, as rows of
+ * an inline table — see AllowanceFormPage. Owned by the Planning QA. The
+ * URL carries the code.
  */
 export class OperationDetailPage extends BasePage {
   readonly locators: OperationDetailLocators;
+  readonly allowances: InlineTable;
 
   constructor(page: Page) {
     super(page);
     this.locators = new OperationDetailLocators(page);
+    this.allowances = new InlineTable(page, 'Allowances', 'allowance');
   }
 
   async open(code: string): Promise<void> {
@@ -89,38 +95,66 @@ export class OperationDetailPage extends BasePage {
     );
   }
 
-  /** Every allowance type is already on the operation: "New allowance" is disabled. */
+  /**
+   * Every allowance type is already on the operation: step 2 offers no add
+   * row (or a disabled one) — there's no type left to add.
+   */
   async expectNewAllowanceDisabled(): Promise<void> {
-    await expect(this.locators.newAllowanceButton).toBeDisabled({ timeout: WAIT.SERVER });
+    await this.openAllowancesStep();
+    const add = this.allowances.locators.addButton;
+    if ((await add.count()) > 0) await expect(add).toBeDisabled();
+    else await expect(this.allowances.locators.addRow).toHaveCount(0);
   }
 
+  /** Opens step 2 of Edit operation (if not already there), Allowances tab. */
+  async openAllowancesStep(): Promise<void> {
+    if (!(await this.locators.stepTitle.isVisible())) {
+      await this.locators.editButton.click();
+      await expect(this.page).toHaveURL(/\/operations\/[^/]+\/edit$/, {
+        timeout: WAIT.NAVIGATION,
+      });
+      await this.locators.allowancesStep.click();
+      await expect(this.locators.stepTitle).toBeVisible({ timeout: WAIT.NAVIGATION });
+    }
+    if ((await this.locators.allowancesTab.getAttribute('aria-selected')) !== 'true')
+      await this.locators.allowancesTab.click();
+    await expect(this.allowances.locators.table).toBeVisible({ timeout: WAIT.PAGE_LOAD });
+  }
+
+  /** Allowances are added on step 2 of Edit operation: opens it there, with the add row ready. */
   async openNewAllowance(): Promise<void> {
-    await this.locators.newAllowanceButton.click();
+    await this.openAllowancesStep();
+    await this.allowances.expectAddRow();
   }
 
+  /** A read-only user: no usable "Edit operation", so no way to add one. */
   async expectNewAllowanceUnavailable(): Promise<void> {
     await expect(this.locators.allowancesHeading).toBeVisible({ timeout: WAIT.PAGE_LOAD });
-    await expectAbsentOrDisabled(this.locators.newAllowanceButton);
+    await expectAbsentOrDisabled(this.locators.editButton);
   }
 
-  /**
-   * The row's icon-only "Edit": a normal click lands on the `<td>` that
-   * wraps it (it intercepts pointer events at the button's centre), so
-   * dispatch the click on the button itself.
-   */
+  /** Opens step 2 of Edit operation and the row's "Edit allowance". */
   async openAllowanceEdit(type: string): Promise<void> {
-    await this.locators.allowanceEditButton(type).dispatchEvent('click');
+    await this.openAllowancesStep();
+    await this.allowances.startEdit(type);
   }
 
-  /** Watched for WAIT.PERMISSION_SETTLE — see becomesUsable(). */
+  /** Adding an allowance needs Edit operation. Watched for WAIT.PERMISSION_SETTLE — see becomesUsable(). */
   async isNewAllowanceAvailable(): Promise<boolean> {
     await expect(this.locators.allowancesHeading).toBeVisible({ timeout: WAIT.PAGE_LOAD });
-    return becomesUsable(this.locators.newAllowanceButton);
+    return becomesUsable(this.locators.editButton);
   }
 
+  /** Editing an allowance also needs Edit operation (the grid here is read-only). */
   async isAllowanceEditAvailable(type: string): Promise<boolean> {
     await expect(this.locators.allowanceRow(type)).toBeVisible({ timeout: WAIT.SERVER });
-    return becomesUsable(this.locators.allowanceEditButton(type));
+    return becomesUsable(this.locators.editButton);
+  }
+
+  /** Done on step 2: leaves Edit operation for the detail page (rows are already saved). */
+  async finishEditing(): Promise<void> {
+    await pressDone(this.locators.doneButton);
+    await expect(this.locators.editButton).toBeVisible({ timeout: WAIT.NAVIGATION });
   }
 
   async expectAllowanceRow(type: string, values: AllowanceRowValues = {}): Promise<void> {
@@ -147,11 +181,12 @@ export class OperationDetailPage extends BasePage {
   }
 
   /**
-   * The "Allowances (N)" section with its add action. An operation without
-   * allowances may render no table at all, so the grid isn't required.
+   * The "Allowances (N)" section: read-only here (no add row); allowances
+   * are added through "Edit operation".
    */
   async expectAllowancesSection(): Promise<void> {
     await expect(this.locators.allowancesHeading).toBeVisible({ timeout: WAIT.SERVER });
-    await expect(this.locators.newAllowanceButton).toBeVisible();
+    await this.allowances.expectReadOnly();
+    await expect(this.locators.editButton).toBeVisible();
   }
 }

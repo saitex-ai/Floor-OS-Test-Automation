@@ -44,6 +44,13 @@ export class SetupDepartmentLocators {
   readonly deptActive: Locator;
   readonly createDepartmentSubmit: Locator;
   readonly saveButton: Locator;
+  /**
+   * The inline recipe / machine forms' own submits. They stay one step here
+   * ("Create …"), unlike the standalone forms' "Save & continue" since the
+   * 2026-10-28 dev deploy, so they aren't the standalone locators'.
+   */
+  readonly submitRecipeButton: Locator;
+  readonly submitMachineButton: Locator;
   readonly cancelButton: Locator;
   // Steps 2–6
   readonly createActivityButton: Locator;
@@ -79,7 +86,9 @@ export class SetupDepartmentLocators {
   constructor(private readonly page: Page) {
     this.journeyCard = page.getByRole('link', { name: /Set up my department/ });
     this.journeyCount = this.journeyCard;
-    this.stepHeading = page.getByRole('main').last().getByRole('heading', { level: 1 });
+    // Since the 2026-10-28 dev deploy the h1 is always "Set up my department";
+    // each step's own title is the first h2 under it.
+    this.stepHeading = page.getByRole('main').last().getByRole('heading', { level: 2 }).first();
     this.progress = page.getByText(/^\d+% complete/);
     this.continueButton = page.getByRole('button', { name: 'Continue', exact: true });
     this.backButton = page.getByRole('button', { name: 'Back', exact: true });
@@ -99,6 +108,10 @@ export class SetupDepartmentLocators {
       exact: true,
     });
     this.saveButton = page.getByRole('button', { name: 'Save changes' });
+    this.submitRecipeButton = page.getByRole('button', { name: 'Create recipe', exact: true });
+    this.submitMachineButton = page.getByRole('button', {
+      name: /^(Create machine|Save & continue)$/,
+    });
     this.cancelButton = page.getByRole('button', { name: 'Cancel', exact: true });
     this.createActivityButton = page.getByRole('button', { name: /Create a new activity/ });
     this.createRecipeButton = page.getByRole('button', { name: /Create a new recipe/ });

@@ -1,4 +1,5 @@
 import { type Locator, type Page } from '@playwright/test';
+import { fieldHelp } from './form-field.locators';
 
 /**
  * Raw element locators for the "New recipe" / edit-recipe form (same
@@ -10,6 +11,7 @@ export class RecipeFormLocators {
   readonly newRecipeHeading: Locator;
   readonly createButton: Locator;
   readonly saveChangesButton: Locator;
+  readonly doneButton: Locator;
   readonly cancelButton: Locator;
 
   readonly code: Locator;
@@ -39,13 +41,17 @@ export class RecipeFormLocators {
 
   constructor(private readonly page: Page) {
     this.newRecipeHeading = page.getByRole('heading', { name: 'New recipe' });
-    this.createButton = page.getByRole('button', { name: 'Create recipe' });
-    this.saveChangesButton = page.getByRole('button', { name: 'Save changes' });
+    // Since the 2026-10-28 dev deploy create and edit are two steps: step 1's
+    // "Save & continue" saves the recipe and opens Operations, whose "Done"
+    // opens the detail page.
+    this.createButton = page.getByRole('button', { name: 'Save & continue' });
+    this.saveChangesButton = this.createButton;
+    this.doneButton = page.getByRole('button', { name: 'Done', exact: true });
     this.cancelButton = page.getByRole('button', { name: 'Cancel' });
 
     this.code = this.textbox('Code');
-    this.codeGeneratedHelp = page.getByText(/Assigned automatically when the record is saved/);
-    this.codeLockedHelp = page.getByText(/The code is fixed once the record exists/);
+    this.codeGeneratedHelp = fieldHelp(page, /Assigned automatically when the record is saved/);
+    this.codeLockedHelp = fieldHelp(page, /The code is fixed once the record exists/);
     this.name = this.textbox('Recipe');
     this.recipeType = this.combobox('Recipe type');
     this.owningDepartment = this.combobox('Owning department');
@@ -57,7 +63,7 @@ export class RecipeFormLocators {
     this.shrinkageVariance = this.textbox('Shrinkage variance (%)');
     this.shadeFailRate = this.textbox('Shade fail rate');
     this.labTurnaround = this.textbox('Lab turnaround (days)');
-    this.risksHelp = page.getByText('Becomes a named, visible buffer instead of informal padding');
+    this.risksHelp = fieldHelp(page, /Becomes a named, visible buffer instead of informal padding/);
     this.addSystemLinkButton = page.getByRole('button', { name: 'Add system link' });
     this.systemInput = page.getByRole('textbox', { name: /^System/ }).last();
     this.identifierInput = page.getByRole('textbox', { name: /identifier/i }).last();

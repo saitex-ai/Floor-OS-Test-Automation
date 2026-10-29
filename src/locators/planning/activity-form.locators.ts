@@ -1,4 +1,5 @@
 import { type Locator, type Page } from '@playwright/test';
+import { fieldHelp } from './form-field.locators';
 
 /**
  * Raw element locators for the "New activity" / edit-activity form (same
@@ -59,7 +60,7 @@ export class ActivityFormLocators {
     this.editActivityButton = page.getByRole('button', { name: /^Edit (activity|revision)$/ });
 
     this.code = this.textbox('Activity code');
-    this.codeGeneratedHelp = page.getByText(/Assigned automatically when the record is saved/);
+    this.codeGeneratedHelp = fieldHelp(page, /Assigned automatically when the record is saved/);
     this.name = this.textbox('Activity name');
     this.owningDepartment = this.combobox('Owning department');
     this.activityType = this.combobox('Activity type');

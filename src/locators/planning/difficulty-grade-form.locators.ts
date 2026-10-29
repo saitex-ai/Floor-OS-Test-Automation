@@ -1,4 +1,5 @@
 import { type Locator, type Page } from '@playwright/test';
+import { fieldHelp } from './form-field.locators';
 
 /**
  * Raw element locators for the "New difficulty grade" / edit-grade form
@@ -38,7 +39,7 @@ export class DifficultyGradeFormLocators {
     this.factor = page.getByRole('textbox', { name: 'Factor', exact: true });
     this.sort = page.getByRole('textbox', { name: 'Sort (hardest first)', exact: true });
     this.offMachine = page.getByRole('switch', { name: 'Off-machine (manual)' });
-    this.offMachineHelp = page.getByText('On means no rated speed stands behind it');
+    this.offMachineHelp = fieldHelp(page, /On means no rated speed stands behind it/);
     this.status = page.getByRole('switch', { name: 'Status' });
 
     this.requiredMessage = page.getByText(/required/i);

@@ -1,4 +1,5 @@
 import { type Locator, type Page } from '@playwright/test';
+import { fieldHelp } from './form-field.locators';
 
 /**
  * Raw element locators for the Operation Master create / edit form
@@ -34,6 +35,7 @@ export class OperationMasterFormLocators {
   readonly status: Locator;
   readonly createButton: Locator;
   readonly saveButton: Locator;
+  readonly doneButton: Locator;
   readonly cancelButton: Locator;
   /** "Saving rewrites this operation." / a "saves as a new version" notice on edit. */
   readonly saveNotice: Locator;
@@ -44,13 +46,14 @@ export class OperationMasterFormLocators {
   constructor(private readonly page: Page) {
     this.newHeading = page.getByRole('heading', { name: 'New operation', level: 1 });
     this.code = page.getByRole('textbox', { name: 'Operation code' });
-    this.codeGeneratedHelp = page.getByText(/Assigned automatically when the record is saved/);
-    this.codeFixedHelp = page.getByText(/The code is fixed once the record exists/);
+    this.codeGeneratedHelp = fieldHelp(page, /Assigned automatically when the record is saved/);
+    this.codeFixedHelp = fieldHelp(page, /The code is fixed once the record exists/);
     this.name = page.getByRole('textbox', { name: 'Operation', exact: true });
     this.owningDepartment = page.getByRole('combobox', { name: 'Owning department', exact: true });
     this.difficultyGrade = page.getByRole('combobox', { name: 'Difficulty grade', exact: true });
     this.machineType = page.getByRole('combobox', { name: 'Machine type', exact: true });
-    this.machineTypeHint = page.getByText(/^(Not required|Required) — the chosen grade is/);
+    // "Required — …" is a tooltip button's name, "Not required — …" plain text (dev 2026-10-29).
+    this.machineTypeHint = fieldHelp(page, /^(Not required|Required) — the chosen grade is/);
     this.minimumSkillGrade = page.getByRole('combobox', {
       name: 'Minimum skill grade',
       exact: true,
@@ -72,8 +75,12 @@ export class OperationMasterFormLocators {
     this.parameterValues = page.getByRole('textbox', { name: 'Value', exact: true });
     this.addSystemLinkButton = page.getByRole('button', { name: 'Add system link' });
     this.status = page.getByRole('combobox', { name: 'Status', exact: true });
-    this.createButton = page.getByRole('button', { name: 'Create operation' });
-    this.saveButton = page.getByRole('button', { name: 'Save changes' });
+    // Since the 2026-10-28 dev deploy create and edit are two steps: step 1's
+    // "Save & continue" saves the operation and opens Allowances and tooling,
+    // whose "Done" opens the detail page.
+    this.createButton = page.getByRole('button', { name: 'Save & continue' });
+    this.saveButton = this.createButton;
+    this.doneButton = page.getByRole('button', { name: 'Done', exact: true });
     this.cancelButton = page.getByRole('button', { name: 'Cancel' });
     this.saveNotice = page.getByText(/^(Saving|Saves)\b/);
     this.blockedToast = page.getByText(/^Fill the \d+ highlighted field\(s\) before saving/);
@@ -81,6 +88,14 @@ export class OperationMasterFormLocators {
   }
 
   /** An option inside whichever combobox popover is currently open. */
+  /** The Machine type hint for `required`: text, or a tooltip button's name (2026-10-29). */
+  machineTypeHintFor(required: boolean): Locator {
+    return fieldHelp(
+      this.page,
+      required ? /^Required — the chosen grade/ : /^Not required — the chosen grade/,
+    );
+  }
+
   option(name: string | RegExp): Locator {
     return this.page.getByRole('option', { name });
   }

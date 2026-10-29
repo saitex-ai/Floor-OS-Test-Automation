@@ -18,9 +18,17 @@ export function fieldAlert(control: Locator, levels: 1 | 2 = 1): Locator {
   return control.locator(levels === 1 ? 'xpath=..' : 'xpath=../..').getByRole('alert');
 }
 
+/** The validation messages (`role=alert`) inside `scope` — an inline-table row or one of its cells. */
+export function alertsIn(scope: Locator): Locator {
+  return scope.getByRole('alert');
+}
+
 /**
  * A read-only detail page renders each field as a label span followed by
  * its value span inside one wrapper — this is the value next to `label`.
+ * Since the 2026-10-28 dev deploy a label with an info tooltip is wrapped
+ * with its button in a span of its own (div > span > [span label, button]),
+ * so the value is the sibling of whichever span sits directly in the div.
  */
 export function detailValue(page: Page, label: string): Locator {
   return page
@@ -28,7 +36,16 @@ export function detailValue(page: Page, label: string): Locator {
     .last()
     .getByText(label, { exact: true })
     .first()
-    .locator('xpath=following-sibling::span[1]');
+    .locator('xpath=ancestor-or-self::span[parent::div][1]/following-sibling::span[1]');
+}
+
+/**
+ * A field's help text: inline under the field, or — since the 2026-10-28 dev
+ * deploy — the accessible name of the info-tooltip button beside its label.
+ * `scope` narrows it, e.g. to a dialog.
+ */
+export function fieldHelp(scope: Page | Locator, text: RegExp): Locator {
+  return scope.getByText(text).or(scope.getByRole('button', { name: text }));
 }
 
 /**
@@ -48,11 +65,20 @@ export class DatePickerLocators {
   constructor(page: Page) {
     this.dialog = page.getByRole('dialog').last();
     this.grid = this.dialog.getByRole('grid');
-    this.previousMonth = this.dialog.getByRole('button', { name: 'Go to the Previous Month' });
-    this.nextMonth = this.dialog.getByRole('button', { name: 'Go to the Next Month' });
+    // Since the 2026-10-28 dev deploy the popover is "Choose a date": the month
+    // buttons are "Previous month" / "Next month", and a date is only kept on
+    // "Apply".
+    this.previousMonth = this.dialog.getByRole('button', {
+      name: /^(Go to the Previous Month|Previous month)$/,
+    });
+    this.nextMonth = this.dialog.getByRole('button', {
+      name: /^(Go to the Next Month|Next month)$/,
+    });
+    // Today's own day cell ("Today, Thursday, October 29th, 2026"), not the "Today"
+    // button: the popover can open upward and clip that button off-screen.
     this.today = this.dialog.getByRole('button', { name: /^Today, / });
     this.timeGroup = this.dialog.getByRole('group', { name: 'Pick time' });
-    this.doneButton = this.dialog.getByRole('button', { name: 'Done', exact: true });
+    this.doneButton = this.dialog.getByRole('button', { name: /^(Done|Apply)$/ });
   }
 
   day(name: RegExp): Locator {

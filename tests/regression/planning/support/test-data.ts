@@ -43,6 +43,7 @@ import {
   type CalendarOptions,
 } from '../../../../src/pages/planning/calendar-form.page';
 import { CalendarDetailPage } from '../../../../src/pages/planning/calendar-detail.page';
+import { CalendarsListPage } from '../../../../src/pages/planning/calendars-list.page';
 import {
   ShiftKindsPage,
   type ShiftKindValues,
@@ -368,6 +369,8 @@ export async function addAllowance(
   if (values.why !== undefined) await form.fillWhy(values.why);
   expect(await form.create(), `create allowance ${values.type}`).toBe('submitted');
   await detail.expectAllowanceRow(values.type);
+  // Added on step 2 of Edit operation; Done goes back to the detail page.
+  await detail.finishEditing();
 }
 
 /**
@@ -451,7 +454,11 @@ export async function openMachine(page: Page, code: string): Promise<void> {
   await new MachineDetailPage(page).expectLoaded(code);
 }
 
-/** On a machine's detail page: adds one maintenance window (Why is required here, as its row key). */
+/**
+ * From a machine's detail page: adds one maintenance window (Why is
+ * required here, as its row key) on step 2 of Edit machine, then Done back
+ * to the detail page.
+ */
 export async function addWindow(page: Page, values: WindowValues & { why: string }): Promise<void> {
   const detail = new MachineDetailPage(page);
   const form = new MaintenanceWindowFormPage(page);
@@ -459,6 +466,7 @@ export async function addWindow(page: Page, values: WindowValues & { why: string
   await form.fill({ kind: 'Planned', start: '06:00', ...values });
   expect(await form.create(), `create maintenance window ${values.why}`).toBe('submitted');
   await detail.expectWindowRow(values.why);
+  await detail.finishEditing();
 }
 
 // ── Sprint 3: Code lists, Calendars, Shifts, Set up my department ──
@@ -527,6 +535,43 @@ export async function createCalendar(page: Page, options: CalendarOptions = {}):
   return code;
 }
 
+/** The most calendars "Inherits from" lists: it loads only the first 200 (`limit=200`). */
+const PARENT_PICKER_LIMIT = 200;
+
+/**
+ * `n` calendars "Inherits from" offers, from the `skip`-th on. Where the
+ * picker reaches every calendar these are fresh QA-AUTO calendars. Dev has
+ * outgrown its 200-calendar list (2026-10-29: 450+, nearly all QA-AUTO), so
+ * there a calendar created now is never offered; then these are the QA-AUTO
+ * calendars it does offer — older test data, which a case may re-parent but
+ * never seed. The user graded that limit a pass: a real factory has far
+ * fewer calendars (2026-10-29).
+ */
+export async function parentCalendars(page: Page, n: number, skip = 0): Promise<string[]> {
+  const list = new CalendarsListPage(page);
+  await list.open();
+  await list.expectLoaded();
+  if ((await list.showing()).total <= PARENT_PICKER_LIMIT) {
+    const fresh: string[] = [];
+    for (let i = 0; i < n; i += 1) fresh.push(await createCalendar(page));
+    return fresh;
+  }
+  const offered = (await new CalendarFormPage(page).offeredQaParents()).slice(skip, skip + n);
+  expect(offered, `${n} QA-AUTO calendars offered as a parent`).toHaveLength(n);
+  return offered;
+}
+
+/** Edit → "Inherits from" `parent` (or top level when undefined) → save. */
+export async function setParent(page: Page, code: string, parent?: string): Promise<void> {
+  const form = new CalendarFormPage(page);
+  await form.openEdit(code);
+  if (parent) await form.fill({ inheritsFrom: parent });
+  else await form.setTopLevel();
+  expect(await form.saveChanges(), `${code} inherits from ${parent ?? 'nothing'}`).toBe(
+    'submitted',
+  );
+}
+
 /** Opens a calendar's detail page (its URL carries the code). */
 export async function openCalendar(page: Page, code: string): Promise<void> {
   await new CalendarDetailPage(page).open(code);
@@ -572,11 +617,23 @@ export async function createShift(page: Page, values: ShiftValues = {}): Promise
   return code;
 }
 
-/** On a shift's detail page: adds one break (default 12:00 → 12:30, unpaid). */
+/**
+ * From a shift's detail page: adds one break (default 12:00 → 12:30, unpaid)
+ * on step 2 of Edit shift (`active: false` retires it straight after), then
+ * Done back to the detail page.
+ */
 export async function addBreak(page: Page, values: BreakValues & { name: string }): Promise<void> {
   const detail = new ShiftDetailPage(page);
+  const { active, ...rest } = values;
   await detail.openNewBreak();
-  await detail.fillBreak({ starts: '12:00', ends: '12:30', ...values });
+  await detail.fillBreak({ starts: '12:00', ends: '12:30', ...rest });
   expect(await detail.createBreak(), `create break ${values.name}`).toBe('submitted');
   await detail.expectBreakRow(values.name);
+  // A new break is always Active (the add row has no switch): retire it by editing the row.
+  if (active === false) {
+    await detail.openBreakEdit(values.name);
+    await detail.fillBreak({ active: false });
+    expect(await detail.saveBreak(), `retire break ${values.name}`).toBe('submitted');
+  }
+  await detail.finishEditing();
 }
