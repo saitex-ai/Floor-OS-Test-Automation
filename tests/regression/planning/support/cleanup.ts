@@ -17,7 +17,6 @@ import { WorkCentreFormPage } from '../../../../src/pages/planning/work-centre-f
 import { OperationsListPage } from '../../../../src/pages/planning/operations-list.page';
 import { OperationDetailPage } from '../../../../src/pages/planning/operation-detail.page';
 import { OperationMasterFormPage } from '../../../../src/pages/planning/operation-master-form.page';
-import { WAIT } from '../../../../src/pages/planning/waits';
 import { CodeListValuesPage } from '../../../../src/pages/planning/code-lists.page';
 import { CodeListValueDialogPage } from '../../../../src/pages/planning/code-list-value-dialog.page';
 import { CalendarsListPage } from '../../../../src/pages/planning/calendars-list.page';
@@ -72,10 +71,10 @@ async function retireMachine(page: Page, code: string): Promise<void> {
   for (const why of await detail.activeWindowWhys()) {
     await detail.openWindowEdit(why);
     const windowForm = new MaintenanceWindowFormPage(page);
-    await windowForm.expectOpenForEdit(code);
+    await windowForm.expectOpenForEdit();
     await windowForm.fill({ active: false });
     expect(await windowForm.saveChanges(), `deactivate window "${why}"`).toBe('submitted');
-    await expect(windowForm.locators.saveButton).toBeHidden({ timeout: WAIT.NAVIGATION });
+    await openMachine(page, code);
   }
   await detail.startEditing();
   const form = new MachineFormPage(page);

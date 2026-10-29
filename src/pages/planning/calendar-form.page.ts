@@ -3,7 +3,7 @@ import { BasePage } from '../base.page';
 import { CalendarFormLocators } from '../../locators/planning/calendar-form.locators';
 import { escapeRegExp } from '../../locators/planning/master-data-list.locators';
 import { fieldAlert } from '../../locators/planning/form-field.locators';
-import { submitForm, submitExpectingToast, type SubmitResult } from './form-submit';
+import { submitExpectingToast, submitStepped, type SubmitResult } from './form-submit';
 import { ensureRoute } from './navigation';
 import { WAIT } from './waits';
 
@@ -27,8 +27,11 @@ export interface CalendarOptions {
  * Real routes: /planning/master-data/calendars/new and /calendars/<CODE>/edit.
  * Owned by the Planning QA. Only Calendar code + Name are needed; Applies
  * to (Department), Inherits from (none) and Time zone (Asia/Ho_Chi_Minh)
- * have defaults. A create lands on /calendars/<CODE> ("Calendar created.");
- * a duplicate code or an inheritance loop is refused with a toast.
+ * have defaults. Create and edit are two steps since the 2026-10-28 dev
+ * deploy: step 1's "Save & continue" saves ("Calendar created. Add its
+ * working week and entries next."), step 2 holds the working week and
+ * entries (see CalendarDetailPage), and Done lands on /calendars/<CODE>.
+ * An inheritance loop is refused with a toast.
  */
 export class CalendarFormPage extends BasePage {
   readonly locators: CalendarFormLocators;
@@ -99,7 +102,8 @@ export class CalendarFormPage extends BasePage {
         new RegExp(`^${escapeRegExp(values.inheritsFrom)} ·`),
         values.inheritsFrom,
       );
-    if (values.timeZone)
+    // Re-picking the zone the field already shows leaves its list open (2026-10-29).
+    if (values.timeZone && (await l.timeZone.innerText()).trim() !== values.timeZone)
       await this.pick(
         l.timeZone,
         new RegExp(`^${escapeRegExp(values.timeZone)}$`),
@@ -118,6 +122,27 @@ export class CalendarFormPage extends BasePage {
     return options;
   }
 
+  /**
+   * The QA-AUTO calendars "Inherits from" offers on a new calendar, lowest
+   * code first. It loads only the first 200 calendars (`limit=200`; dev
+   * 2026-10-29 has 450+), so a calendar created after those isn't offered.
+   */
+  async offeredQaParents(): Promise<string[]> {
+    await this.open();
+    await this.locators.inheritsFrom.click();
+    // "Nothing — top level" shows before the calendars arrive: wait for them.
+    const qa = this.locators.options().filter({ hasText: / · QA-AUTO / });
+    await expect(qa.first()).toBeVisible({ timeout: WAIT.SERVER });
+    const codes = (await qa.allInnerTexts()).map((o) => o.trim().split(' · ')[0]!);
+    await this.page.keyboard.press('Escape');
+    return codes;
+  }
+
+  /** "Inherits from" back to "Nothing — top level". */
+  async setTopLevel(): Promise<void> {
+    await this.pick(this.locators.inheritsFrom, /^Nothing — top level$/);
+  }
+
   async setName(name: string): Promise<void> {
     await this.locators.name.fill(name);
   }
@@ -127,12 +152,13 @@ export class CalendarFormPage extends BasePage {
     await this.locators.createButton.click();
   }
 
+  /** Step 1's "Save & continue", then Done on step 2 — see submitStepped(). */
   async submitCreate(): Promise<SubmitResult> {
-    return submitForm(this.locators.createButton);
+    return submitStepped(this.locators.createButton, this.locators.doneButton);
   }
 
   async saveChanges(): Promise<SubmitResult> {
-    return submitForm(this.locators.saveButton);
+    return submitStepped(this.locators.saveButton, this.locators.doneButton);
   }
 
   async createExpectingToast(text: string | RegExp): Promise<void> {

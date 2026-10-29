@@ -1,7 +1,7 @@
 import { type Locator, type Page, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
 import { RecipeFormLocators } from '../../locators/planning/recipe-form.locators';
-import { submitForm, type SubmitResult } from './form-submit';
+import { submitStepped, type SubmitResult } from './form-submit';
 import { WAIT } from './waits';
 
 export interface RecipeFieldValues {
@@ -195,11 +195,11 @@ export class RecipeFormPage extends BasePage {
   }
 
   async create(): Promise<SubmitResult> {
-    return submitForm(this.locators.createButton);
+    return submitStepped(this.locators.createButton, this.locators.doneButton);
   }
 
   async saveChanges(): Promise<SubmitResult> {
-    return submitForm(this.locators.saveChangesButton);
+    return submitStepped(this.locators.saveChangesButton, this.locators.doneButton);
   }
 
   async cancel(): Promise<void> {

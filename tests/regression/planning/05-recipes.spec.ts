@@ -6,7 +6,6 @@ import {
   addOperation,
   asPersona,
   createRecipe,
-  knownBug,
   openRecipe,
   personaCredentials,
   personaSkipReason,
@@ -447,9 +446,10 @@ test.describe('Planning - Recipes', () => {
     // Confirmed bug, ClickUp z941abybge (2026-10-09): read-only users are
     // offered write controls on some Planning screens (enabled, then refused
     // with "Access restricted" / 403) while others hide or disable them.
-    // Marked with knownBug() until fixed.
+    // Not reproduced on this screen on dev 2026-10-29: "New recipe" was unavailable
+    // to the read-only login in every run, so it's no longer a knownBug()
+    // here. The ClickUp status is left to the user.
     test.skip(!personaCredentials('READONLY'), personaSkipReason('READONLY'));
-    knownBug('z941abybge');
     await asPersona(personas, 'READONLY', async (page) => {
       const list = new RecipesListPage(page);
       await list.open();

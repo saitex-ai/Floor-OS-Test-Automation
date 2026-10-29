@@ -1,4 +1,5 @@
 import { type Locator, type Page } from '@playwright/test';
+import { fieldHelp } from './form-field.locators';
 
 /**
  * Raw element locators for the Calendar create / edit form
@@ -29,8 +30,8 @@ export class CalendarFormLocators {
   constructor(private readonly page: Page) {
     this.newHeading = page.getByRole('heading', { name: 'New calendar', level: 1 });
     this.calendarCode = page.getByRole('textbox', { name: 'Calendar code' });
-    this.codeFixedHelp = page.getByText(/The code is fixed once the record exists/);
-    this.codeGeneratedHelp = page.getByText(/Assigned automatically when the record is saved/);
+    this.codeFixedHelp = fieldHelp(page, /The code is fixed once the record exists/);
+    this.codeGeneratedHelp = fieldHelp(page, /Assigned automatically when the record is saved/);
     this.name = page.getByRole('textbox', { name: 'Name', exact: true });
     this.appliesTo = page.getByRole('combobox', { name: 'Applies to', exact: true });
     this.inheritsFrom = page.getByRole('combobox', { name: 'Inherits from', exact: true });
@@ -43,7 +44,8 @@ export class CalendarFormLocators {
     // week and entries) opens it.
     this.createButton = page.getByRole('button', { name: 'Save & continue' });
     this.doneButton = page.getByRole('button', { name: 'Done', exact: true });
-    this.saveButton = page.getByRole('button', { name: 'Save changes' });
+    // Edit is two steps too (2026-10-28): step 1's "Save & continue" saves.
+    this.saveButton = this.createButton;
     this.cancelButton = page.getByRole('button', { name: 'Cancel' });
     this.saveNotice = page.getByText(/^(Saving|Saves)\b/);
   }

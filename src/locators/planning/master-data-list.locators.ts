@@ -14,12 +14,17 @@ export class MasterDataListLocators {
   readonly filtersButton: Locator;
   readonly configureColumnsButton: Locator;
   readonly toggleCellFiltersButton: Locator;
+  /** Opens the rule builder ("Add rule") under the Filters panel's per-field pickers. */
+  readonly advancedFilterButton: Locator;
   readonly addRuleButton: Locator;
   readonly ruleAttribute: Locator;
   readonly ruleValue: Locator;
   readonly removeRuleButton: Locator;
   readonly filterMatchCount: Locator;
   readonly applyButton: Locator;
+  /** The Filters side sheet (since the 2026-10-28 dev deploy) and its Close. */
+  readonly filtersDialog: Locator;
+  readonly closeFiltersButton: Locator;
   readonly clearAllButton: Locator;
   readonly doneButton: Locator;
   readonly resetColumnsButton: Locator;
@@ -38,6 +43,7 @@ export class MasterDataListLocators {
     this.filtersButton = page.getByRole('button', { name: /^Filters( \(\d+ applied\))?$/ });
     this.configureColumnsButton = page.getByRole('button', { name: 'Configure columns' });
     this.toggleCellFiltersButton = page.getByRole('button', { name: 'Toggle cell filters' });
+    this.advancedFilterButton = page.getByRole('button', { name: 'Advanced filter' });
     this.addRuleButton = page.getByRole('button', { name: 'Add rule' });
     this.ruleAttribute = page
       .getByRole('combobox')
@@ -50,6 +56,8 @@ export class MasterDataListLocators {
     this.removeRuleButton = page.getByRole('button', { name: 'Remove rule' });
     this.filterMatchCount = page.getByText(/\d+ \w+ match/);
     this.applyButton = page.getByRole('button', { name: 'Apply', exact: true });
+    this.filtersDialog = page.getByRole('dialog', { name: 'Filters' });
+    this.closeFiltersButton = this.filtersDialog.getByRole('button', { name: 'Close' });
     this.clearAllButton = page
       .getByRole('button', { name: 'Clear all' })
       .or(page.getByRole('link', { name: 'Clear all' }));
@@ -59,7 +67,8 @@ export class MasterDataListLocators {
     this.rowsPerPage = page.getByRole('combobox', { name: 'Rows per page' });
     this.nextPageButton = page.getByRole('button', { name: 'Next page' });
     this.previousPageButton = page.getByRole('button', { name: 'Previous page' });
-    this.pageJump = page.getByRole('textbox', { name: /Jump to page/ });
+    // Was a "Jump to page" textbox until the 2026-10-28 dev deploy; now plain "N of M" text.
+    this.pageJump = page.getByText(/^\d+ of \d+$/);
     this.showingText = page.getByText(/^Showing \d+ to \d+ of \d+/);
     this.accessRestricted = page.getByText(/Access restricted/i);
   }
@@ -70,17 +79,29 @@ export class MasterDataListLocators {
   }
 
   /** Status/department tabs above the grid, e.g. "All 101", "Production 58". */
+  /** A tab: its label, then its count ("All 377"); not the page's "All masters" back link. */
   tab(name: string): Locator {
-    return this.page.getByRole('button', { name: new RegExp(`^${name}\\b`) });
+    return this.page.getByRole('button', { name: new RegExp(`^${escapeRegExp(name)}( \\d+)?$`) });
   }
 
   /**
-   * "No split" / "Vertical split" / "Horizontal split" in the page's own
-   * toolbar — a split view can render a second grid (e.g. a recipe's
-   * operations) with its own view switch, so this takes the first.
+   * The page toolbar's "View" menu button (since the 2026-10-28 dev deploy;
+   * it replaced the three No split / Vertical split / Horizontal split
+   * buttons). A split view can render a second grid (e.g. a recipe's
+   * operations) with its own View, so this takes the first.
    */
-  viewButton(name: 'No split' | 'Vertical split' | 'Horizontal split'): Locator {
-    return this.page.getByRole('button', { name, exact: true }).first();
+  viewMenuButton(): Locator {
+    return this.page.getByRole('button', { name: 'View', exact: true }).first();
+  }
+
+  /** The open View menu. */
+  viewMenu(): Locator {
+    return this.page.getByRole('menu', { name: 'View' });
+  }
+
+  /** One choice in the open View menu: "List View", "Vertical Split", "Horizontal Split". */
+  viewOption(name: 'List View' | 'Vertical Split' | 'Horizontal Split'): Locator {
+    return this.viewMenu().getByRole('menuitemradio', { name });
   }
 
   /**

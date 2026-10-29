@@ -3,20 +3,25 @@ import { BasePage } from '../base.page';
 import { RecipeDetailLocators } from '../../locators/planning/recipe-detail.locators';
 import { detailValue } from '../../locators/planning/form-field.locators';
 import { expectAbsentOrDisabled } from './master-data-list.page';
+import { InlineTable } from './inline-table';
+import { pressDone } from './form-submit';
 import { WAIT } from './waits';
 
 /**
  * A recipe's detail page — read-only summary, Edit recipe / Send for
- * approval / Delete draft, and the Operations table. Owned by the
- * Planning QA. Totals are computed from the operations, never typed:
+ * approval / Delete draft, and the read-only Operations table (operations
+ * are added and edited on step 2 of Edit recipe since the 2026-10-28 dev
+ * deploy — see OperationFormPage). Owned by the Planning QA. Totals are computed from the operations, never typed:
  * the heading reads "Operations (N) — the source of the X min total".
  */
 export class RecipeDetailPage extends BasePage {
   readonly locators: RecipeDetailLocators;
+  readonly operations: InlineTable;
 
   constructor(page: Page) {
     super(page);
     this.locators = new RecipeDetailLocators(page);
+    this.operations = new InlineTable(page, 'Operations', 'operation');
   }
 
   /** After "Create recipe": the code dev generated (RCP-0001…), read from the new detail page. */
@@ -52,11 +57,15 @@ export class RecipeDetailPage extends BasePage {
     await expect(this.locators.approvalPrerequisites).not.toContainText(item);
   }
 
-  /** A read-only user can't edit the recipe, add an operation or edit one. */
+  /**
+   * A read-only user can't edit the recipe, add an operation or edit one —
+   * all three go through "Edit recipe" since the 2026-10-28 dev deploy, and
+   * the Operations grid here has no add row or row Edit.
+   */
   async expectReadOnly(operation?: string): Promise<void> {
     await expect(this.locators.operationsHeading).toBeVisible({ timeout: WAIT.NAVIGATION });
     await expectAbsentOrDisabled(this.locators.editRecipeButton);
-    await expectAbsentOrDisabled(this.locators.newOperationButton);
+    await this.operations.expectReadOnly();
     if (operation) await expectAbsentOrDisabled(this.locators.operationEditButton(operation));
   }
 
@@ -66,9 +75,10 @@ export class RecipeDetailPage extends BasePage {
     await expectAbsentOrDisabled(this.locators.editRecipeButton);
   }
 
+  /** Adding an operation needs Edit recipe (the grid here is read-only). */
   async expectNoNewOperation(): Promise<void> {
     await expect(this.locators.operationsHeading).toBeVisible({ timeout: WAIT.NAVIGATION });
-    await expectAbsentOrDisabled(this.locators.newOperationButton);
+    await expectAbsentOrDisabled(this.locators.editRecipeButton);
   }
 
   async startEditing(): Promise<void> {
@@ -99,12 +109,21 @@ export class RecipeDetailPage extends BasePage {
     return text.match(/Standard minutes \/ \w+\s*([^\s]+)/)?.[1] ?? '';
   }
 
+  /**
+   * "Operations (N)", and with `totalMinutes` the recipe's "Total duration
+   * (min)". The heading said "— the source of the X min total" until the
+   * 2026-10-28 dev deploy; the total is now only in the summary, so this
+   * leaves step 2 of Edit recipe with Done (rows are already saved) to read it.
+   */
   async expectOperationsHeading(count: number, totalMinutes?: number): Promise<void> {
-    const name =
-      totalMinutes === undefined
-        ? new RegExp(`^Operations \\(${count}\\)`)
-        : new RegExp(`^Operations \\(${count}\\) — the source of the ${totalMinutes} min total`);
-    await expect(this.page.getByRole('heading', { name })).toBeVisible({ timeout: WAIT.SERVER });
+    await expect(
+      this.page.getByRole('heading', { name: new RegExp(`^Operations \\(${count}\\)`) }),
+    ).toBeVisible({ timeout: WAIT.SERVER });
+    if (totalMinutes === undefined) return;
+    if (/\/edit$/.test(new URL(this.page.url()).pathname)) await this.finishEditing();
+    await expect
+      .poll(() => this.totalDuration(), { timeout: WAIT.SERVER })
+      .toBe(String(totalMinutes));
   }
 
   async expectRisksPresentedAsBuffers(): Promise<void> {
@@ -112,12 +131,30 @@ export class RecipeDetailPage extends BasePage {
     await expect(this.locators.risksHelp).toBeVisible();
   }
 
+  /**
+   * Operations are added on step 2 of Edit recipe: opens it there (if not
+   * already), with the add row ready.
+   */
   async openNewOperation(): Promise<void> {
-    await this.locators.newOperationButton.click();
+    if (!(await this.operations.locators.addButton.isVisible())) {
+      await this.locators.editRecipeButton.click();
+      await expect(this.page).toHaveURL(/\/recipes\/[^/]+\/edit$/, { timeout: WAIT.NAVIGATION });
+      await this.locators.operationsStep.click();
+    }
+    await this.operations.expectAddRow();
   }
 
+  /** Opens step 2 of Edit recipe and the row's "Edit operation". */
   async openOperationForEdit(name: string): Promise<void> {
+    await this.openNewOperation();
     await this.locators.operationEditButton(name).click();
+    await expect(this.operations.locators.editingRow).toBeVisible({ timeout: WAIT.NAVIGATION });
+  }
+
+  /** Done on step 2: leaves Edit recipe for the detail page (rows are already saved). */
+  async finishEditing(): Promise<void> {
+    await pressDone(this.locators.doneButton);
+    await expect(this.locators.editRecipeButton).toBeVisible({ timeout: WAIT.NAVIGATION });
   }
 
   async searchOperations(term: string): Promise<void> {
@@ -160,7 +197,12 @@ export class RecipeDetailPage extends BasePage {
     await expect(this.locators.deleteDraftDialog).toHaveCount(0);
   }
 
+  /**
+   * Reloads the recipe's detail page. From step 2 of Edit recipe it leaves
+   * with Done first (rows are already saved; a reload there reopens step 1).
+   */
   async reload(): Promise<void> {
+    if (/\/edit$/.test(new URL(this.page.url()).pathname)) await this.finishEditing();
     await this.page.reload();
     await expect(this.locators.operationsHeading).toBeVisible({ timeout: WAIT.NAVIGATION });
   }

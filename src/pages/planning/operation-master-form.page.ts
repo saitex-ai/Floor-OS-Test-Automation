@@ -3,7 +3,7 @@ import { BasePage } from '../base.page';
 import { OperationMasterFormLocators } from '../../locators/planning/operation-master-form.locators';
 import { dateTriggers, fieldAlert } from '../../locators/planning/form-field.locators';
 import { pickToday } from './date-picker';
-import { submitForm, type SubmitResult } from './form-submit';
+import { submitStepped, type SubmitResult } from './form-submit';
 import { WAIT } from './waits';
 import { ensureRoute } from './navigation';
 
@@ -35,8 +35,9 @@ export type OperationRequiredField = (typeof OPERATION_REQUIRED)[number] | 'skil
 
 /**
  * The Operation Master create / edit form. Owned by the Planning QA.
- * Create lands back on the list with "Operation created."; Save changes
- * returns to the detail page with "Operation updated.". New operations
+ * Create and edit are two steps since the 2026-10-28 dev deploy: step 1's
+ * "Save & continue" saves ("Operation created." / "Operation updated."),
+ * step 2 holds allowances and tooling, and Done opens the detail page. New operations
  * start as Draft; the form still needs department, difficulty grade and
  * minimum skill grade (plus Machine type for an on-machine grade).
  */
@@ -173,17 +174,16 @@ export class OperationMasterFormPage extends BasePage {
   }
 
   async expectMachineTypeRequired(required: boolean): Promise<void> {
-    await expect(this.locators.machineTypeHint).toHaveText(
-      required ? /^Required —/ : /^Not required —/,
-    );
+    // Text or a tooltip button's name, depending on the state (dev 2026-10-29).
+    await expect(this.locators.machineTypeHintFor(required)).toBeVisible();
   }
 
   async create(): Promise<SubmitResult> {
-    return submitForm(this.locators.createButton);
+    return submitStepped(this.locators.createButton, this.locators.doneButton);
   }
 
   async saveChanges(): Promise<SubmitResult> {
-    return submitForm(this.locators.saveButton);
+    return submitStepped(this.locators.saveButton, this.locators.doneButton);
   }
 
   async cancel(): Promise<void> {
@@ -195,7 +195,7 @@ export class OperationMasterFormPage extends BasePage {
   }
 
   /**
-   * Clicks Create / Save changes expecting it to be refused with "Fill the
+   * Clicks step 1's "Save & continue" expecting it to be refused with "Fill the
    * N highlighted field(s) before saving." The toast fades after a few
    * seconds, so it's checked straight after the click rather than after
    * submitForm()'s wait for a navigation that never comes.

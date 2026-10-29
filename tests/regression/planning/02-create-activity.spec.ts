@@ -26,6 +26,8 @@ import { cleanUpAfterAll } from './support/cleanup';
  * saves is a QA-AUTO draft.
  */
 const cu = (id: string) => `https://app.clickup.com/t/${id}`;
+/** A generated activity code: upper-case prefix, a dash, digits (ACT-0027, CUT-0018). */
+const GENERATED_CODE = /^[A-Z]+-\d+$/;
 
 /**
  * The cycle cases need activities that can be picked as predecessors, and
@@ -113,7 +115,9 @@ test.describe('Planning - Create Activity', () => {
     await activityFormPage.expectCodeGenerated();
     const a = await createActivityDraft(page);
     const b = await createActivityDraft(page);
-    for (const code of [a, b]) expect(code).toMatch(/^ACT-\d+$/);
+    // The prefix isn't always ACT-: on dev 2026-10-29 a Cutting activity got
+    // CUT-0018. So this checks the generated code's shape only.
+    for (const code of [a, b]) expect(code).toMatch(GENERATED_CODE);
     expect(b, 'each activity gets its own code').not.toBe(a);
   });
 
@@ -248,9 +252,10 @@ test.describe('Planning - Create Activity', () => {
     // Confirmed bug, ClickUp z941abybge (2026-10-09): read-only users are
     // offered write controls on some Planning screens (enabled, then refused
     // with "Access restricted" / 403) while others hide or disable them.
-    // Marked with knownBug() until fixed.
+    // Not reproduced on this screen on dev 2026-10-29: "New activity" was unavailable
+    // to the read-only login in every run, so it's no longer a knownBug()
+    // here. The ClickUp status is left to the user.
     test.skip(!personaCredentials('READONLY'), personaSkipReason('READONLY'));
-    knownBug('z941abybge');
     await asPersona(personas, 'READONLY', async (page) => {
       const list = new ActivitiesListPage(page);
       await list.open();
@@ -291,7 +296,7 @@ test.describe('Planning - Create Activity', () => {
     await activitiesListPage.expectLoaded();
     await activitiesListPage.openNew();
     await activityFormPage.expectCodeGenerated();
-    expect(await createActivityDraft(page)).toMatch(/^ACT-\d+$/);
+    expect(await createActivityDraft(page)).toMatch(GENERATED_CODE);
   });
 
   test('TC-CA-13 An activity cannot list itself as its own predecessor', async ({

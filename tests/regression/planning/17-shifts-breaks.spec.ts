@@ -9,6 +9,7 @@ import {
   addBreak,
   asPersona,
   createShift,
+  knownBug,
   nameOf,
   personaCredentials,
   personaSkipReason,
@@ -106,6 +107,11 @@ test.describe('Planning - Shifts & Breaks', () => {
 
   test('TC-LSH-02 Standard / Overtime / Night tabs partition All', async ({ page }) => {
     await allure.tms(cu('z941abw5nk'), 'TC-LSH-02 (ClickUp)');
+    await allure.tms(cu('z941ac06dz'), 'TC-LSH-02 bug (ClickUp)');
+    // Confirmed bug, ClickUp z941ac06dz (2026-10-29): the list has no
+    // "Overtime" tab although Overtime shifts exist (seed A_OT among them), so
+    // the kind tabs don't add up to All. Marked with knownBug() until fixed.
+    knownBug('z941ac06dz');
     const list = new ShiftsListPage(page);
     await list.open();
     await list.expectLoaded();
@@ -509,8 +515,10 @@ test.describe('Planning - Shifts & Breaks', () => {
     await detail.open(day);
     const url = page.url();
     await detail.openNewBreak();
-    await detail.expectBreakFormOpen('New', day);
-    expect(page.url()).toBe(url);
+    await detail.expectBreakFormOpen('New');
+    // Since the 2026-10-28 dev deploy breaks are added on step 2 of the
+    // shift's own Edit page, not in place on the detail page.
+    expect(page.url()).toBe(`${url}/edit`);
   });
 
   test("TC-LBR-07 A shift's breaks need Shifts read access", async ({ personas }) => {
@@ -530,7 +538,8 @@ test.describe('Planning - Shifts & Breaks', () => {
     const url = page.url();
     await detail.openNewBreak();
     await detail.expectBreakFields();
-    expect(page.url()).toBe(url);
+    // Step 2 of the shift's own Edit page since the 2026-10-28 dev deploy.
+    expect(page.url()).toBe(`${url}/edit`);
   });
 
   test('TC-CBR-02 Break, Starts and Ends are required', async ({ page }) => {
@@ -611,7 +620,7 @@ test.describe('Planning - Shifts & Breaks', () => {
     await detail.openNewBreak();
     await detail.fillBreak({ name: 'QA-AUTO cancelled', starts: '14:00', ends: '14:10' });
     await detail.cancelBreak();
-    await page.reload();
+    await detail.finishEditing();
     await detail.expectLoaded(day);
     await detail.expectBreakCount(2);
     await detail.expectNoBreakRow('QA-AUTO cancelled');
@@ -647,7 +656,7 @@ test.describe('Planning - Shifts & Breaks', () => {
     const detail = new ShiftDetailPage(page);
     await detail.open(day);
     await detail.openBreakEdit(LUNCH);
-    await detail.expectBreakFormOpen('Edit', day);
+    await detail.expectBreakFormOpen('Edit');
     await detail.expectBreakFields();
   });
 
@@ -659,7 +668,7 @@ test.describe('Planning - Shifts & Breaks', () => {
     await detail.openBreakEdit(LUNCH);
     await detail.fillBreak({ starts: '13:00', ends: '13:45', paid: true, active: false });
     expect(await detail.saveBreak()).toBe('submitted');
-    await page.reload();
+    await detail.finishEditing();
     await detail.expectBreakRow(LUNCH, {
       starts: '13:00',
       ends: '13:45',
@@ -677,7 +686,7 @@ test.describe('Planning - Shifts & Breaks', () => {
     await detail.openBreakEdit(LUNCH);
     await detail.fillBreak({ ends: '13:00' });
     expect(await detail.saveBreak()).toBe('submitted');
-    await page.reload();
+    await detail.finishEditing();
     await detail.expectValue('Paid minutes', minutes(480));
   });
 
@@ -689,7 +698,7 @@ test.describe('Planning - Shifts & Breaks', () => {
     await detail.openBreakEdit(LUNCH);
     await detail.fillBreak({ active: false });
     expect(await detail.saveBreak()).toBe('submitted');
-    await page.reload();
+    await detail.finishEditing();
     await detail.expectValue('Paid minutes', minutes(540));
     await detail.expectBreakRow(LUNCH, { active: 'Retired' });
   });
@@ -701,7 +710,7 @@ test.describe('Planning - Shifts & Breaks', () => {
     await detail.openBreakEdit(LUNCH);
     await detail.fillBreak({ name: 'QA-AUTO SHOULD NOT PERSIST', paid: true });
     await detail.cancelBreak();
-    await page.reload();
+    await detail.finishEditing();
     await detail.expectLoaded(day);
     await detail.expectBreakRow(LUNCH, { paid: 'Unpaid' });
   });

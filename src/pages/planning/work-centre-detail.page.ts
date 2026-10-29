@@ -40,7 +40,11 @@ export class WorkCentreDetailPage extends BasePage {
   /** A read-only user gets no working "Edit work centre", or is refused on the edit page. */
   async expectEditBlocked(): Promise<void> {
     await expect(this.locators.allWorkCentresLink).toBeVisible({ timeout: WAIT.PAGE_LOAD });
-    await expectActionBlocked(this.page, this.locators.editButton, 'Save changes');
+    await expectActionBlocked(
+      this.page,
+      this.locators.editButton,
+      /^(Save changes|Save & continue)$/,
+    );
   }
 
   async value(label: string): Promise<string> {

@@ -3,7 +3,7 @@ import { BasePage } from '../base.page';
 import { MachineFormLocators } from '../../locators/planning/machine-form.locators';
 import { dateTriggers, fieldAlert } from '../../locators/planning/form-field.locators';
 import { pickToday } from './date-picker';
-import { submitForm, type SubmitResult } from './form-submit';
+import { submitStepped, type SubmitResult } from './form-submit';
 import { WAIT } from './waits';
 import { ensureRoute } from './navigation';
 
@@ -29,9 +29,10 @@ export type MachineRequiredField = (typeof MACHINE_REQUIRED)[number];
  * Real routes: /planning/master-data/machines/new and
  * /machines/<uuid>/edit. Owned by the Planning QA. Element locators live
  * in MachineFormLocators (`this.locators`) — this class only holds
- * flows/actions/assertions built on top of them. A create returns to the
- * list ("Machine created."); Save changes returns to the detail page
- * ("Machine updated.").
+ * flows/actions/assertions built on top of them. Create and edit are two
+ * steps since the 2026-10-28 dev deploy: step 1's "Save & continue" saves
+ * ("Machine created." / "Machine updated."), step 2 holds the maintenance
+ * windows, and its Done opens the detail page.
  */
 export class MachineFormPage extends BasePage {
   readonly locators: MachineFormLocators;
@@ -197,12 +198,13 @@ export class MachineFormPage extends BasePage {
     await this.locators.createButton.click();
   }
 
+  /** Step 1's "Save & continue", then Done on step 2 — see submitStepped(). */
   async submitCreate(): Promise<SubmitResult> {
-    return submitForm(this.locators.createButton);
+    return submitStepped(this.locators.createButton, this.locators.doneButton);
   }
 
   async saveChanges(): Promise<SubmitResult> {
-    return submitForm(this.locators.saveButton);
+    return submitStepped(this.locators.saveButton, this.locators.doneButton);
   }
 
   async cancel(): Promise<void> {

@@ -2,7 +2,7 @@ import { type Page, type Locator, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
 import { WorkCentreFormLocators } from '../../locators/planning/work-centre-form.locators';
 import { fieldAlert } from '../../locators/planning/form-field.locators';
-import { submitForm, type SubmitResult } from './form-submit';
+import { submitForm, submitStepped, type SubmitResult } from './form-submit';
 import { WAIT } from './waits';
 import { ensureRoute } from './navigation';
 import { expectAbsentOrDisabled } from './master-data-list.page';
@@ -208,16 +208,21 @@ export class WorkCentreFormPage extends BasePage {
    * its name, so a case doesn't depend on one year-bound seed calendar.
    */
   async pickAnotherWorkingCalendar(): Promise<string> {
-    const current = (await this.locators.workingCalendar.innerText()).trim();
-    await this.locators.workingCalendar.click();
-    await expect(this.locators.options().first()).toBeVisible({ timeout: WAIT.SERVER });
-    const names = (await this.locators.options().allInnerTexts())
-      .map((t) => (t.split('\n')[0] ?? '').trim())
-      .filter((t) => t && t !== current && !/^(none|select)/i.test(t));
-    const [picked] = names;
-    if (!picked) throw new Error(`No working calendar other than "${current}" to pick`);
-    await this.locators.option(picked).click();
-    return picked;
+    const combo = this.locators.workingCalendar;
+    const current = (await combo.innerText()).trim();
+    // By keyboard: the list highlights its first option and doesn't show every
+    // option at once (dev 2026-10-29), so a pointer click on a name missed.
+    // The picked name is read back from the field.
+    for (let steps = 1; steps <= 3; steps += 1) {
+      await combo.click();
+      await expect(this.locators.options().first()).toBeVisible({ timeout: WAIT.SERVER });
+      for (let k = 0; k < steps; k += 1) await this.page.keyboard.press('ArrowDown');
+      await this.page.keyboard.press('Enter');
+      await expect(this.locators.options()).toHaveCount(0);
+      const picked = (await combo.innerText()).trim();
+      if (picked && picked !== current && !/^(none|select)/i.test(picked)) return picked;
+    }
+    throw new Error(`No working calendar other than "${current}" to pick`);
   }
 
   /** Smoke: just clicks Create — see expectCreatedSuccessfully(). */
@@ -226,11 +231,22 @@ export class WorkCentreFormPage extends BasePage {
   }
 
   async submitCreate(): Promise<SubmitResult> {
-    return submitForm(this.locators.createButton);
+    return this.submit(this.locators.createButton);
   }
 
   async saveChanges(): Promise<SubmitResult> {
-    return submitForm(this.locators.saveButton);
+    return this.submit(this.locators.saveButton);
+  }
+
+  /**
+   * A centre type with stations saves through "Save & continue" and then
+   * Done on the Stations step (see submitStepped()); any other type in one step.
+   */
+  private async submit(button: Locator): Promise<SubmitResult> {
+    await expect(button).toBeVisible();
+    return (await button.innerText()).trim() === 'Save & continue'
+      ? submitStepped(button, this.locators.doneButton)
+      : submitForm(button);
   }
 
   async cancel(): Promise<void> {
