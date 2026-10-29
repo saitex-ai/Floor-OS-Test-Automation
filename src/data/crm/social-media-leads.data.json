@@ -1,0 +1,17 @@
+{
+  "description": "Existing dev records the [Origin Type = Social Media Post] Lead Qualification spec reads but never modifies (picked on dev, 2026-10-23). The spec checks each record still exists at the given stage and skips with a reason when it doesn't. Dev has no Social Media Post Lead at the Lead stage with a captured post; replace these when one appears.",
+  "withPost": {
+    "id": "5032350f-b915-4c4f-8645-c88057879a3b",
+    "name": "Nudie Jeans",
+    "code": "CTC0002294",
+    "stage": "Qualified Lead",
+    "note": "Social Media Post, Origin blank, one captured Instagram post (@nudiejeans), AI dossier, a stored crawl detection, 2 reviews."
+  },
+  "noPost": {
+    "id": "e55025f7-8b98-4420-9ba8-73ed1a5b6921",
+    "name": "Testing Two",
+    "code": "CTC0000224",
+    "stage": "Qualified Lead",
+    "note": "Social Media Post / Facebook Post, no captured post, seeded AI sections, 2 reviews."
+  }
+}
