@@ -117,7 +117,6 @@ export class LeadQualificationLocators {
   readonly aiPointerLines: Locator;
   readonly tabTextboxes: Locator;
   readonly composerControls: Locator;
-  readonly aiChatbotGreeting: Locator;
   readonly contactsTabButton: Locator;
   readonly overviewTabButton: Locator;
 
@@ -135,6 +134,8 @@ export class LeadQualificationLocators {
   readonly userMessages: Locator;
   readonly assistantMessages: Locator;
   readonly activityPhrase: Locator;
+  readonly aiChatbotGreeting: Locator;
+  readonly revertTooltip: Locator;
 
   constructor(private readonly page: Page) {
     this.tabButton = page.getByRole('button', { name: 'Lead Qualification', exact: true });
@@ -259,9 +260,6 @@ export class LeadQualificationLocators {
     this.composerControls = this.tabRoot
       .getByRole('button', { name: /reply|comment|send|message|respond|compose/i })
       .or(this.tabRoot.getByRole('textbox', { name: /reply|comment|message/i }));
-    // First chatbot message on a Lead with AI sections: "I generated the
-    // qualification sections for <name>. Ask me to refine anything — …".
-    this.aiChatbotGreeting = page.getByText(/^I generated the qualification sections for /);
     // Customer Details tab strip: "Contacts (N)" and "Overview".
     this.contactsTabButton = page.getByRole('button', { name: /^Contacts \(\d+\)$/ });
     this.overviewTabButton = page.getByRole('button', { name: 'Overview', exact: true });
@@ -309,6 +307,16 @@ export class LeadQualificationLocators {
     this.userMessages = this.aiChatbotPanel.locator('[data-role="user"]');
     this.assistantMessages = this.aiChatbotPanel.locator('[data-role="assistant"]');
     this.activityPhrase = this.aiChatbotPanel.locator('[data-testid="assistant-activity-phrase"]');
+    // The chatbot's opening message on a Lead with AI sections, naming the
+    // Lead: "I generated the qualification sections for <name>. Ask me to
+    // refine anything — or use the markup tool (⌖ on any pointer) to target
+    // a specific line." Shared by specs 37 (Web Crawled) and 38 (Chatbot).
+    this.aiChatbotGreeting = this.aiChatbotPanel.getByText(
+      /^I generated the qualification sections for /,
+    );
+    // Hover text of "Revert to the previous wording" (a Radix tooltip; dev
+    // 2026-10-29 reads the button's own name).
+    this.revertTooltip = page.getByRole('tooltip');
   }
 
   /**
@@ -336,11 +344,9 @@ export class LeadQualificationLocators {
     );
   }
 
-  /** The chatbot's opening message, which names the Lead. */
-  aiChatbotOpeningMessage(leadName: string): Locator {
-    return this.aiChatbotPanel.getByText(
-      `I generated the qualification sections for ${leadName}. Ask me to refine anything`,
-    );
+  /** HTML elements rendered inside a thread bubble (a prompt typed with `<b>` / `<script>` must stay text). */
+  renderedMarkupIn(message: Locator): Locator {
+    return message.locator('b, script');
   }
 
   /**
