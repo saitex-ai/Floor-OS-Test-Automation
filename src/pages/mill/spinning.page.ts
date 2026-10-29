@@ -31,9 +31,9 @@ export class SpinningPage extends MillScreenPage {
     await this.locators.newMixingOrderButton.click();
   }
 
-  /** Picks the `index`-th open cotton unit for a recipe line (form state only). */
-  async pickRecipeUnit(unitPicker: Locator, index: number): Promise<void> {
-    await unitPicker.click();
-    await this.locators.cottonUnitOptions.nth(index).click();
+  /** Picks the `index`-th cotton or fiber item for a recipe line (form state only). */
+  async pickRecipeItem(itemPicker: Locator, index: number): Promise<void> {
+    await itemPicker.click();
+    await this.locators.recipeItemOptions.nth(index).click();
   }
 }

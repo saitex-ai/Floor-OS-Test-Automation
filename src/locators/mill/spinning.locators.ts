@@ -19,10 +19,10 @@ export class SpinningLocators {
   // always-visible card before the 2026-09 mill UI redesign; the default
   // view now shows the most recent real order's own recipe instead).
   readonly newMixingOrderButton: Locator;
-  readonly firstRecipeUnitSelect: Locator;
-  readonly secondRecipeUnitSelect: Locator;
+  readonly firstRecipeItemSelect: Locator;
+  readonly secondRecipeItemSelect: Locator;
   readonly firstRecipeShareInput: Locator;
-  readonly cottonUnitOptions: Locator;
+  readonly recipeItemOptions: Locator;
   readonly sharesTotalText: Locator;
   readonly sharesNot100Message: Locator;
   readonly createOrderButton: Locator;
@@ -44,12 +44,14 @@ export class SpinningLocators {
     this.yarnOutputTab = page.getByRole('tab', { name: /^Yarn output/ });
 
     this.newMixingOrderButton = page.getByRole('button', { name: /New mixing order/i });
-    this.firstRecipeUnitSelect = page.getByLabel('Recipe line 1 cotton unit');
-    this.secondRecipeUnitSelect = page.getByLabel('Recipe line 2 cotton unit');
+    // Since 2026-10-29 a recipe line picks a cotton or fiber item
+    // ("Recipe line N item"), not a graded cotton unit ("… cotton unit").
+    this.firstRecipeItemSelect = page.getByLabel('Recipe line 1 item');
+    this.secondRecipeItemSelect = page.getByLabel('Recipe line 2 item');
     this.firstRecipeShareInput = page.getByLabel('Recipe line 1 share');
-    // A recipe line's cotton unit picker is a custom combobox: clicking it
-    // opens a listbox of "GRD-… · {cotton} · {n} kg available" options.
-    this.cottonUnitOptions = page.getByRole('listbox').getByRole('option');
+    // The item picker is a custom combobox: clicking it opens a listbox of
+    // "COT-… · {item name}" options.
+    this.recipeItemOptions = page.getByRole('listbox').getByRole('option');
     this.sharesTotalText = page.getByText(/Shares total \d+(\.\d+)?%/);
     this.sharesNot100Message = page.getByText(/The shares total .*not 100%/);
     this.createOrderButton = page.getByRole('button', { name: 'Create order' }).first();
