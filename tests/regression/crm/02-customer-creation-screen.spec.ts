@@ -64,10 +64,12 @@ test.describe('CRM - Customer Creation Screen', () => {
     });
   });
 
-  test('TC:2 Verify mandatory field validation across Profile and Management sections', async ({
+  test('TC:2 Verify Only Customer Name Is Mandatory on the Customer Creation Screen', async ({
     createCustomerPage,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abt7af', 'TC:2 (ClickUp)');
+    // Only Customer Name is mandatory — QA decision recorded on the test case:
+    // https://app.clickup.com/t/z941abt7af?comment=1100750000251304
     await createCustomerPage.openFromCrmHome();
 
     await test.step('Leave mandatory fields empty and click Save', async () => {
@@ -83,8 +85,9 @@ test.describe('CRM - Customer Creation Screen', () => {
     createCustomerPage,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abt7ag', 'TC:3 (ClickUp)');
-    // Only Customer Name is mandatory (prototype crm.jsx field rules and dev,
-    // 2026-10-26); Referred By is an optional field shown for Referral only.
+    // Referred By is optional and shown for Referral only; only Customer Name
+    // is mandatory — QA decision recorded on the test case:
+    // https://app.clickup.com/t/z941abt7ag?comment=1100750000251305
     const l = createCustomerPage.locators;
     await createCustomerPage.openFromCrmHome();
 

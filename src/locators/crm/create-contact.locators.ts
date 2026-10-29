@@ -23,10 +23,10 @@ import { type Locator, type Page } from '@playwright/test';
  *   context, it instead renders as locked plain text plus the helper
  *   copy "Customer is fixed by where this form was opened from and
  *   cannot be changed." (confirmed on dev).
- * - The Customer Name combobox's popup is a plain paginated `listbox`
- *   with no search textbox at all — unlike every other combobox in this
- *   app — with real customers ("Acme Textiles", "ACME Apparel", etc.)
- *   and a "Load 15 more" button once you scroll past the first page.
+ * - The Customer Name combobox accepts typing, which filters its
+ *   Customers `listbox` (options read "<Name> <Code> · <Stage>"; a
+ *   "Load 15 more" button pages the unfiltered list). A name that matches
+ *   no Customer offers a "The Customer <name> does not exist…" option.
  * - A duplicate email is a BLOCKING inline error (confirmed on dev: "This
  *   email address is already used by {Contact} ({Contact Code}). Enter a
  *   different email address to create this Contact.") — not the
@@ -65,7 +65,6 @@ export class CreateContactLocators {
 
   // Provisional — not confirmed locally (blocked, see class doc)
   readonly customersDialog: Locator;
-  readonly loadMoreCustomersButton: Locator;
   readonly postSaveCreateCustomerModal: Locator;
   readonly createCustomerButton: Locator;
   readonly postSaveCancelButton: Locator;
@@ -115,9 +114,6 @@ export class CreateContactLocators {
     this.customersDialog = page
       .getByRole('dialog')
       .filter({ has: page.getByRole('listbox', { name: 'Customers' }) });
-    this.loadMoreCustomersButton = this.customersDialog.getByRole('button', {
-      name: 'Load 15 more',
-    });
 
     // Not confirmed locally — the Customers list never finished loading, so
     // this flow could never be driven far enough to see the real modal.
@@ -141,7 +137,9 @@ export class CreateContactLocators {
     this.toast = page.locator('[data-sonner-toast]').first();
   }
 
+  /** A Customer's own option, matched from the start of its name (not the "does not exist" option). */
   customerOption(customerName: string): Locator {
-    return this.customersDialog.getByRole('option', { name: customerName });
+    const escaped = customerName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return this.customersDialog.getByRole('option', { name: new RegExp(`^${escaped} `) }).first();
   }
 }

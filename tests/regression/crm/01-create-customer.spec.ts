@@ -70,6 +70,8 @@ test.describe('CRM - Create Customer', () => {
     createCustomerPage,
   }) => {
     await allure.tms('https://app.clickup.com/t/86eyqvatv', 'TC:2 (ClickUp)');
+    // Only Customer Name is mandatory — QA decision recorded on the test case:
+    // https://app.clickup.com/t/86eyqvatv?comment=1100750000251303
     await createCustomerPage.openFromCrmHome();
 
     await test.step('Leave mandatory fields empty and click Save', async () => {

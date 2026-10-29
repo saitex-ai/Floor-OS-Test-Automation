@@ -39,28 +39,28 @@ test.describe('CRM Smoke — Recent', () => {
   });
 
   // Only the mandatory fields are filled: Customer Name for a Customer,
-  // Contact Name and Email for a Contact (dev and prototype, 2026-10-26).
+  // Contact Name and Email for a Contact (QA decision 2026-10-29, recorded
+  // on ClickUp 86eyqvatv). Created Customers carry the QA-AUTO tag.
   test('Create Customer: successful creation without a linked Contact', async ({
     createCustomerPage,
   }) => {
     await createCustomerPage.openFromCrmHome();
     await createCustomerPage.fillProfile({
-      name: `Playwright Smoke Customer ${Date.now()}`,
+      name: `QA-AUTO Playwright Smoke Customer ${Date.now()}`,
       skipCompany: true,
     });
     await createCustomerPage.save();
-    if (await createCustomerPage.locators.duplicateWarningModal.isVisible()) {
-      await createCustomerPage.locators.saveAnywayButton.click();
-    }
     await createCustomerPage.expectSavedSuccessfully();
   });
 
   test('Create Contact: linking to an existing Customer succeeds', async ({
     createCustomerPage,
     createContactPage,
+    contactDetailPage,
+    page,
   }) => {
     // Its own Customer to link to, rather than a seeded dev record.
-    const customerName = `Playwright Smoke Contact Customer ${Date.now()}`;
+    const customerName = `QA-AUTO Playwright Smoke Contact Customer ${Date.now()}`;
     await createCustomerPage.openFromCrmHome();
     await createCustomerPage.fillProfile({ name: customerName, skipCompany: true });
     await createCustomerPage.save();
@@ -74,5 +74,8 @@ test.describe('CRM Smoke — Recent', () => {
     await createContactPage.linkToCustomer(customerName);
     await createContactPage.save();
     await expect(createContactPage.locators.toast).toBeVisible();
+    // The saved Contact is linked to that Customer (not left unlinked).
+    await expect(page).toHaveURL(/\/crm\/contacts\/[0-9a-f-]{36}$/);
+    await contactDetailPage.expectLinkedToCustomer(customerName);
   });
 });
