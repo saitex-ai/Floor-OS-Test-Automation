@@ -1,7 +1,7 @@
 import { type Locator, type Page, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
 import { RecipeFormLocators } from '../../locators/planning/recipe-form.locators';
-import { submitForm, type SubmitResult } from './form-submit';
+import { submitStepped, type SubmitResult } from './form-submit';
 import { WAIT } from './waits';
 
 export interface RecipeFieldValues {
@@ -47,6 +47,13 @@ export class RecipeFormPage extends BasePage {
     });
     await expect(this.locators.saveChangesButton).toBeVisible();
     await expect(this.locators.cancelButton).toBeVisible();
+  }
+
+  /** New form since the 2026-10-16 deploy: the code can't be typed, dev assigns it on save. */
+  async expectCodeGenerated(): Promise<void> {
+    await expect(this.locators.code).toBeDisabled();
+    await expect(this.locators.code).toHaveAttribute('placeholder', 'Auto-generated');
+    await expect(this.locators.codeGeneratedHelp).toBeVisible();
   }
 
   async expectCodeLocked(): Promise<void> {
@@ -110,13 +117,8 @@ export class RecipeFormPage extends BasePage {
   }
 
   /** Every required field with a valid default ("Other" type, so no batch fields); `overrides` win. */
-  async fillAllRequired(
-    code: string,
-    name: string,
-    overrides: RecipeFieldValues = {},
-  ): Promise<void> {
+  async fillAllRequired(name: string, overrides: RecipeFieldValues = {}): Promise<void> {
     await this.fill({
-      code,
       name,
       recipeType: 'Other',
       department: 'Cutting',
@@ -193,11 +195,11 @@ export class RecipeFormPage extends BasePage {
   }
 
   async create(): Promise<SubmitResult> {
-    return submitForm(this.locators.createButton);
+    return submitStepped(this.locators.createButton, this.locators.doneButton);
   }
 
   async saveChanges(): Promise<SubmitResult> {
-    return submitForm(this.locators.saveChangesButton);
+    return submitStepped(this.locators.saveChangesButton, this.locators.doneButton);
   }
 
   async cancel(): Promise<void> {

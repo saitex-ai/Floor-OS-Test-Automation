@@ -1,4 +1,5 @@
 import { type Locator, type Page } from '@playwright/test';
+import { fieldHelp } from './form-field.locators';
 
 /**
  * Raw element locators for the Machine create / edit form
@@ -9,6 +10,8 @@ import { type Locator, type Page } from '@playwright/test';
 export class MachineFormLocators {
   readonly newHeading: Locator;
   readonly assetCode: Locator;
+  /** New form, since the 2026-10-16 deploy: the code is generated on save. */
+  readonly codeGeneratedHelp: Locator;
   readonly codeFixedHelp: Locator;
   readonly machineType: Locator;
   readonly workCentre: Locator;
@@ -22,6 +25,7 @@ export class MachineFormLocators {
   readonly identifierInputs: Locator;
   readonly createButton: Locator;
   readonly saveButton: Locator;
+  readonly doneButton: Locator;
   readonly cancelButton: Locator;
   /** Any open dialog — the create form is a page of its own, not a dialog (TC-CM-01). */
   readonly dialog: Locator;
@@ -33,7 +37,8 @@ export class MachineFormLocators {
   constructor(private readonly page: Page) {
     this.newHeading = page.getByRole('heading', { name: 'New machine', level: 1 });
     this.assetCode = page.getByRole('textbox', { name: 'Asset code' });
-    this.codeFixedHelp = page.getByText(/The code is fixed once the record exists/);
+    this.codeGeneratedHelp = fieldHelp(page, /Assigned automatically when the record is saved/);
+    this.codeFixedHelp = fieldHelp(page, /The code is fixed once the record exists/);
     // Was a free-text "Machine class" textbox until the 2026-10-14 dev deploy; now a
     // combobox of the Machine type master ("BTK · Bartack", …) with no empty choice.
     this.machineType = page.getByRole('combobox', { name: 'Machine type', exact: true });
@@ -46,10 +51,12 @@ export class MachineFormLocators {
     this.addSystemLinkButton = page.getByRole('button', { name: 'Add system link' });
     this.systemInputs = page.getByRole('textbox', { name: 'System', exact: true });
     this.identifierInputs = page.getByRole('textbox', { name: 'Identifier there', exact: true });
-    // Since the 2026-10-28 dev deploy the form is in two steps: step 1's
-    // "Save & continue" creates the machine, then step 2 (maintenance windows) opens.
+    // Since the 2026-10-28 dev deploy the form is in two steps, on create and
+    // edit: step 1's "Save & continue" saves the machine, then step 2
+    // (maintenance windows) opens, and its "Done" opens the detail page.
     this.createButton = page.getByRole('button', { name: 'Save & continue' });
-    this.saveButton = page.getByRole('button', { name: 'Save changes' });
+    this.saveButton = this.createButton;
+    this.doneButton = page.getByRole('button', { name: 'Done', exact: true });
     this.cancelButton = page.getByRole('button', { name: 'Cancel' });
     this.dialog = page.getByRole('dialog');
     this.saveNotice = page.getByText(/^(Saving|Saves)\b/);

@@ -15,9 +15,11 @@ import {
 import { cleanUpAfterAll } from './support/cleanup';
 
 /**
- * Planning — Maintenance windows (Add / Edit), nested in a machine's
- * detail page: "New maintenance window" and a row's "Edit" swap the
- * windows grid for the window form on the same URL.
+ * Planning — Maintenance windows (Add / Edit). Since the 2026-10-28 dev
+ * deploy they're an inline table on step 2 of Edit machine: a new window is
+ * typed into the add row ("Add maintenance window"), a saved one edited in
+ * place (Save / Cancel on the row). The machine's detail page shows the
+ * grid read-only.
  *
  * Source of truth for these cases: test-cases/planning/maintenance-windows.md
  * (ClickUp "Planning -Sprint-2 - Machine and maintenance"). Every window
@@ -70,7 +72,7 @@ test.describe('Planning - Maintenance Windows', () => {
     await allure.tms(cu('z941abv8qv'), 'TC-CMW-01 (ClickUp)');
     await openMachine(page, machine);
     await machineDetailPage.openNewWindow();
-    await maintenanceWindowFormPage.expectOpenForCreate(machine);
+    await maintenanceWindowFormPage.expectOpenForCreate();
     await maintenanceWindowFormPage.expectFields();
   });
 
@@ -163,8 +165,7 @@ test.describe('Planning - Maintenance Windows', () => {
     await machineDetailPage.openNewWindow();
     await maintenanceWindowFormPage.fill({ kind: 'Planned', start: '10:00', why });
     await maintenanceWindowFormPage.cancel();
-    await page.reload();
-    await machineDetailPage.expectLoaded(machine);
+    await openMachine(page, machine);
     await machineDetailPage.expectWindowRow(closed);
     await machineDetailPage.expectNoWindowRow(why);
   });
@@ -181,7 +182,7 @@ test.describe('Planning - Maintenance Windows', () => {
     await test.step('Planner (write) opens New maintenance window', async () => {
       await openMachine(page, machine);
       await machineDetailPage.openNewWindow();
-      await maintenanceWindowFormPage.expectOpenForCreate(machine);
+      await maintenanceWindowFormPage.expectOpenForCreate();
     });
     await test.step('Read-only user cannot add a window', async () => {
       await asPersona(personas, 'READONLY', async (roPage) => {
@@ -192,7 +193,7 @@ test.describe('Planning - Maintenance Windows', () => {
         if (await detail.isNewWindowAvailable()) {
           const form = new MaintenanceWindowFormPage(roPage);
           await detail.openNewWindow();
-          await form.expectOpenForCreate(machine);
+          await form.expectOpenForCreate();
           await form.fill({ kind: 'Planned', start: '11:00', why: attempted });
           await form.create();
         }
@@ -220,9 +221,12 @@ test.describe('Planning - Maintenance Windows', () => {
     // place — graded a pass by the user (2026-10-12).
     await openMachine(page, machine);
     await machineDetailPage.openWindowEdit(closed);
-    await maintenanceWindowFormPage.expectOpenForEdit(machine);
+    await maintenanceWindowFormPage.expectOpenForEdit();
+    // Since the 2026-10-28 deploy the notice is part of the table's note:
+    // "A save rewrites the window in place; a retired window still resolves
+    // for everything that already references it, …".
     await maintenanceWindowFormPage.expectSaveNotice(
-      'Saves in place. Retired rows still resolve for anything that already references them.',
+      'A save rewrites the window in place; a retired window still resolves for everything that already references it',
     );
   });
 
@@ -238,11 +242,10 @@ test.describe('Planning - Maintenance Windows', () => {
     await addWindow(page, { kind: 'Unplanned', start: '06:15', why });
     await machineDetailPage.expectWindowRow(why, { end: 'Still open' });
     await machineDetailPage.openWindowEdit(why);
-    await maintenanceWindowFormPage.expectOpenForEdit(code);
+    await maintenanceWindowFormPage.expectOpenForEdit();
     await maintenanceWindowFormPage.fill({ end: '09:30' });
     expect(await maintenanceWindowFormPage.saveChanges()).toBe('submitted');
-    await page.reload();
-    await machineDetailPage.expectLoaded(code);
+    await openMachine(page, code);
     await machineDetailPage.expectWindowRow(why, { end: /^\d{4}-\d{2}-\d{2} 09:30$/ });
   });
 
@@ -254,7 +257,7 @@ test.describe('Planning - Maintenance Windows', () => {
     await allure.tms(cu('z941abv8r7'), 'TC-EMW-03 (ClickUp)');
     await openMachine(page, machine);
     await machineDetailPage.openWindowEdit(closed);
-    await maintenanceWindowFormPage.expectOpenForEdit(machine);
+    await maintenanceWindowFormPage.expectOpenForEdit();
     await test.step('Kind is a select with no empty choice', async () => {
       await maintenanceWindowFormPage.expectKindHasNoEmptyChoice();
     });
@@ -273,11 +276,10 @@ test.describe('Planning - Maintenance Windows', () => {
     await allure.tms(cu('z941abv8r8'), 'TC-EMW-04 (ClickUp)');
     await openMachine(page, machine);
     await machineDetailPage.openWindowEdit(closed);
-    await maintenanceWindowFormPage.expectOpenForEdit(machine);
+    await maintenanceWindowFormPage.expectOpenForEdit();
     await maintenanceWindowFormPage.fill({ why: `${closed} (cancelled)`, end: '10:45' });
     await maintenanceWindowFormPage.cancel();
-    await page.reload();
-    await machineDetailPage.expectLoaded(machine);
+    await openMachine(page, machine);
     await machineDetailPage.expectWindowRow(closed, { end: /07:00$/ });
     await machineDetailPage.expectNoWindowRow(`${closed} (cancelled)`);
   });
@@ -299,7 +301,7 @@ test.describe('Planning - Maintenance Windows', () => {
         if (await detail.isWindowEditAvailable(closed)) {
           const form = new MaintenanceWindowFormPage(roPage);
           await detail.openWindowEdit(closed);
-          await form.expectOpenForEdit(machine);
+          await form.expectOpenForEdit();
           await form.fill({ why: attempted });
           await form.saveChanges();
         }

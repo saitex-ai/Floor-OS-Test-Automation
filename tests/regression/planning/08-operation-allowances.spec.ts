@@ -15,8 +15,10 @@ import { cleanUpAfterAll } from './support/cleanup';
 
 /**
  * Planning — Operation Allowance (Create / Edit), nested in an operation's
- * detail page: "New allowance" and a row's "Edit" swap the Allowances grid
- * for the allowance form on the same URL.
+ * detail page. Since the 2026-10-28 dev deploy they're an inline table on
+ * step 2 of Edit operation (Allowances tab): a new allowance is typed into
+ * the add row ("Add allowance"), a saved one edited in place (Save / Cancel
+ * on the row). The operation's detail page shows the grid read-only.
  *
  * Source of truth for these cases: test-cases/planning/operation-allowances.md
  * (ClickUp "Planning -Sprint -2 - Operations and Allowance"). Every
@@ -73,7 +75,7 @@ test.describe('Planning - Operation Allowances', () => {
     const fresh = await createOperation(page);
     await openOperation(page, fresh);
     await operationDetailPage.openNewAllowance();
-    await allowanceFormPage.expectOpenForCreate(fresh);
+    await allowanceFormPage.expectOpenForCreate();
     await allowanceFormPage.expectFields();
     await allowanceFormPage.pickType(FATIGUE);
     await allowanceFormPage.setDiffers(true);
@@ -105,7 +107,7 @@ test.describe('Planning - Operation Allowances', () => {
       await allowanceFormPage.expectFieldFlagged('percentage');
     });
     await allowanceFormPage.cancel();
-    await page.reload();
+    await operationDetailPage.finishEditing();
     await operationDetailPage.expectLoaded(fresh);
     await operationDetailPage.expectAllowanceRow(FATIGUE);
     await operationDetailPage.expectAllowanceCount(1);
@@ -190,7 +192,7 @@ test.describe('Planning - Operation Allowances', () => {
     await allowanceFormPage.pickType(HANDLING);
     await allowanceFormPage.setPercentage('7');
     await allowanceFormPage.cancel();
-    await page.reload();
+    await operationDetailPage.finishEditing();
     await operationDetailPage.expectLoaded(fresh);
     await operationDetailPage.expectAllowanceRow(FATIGUE);
     await operationDetailPage.expectAllowanceCount(1);
@@ -208,7 +210,7 @@ test.describe('Planning - Operation Allowances', () => {
     await test.step('Planner (write) opens New allowance', async () => {
       await openOperation(page, opOne);
       await operationDetailPage.openNewAllowance();
-      await allowanceFormPage.expectOpenForCreate(opOne);
+      await allowanceFormPage.expectOpenForCreate();
     });
     await test.step('Read-only user cannot add an allowance', async () => {
       await asPersona(personas, 'READONLY', async (roPage) => {
@@ -220,7 +222,7 @@ test.describe('Planning - Operation Allowances', () => {
         if (await detail.isNewAllowanceAvailable()) {
           const form = new AllowanceFormPage(roPage);
           await detail.openNewAllowance();
-          await form.expectOpenForCreate(opOne);
+          await form.expectOpenForCreate();
           await form.pickType(HANDLING);
           await form.create();
         }
@@ -246,9 +248,11 @@ test.describe('Planning - Operation Allowances', () => {
     await allure.link(cu('z941abwdad'), 'Demo Feedback z941abwdad (ClickUp)');
     await openOperation(page, op);
     await operationDetailPage.openAllowanceEdit(HANDLING);
-    await allowanceFormPage.expectOpenForEdit(op);
+    await allowanceFormPage.expectOpenForEdit();
+    // Since the 2026-10-28 deploy allowances are rows of an inline table,
+    // and its note says how a row saves.
     await allowanceFormPage.expectSaveNotice(
-      'Saving overwrites this allowance — it is not versioned, so no earlier state is kept.',
+      'Each allowance is saved the moment its + or Save is pressed.',
     );
   });
 
@@ -264,12 +268,12 @@ test.describe('Planning - Operation Allowances', () => {
     await addAllowance(page, { type: FATIGUE });
     await operationDetailPage.expectAllowanceRow(FATIGUE, { override: 'Default' });
     await operationDetailPage.openAllowanceEdit(FATIGUE);
-    await allowanceFormPage.expectOpenForEdit(fresh);
+    await allowanceFormPage.expectOpenForEdit();
     await allowanceFormPage.setPercentage('18');
     await allowanceFormPage.expectDiffers(true);
     await allowanceFormPage.fillWhy(`${REASON} (edit)`);
     expect(await allowanceFormPage.saveChanges()).toBe('submitted');
-    await page.reload();
+    await operationDetailPage.finishEditing();
     await operationDetailPage.expectLoaded(fresh);
     await operationDetailPage.expectAllowanceRow(FATIGUE, {
       percentage: '18%',
@@ -287,7 +291,7 @@ test.describe('Planning - Operation Allowances', () => {
     // Allowance type is locked on edit (TC-EOA-05), so only the percentage can be cleared.
     await openOperation(page, op);
     await operationDetailPage.openAllowanceEdit(HANDLING);
-    await allowanceFormPage.expectOpenForEdit(op);
+    await allowanceFormPage.expectOpenForEdit();
     await allowanceFormPage.expectTypeLocked();
     await allowanceFormPage.setPercentage('');
     expect(await allowanceFormPage.saveChanges()).not.toBe('submitted');
@@ -303,7 +307,7 @@ test.describe('Planning - Operation Allowances', () => {
     await openOperation(page, op);
     await operationDetailPage.expectAllowanceRow(HANDLING, { override: 'Default' });
     await operationDetailPage.openAllowanceEdit(HANDLING);
-    await allowanceFormPage.expectOpenForEdit(op);
+    await allowanceFormPage.expectOpenForEdit();
     await allowanceFormPage.expectDiffers(false);
     await allowanceFormPage.setPercentage('6.5');
     await allowanceFormPage.expectDiffers(true);
@@ -319,7 +323,7 @@ test.describe('Planning - Operation Allowances', () => {
     await allure.tms(cu('z941abv8pj'), 'TC-EOA-05 (ClickUp)');
     await openOperation(page, op);
     await operationDetailPage.openAllowanceEdit(FATIGUE);
-    await allowanceFormPage.expectOpenForEdit(op);
+    await allowanceFormPage.expectOpenForEdit();
     await allowanceFormPage.expectTypeLocked();
   });
 
@@ -332,10 +336,10 @@ test.describe('Planning - Operation Allowances', () => {
     await openOperation(page, op);
     const original = await operationDetailPage.allowancePercentage(FATIGUE);
     await operationDetailPage.openAllowanceEdit(FATIGUE);
-    await allowanceFormPage.expectOpenForEdit(op);
+    await allowanceFormPage.expectOpenForEdit();
     await allowanceFormPage.setPercentage('55.5555');
     await allowanceFormPage.cancel();
-    await page.reload();
+    await operationDetailPage.finishEditing();
     await operationDetailPage.expectLoaded(op);
     await operationDetailPage.expectAllowanceRow(FATIGUE, { percentage: original });
   });
@@ -358,7 +362,7 @@ test.describe('Planning - Operation Allowances', () => {
         if (await detail.isAllowanceEditAvailable(HANDLING)) {
           const form = new AllowanceFormPage(roPage);
           await detail.openAllowanceEdit(HANDLING);
-          await form.expectOpenForEdit(op);
+          await form.expectOpenForEdit();
           await form.setPercentage('6');
           await form.fillWhy(`${REASON} (read-only attempt)`);
           await form.saveChanges();

@@ -1,4 +1,5 @@
 import { type Locator, type Page } from '@playwright/test';
+import { fieldHelp } from './form-field.locators';
 
 /**
  * Raw element locators for Planning > Master Data > Code lists
@@ -70,7 +71,7 @@ export class CodeListValueDialogLocators {
     this.heading = this.dialog.getByRole('heading', { level: 2 });
     this.subtitle = this.heading.locator('xpath=following-sibling::p[1]');
     this.value = this.dialog.getByRole('textbox', { name: 'Value', exact: true });
-    this.valueFixedHelp = this.dialog.getByText(/The value is fixed once the record exists/);
+    this.valueFixedHelp = fieldHelp(this.dialog, /The value is fixed once the record exists/);
     this.shownAs = this.dialog.getByRole('textbox', { name: 'Shown as' });
     this.whatItMeans = this.dialog.getByRole('textbox', { name: 'What it means' });
     this.displayOrder = this.dialog.getByRole('textbox', { name: 'Display order' });

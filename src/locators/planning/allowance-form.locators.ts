@@ -1,38 +1,63 @@
 import { type Locator, type Page } from '@playwright/test';
 
+/** Where a row's input is looked up: its row, or the page (for a `has:` filter). */
+type Scope = Locator | Page;
+
 /**
- * Raw element locators for the New / Edit allowance form, which replaces
- * the Allowances grid on an operation's detail page (same URL). No actions
- * or assertions here, see src/pages/planning/allowance-form.page.ts.
+ * Raw element locators for an allowance's inputs. Since the 2026-10-28 dev
+ * deploy an allowance is a row of the "Allowances (N)" inline table on step
+ * 2 of Edit operation ("Allowances and tooling", Allowances tab — see
+ * InlineTableLocators): the add row for a new one, a saved row after its
+ * "Edit allowance". Each input is looked up inside the row passed in. No
+ * actions or assertions here, see src/pages/planning/allowance-form.page.ts.
  */
 export class AllowanceFormLocators {
-  readonly breadcrumb: Locator;
-  readonly newHeading: Locator;
-  readonly editHeading: Locator;
-  readonly type: Locator;
-  readonly percentage: Locator;
-  readonly differs: Locator;
-  readonly why: Locator;
-  readonly createButton: Locator;
-  readonly saveButton: Locator;
-  readonly cancelButton: Locator;
-  /** The edit form's save notice ("Saving overwrites this allowance — …" / "Saves as a new version …"). */
+  readonly stepTitle: Locator;
+  readonly allowancesTab: Locator;
+  readonly allowancesPanel: Locator;
+  /** "Each allowance is saved the moment its + or Save is pressed." */
   readonly saveNotice: Locator;
-  readonly operationPicker: Locator;
+  /** The form's footer Cancel (a row being edited has its own Cancel, above it). */
+  readonly cancelButton: Locator;
 
   constructor(private readonly page: Page) {
-    this.breadcrumb = page.getByRole('navigation', { name: 'Breadcrumb' });
-    this.newHeading = page.getByRole('heading', { name: 'New allowance', level: 1 });
-    this.editHeading = page.getByRole('heading', { name: 'Edit allowance', level: 1 });
-    this.type = page.getByRole('combobox', { name: 'Allowance type', exact: true });
-    this.percentage = page.getByRole('textbox', { name: 'Percentage applied (%)' });
-    this.differs = page.getByRole('switch', { name: 'Differs from the allowance type default' });
-    this.why = page.getByRole('textbox', { name: 'Why the default was not used' });
-    this.createButton = page.getByRole('button', { name: 'Create allowance' });
-    this.saveButton = page.getByRole('button', { name: 'Save changes' });
-    this.cancelButton = page.getByRole('button', { name: 'Cancel' });
-    this.saveNotice = page.getByText(/^(Saving|Saves)\b/);
-    this.operationPicker = page.getByRole('combobox', { name: /^Operation/ });
+    this.stepTitle = page.getByText('STEP 2 OF 2 · ALLOWANCES AND TOOLING');
+    this.allowancesTab = page.getByRole('tab', { name: 'Allowances' });
+    this.allowancesPanel = page.getByRole('tabpanel', { name: 'Allowances' });
+    this.saveNotice = page.getByText(/^Each allowance is saved the moment/);
+    this.cancelButton = page.getByRole('button', { name: 'Cancel', exact: true }).last();
+  }
+
+  /** On a saved row being edited the type is fixed: shown as text, or a disabled picker. */
+  type(row: Scope): Locator {
+    return row.getByRole('combobox', { name: 'Allowance type', exact: true });
+  }
+
+  percentage(row: Scope): Locator {
+    return row.getByRole('textbox', { name: 'Percentage applied' });
+  }
+
+  /** "Override" (was "Differs from the allowance type default"): on once the percentage differs. */
+  differs(row: Scope): Locator {
+    return row.getByRole('switch', { name: 'Override' });
+  }
+
+  /** Only once Override is on. */
+  why(row: Scope): Locator {
+    return row.getByRole('textbox', { name: 'Why the default was not used' });
+  }
+
+  operationPicker(row: Scope): Locator {
+    return row.getByRole('combobox', { name: /^Operation/ });
+  }
+
+  /**
+   * The cell holding `control`, where its message renders. Pass the control
+   * built on the page (e.g. `kind(page)`): a `has:` filter is queried inside
+   * each cell.
+   */
+  cellOf(row: Locator, control: Locator): Locator {
+    return row.getByRole('cell').filter({ has: control });
   }
 
   option(name: string | RegExp): Locator {

@@ -1,4 +1,5 @@
 import { type Locator, type Page } from '@playwright/test';
+import { fieldHelp } from './form-field.locators';
 
 /**
  * Raw element locators for Planning > Master Data > Shift kinds
@@ -41,7 +42,7 @@ export class ShiftKindsLocators {
     // The header's one-click toggle: "Retire this record" / "Restore this record".
     this.retireToggle = this.dialog.getByRole('button', { name: /^(Retire|Restore) this record$/ });
     this.code = this.dialog.getByRole('textbox', { name: 'Lookup code' });
-    this.codeFixedHelp = this.dialog.getByText(/The code is fixed once the record exists/);
+    this.codeFixedHelp = fieldHelp(this.dialog, /The code is fixed once the record exists/);
     this.label = this.dialog.getByRole('textbox', { name: 'Display label' });
     this.description = this.dialog.getByRole('textbox', { name: 'Description' });
     this.countsAgainstCap = this.dialog.getByRole('switch', {

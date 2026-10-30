@@ -58,6 +58,13 @@ export async function expectActionBlocked(
   await expect(grid.submitButton(submitName)).toHaveCount(0);
 }
 
+type ListView = 'No split' | 'Vertical split' | 'Horizontal split';
+const VIEW_OPTION = {
+  'No split': 'List View',
+  'Vertical split': 'Vertical Split',
+  'Horizontal split': 'Horizontal Split',
+} as const;
+
 export abstract class MasterDataListPage extends BasePage {
   readonly grid: MasterDataListLocators;
 
@@ -103,7 +110,7 @@ export abstract class MasterDataListPage extends BasePage {
   async expectNewBlocked(): Promise<void> {
     await expect(this.heading).toBeVisible({ timeout: WAIT.PAGE_LOAD });
     await expect(this.grid.bodyRows().first()).toBeVisible({ timeout: WAIT.PAGE_LOAD });
-    await expectActionBlocked(this.page, this.newButton, /^Create\b/);
+    await expectActionBlocked(this.page, this.newButton, /^(Create\b|Save & continue$)/);
   }
 
   /**
@@ -145,8 +152,47 @@ export abstract class MasterDataListPage extends BasePage {
     await expect(this.grid.row(code)).toBeVisible({ timeout: WAIT.SERVER });
   }
 
+  /**
+   * Searching `term` finds `code`'s row, on whichever page — retried, because
+   * a record can take a while to reach a search by its scope (dev 2026-10-29:
+   * a Shift calendar matched "shift" about a minute after it was created).
+   */
+  async expectSearchFinds(term: string, code: string): Promise<void> {
+    await expect(async () => {
+      await this.open();
+      await this.expectLoaded();
+      await this.search(term);
+      await this.expectRowInResults(code);
+    }).toPass({ timeout: 90_000, intervals: [10_000] });
+  }
+
+  /**
+   * `code`'s row is among the current results, on whichever page: a broad
+   * search can match more test data than one page holds. Pages forward from
+   * the current page until the row shows.
+   */
+  async expectRowInResults(code: string): Promise<void> {
+    await expect(this.grid.bodyRows().first()).toBeVisible({ timeout: WAIT.SERVER });
+    while ((await this.grid.row(code).count()) === 0) {
+      expect(await this.grid.nextPageButton.isEnabled(), `${code} in the search results`).toBe(
+        true,
+      );
+      const { from } = await this.showing();
+      await this.nextPage();
+      await expect.poll(async () => (await this.showing()).from).not.toBe(from);
+    }
+    await expect(this.grid.row(code)).toBeVisible();
+  }
+
   async expectNoRow(code: string): Promise<void> {
     await expect(this.grid.row(code)).toHaveCount(0, { timeout: WAIT.SERVER });
+  }
+
+  /** No row holds `text` anywhere (e.g. a record's name tag, when it has no code yet). */
+  async expectNoRowContaining(text: string): Promise<void> {
+    await expect(this.grid.bodyRows().filter({ hasText: text })).toHaveCount(0, {
+      timeout: WAIT.SERVER,
+    });
   }
 
   async expectRowContains(code: string, text: string | RegExp): Promise<void> {
@@ -175,12 +221,6 @@ export abstract class MasterDataListPage extends BasePage {
   }
 
   /**
-   * Searches `term` and returns each of `codes` that has a row, with that
-   * row's text. The search applies after a debounce, so this first waits
-   * until every visible row contains `term` (or the grid is empty) — a read
-   * before that would still see the unfiltered first page.
-   */
-  /**
    * For cleanup: the codes of rows whose text holds one of `tags` (a record's
    * unique name tag), after searching `term`. Codes as dev generates them
    * (CAL-0001, SH-0002…): the first cell that reads like one.
@@ -208,6 +248,31 @@ export abstract class MasterDataListPage extends BasePage {
     return codes;
   }
 
+  /**
+   * After a create: the code dev generated for the record whose row holds
+   * `tag` (its unique name tag), found on the list by searching `term` (the
+   * tag itself unless the list's search doesn't cover where the tag is, e.g.
+   * a machine's system link). Opens the list: since the 2026-10-28 dev
+   * deploy a create ends on the record's detail page.
+   */
+  async codeOf(tag: string, term: string = tag): Promise<string> {
+    await this.open();
+    await this.expectLoaded();
+    await this.search(term);
+    const row = this.grid.bodyRows().filter({ hasText: tag }).first();
+    await expect(row).toBeVisible({ timeout: WAIT.SERVER });
+    const cells = (await row.getByRole('cell').allInnerTexts()).map((c) => c.trim());
+    const code = cells.find((c) => /^[A-Z][A-Z0-9_]*-\d+$/.test(c));
+    if (!code) throw new Error(`No generated code in row "${cells.join(' | ')}"`);
+    return code;
+  }
+
+  /**
+   * Searches `term` and returns each of `codes` that has a row, with that
+   * row's text. The search applies after a debounce, so this first waits
+   * until every visible row contains `term` (or the grid is empty) — a read
+   * before that would still see the unfiltered first page.
+   */
   async rowTexts(term: string, codes: string[]): Promise<Map<string, string>> {
     await this.search(term);
     const rows = this.grid.bodyRows();
@@ -268,6 +333,7 @@ export abstract class MasterDataListPage extends BasePage {
   }
 
   async expectColumnHeaders(names: string[]): Promise<void> {
+    await expect(this.grid.columnHeader(names[0]!)).toBeVisible({ timeout: WAIT.SERVER });
     const headers = (await this.grid.table.getByRole('columnheader').allInnerTexts())
       .map((h) => h.trim())
       .filter(Boolean);
@@ -280,6 +346,8 @@ export abstract class MasterDataListPage extends BasePage {
 
   /** The texts of one column's cells, top to bottom. */
   async columnValues(column: string): Promise<string[]> {
+    // The grid re-renders after a rows-per-page change: wait for the header.
+    await expect(this.grid.columnHeader(column)).toBeVisible({ timeout: WAIT.SERVER });
     const headers = (await this.grid.table.getByRole('columnheader').allInnerTexts()).map((h) =>
       h.trim(),
     );
@@ -294,6 +362,7 @@ export abstract class MasterDataListPage extends BasePage {
 
   /** One cell's text, by the row's code and the column's header. */
   async cellValue(code: string, column: string): Promise<string> {
+    await expect(this.grid.columnHeader(column)).toBeVisible({ timeout: WAIT.SERVER });
     const headers = (await this.grid.table.getByRole('columnheader').allInnerTexts()).map((h) =>
       h.trim(),
     );
@@ -313,14 +382,23 @@ export abstract class MasterDataListPage extends BasePage {
     await this.grid.columnSortButton(column).click();
   }
 
+  /**
+   * Opens Filters at its rule builder. Since the 2026-10-28 dev deploy the
+   * panel is a side sheet of per-field "Value…" pickers; "Add rule" is under
+   * its "Advanced filter".
+   */
   async openFilters(): Promise<void> {
     await this.grid.filtersButton.click();
+    await expect(this.grid.advancedFilterButton).toBeVisible();
+    if ((await this.grid.advancedFilterButton.getAttribute('aria-expanded')) !== 'true')
+      await this.grid.advancedFilterButton.click();
     await expect(this.grid.addRuleButton).toBeVisible();
   }
 
   /**
-   * Filters → "Add rule" → Attribute / operator / Value → Apply. The panel
-   * renders inline above the grid with a live "N <records> match" count.
+   * Filters → "Add rule" → Attribute / operator / Value → Apply, then closes
+   * the sheet (it stays open after Apply and covers the grid). The sheet
+   * shows a live "N <records> match" count — read it before this closes it.
    */
   async addFilterRule(attribute: string, value: string): Promise<void> {
     await this.grid.addRuleButton.click();
@@ -336,10 +414,20 @@ export abstract class MasterDataListPage extends BasePage {
       .first()
       .click();
     await this.grid.applyButton.click();
+    await this.closeFilters();
   }
 
+  async closeFilters(): Promise<void> {
+    await this.grid.closeFiltersButton.click();
+    await expect(this.grid.filtersDialog).toBeHidden();
+  }
+
+  /** The Filters sheet's live "N <records> match" (opens the sheet if needed, and closes it again). */
   async filterMatchCount(): Promise<number> {
+    const open = await this.grid.filtersDialog.isVisible();
+    if (!open) await this.grid.filtersButton.click();
     const text = await this.grid.filterMatchCount.innerText();
+    if (!open) await this.closeFilters();
     return Number(text.match(/(\d+)/)![1]);
   }
 
@@ -356,8 +444,10 @@ export abstract class MasterDataListPage extends BasePage {
   }
 
   async removeFilterRule(): Promise<void> {
+    await this.openFilters();
     await this.grid.removeRuleButton.click();
     await this.grid.applyButton.click();
+    await this.closeFilters();
   }
 
   async expectFiltersBadge(count: number): Promise<void> {
@@ -402,12 +492,18 @@ export abstract class MasterDataListPage extends BasePage {
     await this.grid.cellFilter(column).fill(value);
   }
 
-  async switchView(name: 'No split' | 'Vertical split' | 'Horizontal split'): Promise<void> {
-    await this.grid.viewButton(name).click();
+  /** Picks the view from the toolbar's View menu (the cases' names; "No split" is "List View"). */
+  async switchView(name: ListView): Promise<void> {
+    await this.grid.viewMenuButton().click();
+    await this.grid.viewOption(VIEW_OPTION[name]).click();
+    await expect(this.grid.viewMenu()).toBeHidden();
   }
 
-  async expectViewActive(name: 'No split' | 'Vertical split' | 'Horizontal split'): Promise<void> {
-    await expect(this.grid.viewButton(name)).toHaveAttribute('aria-pressed', 'true');
+  /** The View menu has `name` checked (opens the menu and closes it again). */
+  async expectViewActive(name: ListView): Promise<void> {
+    await this.grid.viewMenuButton().click();
+    await expect(this.grid.viewOption(VIEW_OPTION[name])).toHaveAttribute('aria-checked', 'true');
+    await this.page.keyboard.press('Escape');
   }
 
   async setRowsPerPage(rows: number): Promise<void> {
@@ -431,7 +527,8 @@ export abstract class MasterDataListPage extends BasePage {
     return { from: Number(match[1]), to: Number(match[2]), total: Number(match[3]) };
   }
 
+  /** The pager's "N of M" reads page `n`. */
   async expectOnPage(n: number): Promise<void> {
-    await expect(this.grid.pageJump).toHaveValue(String(n));
+    await expect(this.grid.pageJump).toHaveText(new RegExp(`^${n} of \\d+$`));
   }
 }

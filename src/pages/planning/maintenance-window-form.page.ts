@@ -1,9 +1,10 @@
 import { type Page, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
+import { alertsIn, dateClearButton } from '../../locators/planning/form-field.locators';
 import { MaintenanceWindowFormLocators } from '../../locators/planning/maintenance-window-form.locators';
-import { dateClearButton, fieldAlert } from '../../locators/planning/form-field.locators';
 import { pickTodayAt } from './date-picker';
-import { submitForm, type SubmitResult } from './form-submit';
+import { type SubmitResult } from './form-submit';
+import { InlineTable } from './inline-table';
 import { WAIT } from './waits';
 
 export interface WindowValues {
@@ -13,97 +14,104 @@ export interface WindowValues {
   /** Today at "hh:mm"; omit to leave the window open. */
   end?: string;
   why?: string;
-  /** The "Active" switch — the window's soft-delete flag. */
+  /** The "Active" switch — the window's soft-delete flag (a saved row only). */
   active?: boolean;
 }
 
 /**
- * The New / Edit maintenance window form on a machine's detail page.
- * Owned by the Planning QA. It replaces the windows grid in place (same
- * URL) under a "Machine · <CODE>" breadcrumb; there's no Machine picker.
- * Kind and Window start are required; a blank Window end is a stoppage
- * that is still open.
+ * A maintenance window's inputs, on step 2 of Edit machine. Owned by the
+ * Planning QA. Since the 2026-10-28 dev deploy there's no window form of
+ * its own: a new window is typed into the "Maintenance windows (N)" table's
+ * add row, a saved one edited in place (Save / Cancel on the row), and each
+ * row saves on its own. Kind and Window start are required; a blank Window
+ * end is a stoppage that is still open. Reach it with
+ * MachineDetailPage.openNewWindow() / openWindowEdit().
  */
 export class MaintenanceWindowFormPage extends BasePage {
   readonly locators: MaintenanceWindowFormLocators;
+  readonly windows: InlineTable;
 
   constructor(page: Page) {
     super(page);
     this.locators = new MaintenanceWindowFormLocators(page);
+    this.windows = new InlineTable(page, 'Maintenance windows', 'maintenance window');
   }
 
-  async expectOpenForCreate(machineCode: string): Promise<void> {
-    await expect(this.locators.newHeading).toBeVisible({ timeout: WAIT.NAVIGATION });
-    await expect(this.locators.breadcrumb).toHaveText(`Machine · ${machineCode}`);
-    await expect(this.locators.createButton).toBeVisible();
-    await expect(this.locators.cancelButton).toBeVisible();
+  /** On the machine's own Edit machine, step 2, with the add row ready. */
+  async expectOpenForCreate(): Promise<void> {
+    await expect(this.locators.stepTitle).toBeVisible({ timeout: WAIT.NAVIGATION });
+    await this.windows.expectAddRow();
   }
 
-  async expectOpenForEdit(machineCode: string): Promise<void> {
-    await expect(this.locators.editHeading).toBeVisible({ timeout: WAIT.NAVIGATION });
-    await expect(this.locators.breadcrumb).toHaveText(`Machine · ${machineCode}`);
-    await expect(this.locators.saveButton).toBeVisible();
-    await expect(this.locators.cancelButton).toBeVisible();
+  async expectOpenForEdit(): Promise<void> {
+    await expect(this.windows.locators.editingRow).toBeVisible({ timeout: WAIT.NAVIGATION });
+    await expect(this.windows.locators.saveButton).toBeVisible();
+    await expect(this.windows.locators.cancelButton).toBeVisible();
   }
 
+  /** The add row's inputs; Anomaly is a column (a picker once the machine has anomalies); no Machine picker. */
   async expectFields(): Promise<void> {
-    await expect(this.locators.kind).toBeVisible();
-    await expect(this.locators.windowStart).toBeVisible();
-    await expect(this.locators.windowEnd).toBeVisible();
-    await expect(this.locators.why).toBeVisible();
-    await expect(this.locators.anomaly).toBeVisible();
-    await expect(this.locators.machinePicker).toHaveCount(0);
+    const row = this.windows.locators.addRow;
+    await expect(this.locators.kind(row)).toBeVisible();
+    await expect(this.locators.windowStart(row)).toBeVisible();
+    await expect(this.locators.windowEnd(row)).toBeVisible();
+    await expect(this.locators.why(row)).toBeVisible();
+    await expect(this.locators.anomalyColumn).toBeVisible();
+    await expect(this.locators.machinePicker(row)).toHaveCount(0);
   }
 
   async kindOptions(): Promise<string[]> {
-    await this.locators.kind.click();
-    await expect(this.locators.options().first()).toBeVisible();
-    const options = (await this.locators.options().allInnerTexts()).map((o) => o.trim());
-    await this.page.keyboard.press('Escape');
-    return options;
-  }
-
-  private async pickAt(which: 'start' | 'end', time: string): Promise<void> {
-    const [hh = '00', mm = '00'] = time.split(':');
-    const trigger = which === 'start' ? this.locators.windowStart : this.locators.windowEnd;
-    await pickTodayAt(this.page, trigger, hh, mm);
+    return this.windows.optionsOf(this.locators.kind(await this.windows.inputRow()));
   }
 
   async fill(values: WindowValues): Promise<void> {
+    const row = await this.windows.inputRow();
+    const l = this.locators;
     if (values.kind) {
-      await this.locators.kind.click();
-      await this.locators.option(values.kind).click();
+      await l.kind(row).click();
+      await l.option(values.kind).click();
     }
-    if (values.start) await this.pickAt('start', values.start);
-    if (values.end) await this.pickAt('end', values.end);
-    if (values.why !== undefined) await this.locators.why.fill(values.why);
-    if (values.active !== undefined && (await this.locators.active.isChecked()) !== values.active)
-      await this.locators.active.click();
+    if (values.start) await pickTodayAt(this.page, l.windowStart(row), ...hhmm(values.start));
+    if (values.end) await pickTodayAt(this.page, l.windowEnd(row), ...hhmm(values.end));
+    if (values.why !== undefined) await l.why(row).fill(values.why);
+    if (values.active !== undefined && (await l.active(row).isChecked()) !== values.active)
+      await l.active(row).click();
   }
 
   async clearWindowStart(): Promise<void> {
-    await dateClearButton(this.locators.windowStart).click();
+    const start = this.locators.windowStart(await this.windows.inputRow());
+    await dateClearButton(start).click();
   }
 
+  /** "Add maintenance window" on the add row. */
   async create(): Promise<SubmitResult> {
-    return submitForm(this.locators.createButton);
+    return this.windows.add();
   }
 
+  /** Save on the row being edited. */
   async saveChanges(): Promise<SubmitResult> {
-    return submitForm(this.locators.saveButton);
+    return this.windows.save();
   }
 
+  /**
+   * A row being edited: its own Cancel. The add row: its "Clear" (✕) — the
+   * step's Cancel and Done refuse to leave while the add row holds input.
+   */
   async cancel(): Promise<void> {
-    await this.locators.cancelButton.click();
-    await expect(this.locators.cancelButton).toBeHidden({ timeout: WAIT.NAVIGATION });
+    if ((await this.windows.locators.editingRow.count()) > 0) await this.windows.cancelEdit();
+    else await this.windows.clearAddRow();
   }
 
   async expectRequiredCount(count: number): Promise<void> {
-    await expect(this.locators.requiredMessages).toHaveCount(count, { timeout: WAIT.VALIDATION });
+    await expect(await this.windows.requiredMessages()).toHaveCount(count, {
+      timeout: WAIT.VALIDATION,
+    });
   }
 
   async expectFieldFlagged(field: 'kind' | 'windowStart'): Promise<void> {
-    await expect(fieldAlert(this.locators[field])).toBeVisible({ timeout: WAIT.VALIDATION });
+    const row = await this.windows.inputRow();
+    const cell = this.locators.cellOf(row, this.locators[field](this.page));
+    await expect(alertsIn(cell)).toBeVisible({ timeout: WAIT.VALIDATION });
   }
 
   /** Kind is a select with no empty choice — it can't be cleared on edit. */
@@ -112,14 +120,15 @@ export class MaintenanceWindowFormPage extends BasePage {
   }
 
   async expectSaveNotice(text: string | RegExp): Promise<void> {
-    await expect(this.locators.saveNotice).toHaveText(text);
-  }
-
-  async saveNoticeText(): Promise<string> {
-    return (await this.locators.saveNotice.innerText()).trim();
+    await expect(this.locators.saveNotice).toContainText(text);
   }
 
   async whyValue(): Promise<string> {
-    return this.locators.why.inputValue();
+    return this.locators.why(await this.windows.inputRow()).inputValue();
   }
+}
+
+function hhmm(time: string): [string, string] {
+  const [hh = '00', mm = '00'] = time.split(':');
+  return [hh, mm];
 }

@@ -1,4 +1,5 @@
 import { type Locator, type Page } from '@playwright/test';
+import { fieldHelp } from './form-field.locators';
 
 /**
  * Raw element locators for the Work Centre create / edit form
@@ -16,6 +17,8 @@ import { type Locator, type Page } from '@playwright/test';
 export class WorkCentreFormLocators {
   readonly newHeading: Locator;
   readonly centreCode: Locator;
+  /** New form, since the 2026-10-16 deploy: the code is generated on save. */
+  readonly codeGeneratedHelp: Locator;
   readonly codeFixedHelp: Locator;
   readonly name: Locator;
   readonly owningDepartment: Locator;
@@ -41,6 +44,7 @@ export class WorkCentreFormLocators {
   readonly centreTypeHelp: Locator;
   readonly createButton: Locator;
   readonly saveButton: Locator;
+  readonly doneButton: Locator;
   readonly cancelButton: Locator;
   /** "Saving rewrites this work centre." / a "saves as a new version" notice on edit. */
   readonly saveNotice: Locator;
@@ -50,7 +54,8 @@ export class WorkCentreFormLocators {
   constructor(private readonly page: Page) {
     this.newHeading = page.getByRole('heading', { name: 'New work centre', level: 1 });
     this.centreCode = page.getByRole('textbox', { name: 'Centre code' });
-    this.codeFixedHelp = page.getByText(/The code is fixed once the record exists/);
+    this.codeGeneratedHelp = fieldHelp(page, /Assigned automatically when the record is saved/);
+    this.codeFixedHelp = fieldHelp(page, /The code is fixed once the record exists/);
     this.name = page.getByRole('textbox', { name: 'Name', exact: true });
     this.owningDepartment = page.getByRole('combobox', { name: 'Owning department', exact: true });
     this.area = page.getByRole('combobox', { name: 'Area it sits in', exact: true });
@@ -76,14 +81,16 @@ export class WorkCentreFormLocators {
     this.capacityPerDay = page.getByRole('textbox', { name: /^Capacity per day/ });
     this.status = page.getByRole('combobox', { name: 'Status', exact: true });
     this.effectiveDateLabels = page.getByText(/^Effective (from|to)\b/);
-    this.centreTypeHelp = page.getByText(/^The class of centre/);
+    this.centreTypeHelp = fieldHelp(page, /^The class of centre/);
     // Since the 2026-10-28 dev deploy a centre type with stations (e.g. Sewing
-    // lines) adds a second step: step 1's button turns from "Create work
-    // centre" into "Save & continue", which creates it and opens Stations.
+    // lines) adds a second step, on create and edit: step 1's button turns
+    // from "Create work centre" / "Save changes" into "Save & continue", which
+    // saves and opens Stations; that step's "Done" opens the detail page.
     this.createButton = page.getByRole('button', {
       name: /^(Create work centre|Save & continue)$/,
     });
-    this.saveButton = page.getByRole('button', { name: 'Save changes' });
+    this.saveButton = page.getByRole('button', { name: /^(Save changes|Save & continue)$/ });
+    this.doneButton = page.getByRole('button', { name: 'Done', exact: true });
     this.cancelButton = page.getByRole('button', { name: 'Cancel' });
     this.saveNotice = page.getByText(/^(Saving|Saves)\b/);
     this.codeTaken = page.getByText(/already taken|already used by/i);

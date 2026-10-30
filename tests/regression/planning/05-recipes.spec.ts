@@ -6,13 +6,14 @@ import {
   addOperation,
   asPersona,
   createRecipe,
-  knownBug,
   openRecipe,
   personaCredentials,
   personaSkipReason,
   setupPage,
+  nameOf,
   taggedName,
   uniqueCode,
+  uniqueTag,
   washRecipe,
 } from './support/test-data';
 import { cleanUpAfterAll } from './support/cleanup';
@@ -87,7 +88,7 @@ test.describe('Planning - Recipes', () => {
     await recipesListPage.search(recipe);
     await recipesListPage.expectRowVisible(recipe);
     await recipesListPage.expectEveryRowMatches(recipe);
-    await recipesListPage.search(taggedName(recipe).slice(0, 25));
+    await recipesListPage.search(nameOf(recipe).slice(0, 25));
     await recipesListPage.expectRowVisible(recipe);
   });
 
@@ -227,20 +228,21 @@ test.describe('Planning - Recipes', () => {
     recipeDetailPage,
   }) => {
     await allure.tms(cu('z941abu5e8'), 'TC-CR-02 (ClickUp)');
-    // Since Sprint 1 a recipe is created as a draft: only Code and Recipe
-    // block saving; the rest are listed as approval prerequisites.
+    // Since Sprint 1 a recipe is created as a draft: only Recipe blocks
+    // saving (the code is generated since the 2026-10-16 deploy); the rest
+    // are listed as approval prerequisites.
     await recipesListPage.open();
     await recipesListPage.expectLoaded();
     await recipesListPage.openNew();
-    await test.step('Create is blocked while Code and Recipe are empty', async () => {
+    await test.step('Create is blocked while Recipe is empty; the code is generated', async () => {
       expect(await recipeFormPage.create()).not.toBe('submitted');
-      await recipeFormPage.expectRequiredFlagged(2);
+      await recipeFormPage.expectRequiredFlagged(1);
+      await recipeFormPage.expectCodeGenerated();
     });
-    await test.step('A code-and-name-only draft lists the rest before approval', async () => {
-      const code = uniqueCode('QAR-');
-      await recipeFormPage.fill({ code, name: taggedName(code) });
+    await test.step('A name-only draft lists the rest before approval', async () => {
+      await recipeFormPage.fill({ name: taggedName(uniqueTag('QAR-')) });
       expect(await recipeFormPage.create()).toBe('submitted');
-      await recipeDetailPage.expectLoaded(code);
+      await recipeDetailPage.expectLoaded(await recipeDetailPage.createdCode());
       await recipeDetailPage.expectApprovalPrerequisites([
         'Owning department',
         'Fills activity',
@@ -251,14 +253,18 @@ test.describe('Planning - Recipes', () => {
     });
   });
 
-  test('TC-CR-03 Recipe code must be unique', async ({ recipesListPage, recipeFormPage }) => {
+  test('TC-CR-03 Recipe code must be unique', async ({ page, recipesListPage, recipeFormPage }) => {
     await allure.tms(cu('z941abu5e9'), 'TC-CR-03 (ClickUp)');
+    // Dev 2026-10-16: the code is generated on save (RCP-0001…) and can't be
+    // typed, so a duplicate can't be entered. Checks what replaces the rule:
+    // the code field is locked and each new recipe gets its own code.
     await recipesListPage.open();
     await recipesListPage.expectLoaded();
     await recipesListPage.openNew();
-    await recipeFormPage.fillAllRequired(recipe, taggedName(recipe));
-    expect(await recipeFormPage.create()).not.toBe('submitted');
-    await recipeFormPage.expectCodeTaken();
+    await recipeFormPage.expectCodeGenerated();
+    const another = await createRecipe(page);
+    for (const code of [recipe, another]) expect(code).toMatch(/^RCP-\d+$/);
+    expect(another, 'each recipe gets its own code').not.toBe(recipe);
   });
 
   test('TC-CR-04 The field set is the same for every recipe type', async ({
@@ -305,16 +311,14 @@ test.describe('Planning - Recipes', () => {
     await recipesListPage.expectLoaded();
     await recipesListPage.openNew();
     expect(await recipeFormPage.departmentOptions()).toEqual(expect.arrayContaining(['Cutting']));
-    const code = uniqueCode('QAR-');
     await recipeFormPage.fill({
-      code,
-      name: taggedName(code),
+      name: taggedName(uniqueTag('QAR-')),
       recipeType: 'Other',
       source: 'Entered by hand',
       maturity: 'Estimated',
     });
     expect(await recipeFormPage.create()).toBe('submitted');
-    await recipeDetailPage.expectLoaded(code);
+    await recipeDetailPage.expectLoaded(await recipeDetailPage.createdCode());
     await recipeDetailPage.expectApprovalPrerequisites(['Owning department', 'Fills activity']);
   });
 
@@ -424,15 +428,15 @@ test.describe('Planning - Recipes', () => {
     recipeFormPage,
   }) => {
     await allure.tms(cu('z941abu5en'), 'TC-CR-14 (ClickUp)');
-    const code = uniqueCode('QAR-');
+    const tag = uniqueTag('QAR-');
     await recipesListPage.open();
     await recipesListPage.expectLoaded();
     await recipesListPage.openNew();
-    await recipeFormPage.fill({ code, name: taggedName(code), recipeType: 'Other' });
+    await recipeFormPage.fill({ name: taggedName(tag), recipeType: 'Other' });
     await recipeFormPage.cancel();
     await recipeFormPage.expectBackOnList();
     await recipesListPage.expectLoaded();
-    await recipesListPage.search(code);
+    await recipesListPage.search(tag);
     await recipesListPage.expectNoMatchState();
   });
 
@@ -442,9 +446,10 @@ test.describe('Planning - Recipes', () => {
     // Confirmed bug, ClickUp z941abybge (2026-10-09): read-only users are
     // offered write controls on some Planning screens (enabled, then refused
     // with "Access restricted" / 403) while others hide or disable them.
-    // Marked with knownBug() until fixed.
+    // Not reproduced on this screen on dev 2026-10-29: "New recipe" was unavailable
+    // to the read-only login in every run, so it's no longer a knownBug()
+    // here. The ClickUp status is left to the user.
     test.skip(!personaCredentials('READONLY'), personaSkipReason('READONLY'));
-    knownBug('z941abybge');
     await asPersona(personas, 'READONLY', async (page) => {
       const list = new RecipesListPage(page);
       await list.open();
@@ -483,7 +488,7 @@ test.describe('Planning - Recipes', () => {
   }) => {
     await allure.tms(cu('z941abu5eu'), 'TC-ER-03 (ClickUp)');
     const code = await createRecipe(page, washRecipe());
-    const renamed = `${taggedName(code)} (edited)`;
+    const renamed = `${nameOf(code)} (edited)`;
     await recipeDetailPage.startEditing();
     await recipeFormPage.fill({
       name: renamed,
@@ -584,7 +589,7 @@ test.describe('Planning - Recipes', () => {
     await allure.tms(cu('z941abu5f1'), 'TC-ER-09 (ClickUp)');
     await openRecipe(page, recipe);
     await recipeDetailPage.startEditing();
-    await recipeFormPage.fill({ name: `${taggedName(recipe)} SHOULD NOT PERSIST` });
+    await recipeFormPage.fill({ name: `${nameOf(recipe)} SHOULD NOT PERSIST` });
     await recipeFormPage.cancel();
     await openRecipe(page, recipe);
     await recipeDetailPage.expectSummaryLacks('SHOULD NOT PERSIST');

@@ -25,6 +25,8 @@ import { cleanUpAfterAll } from './support/cleanup';
  * beforeAll builds `kind` (Counts against overtime cap off, display order 990).
  */
 const cu = (id: string) => `https://app.clickup.com/t/${id}`;
+/** In `kind`'s description only (not its code or label), for TC-LSK-05's description search. */
+const DESCRIPTION_WORD = `desc${Date.now().toString(36)}`;
 const label = (code: string) => `QA-AUTO ${code}`;
 
 test.describe('Planning - Shift Kinds', () => {
@@ -36,7 +38,10 @@ test.describe('Planning - Shift Kinds', () => {
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(180_000);
     const page = await setupPage(browser);
-    kind = await createShiftKind(page, { displayOrder: '990' });
+    kind = await createShiftKind(page, {
+      displayOrder: '990',
+      description: `${TEST_DATA_TAG} ${DESCRIPTION_WORD}`,
+    });
     await page.close();
   });
 
@@ -121,7 +126,9 @@ test.describe('Planning - Shift Kinds', () => {
       await kinds.expectEveryRowMatches('overtime');
     });
     await test.step('By description', async () => {
-      await kinds.search('Planning regression test data');
+      // A word only `kind`'s description has: the shared QA-AUTO text matches
+      // hundreds of kinds on dev by now, so `kind` could sit past page 1.
+      await kinds.search(DESCRIPTION_WORD);
       await kinds.expectRowVisible(kind);
     });
   });

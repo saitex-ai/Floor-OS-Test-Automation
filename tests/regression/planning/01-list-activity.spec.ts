@@ -9,7 +9,7 @@ import {
   personaCredentials,
   personaSkipReason,
   setupPage,
-  taggedName,
+  nameOf,
 } from './support/test-data';
 import { cleanUpAfterAll } from './support/cleanup';
 
@@ -121,7 +121,7 @@ test.describe('Planning - List Activity', () => {
       await activitiesListPage.expectRowVisible(code);
     });
     await test.step('By name', async () => {
-      await activitiesListPage.search(taggedName(code).slice(0, 30));
+      await activitiesListPage.search(nameOf(code).slice(0, 30));
       await activitiesListPage.expectRowVisible(code);
     });
     // Department / type terms also match rows whose visible cells don't

@@ -6,7 +6,6 @@ import {
   addOperation,
   asPersona,
   createRecipe,
-  knownBug,
   openRecipe,
   personaCredentials,
   personaSkipReason,
@@ -72,12 +71,14 @@ test.describe('Planning - Recipe Operations', () => {
     operationFormPage,
   }) => {
     await allure.tms(cu('z941abu5fh'), 'TC-CO-01 (ClickUp)');
-    // Corrected 2026-09-09: a full form replacing the table (same URL) is the design.
+    // Corrected 2026-09-09: a full form replacing the table (same URL) was
+    // the design. Since the 2026-10-28 dev deploy a new operation is the add
+    // row on step 2 of the recipe's own Edit page.
     await openRecipe(page, recipe);
     const url = page.url();
     await recipeDetailPage.openNewOperation();
     await operationFormPage.expectOpenForCreate();
-    expect(page.url()).toBe(url);
+    expect(page.url()).toBe(`${url}/edit`);
     await operationFormPage.cancel();
   });
 
@@ -231,6 +232,9 @@ test.describe('Planning - Recipe Operations', () => {
     await addOperation(page, { step: '10', name: OP_A, cycleTime: '30' });
     await recipeDetailPage.openNewOperation();
     await operationFormPage.fill({ step: '20', name: 'QA-AUTO unsaved op', cycleTime: '40' });
+    // Since the 2026-10-28 dev deploy the add row is discarded with its Clear
+    // (✕): Done / Cancel refuse to leave while it holds input.
+    await operationFormPage.cancel();
     await recipeDetailPage.reload();
     await recipeDetailPage.expectOperationsHeading(1, 30);
     await recipeDetailPage.expectNoOperationRow('QA-AUTO unsaved op');
@@ -242,9 +246,11 @@ test.describe('Planning - Recipe Operations', () => {
     // Confirmed bug, ClickUp z941abybge (2026-10-09): read-only users are
     // offered write controls on some Planning screens (enabled, then refused
     // with "Access restricted" / 403) while others hide or disable them.
-    // Marked with knownBug() until fixed.
+    // Not reproduced here on dev 2026-10-29: since that deploy operations are
+    // added and edited only through "Edit recipe", which the read-only login
+    // doesn't get, so it's no longer a knownBug() here. The ClickUp status is
+    // left to the user.
     test.skip(!personaCredentials('READONLY'), personaSkipReason('READONLY'));
-    knownBug('z941abybge');
     await asPersona(personas, 'READONLY', async (page) => {
       const list = new RecipesListPage(page);
       await list.findRow(recipe);
@@ -418,9 +424,11 @@ test.describe('Planning - Recipe Operations', () => {
     // Confirmed bug, ClickUp z941abybge (2026-10-09): read-only users are
     // offered write controls on some Planning screens (enabled, then refused
     // with "Access restricted" / 403) while others hide or disable them.
-    // Marked with knownBug() until fixed.
+    // Not reproduced here on dev 2026-10-29: since that deploy operations are
+    // added and edited only through "Edit recipe", which the read-only login
+    // doesn't get, so it's no longer a knownBug() here. The ClickUp status is
+    // left to the user.
     test.skip(!personaCredentials('READONLY'), personaSkipReason('READONLY'));
-    knownBug('z941abybge');
     await asPersona(personas, 'READONLY', async (page) => {
       const list = new RecipesListPage(page);
       await list.findRow(recipe);

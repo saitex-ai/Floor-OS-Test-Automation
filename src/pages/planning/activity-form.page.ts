@@ -49,6 +49,13 @@ export class ActivityFormPage extends BasePage {
     await expect(this.locators.code).toBeDisabled();
   }
 
+  /** New form since the 2026-10-16 deploy: the code can't be typed, dev assigns it on save. */
+  async expectCodeGenerated(): Promise<void> {
+    await expect(this.locators.code).toBeDisabled();
+    await expect(this.locators.code).toHaveAttribute('placeholder', 'Auto-generated');
+    await expect(this.locators.codeGeneratedHelp).toBeVisible();
+  }
+
   async expectCodeLocked(): Promise<void> {
     await expect(this.locators.code).toBeDisabled();
   }
@@ -148,13 +155,8 @@ export class ActivityFormPage extends BasePage {
   }
 
   /** Every required field with a valid default; `overrides` win. */
-  async fillAllRequired(
-    code: string,
-    name: string,
-    overrides: ActivityFieldValues = {},
-  ): Promise<void> {
+  async fillAllRequired(name: string, overrides: ActivityFieldValues = {}): Promise<void> {
     await this.fill({
-      code,
       name,
       department: 'Cutting',
       activityType: 'Production',

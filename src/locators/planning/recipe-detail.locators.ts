@@ -1,4 +1,5 @@
 import { type Locator, type Page } from '@playwright/test';
+import { fieldHelp } from './form-field.locators';
 
 /**
  * Raw element locators for a recipe's detail page
@@ -21,9 +22,10 @@ export class RecipeDetailLocators {
   readonly risksHelp: Locator;
   readonly operationsHeading: Locator;
   readonly operationsSearch: Locator;
-  readonly newOperationButton: Locator;
+  /** Edit recipe's step 2 in its "Steps" list. */
+  readonly operationsStep: Locator;
+  readonly doneButton: Locator;
   readonly operationsTable: Locator;
-  readonly noOperationsState: Locator;
 
   constructor(private readonly page: Page) {
     this.allRecipesLink = page.getByRole('link', { name: 'All recipes' });
@@ -35,16 +37,17 @@ export class RecipeDetailLocators {
     this.summary = page.getByRole('main').last();
     this.approvalPrerequisites = page.getByText(/^Before it can be sent for approval/);
     this.risksHeading = page.getByRole('heading', { name: 'Known risks it carries' });
-    this.risksHelp = page.getByText(
-      'These become named, visible buffers instead of informal padding.',
-    );
+    // A tooltip button's name since the 2026-10-28 dev deploy (was an inline line).
+    this.risksHelp = fieldHelp(page, /named, visible buffers? instead of informal padding/);
     this.operationsHeading = page.getByRole('heading', { name: /^Operations \(\d+\)/ });
-    this.operationsSearch = page.getByRole('searchbox', { name: /^Search operations in/ });
-    this.newOperationButton = page.getByRole('button', { name: 'New operation' });
+    this.operationsSearch = page.getByRole('searchbox', { name: /^Search operations/ });
+    this.operationsStep = page.getByRole('list', { name: 'Steps' }).getByRole('button', {
+      name: /^Operations/,
+    });
+    this.doneButton = page.getByRole('button', { name: 'Done', exact: true });
     this.operationsTable = page.getByRole('table').filter({
       has: page.getByRole('columnheader', { name: 'Step' }),
     });
-    this.noOperationsState = page.getByText('Use New operation above to add the first one.');
   }
 
   /** An operation row, matched on its Operation cell's exact text. */
@@ -55,10 +58,15 @@ export class RecipeDetailLocators {
   }
 
   operationEditButton(name: string): Locator {
-    return this.operationRow(name).getByRole('button', { name: 'Edit', exact: true });
+    return this.operationRow(name).getByRole('button', { name: 'Edit operation', exact: true });
   }
 
+  /** Saved operation rows: not the header, the add row or the empty-grid message. */
   operationDataRows(): Locator {
-    return this.operationsTable.getByRole('row').filter({ has: this.page.getByRole('cell') });
+    return this.operationsTable
+      .getByRole('row')
+      .filter({ has: this.page.getByRole('cell') })
+      .filter({ hasNot: this.page.getByRole('button', { name: 'Add operation' }) })
+      .filter({ hasNotText: /^No operations/ });
   }
 }
