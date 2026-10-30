@@ -5,10 +5,9 @@ import { type Locator, type Page } from '@playwright/test';
  * its "New BOM" → "Create BOM techpack" dialog — no actions or assertions
  * here, see src/pages/bom/bom-list.page.ts for those.
  *
- * All / Open / Approved are `aria-pressed` buttons, not tabs, and their
- * accessible name carries the count ("Open 42"). The count is part of
- * the regex on purpose: a bare /^Open/ also matches the shell's "Open
- * navigation" button.
+ * All / Open / Approved are tabs (`role="tab"`, `aria-selected`) since
+ * dev's 2026-10-30 deploy (uat too, same day); they were `aria-pressed`
+ * buttons before. Their accessible name carries the count ("Open 42").
  */
 export class BomListLocators {
   readonly heading: Locator;
@@ -68,8 +67,6 @@ export class BomListLocators {
   // replaced the No / Vertical / Horizontal split buttons.
   readonly viewButton: Locator;
   readonly viewMenu: Locator;
-  readonly essentialCardsButton: Locator;
-  readonly detailedCardsButton: Locator;
   readonly filterMatchCount: Locator;
   readonly showAllColumnsButton: Locator;
   readonly hideAllColumnsButton: Locator;
@@ -88,9 +85,9 @@ export class BomListLocators {
   constructor(private readonly page: Page) {
     this.heading = page.getByRole('heading', { level: 1, name: 'Bill of Materials' });
 
-    this.allTab = page.getByRole('button', { name: /^All [\d,]+$/ });
-    this.openTab = page.getByRole('button', { name: /^Open [\d,]+$/ });
-    this.approvedTab = page.getByRole('button', { name: /^Approved [\d,]+$/ });
+    this.allTab = page.getByRole('tab', { name: /^All [\d,]+$/ });
+    this.openTab = page.getByRole('tab', { name: /^Open [\d,]+$/ });
+    this.approvedTab = page.getByRole('tab', { name: /^Approved [\d,]+$/ });
 
     this.newBomButton = page.getByRole('button', { name: 'New BOM' });
     this.searchInput = page.getByRole('textbox', { name: 'Search', exact: true });
@@ -159,8 +156,6 @@ export class BomListLocators {
       .last()
       .getByRole('button', { name: 'View', exact: true });
     this.viewMenu = page.getByRole('menu', { name: 'View' });
-    this.essentialCardsButton = page.getByRole('button', { name: 'Essential', exact: true });
-    this.detailedCardsButton = page.getByRole('button', { name: 'Detailed', exact: true });
     this.showAllColumnsButton = page.getByRole('button', { name: 'Show all' });
     this.hideAllColumnsButton = page.getByRole('button', { name: 'Hide all' });
 
@@ -187,9 +182,14 @@ export class BomListLocators {
     return this.page.getByRole('heading', { level: 1, name });
   }
 
-  /** A toolbar/tab button by its (possibly translated) accessible name. */
+  /** A toolbar button by its (possibly translated) accessible name. */
   buttonNamed(name: string | RegExp): Locator {
     return this.page.getByRole('main').getByRole('button', { name });
+  }
+
+  /** A status tab by its (possibly translated) accessible name. */
+  tabNamed(name: string | RegExp): Locator {
+    return this.page.getByRole('main').getByRole('tab', { name });
   }
 
   /** The search box by its (possibly translated) placeholder. */

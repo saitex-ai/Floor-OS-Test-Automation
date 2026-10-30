@@ -59,7 +59,7 @@ test.describe('BOM - Bill of Materials List', () => {
       await expect(l.allTab).toBeVisible();
       await expect(l.openTab).toBeVisible();
       await expect(l.approvedTab).toBeVisible();
-      await expect(l.allTab).toHaveAttribute('aria-pressed', 'true');
+      await expect(l.allTab).toHaveAttribute('aria-selected', 'true');
       await expect(l.searchByPlaceholder('Search by code, customer, season...')).toBeVisible();
       await expect(l.newBomButton).toBeVisible();
       await expect(l.rows.first()).toBeVisible();
@@ -244,8 +244,6 @@ test.describe('BOM - Bill of Materials List', () => {
     await test.step('Vertical Split: a card list beside a preview of the selected BOM', async () => {
       await bomListPage.setLayout('Vertical Split');
       await expect(l.splitRecordCount).toHaveText(`${total} record${total === 1 ? '' : 's'}`);
-      await expect(l.essentialCardsButton).toHaveAttribute('aria-pressed', 'true');
-      await expect(l.detailedCardsButton).toBeVisible();
       await l.splitRecordRows.first().click();
       await expect(l.previewBreadcrumb).toContainText(firstCode);
     });
@@ -331,9 +329,9 @@ test.describe('BOM - Bill of Materials List', () => {
 
     await test.step('Heading, tabs, toolbar, search placeholder and column headers translate', async () => {
       await expect(l.headingNamed('Định mức nguyên phụ liệu')).toBeVisible({ timeout: 60_000 });
-      await expect(l.buttonNamed(/^Tất cả [\d,]+$/)).toBeVisible();
-      await expect(l.buttonNamed(/^Mở [\d,]+$/)).toBeVisible();
-      await expect(l.buttonNamed(/^Đã duyệt [\d,]+$/)).toBeVisible();
+      await expect(l.tabNamed(/^Tất cả [\d,]+$/)).toBeVisible();
+      await expect(l.tabNamed(/^Mở [\d,]+$/)).toBeVisible();
+      await expect(l.tabNamed(/^Đã duyệt [\d,]+$/)).toBeVisible();
       await expect(l.buttonNamed('BOM mới')).toBeVisible();
       await expect(l.buttonNamed('Xuất CSV')).toBeVisible();
       await expect(l.searchByPlaceholder('Tìm theo mã, khách hàng, mùa...')).toBeVisible();

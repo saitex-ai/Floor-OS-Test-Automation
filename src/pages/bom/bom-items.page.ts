@@ -185,11 +185,6 @@ export class BomItemsPage extends BasePage {
     const required = this.locators.supplierRequiredButtons;
     let changed = 0;
     for (; changed < 10 && (await required.count()) > 0; changed++) {
-      const saved = this.page.waitForResponse(
-        (res) =>
-          res.request().method() === 'POST' && /\/items\/[^/]+$/.test(new URL(res.url()).pathname),
-        { timeout: 30_000 },
-      );
       await required.first().click();
       await expect(this.locators.supplierDialog).toBeVisible();
       // Active vendors only. The dialog opens with inactive vendors included
@@ -214,8 +209,18 @@ export class BomItemsPage extends BasePage {
       if (!(await this.locators.supplierOptions.first().isVisible())) {
         await this.locators.supplierCombobox.click();
       }
-      await this.locators.supplierOptions.first().click();
-      expect((await saved).ok(), 'saving the supplier on the line').toBe(true);
+      // Picking the vendor saves the line. Promise.all keeps the response
+      // wait from being left unhandled if the click fails.
+      const [saved] = await Promise.all([
+        this.page.waitForResponse(
+          (res) =>
+            res.request().method() === 'POST' &&
+            /\/items\/[^/]+$/.test(new URL(res.url()).pathname),
+          { timeout: 30_000 },
+        ),
+        this.locators.supplierOptions.first().click(),
+      ]);
+      expect(saved.ok(), 'saving the supplier on the line').toBe(true);
       await expect(this.locators.supplierDialog).toBeHidden();
     }
     return changed;

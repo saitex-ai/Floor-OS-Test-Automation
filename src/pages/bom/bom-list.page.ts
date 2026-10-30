@@ -103,16 +103,16 @@ export class BomListPage extends BasePage {
 
   /**
    * Clicks a status tab and checks the grid follows it: the tab reads as
-   * pressed, and the footer total matches the tab's count. A zero-result
+   * selected, and the footer total matches the tab's count. A zero-result
    * tab renders no footer at all, so that case checks the row count instead.
    */
   async selectStatusTab(tab: Locator): Promise<void> {
-    if ((await this.locators.allTab.getAttribute('aria-pressed')) === 'true') {
+    if ((await this.locators.allTab.getAttribute('aria-selected')) === 'true') {
       await this.waitForTabCounts();
     }
     const expected = await this.countOf(tab);
     await tab.click();
-    await expect(tab).toHaveAttribute('aria-pressed', 'true');
+    await expect(tab).toHaveAttribute('aria-selected', 'true');
     if (expected === 0) {
       await expect(this.locators.rows).toHaveCount(0);
       return;
@@ -348,13 +348,14 @@ export class BomListPage extends BasePage {
    * the navigation (under 2 workers the create can take a while on uat).
    */
   async createBom(code: string): Promise<Request> {
-    const responsePromise = this.page.waitForResponse(
-      (res) =>
-        res.request().method() === 'POST' && /\/bom-techpack$/.test(new URL(res.url()).pathname),
-      { timeout: 60_000 },
-    );
-    await this.locators.createBomButton.click();
-    const response = await responsePromise;
+    const [response] = await Promise.all([
+      this.page.waitForResponse(
+        (res) =>
+          res.request().method() === 'POST' && /\/bom-techpack$/.test(new URL(res.url()).pathname),
+        { timeout: 60_000 },
+      ),
+      this.locators.createBomButton.click(),
+    ]);
     if (!response.ok()) {
       throw new CreateBomError(
         response.status(),

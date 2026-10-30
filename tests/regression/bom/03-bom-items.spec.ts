@@ -322,9 +322,10 @@ test.describe('BOM - Items', () => {
     // Destination split on a THD line saved silently). In every run since
     // 2026-10-23, each on a fresh BOM, it has been refused: with a toast on
     // dev (POST …/items/<THD> → 400 THD_NO_DESTINATION_SPLIT), and with a
-    // "Not Allowed" dialog on uat since its 2026-10-26 deploy. The ClickUp
-    // retest hasn't been done yet. The cleanup step unticks it again if it
-    // ever saves, so the rest of this file sees the line as seeded.
+    // "Not Allowed" dialog on uat since its 2026-10-26 deploy. The bug has
+    // been retested and is closed (Done) in ClickUp. The cleanup step
+    // unticks it again if it ever saves, so the rest of this file sees the
+    // line as seeded.
     const l = bomItemsPage.locators;
 
     await test.step('Its country cell shows "—" (or "-") instead of "Pick country"', async () => {
