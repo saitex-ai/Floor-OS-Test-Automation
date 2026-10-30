@@ -40,7 +40,10 @@ test.describe.serial('BOM - Permissions (second user)', () => {
     alice = await browser.newPage({ storageState: authFile('bom') });
     aliceDetail = new BomDetailPage(alice);
     code = await createDisposableBom(alice);
-    await new BomItemsPage(alice).addLines(LINES);
+    const items = new BomItemsPage(alice);
+    await items.addLines(LINES);
+    // TC:4's Costing Approve needs every line to have a supplier (intended, dev 2026-10-26).
+    await items.assignSuppliersWhereRequired();
     bob = await loginAsUser(browser, credentials!.username, credentials!.password);
     bobList = new BomListPage(bob.page);
     bobDetail = new BomDetailPage(bob.page);
