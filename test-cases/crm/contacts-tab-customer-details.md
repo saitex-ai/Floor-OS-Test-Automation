@@ -28,14 +28,14 @@
 
 ## Test cases
 
-| #    | Test case                                                              | Steps                                                                                                                                                              | Expected result                                                                                                     | ClickUp                                      | Automated | Verified locally |
-| ---- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | --------- | ---------------- |
-| TC:1 | Verify default/empty state of Contacts tab when no contacts are linked | 1. Open a Customer with no linked Contacts.<br>2. Navigate to its Contacts tab.                                                                                    | Tab shows an empty state (no linked Contacts listed) plus entry points to link an existing or create a new Contact. | [link](https://app.clickup.com/t/z941abu03j) | ✅        | ❌ not yet run   |
-| TC:2 | Verify searching, selecting, and linking existing contacts             | 1. Open the Contacts tab.<br>2. Click "Link Contact".<br>3. Search for and select one or more existing unlinked Contacts.<br>4. Confirm.                           | Selected Contacts appear in the tab's linked-Contacts list.                                                         | [link](https://app.clickup.com/t/z941abu03k) | ✅        | ❌ not yet run   |
-| TC:3 | Verify unlinking a contact from Customer without deleting record       | 1. Open the Contacts tab for a Customer with a linked Contact.<br>2. Unlink that Contact and confirm.<br>3. Check the Contact still exists as a standalone record. | Contact no longer appears in the tab's list, but the Contact record itself still exists (findable elsewhere).       | [link](https://app.clickup.com/t/z941abu03n) | ✅        | ❌ not yet run   |
-| TC:4 | Verify unlinking a contact from a customer                             | 1. Open the Contacts tab for a Customer with a linked Contact.<br>2. Unlink that Contact and confirm.                                                              | Contact no longer appears in the tab's linked-Contacts list.                                                        | [link](https://app.clickup.com/t/z941abu03p) | ✅        | ❌ not yet run   |
-| TC:5 | Verify navigation to Contact Details from the linked contacts list     | 1. Open the Contacts tab for a Customer with a linked Contact.<br>2. Click that Contact's row.                                                                     | Navigates to that Contact's own Details screen.                                                                     | [link](https://app.clickup.com/t/z941abu03r) | ✅        | ❌ not yet run   |
-| TC:6 | Verify status propagation (Active / Deactivate governance)             | 1. Open the Contacts tab for a Customer whose status is governed together with its Contacts.<br>2. Deactivate/activate the Customer.<br>3. Re-check the tab.       | Linked Contacts' active/inactive status reflects the Customer's own status change.                                  | [link](https://app.clickup.com/t/z941abu09y) | ✅        | ❌ not yet run   |
+| #    | Test case                                                              | Steps                                                                                                                                                              | Expected result                                                                                                     | ClickUp                                      | Automated         | Verified locally                        |
+| ---- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ----------------- | --------------------------------------- |
+| TC:1 | Verify default/empty state of Contacts tab when no contacts are linked | 1. Open a Customer with no linked Contacts.<br>2. Navigate to its Contacts tab.                                                                                    | Tab shows an empty state (no linked Contacts listed) plus entry points to link an existing or create a new Contact. | [link](https://app.clickup.com/t/z941abu03j) | ✅                | ❌ not yet run                          |
+| TC:2 | Verify searching, selecting, and linking existing contacts             | 1. Open the Contacts tab.<br>2. Click "Link Contact".<br>3. Search for and select one or more existing unlinked Contacts.<br>4. Confirm.                           | Selected Contacts appear in the tab's linked-Contacts list.                                                         | [link](https://app.clickup.com/t/z941abu03k) | ✅                | ❌ not yet run                          |
+| TC:3 | Verify unlinking a contact from Customer without deleting record       | 1. Open the Contacts tab for a Customer with a linked Contact.<br>2. Unlink that Contact and confirm.<br>3. Check the Contact still exists as a standalone record. | Contact no longer appears in the tab's list, but the Contact record itself still exists (findable elsewhere).       | [link](https://app.clickup.com/t/z941abu03n) | ✅                | ❌ not yet run                          |
+| TC:4 | Verify unlinking a contact from a customer                             | 1. Open the Contacts tab for a Customer with a linked Contact.<br>2. Unlink that Contact and confirm.                                                              | Contact no longer appears in the tab's linked-Contacts list.                                                        | [link](https://app.clickup.com/t/z941abu03p) | ✅                | ❌ not yet run                          |
+| TC:5 | Verify navigation to Contact Details from the linked contacts list     | 1. Open the Contacts tab for a Customer with a linked Contact.<br>2. Click that Contact's row.                                                                     | Navigates to that Contact's own Details screen.                                                                     | [link](https://app.clickup.com/t/z941abu03r) | ✅                | ❌ not yet run                          |
+| TC:6 | Verify status propagation (Active / Deactivate governance)             | 1. Open the Contacts tab for a Customer whose status is governed together with its Contacts.<br>2. Deactivate/activate the Customer.<br>3. Re-check the tab.       | Linked Contacts' active/inactive status reflects the Customer's own status change.                                  | [link](https://app.clickup.com/t/z941abu09y) | ⚠️ `test.fixme()` | ❌ fails on dev (2026-10-23, see Notes) |
 
 ## Notes for whoever picks this up next
 
@@ -79,13 +79,15 @@ multi-select popups, `role=dialog` modals, `[data-sonner-toast]` toasts),
   flow). Implemented as written — two separate tests — rather than
   merged, the same way `create-customer.md` notes an equivalent overlap
   with `contact-creation-screen.md` rather than silently deduplicating.
-- **TC:6 (status propagation)** is the least concrete requirement in the
-  source text ("where the two are governed together" — unclear which
-  statuses are actually linked, or whether Contact status is ever
-  independently settable at all). `17-contacts-tab-customer-details.spec.ts`
-  marks this one `test.fixme()` pending a live look at the real
-  Customer/Contact status relationship, the same way TC:5-6/TC:10 are
-  `test.fixme()`'d in `11-create-contact.spec.ts` for comparable reasons.
+- **TC:6 (status propagation) still fails on dev (re-checked
+  2026-10-23).** Deactivating a Customer with one linked Contact: the
+  confirm dialog says "This will also affect 1 linked contact." and the
+  Customer goes Inactive, but the Contact's Details screen (after a full
+  reload) and its Contacts list row still read "Active", and its Updated
+  On is unchanged. Reactivating changes nothing either. There is no
+  "deactivate linked contacts" option in the dialog. The Contacts tab row
+  itself shows no status at all. `17-contacts-tab-customer-details.spec.ts`
+  keeps this one `test.fixme()` until the status propagates.
 
 Before trusting a pass/fail from
 `17-contacts-tab-customer-details.spec.ts`, run it against a live

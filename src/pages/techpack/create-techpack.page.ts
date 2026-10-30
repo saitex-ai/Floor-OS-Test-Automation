@@ -333,6 +333,34 @@ export class CreateTechpackPage extends BasePage {
     return exists;
   }
 
+  /**
+   * Searches the Customer picker for a Customer by name. An active Customer
+   * is offered; an inactive one isn't ("No customers match.") — confirmed on
+   * dev 2026-10-23. Closes the picker afterwards.
+   *
+   * The picker loads every active Customer in one request
+   * (`customers/export?active=true`) and filters client-side, but until
+   * that request returns (1-2 s on dev, checked 2026-10-26) it already
+   * reads "No customers match." So wait for the options to load before
+   * searching, or the "not offered" check would pass without looking.
+   */
+  async expectCustomerSelectable(customerName: string, selectable: boolean): Promise<void> {
+    await this.locators.fieldTrigger('Customer*').click();
+    const listbox = this.locators.openListbox();
+    await expect(listbox.getByRole('option').first()).toBeVisible({ timeout: 30_000 });
+    await this.locators.comboboxSearchInput().fill(customerName);
+    const escaped = customerName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const option = listbox.getByRole('option', { name: new RegExp(`^${escaped}\\b`) });
+    if (selectable) {
+      await expect(option).toHaveCount(1, { timeout: 20_000 });
+    } else {
+      await expect(listbox.getByText('No customers match.')).toBeVisible({ timeout: 20_000 });
+      await expect(option).toHaveCount(0);
+    }
+    await this.page.keyboard.press('Escape');
+    await this.expectListboxClosed();
+  }
+
   async searchComboboxForNewValue(labelText: string, searchText: string): Promise<void> {
     await this.locators.fieldTrigger(labelText).click();
     const listbox = this.page.getByRole('listbox').last();

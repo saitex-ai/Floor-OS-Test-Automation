@@ -1,5 +1,6 @@
 import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/crm.fixtures';
+import { randomLetters } from '../../../src/utils/test-data';
 
 /**
  * CRM — Create Contact (Sprint 1).
@@ -9,10 +10,18 @@ import { test, expect } from '../../../src/fixtures/crm.fixtures';
  * confirmed against dev on 2026-09-16 (both local-blocked issues — no
  * selectable Country, and the Customers linkage popup stuck on
  * "Loading customers…" with zero local seed data — turned out fine on
- * dev). TC:5-6 is `test.fixme()`'d: dev's real behavior contradicts the
- * ClickUp text (see create-contact.page.ts's class doc). TC:10 is
- * `test.fixme()`'d — marked `fail` in ClickUp, no confirmed audit view.
+ * dev). TC:5-6 (the create-Customer prompt) re-checked and enabled on
+ * dev 2026-10-23. TC:10 is `test.fixme()`'d — marked `fail` in ClickUp,
+ * no confirmed audit view.
  */
+/**
+ * A unique "Playwright Test Contact <letters>" name, so the prompt checks
+ * can tell this run's Contact from earlier ones (Contact Name is letters only).
+ */
+function uniqueContactName(): string {
+  return `Playwright Test Contact ${randomLetters()}`;
+}
+
 test.describe('CRM - Create Contact', () => {
   test.beforeEach(async () => {
     await allure.epic('CRM');
@@ -113,43 +122,47 @@ test.describe('CRM - Create Contact', () => {
 
   test('TC:5-6 New Customer name at save time, then accept the create-Customer prompt', async ({
     createContactPage,
+    createCustomerPage,
     page,
   }) => {
     await allure.tms('https://app.clickup.com/t/86eyrtq5u', 'TC:5 (ClickUp)');
     await allure.tms('https://app.clickup.com/t/86eyrtq95', 'TC:6 (ClickUp)');
 
-    // Confirmed directly on dev (2026-09-16): typing a non-existent
-    // Customer name and saving does NOT show a "create this Customer
-    // now?" prompt — the Contact just saves as Unlinked, silently
-    // discarding the typed text. Contradicts this ClickUp task; flagged
-    // rather than forced to a false pass. See create-contact.page.ts.
-    test.fixme(
-      true,
-      'The app does not show a "create this Customer now?" prompt when a non-existent Customer name is typed — confirmed directly, contradicts ClickUp. Flag to the team.',
-    );
+    // Re-checked on dev (2026-10-23): this prompt now exists. It was
+    // test.fixme since 2026-09-16, when the typed name was dropped and the
+    // Contact saved Unlinked. Accepting only opens Create Customer; the
+    // Customer itself is not saved here.
+    const contactName = uniqueContactName();
+    const newCustomerName = `Playwright Prompt Customer ${Date.now()}`;
+    const modal = createContactPage.locators.postSaveCreateCustomerModal;
 
     await createContactPage.openFromContactList();
 
     await test.step('Complete mandatory fields with a not-yet-existing Customer name', async () => {
       await createContactPage.fillProfile({
-        name: 'Playwright Test Contact',
+        name: contactName,
         designation: 'Buyer',
         email: `pw-contact-${Date.now()}@example.com`,
         city: 'Coimbatore',
         country: 'India',
       });
-      await createContactPage.locators.customerNameCombobox.click();
-      await createContactPage.locators.customerNameCombobox.fill('Totally New Customer XYZ');
+      await createContactPage.enterNewCustomerName(newCustomerName);
     });
 
-    await test.step('Save and expect the "create this Customer now?" prompt', async () => {
+    await test.step('Save: the Contact saves and the "create this Customer now?" prompt opens', async () => {
       await createContactPage.save();
-      await expect(createContactPage.locators.postSaveCreateCustomerModal).toBeVisible();
+      await expect(createContactPage.locators.toast).toContainText(
+        `Contact ${contactName} created`,
+      );
+      await expect(modal).toBeVisible();
+      await expect(modal).toContainText(`Proceed to create customer ${newCustomerName}`);
     });
 
-    await test.step('Accept the prompt — routed into Customer creation, pre-linked', async () => {
+    await test.step('Accept the prompt: routed into Customer creation, pre-linked to the Contact', async () => {
       await createContactPage.locators.createCustomerButton.click();
       await expect(page).toHaveURL(/\/crm\/customers\/new\?.*contactId=/);
+      await expect(createCustomerPage.locators.customerNameInput).toHaveValue(newCustomerName);
+      await expect(createCustomerPage.locators.linkContactsCombobox).toContainText(contactName);
     });
   });
 

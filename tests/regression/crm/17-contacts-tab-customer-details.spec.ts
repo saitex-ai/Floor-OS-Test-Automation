@@ -1,5 +1,6 @@
 import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/crm.fixtures';
+import { randomLetters } from '../../../src/utils/test-data';
 
 /**
  * CRM — Contacts tab in Customer Details screen (Sprint 2).
@@ -12,10 +13,6 @@ import { test, expect } from '../../../src/fixtures/crm.fixtures';
  * linking goes through a "Contacts to link" combobox (not a separate
  * dialog trigger), and a linked Contact is "Delink"ed (not "Unlink"ed).
  */
-/** Contact Name is validated "Alphabets only" — no digits allowed, so timestamps can't be used for uniqueness there. */
-function randomLetters(length = 8): string {
-  return Array.from({ length }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join('');
-}
 
 test.describe('CRM - Contacts tab in Customer Details', () => {
   test.beforeEach(async () => {
@@ -245,17 +242,17 @@ test.describe('CRM - Contacts tab in Customer Details', () => {
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abu09y', 'TC:6 (ClickUp)');
 
-    // Confirmed against the running app: this does NOT happen. A linked
-    // Contact's row in this tab shows no status at all (just its name and
-    // a Delink button — see contacts-tab.locators.ts), and deactivating
-    // the Customer leaves the Contact's own Details screen reading
-    // "Active" unchanged. Kept as fixme (not deleted, not asserted as
-    // passing) so this gap between the ClickUp text and the real app
-    // stays visible — same discipline as TC:3/TC:5 in
-    // 14-generate-key-meeting-notes.spec.ts.
+    // Re-checked on dev (2026-10-23), still not happening: the Deactivate
+    // confirm dialog says "This will also affect 1 linked contact." and
+    // the Customer goes Inactive, but the linked Contact's Details screen
+    // (after a full reload) and its Contacts list row both still read
+    // "Active", and its Updated On is unchanged. Reactivating changes
+    // nothing either. A linked Contact's row in this tab shows no status
+    // at all (just its name and a Delink button). Kept as fixme so the gap
+    // stays visible; re-enable once the status propagates.
     test.fixme(
       true,
-      "Status does not propagate from Customer to linked Contact — confirmed against the running app, contradicting contacts-tab-customer-details.md's premise.",
+      'Re-checked on dev 2026-10-23: status does not propagate from Customer to linked Contact. After deactivating the Customer (dialog: "This will also affect 1 linked contact."), the Contact Details screen and Contacts list still show the Contact as Active. Bug: https://app.clickup.com/t/z941abzkhy',
     );
 
     const { customerId, customerName } = await createTestCustomer(createCustomerPage, page);
