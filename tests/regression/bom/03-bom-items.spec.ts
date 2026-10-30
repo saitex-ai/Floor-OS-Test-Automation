@@ -175,12 +175,19 @@ test.describe('BOM - Items', () => {
     });
 
     await test.step('A changed description alone still leaves Save disabled', async () => {
-      await l.descriptionInput.fill(`QA regression description ${Date.now()}`);
+      // The dialog can still be loading the line's current text when it
+      // opens, which would overwrite what was typed, so check it stuck.
+      const description = `QA regression description ${Date.now()}`;
+      await expect(async () => {
+        await l.descriptionInput.fill(description);
+        await expect(l.descriptionInput).toHaveValue(description, { timeout: 2_000 });
+      }).toPass({ timeout: 15_000 });
       await expect(l.descriptionSaveButton).toBeDisabled();
     });
 
     await test.step('Adding a reason enables Save', async () => {
       await l.descriptionReasonInput.fill('QA regression: reason gate check');
+      await expect(l.descriptionReasonInput).toHaveValue('QA regression: reason gate check');
       await expect(l.descriptionSaveButton).toBeEnabled();
     });
 
@@ -311,38 +318,53 @@ test.describe('BOM - Items', () => {
 
   test('TC:15 Verify a thread (THD) item cannot be destination-split', async () => {
     await allure.tms('https://app.clickup.com/t/z941aby8eb', 'TC:15 bug (ClickUp)');
-    // Confirmed bug, ClickUp z941aby8eb (see test-case doc's own notes):
-    // on uat and dev (2026-10-08) ticking Destination split on a THD line
-    // saves silently — no "Not Allowed" alert, and it survives a refresh.
-    // Expected to fail until that's fixed; the finally block unticks it
-    // again so the rest of this file sees the line as seeded.
+    // Regression check for ClickUp z941aby8eb (2026-10-08: ticking
+    // Destination split on a THD line saved silently). In every run since
+    // 2026-10-23, each on a fresh BOM, it has been refused: with a toast on
+    // dev (POST …/items/<THD> → 400 THD_NO_DESTINATION_SPLIT), and with a
+    // "Not Allowed" dialog on uat since its 2026-10-26 deploy. The bug has
+    // been retested and is closed (Done) in ClickUp. The cleanup step
+    // unticks it again if it ever saves, so the rest of this file sees the
+    // line as seeded.
     const l = bomItemsPage.locators;
 
-    await test.step('Its country cell shows "—" instead of "Pick country"', async () => {
+    await test.step('Its country cell shows "—" (or "-") instead of "Pick country"', async () => {
       await expect(l.rowPickCountryButton(THREAD)).toHaveCount(0);
       await expect(l.rowNoCountryCell(THREAD)).toBeVisible();
     });
 
+    let failure: unknown;
     try {
-      await test.step('Ticking Destination split is refused with "Not Allowed"', async () => {
+      await test.step('Ticking Destination split is refused ("Not Allowed" dialog or toast)', async () => {
         await bomItemsPage.clickCheckbox(THREAD, 'Destination split');
-        await expect
-          .soft(l.notAllowedDialog)
-          .toContainText('THD items are NOT ALLOWED to do Destination Split!');
+        await bomItemsPage.expectRefused('THD items are NOT ALLOWED to do Destination Split!');
       });
 
       await test.step('After a refresh, the thread line still has no Destination split', async () => {
         await bomDetailPage.refresh();
         expect(await bomItemsPage.activeSplitTypes(THREAD)).not.toContain('Destination split');
       });
-    } finally {
-      // Undo it if it did save, so later cases see the line as seeded.
+    } catch (error) {
+      failure = error;
+    }
+
+    // Undo it if it did save, so later cases see the line as seeded. If the
+    // test has already failed, a cleanup error is recorded instead of thrown,
+    // so it can't replace the real failure.
+    try {
       await bomDetailPage.refresh();
       if (await bomItemsPage.isChecked(THREAD, 'Destination split')) {
         await bomItemsPage.clickCheckbox(THREAD, 'Destination split');
         await expect(l.rowCheckbox(THREAD, 'Destination split')).not.toBeChecked();
       }
+    } catch (cleanupError) {
+      if (failure === undefined) throw cleanupError;
+      test.info().annotations.push({
+        type: 'cleanup',
+        description: `Could not untick Destination split on ${THREAD}: ${String(cleanupError).split('\n')[0]}`,
+      });
     }
+    if (failure !== undefined) throw failure;
   });
 
   test('TC:16 Verify "Pick country" turns on Destination split and opens the country picker', async () => {

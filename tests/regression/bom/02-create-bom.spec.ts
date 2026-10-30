@@ -216,7 +216,8 @@ test.describe.serial('BOM - Create BOM', () => {
       await expect(d.notCompletedIcon).toBeVisible();
       const createdBy = await bomDetailPage.headerField('Created by');
       expect(createdBy).not.toMatch(/^(N\/A|—|)$/);
-      await expect(shellHeaderPage.locators.userMenuButton).toContainText(createdBy);
+      // The user-menu button shows initials only; the name is in the opened menu.
+      expect(await shellHeaderPage.signedInUserText()).toContain(createdBy);
       expect(await bomDetailPage.headerField('Approved Date')).toBe('—');
       expect(await bomDetailPage.headerField('Approved By')).toBe('—');
     });

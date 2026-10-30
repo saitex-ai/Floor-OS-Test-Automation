@@ -16,8 +16,19 @@ const BOM_REMOTE_LOAD_TIMEOUT = 75_000;
 /** The techpack picker's list call can take a while on a cold remote. */
 const PICKER_LOAD_TIMEOUT = 30_000;
 
-/** Layout modes offered by the list toolbar. */
-export type BomListLayout = 'No split' | 'Vertical split' | 'Horizontal split';
+/** Create BOM answered with an error status (thrown by BomListPage.createBom()). */
+export class CreateBomError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'CreateBomError';
+  }
+}
+
+/** Layouts offered by the list's "View" menu (2026-10-22 redesign). */
+export type BomListLayout = 'List View' | 'Vertical Split' | 'Horizontal Split';
 
 /**
  * BOM list (/bom, "Bill of Materials") and its "New BOM" dialog. Owned by
@@ -92,16 +103,16 @@ export class BomListPage extends BasePage {
 
   /**
    * Clicks a status tab and checks the grid follows it: the tab reads as
-   * pressed, and the footer total matches the tab's count. A zero-result
+   * selected, and the footer total matches the tab's count. A zero-result
    * tab renders no footer at all, so that case checks the row count instead.
    */
   async selectStatusTab(tab: Locator): Promise<void> {
-    if ((await this.locators.allTab.getAttribute('aria-pressed')) === 'true') {
+    if ((await this.locators.allTab.getAttribute('aria-selected')) === 'true') {
       await this.waitForTabCounts();
     }
     const expected = await this.countOf(tab);
     await tab.click();
-    await expect(tab).toHaveAttribute('aria-pressed', 'true');
+    await expect(tab).toHaveAttribute('aria-selected', 'true');
     if (expected === 0) {
       await expect(this.locators.rows).toHaveCount(0);
       return;
@@ -161,23 +172,22 @@ export class BomListPage extends BasePage {
 
   // ---- Toolbar ----
 
+  /** Opens the "Filter" dialog and waits for its live "N BOMs match" count. */
   async openFilters(): Promise<void> {
     await this.locators.filtersButton.click();
+    await expect(this.locators.filterDialog).toBeVisible();
+    await expect(this.locators.filterMatchCount).toBeVisible();
+  }
+
+  /** Expands the dialog's "Advanced Filter" rule builder. */
+  async openAdvancedFilter(): Promise<void> {
+    await this.locators.advancedFilterButton.click();
     await expect(this.locators.filterRulesLabel).toBeVisible();
   }
 
   async addFilterRule(): Promise<void> {
     await this.locators.addRuleButton.click();
-    await expect(this.locators.filterAttributeLabel).toBeVisible();
-  }
-
-  async toggleCellFilters(): Promise<void> {
-    await this.locators.toggleCellFiltersButton.click();
-    await expect(this.locators.cellFilterInput('Techpack Code')).toBeVisible();
-  }
-
-  async filterColumn(label: string, text: string): Promise<void> {
-    await this.locators.cellFilterInput(label).fill(text);
+    await expect(this.locators.ruleAttributeCombobox).toBeVisible();
   }
 
   /** Ticks or unticks one column in "Configure columns" and applies it. */
@@ -196,14 +206,31 @@ export class BomListPage extends BasePage {
     return configurable;
   }
 
+  /**
+   * Picks a layout from the "View" menu. The choice is kept in the browser
+   * (it survives a reload), and every test gets a fresh browser context, so
+   * a test's layout never reaches another test.
+   */
   async setLayout(layout: BomListLayout): Promise<void> {
-    const button = {
-      'No split': this.locators.noSplitButton,
-      'Vertical split': this.locators.verticalSplitButton,
-      'Horizontal split': this.locators.horizontalSplitButton,
-    }[layout];
-    await button.click();
-    await expect(button).toHaveAttribute('aria-pressed', 'true');
+    await this.locators.viewButton.click();
+    await expect(this.locators.viewMenu).toBeVisible();
+    await this.locators.viewOption(layout).click();
+    await expect(this.locators.viewMenu).toBeHidden();
+  }
+
+  /** The "View" menu's layout names, in order, and which one is checked. */
+  async viewOptions(): Promise<{ names: string[]; checked: string }> {
+    await this.locators.viewButton.click();
+    const items = this.locators.viewMenu.getByRole('menuitemradio');
+    await expect(items.first()).toBeVisible();
+    const names = (await items.allInnerTexts()).map((n) => n.trim());
+    let checked = '';
+    for (let i = 0; i < names.length; i++) {
+      if ((await items.nth(i).getAttribute('aria-checked')) === 'true') checked = names[i] ?? '';
+    }
+    await this.page.keyboard.press('Escape');
+    await expect(this.locators.viewMenu).toBeHidden();
+    return { names, checked };
   }
 
   /** Clicks a toolbar/selection-bar control and returns the download it triggers. */
@@ -316,15 +343,26 @@ export class BomListPage extends BasePage {
 
   /**
    * Clicks "Create BOM" and returns the create request it sent, once the
-   * app has navigated to the new BOM's detail page.
+   * app has navigated to the new BOM's detail page. Waits for the create's
+   * response first, so a failed create says why instead of timing out on
+   * the navigation (under 2 workers the create can take a while on uat).
    */
   async createBom(code: string): Promise<Request> {
-    const requestPromise = this.page.waitForRequest(
-      (req) => req.method() === 'POST' && /\/bom-techpack$/.test(new URL(req.url()).pathname),
-    );
-    await this.locators.createBomButton.click();
-    const request = await requestPromise;
-    await this.page.waitForURL(new RegExp(`${BOM_PATH}/${code}/0$`), { timeout: 30_000 });
-    return request;
+    const [response] = await Promise.all([
+      this.page.waitForResponse(
+        (res) =>
+          res.request().method() === 'POST' && /\/bom-techpack$/.test(new URL(res.url()).pathname),
+        { timeout: 60_000 },
+      ),
+      this.locators.createBomButton.click(),
+    ]);
+    if (!response.ok()) {
+      throw new CreateBomError(
+        response.status(),
+        `Create BOM for ${code} answered ${response.status()}: ${(await response.text()).slice(0, 200)}`,
+      );
+    }
+    await this.page.waitForURL(new RegExp(`${BOM_PATH}/${code}/0$`), { timeout: 60_000 });
+    return response.request();
   }
 }

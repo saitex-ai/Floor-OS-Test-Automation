@@ -175,6 +175,11 @@ export class BomDetailLocators {
     return dialog.getByRole('button', { name, exact: true });
   }
 
+  /** Every open toast's "Close toast" button. */
+  toastCloseButtons(): Locator {
+    return this.toasts.getByRole('button', { name: 'Close toast' });
+  }
+
   /** A toast whose text matches. */
   toast(text: string | RegExp): Locator {
     return this.toasts.filter({ hasText: text });

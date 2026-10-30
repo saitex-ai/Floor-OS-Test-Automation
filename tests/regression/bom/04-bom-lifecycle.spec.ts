@@ -64,6 +64,8 @@ test.describe.serial('BOM - Lifecycle', () => {
     const d = bomDetailPage.locators;
     await bomDetailPage.open(code, 0);
     await bomItemsPage.addLines(LINES);
+    // Costing Approve needs every line to have a supplier (intended, dev 2026-10-26).
+    await bomItemsPage.assignSuppliersWhereRequired();
     await bomDetailPage.expectItemCount(LINES.length);
     await expect(d.costingApproveButton).toBeEnabled();
     await expect(d.validateAndLockButton).toHaveCount(0);
@@ -107,8 +109,13 @@ test.describe.serial('BOM - Lifecycle', () => {
     await expect(d.copyBomButton).toHaveCount(0);
     await expect(d.costingApproveButton).toHaveCount(0);
     await expect(d.threadItemsTab).toBeDisabled();
-    await expect(bomItemsPage.locators.rowCheckbox(FABRIC, 'Waist split')).toBeDisabled();
-    await expect(bomItemsPage.locators.rowCheckbox(FABRIC, 'Customer supplied')).toBeDisabled();
+    for (const control of ['Waist split', 'Customer supplied'] as const) {
+      await expect
+        .poll(() => bomItemsPage.isReadOnly(bomItemsPage.locators.rowCheckbox(FABRIC, control)), {
+          message: `${control} on an Approved BOM can't be changed`,
+        })
+        .toBe(true);
+    }
     await expect(bomItemsPage.locators.rowDeleteButton(FABRIC)).toHaveCount(0);
   });
 
@@ -253,7 +260,8 @@ test.describe.serial('BOM - Lifecycle', () => {
 
     await test.step('Create it — rev 0 now offers "Open latest"', async () => {
       await bomDetailPage.submitCreateRevision();
-      await expect(d.openLatestButton).toBeVisible();
+      // The new revision's banner can take a while under 2 workers (dev, 2026-10-26).
+      await expect(d.openLatestButton).toBeVisible({ timeout: 45_000 });
     });
 
     await test.step('The revisions picker lists rev 1 (draft) and rev 0 (validated)', async () => {
@@ -363,10 +371,12 @@ test.describe('BOM - Lifecycle (older revisions)', () => {
     page = await browser.newPage({ storageState: authFile('bom') });
     bomDetailPage = new BomDetailPage(page);
     code = await createDisposableBom(page);
-    await new BomItemsPage(page).addLines(LINES);
+    const items = new BomItemsPage(page);
+    await items.addLines(LINES);
+    await items.assignSuppliersWhereRequired();
     await bomDetailPage.costingApprove();
     await bomDetailPage.submitCreateRevision();
-    await expect(bomDetailPage.locators.openLatestButton).toBeVisible();
+    await expect(bomDetailPage.locators.openLatestButton).toBeVisible({ timeout: 45_000 });
   });
 
   test.afterAll(async () => {

@@ -5,10 +5,9 @@ import { type Locator, type Page } from '@playwright/test';
  * its "New BOM" → "Create BOM techpack" dialog — no actions or assertions
  * here, see src/pages/bom/bom-list.page.ts for those.
  *
- * All / Open / Approved are `aria-pressed` buttons, not tabs, and their
- * accessible name carries the count ("Open 42"). The count is part of
- * the regex on purpose: a bare /^Open/ also matches the shell's "Open
- * navigation" button.
+ * All / Open / Approved are tabs (`role="tab"`, `aria-selected`) since
+ * dev's 2026-10-30 deploy (uat too, same day); they were `aria-pressed`
+ * buttons before. Their accessible name carries the count ("Open 42").
  */
 export class BomListLocators {
   readonly heading: Locator;
@@ -47,17 +46,27 @@ export class BomListLocators {
 
   // Toolbar — the same shared list-screen framework as the Techpacks list.
   readonly filtersButton: Locator;
-  readonly toggleCellFiltersButton: Locator;
   readonly exportCsvButton: Locator;
   readonly configureColumnsButton: Locator;
-  readonly bestFitColumnsButton: Locator;
-  readonly noSplitButton: Locator;
-  readonly verticalSplitButton: Locator;
-  readonly horizontalSplitButton: Locator;
   readonly addRuleButton: Locator;
   readonly applyButton: Locator;
   readonly filterRulesLabel: Locator;
-  readonly filterAttributeLabel: Locator;
+  // "Filter" dialog (2026-10-22 redesign): label + unnamed combobox fields,
+  // date ranges, a live "N BOMs match" count, and an "Advanced Filter" rule
+  // builder behind a toggle.
+  readonly filterDialog: Locator;
+  readonly filterIntroText: Locator;
+  readonly filterApplyButton: Locator;
+  readonly filterClearButton: Locator;
+  readonly advancedFilterButton: Locator;
+  readonly noCustomRulesText: Locator;
+  readonly ruleAttributeCombobox: Locator;
+  readonly ruleValueCombobox: Locator;
+  readonly removeRuleButton: Locator;
+  // "View" menu (List View / Vertical Split / Horizontal Split), which
+  // replaced the No / Vertical / Horizontal split buttons.
+  readonly viewButton: Locator;
+  readonly viewMenu: Locator;
   readonly filterMatchCount: Locator;
   readonly showAllColumnsButton: Locator;
   readonly hideAllColumnsButton: Locator;
@@ -76,9 +85,9 @@ export class BomListLocators {
   constructor(private readonly page: Page) {
     this.heading = page.getByRole('heading', { level: 1, name: 'Bill of Materials' });
 
-    this.allTab = page.getByRole('button', { name: /^All [\d,]+$/ });
-    this.openTab = page.getByRole('button', { name: /^Open [\d,]+$/ });
-    this.approvedTab = page.getByRole('button', { name: /^Approved [\d,]+$/ });
+    this.allTab = page.getByRole('tab', { name: /^All [\d,]+$/ });
+    this.openTab = page.getByRole('tab', { name: /^Open [\d,]+$/ });
+    this.approvedTab = page.getByRole('tab', { name: /^Approved [\d,]+$/ });
 
     this.newBomButton = page.getByRole('button', { name: 'New BOM' });
     this.searchInput = page.getByRole('textbox', { name: 'Search', exact: true });
@@ -117,23 +126,40 @@ export class BomListLocators {
     });
     this.techpackPickerFooter = this.techpackPickerDialog.getByText(/^Showing [\d-]+ of \d+$/);
 
-    this.filtersButton = page.getByRole('button', { name: 'Filters', exact: true });
-    this.toggleCellFiltersButton = page.getByRole('button', { name: 'Toggle cell filters' });
+    this.filtersButton = page.getByRole('button', { name: /^Filters/ });
     this.exportCsvButton = page.getByRole('button', { name: 'Export CSV' });
     this.configureColumnsButton = page.getByRole('button', { name: 'Configure columns' });
-    this.bestFitColumnsButton = page.getByRole('button', { name: 'Best-fit columns' });
-    this.noSplitButton = page.getByRole('button', { name: 'No split' });
-    this.verticalSplitButton = page.getByRole('button', { name: 'Vertical split' });
-    this.horizontalSplitButton = page.getByRole('button', { name: 'Horizontal split' });
-    this.addRuleButton = page.getByRole('button', { name: /Add rule/ });
     this.applyButton = page.getByRole('button', { name: 'Apply', exact: true });
-    this.filterRulesLabel = page.getByText('Rules', { exact: true });
-    this.filterAttributeLabel = page.getByText('Attribute');
-    this.filterMatchCount = page.getByText(/^\d+ BOMs? match$/);
+    this.filterDialog = page.getByRole('dialog', { name: 'Filter', exact: true });
+    this.filterIntroText = this.filterDialog.getByText(
+      'Use the fields to narrow down the list. Clear all filters to reset the view.',
+    );
+    this.filterApplyButton = this.filterDialog.getByRole('button', { name: 'Apply', exact: true });
+    this.filterClearButton = this.filterDialog.getByRole('button', { name: 'Clear', exact: true });
+    this.advancedFilterButton = this.filterDialog.getByRole('button', { name: 'Advanced Filter' });
+    this.addRuleButton = this.filterDialog.getByRole('button', { name: /Add rule/ });
+    this.filterRulesLabel = this.filterDialog.getByText('Rules', { exact: true });
+    this.noCustomRulesText = this.filterDialog.getByText(
+      'No custom rules. Add one to filter on any attribute.',
+    );
+    // "Attribute..." / "Value..." are the comboboxes' shown text, not their names.
+    this.ruleAttributeCombobox = this.filterDialog
+      .getByRole('combobox')
+      .filter({ hasText: 'Attribute...' });
+    this.ruleValueCombobox = this.filterDialog
+      .getByRole('combobox')
+      .filter({ hasText: 'Value...' });
+    this.removeRuleButton = this.filterDialog.getByRole('button', { name: 'Remove rule' });
+    this.filterMatchCount = page.getByText(/^[\d,]+ BOMs? match$/);
+    this.viewButton = page
+      .getByRole('main')
+      .last()
+      .getByRole('button', { name: 'View', exact: true });
+    this.viewMenu = page.getByRole('menu', { name: 'View' });
     this.showAllColumnsButton = page.getByRole('button', { name: 'Show all' });
     this.hideAllColumnsButton = page.getByRole('button', { name: 'Hide all' });
 
-    this.splitRecordCount = page.getByText(/^\d+ records?$/);
+    this.splitRecordCount = page.getByText(/^[\d,]+ records?$/);
     this.splitRecordRows = page.getByRole('main').getByRole('button', { name: /^Select row TP/ });
     // A split layout's preview panel renders the selected BOM's own detail
     // view, breadcrumb included.
@@ -156,9 +182,14 @@ export class BomListLocators {
     return this.page.getByRole('heading', { level: 1, name });
   }
 
-  /** A toolbar/tab button by its (possibly translated) accessible name. */
+  /** A toolbar button by its (possibly translated) accessible name. */
   buttonNamed(name: string | RegExp): Locator {
     return this.page.getByRole('main').getByRole('button', { name });
+  }
+
+  /** A status tab by its (possibly translated) accessible name. */
+  tabNamed(name: string | RegExp): Locator {
+    return this.page.getByRole('main').getByRole('tab', { name });
   }
 
   /** The search box by its (possibly translated) placeholder. */
@@ -186,9 +217,34 @@ export class BomListLocators {
     return this.columnHeaders.getByRole('button', { name: columnLabel, exact: true });
   }
 
-  /** The per-column inline filter input revealed by "Toggle cell filters". */
-  cellFilterInput(columnLabel: string): Locator {
-    return this.page.getByPlaceholder(`Filter ${columnLabel}`);
+  /**
+   * A "Filter" dialog field by its label. The comboboxes have no name of
+   * their own ("Select"); each directly follows its label text.
+   */
+  filterField(label: string): Locator {
+    return this.filterDialog
+      .getByText(label, { exact: true })
+      .locator('xpath=following::*[@role="combobox"][1]');
+  }
+
+  /** A "Filter" dialog label (fields and date ranges), e.g. "Approved date". */
+  filterLabel(label: string): Locator {
+    return this.filterDialog.getByText(label, { exact: true });
+  }
+
+  /** The rule builder's operator picker for the rule row (disabled until an attribute is picked). */
+  ruleOperatorCombobox(): Locator {
+    return this.ruleAttributeCombobox.locator('xpath=following::*[@role="combobox"][1]');
+  }
+
+  /** A "View" menu layout. */
+  viewOption(name: 'List View' | 'Vertical Split' | 'Horizontal Split'): Locator {
+    return this.viewMenu.getByRole('menuitemradio', { name });
+  }
+
+  /** A grid row's Status cell, a plain cell to click without following the code link. */
+  rowStatusCell(index: number): Locator {
+    return this.rows.nth(index).getByRole('cell', { name: /^(Open|Approved)$/ });
   }
 
   /** A row of the techpack picker by its techpack code. */

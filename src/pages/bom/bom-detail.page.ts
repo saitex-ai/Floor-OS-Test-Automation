@@ -72,7 +72,9 @@ export class BomDetailPage extends BasePage {
   async expectOpenFor(code: string, revNo?: number): Promise<void> {
     const rev = revNo === undefined ? '\\d+' : String(revNo);
     await expect(this.page).toHaveURL(new RegExp(`${BOM_PATH}/${code}/${rev}$`));
-    await expect(this.locators.title).toContainText(code);
+    // The BOM remote can take well over the default 15 s to render under 2
+    // workers (seen on dev 2026-10-26).
+    await expect(this.locators.title).toContainText(code, { timeout: 60_000 });
     if (revNo !== undefined) {
       await expect(this.locators.title).toContainText(`Rev ${String(revNo).padStart(2, '0')}`);
     }
@@ -84,8 +86,27 @@ export class BomDetailPage extends BasePage {
     await this.locators.backButton.click();
   }
 
+  /**
+   * Closes every open toast. Since the 2026-10-22 redesign toasts appear
+   * top-right over the header's Refresh, and error toasts don't go away on
+   * their own.
+   */
+  async dismissToasts(): Promise<void> {
+    const close = this.locators.toastCloseButtons();
+    // Toasts slide in and out, so they never count as "stable": click their
+    // close buttons without waiting for that, a bounded number of times.
+    for (let i = 0; i < 5 && (await close.count()) > 0; i++) {
+      await close
+        .first()
+        .click({ force: true, timeout: 5_000 })
+        .catch(() => undefined);
+    }
+    await expect(this.locators.toasts).toHaveCount(0, { timeout: 10_000 });
+  }
+
   /** Re-reads the BOM from the server, the way a user would to confirm a change stuck. */
   async refresh(): Promise<void> {
+    await this.dismissToasts();
     await this.locators.refreshButton.click();
     await expect(this.locators.main.getByText('Lock Status:')).toBeVisible();
   }
@@ -259,7 +280,8 @@ export class BomDetailPage extends BasePage {
   async openRevisionsPicker(): Promise<void> {
     await this.locators.revNoButton.click();
     await expect(this.locators.revisionsDialog).toBeVisible();
-    await expect(this.locators.revisionRows.first()).toBeVisible();
+    // Its rows load separately and can be slow under 2 workers.
+    await expect(this.locators.revisionRows.first()).toBeVisible({ timeout: 30_000 });
   }
 
   async closeRevisionsPicker(): Promise<void> {
