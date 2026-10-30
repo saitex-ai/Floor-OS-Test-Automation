@@ -90,11 +90,11 @@ test.describe('Fabric Mill Smoke', () => {
       // Mixing orders tab now shows the most recent real order's own
       // recipe by default, not an always-visible blank form.
       await spinningPage.openNewMixingOrderForm();
-      // Shares only count once a line has a cotton unit. Pick two distinct
-      // units (form state only — Create order is never pressed), then drop
-      // line 1 from 60% to 50% so the recipe totals 90%.
-      await spinningPage.pickRecipeUnit(l.firstRecipeUnitSelect, 0);
-      await spinningPage.pickRecipeUnit(l.secondRecipeUnitSelect, 1);
+      // Shares only count once a line has an item. Pick two distinct cotton
+      // or fiber items (form state only — Create order is never pressed),
+      // then drop line 1 from 60% to 50% so the recipe totals 90%.
+      await spinningPage.pickRecipeItem(l.firstRecipeItemSelect, 0);
+      await spinningPage.pickRecipeItem(l.secondRecipeItemSelect, 1);
       await l.firstRecipeShareInput.fill('50');
       await expect(l.sharesTotalText).toHaveText(/Shares total 90%/);
       await expect(l.sharesNot100Message).toBeVisible();
