@@ -66,7 +66,9 @@ export class ValidationRulesPage extends BasePage {
       .poll(
         async () => {
           if (await this.locators.emptyStateTitle.isVisible()) return 'empty';
-          const first = this.locators.dataRows.first().getByRole('cell').first();
+          // The first cell is the row's select checkbox (no text) since the
+          // 2026-10-30 deploy, so look at the row's text as a whole.
+          const first = this.locators.dataRows.first();
           if (!(await first.count())) return 'loading';
           return (await first.innerText()).trim() ? 'rows' : 'loading';
         },
@@ -95,7 +97,7 @@ export class ValidationRulesPage extends BasePage {
 
   async selectTab(tab: 'All' | 'Draft' | 'Suggested' | 'Active'): Promise<void> {
     await this.locators.statusTab(tab).click();
-    await expect(this.locators.statusTab(tab)).toHaveAttribute('aria-pressed', 'true');
+    await expect(this.locators.statusTab(tab)).toHaveAttribute('aria-selected', 'true');
     await this.waitForGridSettled();
   }
 

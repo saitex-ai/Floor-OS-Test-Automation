@@ -79,7 +79,7 @@ export class TechpackPage extends BasePage {
   }
 
   async expectTabSelected(tab: StatusTab): Promise<void> {
-    await expect(this.locators.statusTab(tab)).toHaveAttribute('aria-pressed', 'true');
+    await expect(this.locators.statusTab(tab)).toHaveAttribute('aria-selected', 'true');
   }
 
   /** Reads the live count badge on a status tab, e.g. "Open 11" -> 11. */

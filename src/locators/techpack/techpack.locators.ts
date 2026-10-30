@@ -105,10 +105,10 @@ export class TechpackLocators {
       exact: true,
     });
 
-    this.allTab = this.main.getByRole('button', { name: /^All \d+/ });
-    this.draftTab = this.main.getByRole('button', { name: /^Draft \d+/ });
-    this.openTab = this.main.getByRole('button', { name: /^Open \d+/ });
-    this.approvedTab = this.main.getByRole('button', { name: /^Approved \d+/ });
+    this.allTab = this.main.getByRole('tab', { name: /^All \d+/ });
+    this.draftTab = this.main.getByRole('tab', { name: /^Draft \d+/ });
+    this.openTab = this.main.getByRole('tab', { name: /^Open \d+/ });
+    this.approvedTab = this.main.getByRole('tab', { name: /^Approved \d+/ });
 
     this.searchInput = this.main.getByRole('textbox', { name: 'Search' });
     // "Filters" becomes "Filters (1 applied)" once a filter is applied.
@@ -144,8 +144,10 @@ export class TechpackLocators {
 
     this.viewMenu = page.getByRole('menu', { name: 'View' });
     this.openTechPackButton = this.main.getByRole('button', { name: 'Open Tech Pack' });
-    // Grid View cards: `button "Select <code>-<rev> <name> <code>"`.
-    this.gridViewCards = this.main.getByRole('button', { name: /^Select (TP|DRAFT)/ });
+    // Grid View cards: `button "Select <id> <name> <code>"` since the
+    // 2026-10-30 deploy (the id is a 26-character ULID; the name started
+    // with the code before).
+    this.gridViewCards = this.main.getByRole('button', { name: /^Select [0-9A-Z]{26} / });
 
     // The count ("1") is its own element beside the "item selected" label;
     // their parent (the selection bar) starts "1 item selected".
@@ -258,7 +260,7 @@ export class TechpackLocators {
 
   /** A status tab by its full accessible name, e.g. a translated "Mở 12". */
   statusTabNamed(name: RegExp): Locator {
-    return this.main.getByRole('button', { name });
+    return this.main.getByRole('tab', { name });
   }
 
   statusTab(tab: 'All' | 'Draft' | 'Open' | 'Approved'): Locator {
