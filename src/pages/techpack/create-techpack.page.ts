@@ -61,6 +61,9 @@ const REQUIRED_COMBOBOX_LABELS = [
   'Product Type*',
 ] as const;
 
+/** How long waitForAutosave() gives the form's pending browser saves. */
+const AUTOSAVE_SETTLE_MS = 2_000;
+
 export class CreateTechpackPage extends BasePage {
   readonly locators: CreateTechpackLocators;
 
@@ -427,6 +430,194 @@ export class CreateTechpackPage extends BasePage {
         .catch(() => null),
     ]);
     return outcome ?? 'other';
+  }
+
+  /**
+   * Clicks Create exactly once and returns the `POST /api/techpacks`
+   * response: 201 with the new techpack on a create, 409
+   * `techpack_duplicate` when the identity already exists. The wait starts
+   * with the click, so it can't miss the response or be left dangling.
+   */
+  async createAndReadResponse(): Promise<{ status: number; body: Record<string, unknown> }> {
+    const [response] = await Promise.all([
+      this.page.waitForResponse(
+        (r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/techpacks',
+        { timeout: 45_000 },
+      ),
+      this.create(),
+    ]);
+    return {
+      status: response.status(),
+      body: (await response.json().catch(() => ({}))) as Record<string, unknown>,
+    };
+  }
+
+  /** What a picker's trigger shows: the picked value, or its "Search …" placeholder. */
+  async fieldValue(labelText: string): Promise<string> {
+    return (await this.locators.fieldTrigger(labelText).innerText()).replace(/\s+/g, ' ').trim();
+  }
+
+  /** Closes an open picker with Escape and waits for its listbox to go. */
+  async closePicker(): Promise<void> {
+    await this.page.keyboard.press('Escape');
+    await this.expectListboxClosed();
+  }
+
+  /**
+   * Opens a picker and returns its options' texts (each "name\ncode\nname\nstatus"
+   * since the 2026-10-22 redesign), then closes it. Empty if it has none.
+   */
+  async pickerOptionTexts(labelText: string): Promise<string[]> {
+    await this.locators.fieldTrigger(labelText).click();
+    const options = this.locators.openPickerOptions;
+    await options
+      .first()
+      .waitFor({ state: 'visible', timeout: 20_000 })
+      .catch(() => {});
+    const texts = await options.allInnerTexts();
+    await this.closePicker();
+    return texts;
+  }
+
+  /**
+   * Opens a picker and reports whether its footer offers "Add new value".
+   * Every picker offers "Browse all in table" (asserted here). Closes it after.
+   */
+  async pickerOffersAddNewValue(labelText: string): Promise<boolean> {
+    await this.locators.fieldTrigger(labelText).click();
+    await expect(this.locators.browseAllButton).toBeVisible({ timeout: 20_000 });
+    const offered = await this.locators.addNewValueButton.isVisible();
+    await this.closePicker();
+    return offered;
+  }
+
+  /**
+   * Opens a picker, presses Arrow Down `presses` times, then Enter. Returns
+   * the options as they were listed, so the caller can tell which one the
+   * keyboard should have picked (the first option starts highlighted).
+   */
+  async pickWithKeyboard(labelText: string, presses: number): Promise<string[]> {
+    await this.locators.fieldTrigger(labelText).click();
+    const options = this.locators.openPickerOptions;
+    await options.first().waitFor({ state: 'visible', timeout: 20_000 });
+    const texts = await options.allInnerTexts();
+    for (let i = 0; i < presses; i++) await this.page.keyboard.press('ArrowDown');
+    await this.page.keyboard.press('Enter');
+    await this.expectListboxClosed();
+    return texts;
+  }
+
+  /**
+   * Opens a picker's "Browse all in table", searches the table for the first
+   * row's value in `columnName`, waits until every row left matches, and
+   * clicks the first one. Returns the searched value.
+   */
+  async pickFromBrowseAll(labelText: string, columnName: string): Promise<string> {
+    await this.locators.fieldTrigger(labelText).click();
+    await this.locators.browseAllButton.click();
+    const dialog = this.locators.browseAllDialog;
+    await expect(dialog).toBeVisible({ timeout: 20_000 });
+    const dataRows = this.locators.browseAllDataRows;
+    await expect(dataRows.first()).toBeVisible({ timeout: 20_000 });
+    const headers = (await dialog.getByRole('columnheader').allInnerTexts()).map((h) => h.trim());
+    const column = headers.indexOf(columnName);
+    if (column < 0) throw new Error(`No "${columnName}" column in ${JSON.stringify(headers)}`);
+    const value = (await dataRows.first().getByRole('cell').nth(column).innerText()).trim();
+    await this.locators.browseAllSearchInput.fill(value);
+    await expect
+      .poll(async () => {
+        const texts = await dataRows.allInnerTexts();
+        return texts.length > 0 && texts.every((t) => t.includes(value));
+      })
+      .toBe(true);
+    await dataRows.first().click();
+    await expect(dialog).toBeHidden();
+    return value;
+  }
+
+  /**
+   * Opens a picker's "Add new value" dialog (titled e.g. "Add style"), types
+   * `code` into "Code *", reads back how much of it the box kept, and
+   * cancels — nothing is saved to master data.
+   */
+  async addNewValueCodeKeptLength(
+    labelText: string,
+    dialogTitle: string,
+    code: string,
+  ): Promise<number> {
+    await this.locators.fieldTrigger(labelText).click();
+    await this.locators.addNewValueButton.click();
+    const dialog = this.locators.addValueDialog(dialogTitle);
+    await expect(dialog).toBeVisible({ timeout: 10_000 });
+    const codeBox = dialog.getByRole('textbox', { name: 'Code *' });
+    await codeBox.fill(code);
+    const kept = (await codeBox.inputValue()).length;
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dialog).toBeHidden();
+    await this.closePicker();
+    return kept;
+  }
+
+  /**
+   * In "Add techpack type", checks "Add" is disabled with nothing, Code
+   * only or Name only, and enabled with both; then cancels, so nothing is
+   * saved.
+   */
+  async expectAddTechpackTypeNeedsCodeAndName(code: string, name: string): Promise<void> {
+    await this.locators.fieldTrigger('Techpack Type*').click();
+    await this.locators.addNewValueButton.click();
+    await expect(this.locators.addTechpackTypeDialog).toBeVisible({ timeout: 10_000 });
+    const add = this.locators.addTechpackTypeAddButton;
+    await expect(add).toBeDisabled();
+    await this.locators.addTechpackTypeCodeInput.fill(code);
+    await expect(add).toBeDisabled();
+    await this.locators.addTechpackTypeCodeInput.fill('');
+    await this.locators.addTechpackTypeNameInput.fill(name);
+    await expect(add).toBeDisabled();
+    await this.locators.addTechpackTypeCodeInput.fill(code);
+    await expect(add).toBeEnabled();
+    await this.locators.addTechpackTypeCancelButton.click();
+    await expect(this.locators.addTechpackTypeDialog).toBeHidden();
+    await this.closePicker();
+  }
+
+  async removeAttachedFile(fileName: string): Promise<void> {
+    await this.locators.removeFileButton(fileName).click();
+  }
+
+  /** Sets an Operations row's Active checkbox, Description and Value. */
+  async setOperation(
+    service: string,
+    values: { active?: boolean; description?: string; value?: string },
+  ): Promise<void> {
+    const row = this.locators.operationRow(service);
+    if (values.active !== undefined)
+      await row.getByRole('checkbox', { name: 'Active' }).setChecked(values.active);
+    if (values.description !== undefined)
+      await row.getByRole('textbox', { name: 'Description' }).fill(values.description);
+    if (values.value !== undefined)
+      await row.getByRole('textbox', { name: 'Value' }).fill(values.value);
+  }
+
+  /** Types into an Operations row's Value key by key, as a user would, and returns what the box kept. */
+  async typeOperationValue(service: string, text: string): Promise<string> {
+    const box = this.locators.operationRow(service).getByRole('textbox', { name: 'Value' });
+    await box.fill('');
+    await box.pressSequentially(text);
+    await box.blur();
+    return box.inputValue();
+  }
+
+  /**
+   * The form autosaves to the browser a moment after each change. When a
+   * test fills all 7 fields in a few seconds and creates straight away, a
+   * save still pending from the filling can land after the create has
+   * cleared the form, so the form reopens part-filled (seen on uat
+   * 2026-10-30; at a person's pace, or with this pause, it reopens empty).
+   * Call before create() in a test that checks what the form keeps.
+   */
+  async waitForAutosave(): Promise<void> {
+    await this.page.waitForTimeout(AUTOSAVE_SETTLE_MS);
   }
 
   /** Clicks Cancel and, if the form has unsaved input, confirms "Discard & leave". */
