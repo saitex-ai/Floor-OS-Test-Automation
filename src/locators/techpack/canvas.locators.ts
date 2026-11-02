@@ -39,6 +39,8 @@ export class CanvasLocators {
   readonly uploadsSectionHeader: Locator;
   readonly operationsSectionHeader: Locator;
   readonly operationsTable: Locator;
+  /** Details' own Description box: a textarea (the Operations rows' "Description" boxes are inputs). */
+  readonly detailsDescriptionInput: Locator;
   readonly headersApprovalSummary: Locator;
 
   readonly commentsTabEmptyState: Locator;
@@ -143,6 +145,9 @@ export class CanvasLocators {
       .getByRole('table')
       .filter({ hasText: 'EMBROIDRY' })
       .filter({ hasText: 'WASHTYPE' });
+    this.detailsDescriptionInput = page
+      .getByRole('textbox', { name: 'Description', exact: true })
+      .and(page.locator('textarea'));
     // Matches either shape: "N approved / M pending for approval" when at
     // least one field is still pending, or just "N approved" when every
     // field auto-approved on creation — see canvas-review.md's notes on
@@ -229,6 +234,11 @@ export class CanvasLocators {
   /** Any text on the canvas — a posted comment, a pin note, a toast. */
   text(content: string | RegExp): Locator {
     return this.page.getByText(content);
+  }
+
+  /** One service row of the canvas Operations table, e.g. EMBROIDRY. */
+  operationRow(service: string): Locator {
+    return this.operationsTable.getByRole('row', { name: new RegExp(service) });
   }
 
   fieldRow(label: string): Locator {

@@ -51,6 +51,32 @@ export class CanvasPage extends BasePage {
     return this.locators.fieldRow(label).innerText();
   }
 
+  /** An Operations row as saved: its Description, Value and whether Active is ticked. */
+  async operationValues(
+    service: string,
+  ): Promise<{ description: string; value: string; active: boolean }> {
+    const row = this.locators.operationRow(service);
+    return {
+      description: await row.getByRole('textbox', { name: 'Description' }).inputValue(),
+      value: await row.getByRole('textbox', { name: 'Value' }).inputValue(),
+      active: await row.getByRole('checkbox', { name: 'Active' }).isChecked(),
+    };
+  }
+
+  /** Opens the canvas by id and returns the `GET /api/techpacks/{code}` body it loads. */
+  async gotoCanvasByIdAndReadTechpack(id: string): Promise<Record<string, unknown>> {
+    const [response] = await Promise.all([
+      this.page.waitForResponse(
+        (r) =>
+          r.request().method() === 'GET' &&
+          /^\/api\/techpacks\/TP\d+-\d+$/.test(new URL(r.url()).pathname),
+        { timeout: 45_000 },
+      ),
+      this.gotoCanvasById(id),
+    ]);
+    return (await response.json()) as Record<string, unknown>;
+  }
+
   /** 'Approved' or 'Pending' — read from the field row's own status icon (img alt text). */
   async headerFieldStatus(label: string): Promise<'Approved' | 'Pending'> {
     const approved = await this.locators.fieldRow(label).locator('img[alt="Approved"]').count();

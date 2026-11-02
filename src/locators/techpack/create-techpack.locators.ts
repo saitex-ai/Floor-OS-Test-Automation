@@ -87,6 +87,7 @@ export class CreateTechpackLocators {
   readonly addTechpackTypeCodeInput: Locator;
   readonly addTechpackTypeNameInput: Locator;
   readonly addTechpackTypeAddButton: Locator;
+  readonly addTechpackTypeCancelButton: Locator;
 
   // The raw, unformatted AJV/JSON-Schema validation error this bug
   // eventually surfaces at "Create techpack" once the over-length value
@@ -96,6 +97,22 @@ export class CreateTechpackLocators {
   // `[{"instancePath":"/techpackTypeCode",...,"keyword":"maxLength",...}]`.
   readonly rawJsonErrorToast: Locator;
   readonly noTechpackTypesMatchText: Locator;
+
+  /** Footer note shown until the techpack PDF is attached ("7 of 7 fields filled · techpack document needed"). */
+  readonly techpackDocumentNeededText: Locator;
+  /** An open picker's footer actions, beside "Add new value". */
+  readonly browseAllButton: Locator;
+  /**
+   * The "Select <Field> (N of N)" table picker that "Browse all in table"
+   * opens: a search box over a table (#, code, description, id, …); clicking
+   * a row picks it.
+   */
+  readonly browseAllDialog: Locator;
+  /** The Browse-all table's data rows (the header row has no cells). */
+  readonly browseAllDataRows: Locator;
+  readonly browseAllSearchInput: Locator;
+  /** Options of the most recently opened picker. */
+  readonly openPickerOptions: Locator;
 
   constructor(private readonly page: Page) {
     this.landingHeading = page.getByRole('heading', { name: 'Dashboard', level: 1 });
@@ -160,14 +177,26 @@ export class CreateTechpackLocators {
       name: 'Name *',
     });
     this.addTechpackTypeAddButton = this.addTechpackTypeDialog.getByRole('button', { name: 'Add' });
+    this.addTechpackTypeCancelButton = this.addTechpackTypeDialog.getByRole('button', {
+      name: 'Cancel',
+    });
 
     this.noTechpackTypesMatchText = page.getByText('No techpack types match.');
+    this.techpackDocumentNeededText = page.getByText('techpack document needed');
+    this.browseAllButton = page.getByRole('button', { name: 'Browse all in table' });
+    this.browseAllDialog = page.getByRole('dialog').filter({
+      has: page.getByRole('heading', { name: /^Select / }),
+    });
+    this.browseAllDataRows = this.browseAllDialog
+      .getByRole('row')
+      .filter({ has: page.getByRole('cell') });
+    this.browseAllSearchInput = this.browseAllDialog.getByRole('textbox').first();
+    this.openPickerOptions = page.getByRole('listbox').last().getByRole('option');
     this.rawJsonErrorToast = page
       .locator('[data-sonner-toast]')
       .filter({ hasText: 'instancePath' });
   }
 
-  /** Locates a field's trigger button by walking up from its (unlinked) label text. */
   /** A combobox option whose accessible name matches, in the open listbox. */
   comboboxOption(name: RegExp): Locator {
     return this.page.getByRole('option', { name });
@@ -178,7 +207,28 @@ export class CreateTechpackLocators {
     return this.page.getByText(content);
   }
 
+  /** Locates a field's trigger button by walking up from its (unlinked) label text. */
   fieldTrigger(labelText: string): Locator {
     return this.page.getByText(labelText, { exact: true }).locator('xpath=..').getByRole('button');
+  }
+
+  /** The "Remove <file name>" button beside an attached file. */
+  removeFileButton(fileName: string): Locator {
+    return this.page.getByRole('button', { name: `Remove ${fileName}`, exact: true });
+  }
+
+  /**
+   * An "Add new value" dialog by its own title, e.g. "Add style", "Add
+   * fabric", "Add wash", "Add product type". Style, Fabric, Wash and Product
+   * Type share one layout: "Code *" (maxlength 20) and an optional
+   * "Description". Techpack Type has its own (see addTechpackTypeDialog).
+   */
+  addValueDialog(title: string): Locator {
+    return this.page.getByRole('dialog', { name: title });
+  }
+
+  /** One service row of the form's Operations table (EMBROIDRY, PRINTING, EMBOSSING, WASHTYPE). */
+  operationRow(service: string): Locator {
+    return this.operationsTable.getByRole('row', { name: new RegExp(service) });
   }
 }
