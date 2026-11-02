@@ -795,8 +795,10 @@ test.describe('Techpack - New Techpack (AI Mode)', () => {
     test('TC:22 Verify the chat can be reopened from "Ask FloorOS AI" after a reload', async () => {
       const l = ai.locators;
       await page.goto(chatUrl);
-      await expect(l.heading).toBeVisible({ timeout: 60_000 });
-      await expect(l.reviewCard).toHaveCount(0);
+      await expect(l.reviewCard.or(l.emptyDropzoneText)).toBeVisible({ timeout: 60_000 });
+      // Open question, not an assertion: if ?cid= starts restoring the chat,
+      // the card is back and there is nothing left to reopen.
+      if (await l.reviewCard.isVisible()) return;
       openQuestion('Reloading the ?cid= URL shows the empty landing, not the chat');
 
       await l.askFloorOsAiButton.click();

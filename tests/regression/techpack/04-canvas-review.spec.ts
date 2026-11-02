@@ -320,8 +320,9 @@ test.describe('Techpack - Canvas Review (AI Mode)', () => {
   // pattern even when unused, hence the disable below.
   // eslint-disable-next-line no-empty-pattern
   test.beforeEach(async ({}, testInfo) => {
-    // Generate, Create draft and extraction to READY take up to ~7 minutes.
-    testInfo.setTimeout(600_000);
+    // Generate, Create draft and extraction to READY take up to ~7 minutes,
+    // then the canvas's own file extraction up to 5 more.
+    testInfo.setTimeout(900_000);
     await allure.epic('Techpack');
     await allure.feature('Canvas Review');
     await allure.owner('Techpack QA');
@@ -360,9 +361,9 @@ test.describe('Techpack - Canvas Review (AI Mode)', () => {
     // sometimes unreliable (a pre-existing "Create draft" backend
     // flakiness, already documented for ai-mode.spec.ts's TC:7 — not a new
     // problem introduced here).
-    // An AI-created draft's canvas (no "Techpack Details" tab, unlike a Classic
-    // one) can take well over the default to settle, so wait on the button itself.
-    await expect(canvasPage.locators.reExtractButton).toBeVisible({ timeout: 60_000 });
+    // The draft's READY isn't the end of extraction: the canvas shows
+    // "Extracting…" until the file's own callout extraction finishes.
+    await canvasPage.waitForExtraction();
     await expect(canvasPage.locators.askAboutTechpackButton).toBeVisible();
   });
 });
