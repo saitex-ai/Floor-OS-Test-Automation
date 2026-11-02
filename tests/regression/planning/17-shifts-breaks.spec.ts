@@ -115,6 +115,10 @@ test.describe('Planning - Shifts & Breaks', () => {
     const list = new ShiftsListPage(page);
     await list.open();
     await list.expectLoaded();
+    // The tabs that do exist are found first, so the expected failure is the
+    // missing Overtime tab itself, never the tab lookup.
+    await list.expectTabs(['All', 'Standard', 'Night']);
+    await list.expectTabs(['Overtime']);
     // Re-read together: other tests in this file create shifts meanwhile.
     await list.expectTabCountsAddUp(['Standard', 'Overtime', 'Night']);
   });

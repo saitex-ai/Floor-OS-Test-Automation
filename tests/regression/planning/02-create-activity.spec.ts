@@ -100,7 +100,7 @@ test.describe('Planning - Create Activity', () => {
     });
   });
 
-  test('TC-CA-03 Code must be unique among active activities', async ({
+  test('TC-CA-03 Code is generated and locked, so each activity gets its own code', async ({
     page,
     activitiesListPage,
     activityFormPage,
@@ -283,7 +283,7 @@ test.describe('Planning - Create Activity', () => {
     }
   });
 
-  test('TC-CA-12 Code uniqueness check is case-insensitive', async ({
+  test("TC-CA-12 Generated code is upper case and can't be typed", async ({
     page,
     activitiesListPage,
     activityFormPage,

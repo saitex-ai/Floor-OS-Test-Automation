@@ -304,6 +304,12 @@ export abstract class MasterDataListPage extends BasePage {
     return Number(match[1]);
   }
 
+  /** Each named tab is above the grid. */
+  async expectTabs(names: string[]): Promise<void> {
+    for (const name of names)
+      await expect(this.grid.tab(name), `"${name}" tab`).toBeVisible({ timeout: WAIT.SERVER });
+  }
+
   async selectTab(name: string): Promise<void> {
     const tab = this.grid.tab(name);
     await tab.click();
