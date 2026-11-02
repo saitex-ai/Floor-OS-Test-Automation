@@ -64,38 +64,47 @@ test.describe('CRM - Customer Creation Screen', () => {
     });
   });
 
-  test('TC:2 Verify mandatory field validation across Profile and Management sections', async ({
+  test('TC:2 Verify Only Customer Name Is Mandatory on the Customer Creation Screen', async ({
     createCustomerPage,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abt7af', 'TC:2 (ClickUp)');
+    // Only Customer Name is mandatory — QA decision recorded on the test case:
+    // https://app.clickup.com/t/z941abt7af?comment=1100750000251304
     await createCustomerPage.openFromCrmHome();
 
     await test.step('Leave mandatory fields empty and click Save', async () => {
       await createCustomerPage.save();
     });
 
-    await test.step('Save is blocked with inline "Required" errors', async () => {
-      await expect(createCustomerPage.locators.saveButton).toBeVisible();
-      await createCustomerPage.expectFieldError(/required/i);
+    await test.step('Save is blocked: only Customer Name is flagged "Required"', async () => {
+      await createCustomerPage.expectOnlyCustomerNameRequired();
     });
   });
 
-  test('TC:3 Verify conditionally mandatory field validation at save time', async ({
+  test('TC:3 Verify Referred By Shows Only for Origin Type Referral and Is Optional', async ({
     createCustomerPage,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abt7ag', 'TC:3 (ClickUp)');
+    // Referred By is optional and shown for Referral only; only Customer Name
+    // is mandatory — QA decision recorded on the test case:
+    // https://app.clickup.com/t/z941abt7ag?comment=1100750000251305
+    const l = createCustomerPage.locators;
     await createCustomerPage.openFromCrmHome();
 
-    await test.step('Set Origin Type = Referral, leave "Referred By" blank', async () => {
-      await createCustomerPage.fillProfile({ originType: 'Referral' });
+    await test.step('Referred By is hidden until Origin Type = Referral', async () => {
+      await expect(l.referredByInput).toHaveCount(0);
+      await createCustomerPage.fillProfile({
+        name: `Playwright Referral Optional ${Date.now()}`,
+        originType: 'Referral',
+        origin: 'Internal Referral',
+        skipCompany: true,
+      });
+      await expect(l.referredByInput).toBeVisible();
     });
 
-    await test.step('Click Save', async () => {
+    await test.step('Saving with Referred By left blank creates the Customer', async () => {
       await createCustomerPage.save();
-    });
-
-    await test.step('Save is blocked: "Referred By" is required for this Origin Type', async () => {
-      await createCustomerPage.expectFieldError(/required/i);
+      await createCustomerPage.expectSavedSuccessfully();
     });
   });
 

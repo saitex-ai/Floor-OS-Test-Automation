@@ -13,14 +13,12 @@ import { type Locator, type Page } from '@playwright/test';
  * list), not fillable text inputs. "Referred By" is a text field that
  * only appears once Origin Type is set to "Referral".
  *
- * Confirmed directly (2026-10-01): dev's Management section also carries
- * a required "Company" combobox that does NOT exist on local at all —
- * saving without it on dev doesn't reach the duplicate-detection check or
- * a real save at all; it blocks on its own "Missing mandatory fields"
- * confirm-anyway dialog first. `CreateCustomerPage.fillProfile()` fills
- * it automatically (first available option) whenever it's present, so
- * every caller behaves the same on local and dev without needing to know
- * about this difference.
+ * Dev's Management section also carries a "Company" combobox that does
+ * NOT exist on local. It is optional: only Customer Name is mandatory on
+ * Create Customer (QA decision 2026-10-29, recorded on ClickUp
+ * z941abx7dk and 86eyqvatv). `CreateCustomerPage.fillProfile()` still
+ * picks the first Company by default whenever the field is present, and
+ * `skipCompany` leaves it empty.
  */
 export class CreateCustomerLocators {
   // Customers list entry point
@@ -102,10 +100,8 @@ export class CreateCustomerLocators {
     this.facebookInput = page.getByLabel('Facebook');
     this.instagramInput = page.getByLabel('Instagram');
 
-    // Confirmed directly (2026-10-01): a required "Company" combobox that
-    // exists on dev but NOT on local — a dev-only field this app adds to
-    // the Management section. See CreateCustomerPage.fillProfile()'s
-    // handling of it.
+    // The optional "Company" combobox, on dev but NOT on local — a dev-only
+    // field in the Management section. See CreateCustomerPage.fillProfile().
     this.companyCombobox = page.getByRole('combobox', { name: 'Company', exact: true });
     // Confirmed directly (2026-10-15, dev): Company is a MULTI-select —
     // its trigger opens a `dialog` popup holding a "Search companies…"
