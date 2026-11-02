@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as allure from 'allure-js-commons';
 import { test, expect } from '../../../src/fixtures/techpack.fixtures';
+import { QA_AUTO_TEXT, uniqueTechpackPdf } from './support/ai-mode-files';
 
 /**
  * Techpack — Canvas Review (the screen landed on right after creating a techpack).
@@ -319,7 +320,8 @@ test.describe('Techpack - Canvas Review (AI Mode)', () => {
   // pattern even when unused, hence the disable below.
   // eslint-disable-next-line no-empty-pattern
   test.beforeEach(async ({}, testInfo) => {
-    testInfo.setTimeout(300_000);
+    // Generate, Create draft and extraction to READY take up to ~7 minutes.
+    testInfo.setTimeout(600_000);
     await allure.epic('Techpack');
     await allure.feature('Canvas Review');
     await allure.owner('Techpack QA');
@@ -331,32 +333,23 @@ test.describe('Techpack - Canvas Review (AI Mode)', () => {
     page,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abx71b', 'TC:16 bug (ClickUp)');
-    await aiModeCopilotPage.openFromTechpacksList();
-    // The real Country Road sign-off PDF the user supplied — the same file
-    // AI Mode TC:8 uses. sample-techpack.pdf goes down the "items aren't in
-    // master data yet → pick existing" path, where Create draft still fails.
-    await aiModeCopilotPage.uploadFile({
-      name: 'wpa-60323517-sign-off.pdf',
-      mimeType: 'application/pdf',
-      buffer: fs.readFileSync(path.join(__dirname, 'fixtures', 'wpa-60323517-sign-off.pdf')),
-    });
-    // Upload no longer auto-starts extraction (AI Mode redesign, 2026-09-29).
-    await aiModeCopilotPage.startExtraction();
-
-    const outcome = await aiModeCopilotPage.waitForExtractionOutcome();
-    expect(outcome, 'AI Mode extraction should reach the field-picking panel').toBe('ready');
-
-    await aiModeCopilotPage.waitForPickAValueForm();
-    await aiModeCopilotPage.fillAllRequiredWithRandomAvailable();
-    const startUrl = page.url();
-    const result = await aiModeCopilotPage.createDraftExpectingResult();
-    expect(['created', 'file-exists', 'draft-with-warning']).toContain(result);
-    if (result === 'file-exists') {
-      await aiModeCopilotPage.locators.openExistingFileLink.click();
-    } else if (result === 'draft-with-warning') {
-      await aiModeCopilotPage.locators.openTechpackLink.click();
-    }
-    await page.waitForURL((url) => url.toString() !== startUrl, { timeout: 30_000 });
+    // Since the 2026-10-22 redesign: attach a PDF AI Mode hasn't seen,
+    // Generate, fill the Review details card and Create draft, then open the
+    // draft from the chat's "Open Techpack" link.
+    await aiModeCopilotPage.open();
+    await aiModeCopilotPage.attach(uniqueTechpackPdf('canvas-tc16'));
+    await aiModeCopilotPage.generate(`Create a tech pack from the attached file. ${QA_AUTO_TEXT}`);
+    await aiModeCopilotPage.waitForReviewCard();
+    await aiModeCopilotPage.fillEmptyRequiredFields();
+    expect(await aiModeCopilotPage.createDraft()).toBe('created');
+    // "Re-extract" shows once extraction has finished ("Extracting…" until then).
+    expect(await aiModeCopilotPage.waitForDraftDone(), "the draft's extraction status").toBe(
+      'READY',
+    );
+    await aiModeCopilotPage.locators.openTechpackLink.click();
+    await expect(page).toHaveURL(/\/techpacks\/view\/[^/?#]+/, { timeout: 30_000 });
+    // "Open Techpack" opens the view; the same id opens the canvas.
+    await canvasPage.gotoCanvasById(page.url().match(/\/techpacks\/view\/([^/?#]+)/)![1]!);
 
     // Confirmed live 2026-09-10 by reading an existing AI-created record's
     // toolbar (Creator "copilot"): these two actions ARE genuinely
