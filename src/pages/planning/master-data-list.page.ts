@@ -305,7 +305,9 @@ export abstract class MasterDataListPage extends BasePage {
   }
 
   async selectTab(name: string): Promise<void> {
-    await this.grid.tab(name).click();
+    const tab = this.grid.tab(name);
+    await tab.click();
+    await expect(tab).toHaveAttribute('aria-selected', 'true');
   }
 
   /**

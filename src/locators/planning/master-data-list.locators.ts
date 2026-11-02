@@ -78,10 +78,14 @@ export class MasterDataListLocators {
     return this.page.getByRole('button', { name });
   }
 
-  /** Status/department tabs above the grid, e.g. "All 101", "Production 58". */
-  /** A tab: its label, then its count ("All 377"); not the page's "All masters" back link. */
+  /**
+   * A status/department tab above the grid: its label, then its count ("All
+   * 377", "Production 58"); not the page's "All masters" back link. Tabs
+   * (`role="tab"`, the selected one `aria-selected`) since dev's 2026-10-30
+   * deploy; they were buttons before.
+   */
   tab(name: string): Locator {
-    return this.page.getByRole('button', { name: new RegExp(`^${escapeRegExp(name)}( \\d+)?$`) });
+    return this.page.getByRole('tab', { name: new RegExp(`^${escapeRegExp(name)}( \\d+)?$`) });
   }
 
   /**
