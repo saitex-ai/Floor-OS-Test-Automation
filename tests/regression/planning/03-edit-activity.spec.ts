@@ -10,8 +10,9 @@ import {
   personaCredentials,
   personaSkipReason,
   setupPage,
+  nameOf,
   taggedName,
-  uniqueCode,
+  uniqueTag,
 } from './support/test-data';
 import { cleanUpAfterAll } from './support/cleanup';
 
@@ -76,7 +77,7 @@ test.describe('Planning - Edit Activity', () => {
     activityFormPage,
   }) => {
     await allure.tms(cu('z941abtdur'), 'TC-EA-03 (ClickUp)');
-    const renamed = `${taggedName(code)} (edited)`;
+    const renamed = `${nameOf(code)} (edited)`;
     await openActivity(page, code);
     await activityFormPage.startEditing();
     await activityFormPage.fill({ name: renamed, standardTime: '75' });
@@ -130,15 +131,16 @@ test.describe('Planning - Edit Activity', () => {
     test.skip(!probe.some((o) => o.startsWith(CYCLE_PROBE)), CYCLE_SKIP);
     knownBug('z941abu4ac');
     const a = await createActivityDraft(page);
-    const b = uniqueCode('CUT-QA');
+    const bTag = uniqueTag('CUT-QA');
     await activitiesListPage.open();
     await activitiesListPage.expectLoaded();
     await activitiesListPage.openNew();
     const offered = await activityFormPage.predecessorOptions(a);
     test.skip(!offered.some((o) => o.startsWith(a)), `Draft ${a} isn't offered as a predecessor.`);
-    await activityFormPage.fillAllRequired(b, taggedName(b));
+    await activityFormPage.fillAllRequired(taggedName(bTag));
     await activityFormPage.addPredecessorRule(a);
     expect(await activityFormPage.create()).toBe('submitted');
+    const b = await activitiesListPage.codeOf(bTag);
 
     await openActivity(page, a);
     await activityFormPage.startEditing();

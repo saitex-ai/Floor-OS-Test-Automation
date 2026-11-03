@@ -13,6 +13,8 @@ import {
   setupPage,
   trackCode,
   uniqueTag,
+  parentCalendars,
+  setParent,
 } from './support/test-data';
 import { cleanUpAfterAll } from './support/cleanup';
 
@@ -126,17 +128,24 @@ test.describe('Planning - Calendars', () => {
     calendarDetailPage,
   }) => {
     await allure.tms(cu('z941abvf6k'), 'TC-CC-05 (ClickUp)');
-    const child = await createCalendar(page, { inheritsFrom: cal });
-    await calendarDetailPage.expectValue('Inherits from', cal);
+    // A parent must be one "Inherits from" offers: see parentCalendars() (the
+    // picker lists only the first 200 calendars; graded a pass, 2026-10-29).
+    const [parent] = await parentCalendars(page, 1);
+    const child = await createCalendar(page, { inheritsFrom: parent });
+    await calendarDetailPage.expectValue('Inherits from', parent!);
+    // `cal` was created with Inherits from left blank.
     await openCalendar(page, cal);
     await calendarDetailPage.expectValue('Inherits from', 'Nothing — top level');
-    expect(child).not.toBe(cal);
+    expect(child).not.toBe(parent);
   });
 
   test('TC-CC-06 Self-reference and loops are rejected', async ({ page, calendarFormPage }) => {
     await allure.tms(cu('z941abvf6n'), 'TC-CC-06 (ClickUp)');
-    const parent = await createCalendar(page);
-    const child = await createCalendar(page, { inheritsFrom: parent });
+    // A parent must be one "Inherits from" offers: see parentCalendars() (the
+    // picker lists only the first 200 calendars; graded a pass, 2026-10-29).
+    const [parent, child] = (await parentCalendars(page, 2, 0)) as [string, string];
+    await setParent(page, parent);
+    await setParent(page, child, parent);
     await calendarFormPage.openEdit(parent);
     await test.step('A calendar is never offered as its own parent', async () => {
       const options = await calendarFormPage.optionsOf('inheritsFrom');
@@ -156,16 +165,27 @@ test.describe('Planning - Calendars', () => {
     calendarDetailPage,
   }) => {
     await allure.tms(cu('z941abvf6t'), 'TC-CC-07 (ClickUp)');
+    // A parent must be one "Inherits from" offers: see parentCalendars() (the
+    // picker lists only the first 200 calendars; graded a pass, 2026-10-29).
+    // The parent's own time zone is read first: an offered parent may be on either.
+    const [parent] = (await parentCalendars(page, 1)) as [string];
+    await openCalendar(page, parent);
+    const parentZone = await calendarDetailPage.value('Time zone');
+    const otherZone = parentZone === 'Europe/London' ? 'Asia/Ho_Chi_Minh' : 'Europe/London';
     const tag = uniqueTag('QA-CAL');
     await calendarFormPage.open();
-    await calendarFormPage.fill({ name: `QA-AUTO ${tag} tz`, inheritsFrom: cal });
+    await calendarFormPage.fill({
+      name: `QA-AUTO ${tag} tz`,
+      inheritsFrom: parent,
+      timeZone: parentZone,
+    });
     await calendarFormPage.expectTimeZoneWarning(false);
-    await calendarFormPage.fill({ timeZone: 'Europe/London' });
+    await calendarFormPage.fill({ timeZone: otherZone });
     await calendarFormPage.expectTimeZoneWarning(true);
     expect(await calendarFormPage.submitCreate()).toBe('submitted');
     const code = await calendarDetailPage.createdCode();
     trackCode('QA-CAL', code);
-    await calendarDetailPage.expectValue('Time zone', 'Europe/London');
+    await calendarDetailPage.expectValue('Time zone', otherZone);
     expect(page.url()).toContain(code);
   });
 
@@ -222,7 +242,9 @@ test.describe('Planning - Calendars', () => {
     calendarFormPage,
   }) => {
     await allure.tms(cu('z941abvf72'), 'TC-EC-02 (ClickUp)');
-    const parent = await createCalendar(page);
+    // A parent must be one "Inherits from" offers: see parentCalendars() (the
+    // picker lists only the first 200 calendars; graded a pass, 2026-10-29).
+    const [parent] = (await parentCalendars(page, 1)) as [string];
     const code = await createCalendar(page);
     await calendarFormPage.openEdit(code);
     await test.step('The save notice says the edit rewrites the calendar; no Version field', async () => {
@@ -269,8 +291,12 @@ test.describe('Planning - Calendars', () => {
 
   test('TC-EC-04 A loop is refused on Save changes too', async ({ page, calendarFormPage }) => {
     await allure.tms(cu('z941abvf75'), 'TC-EC-04 (ClickUp)');
-    const b = await createCalendar(page);
-    const a = await createCalendar(page, { inheritsFrom: b });
+    // A parent must be one "Inherits from" offers: see parentCalendars() (the
+    // picker lists only the first 200 calendars; graded a pass, 2026-10-29).
+    // A pair of its own, apart from TC-CC-06's, so parallel workers don't share one.
+    const [b, a] = (await parentCalendars(page, 2, 2)) as [string, string];
+    await setParent(page, b);
+    await setParent(page, a, b);
     await calendarFormPage.openEdit(b);
     await calendarFormPage.fill({ inheritsFrom: a });
     await calendarFormPage.saveExpectingToast(`That parent would create a loop: ${b} -> ${a}`);
@@ -343,8 +369,9 @@ test.describe('Planning - Calendars', () => {
       await calendarsListPage.expectRowVisible(cal);
     });
     await test.step('By scope', async () => {
-      await calendarsListPage.search('shift');
-      await calendarsListPage.expectRowVisible(shiftCal);
+      // Over a page of QA-AUTO Shift calendars by now (41, 2026-10-29), and a new
+      // one reaches the scope search a little after it's created.
+      await calendarsListPage.expectSearchFinds('shift', shiftCal);
     });
   });
 
@@ -436,7 +463,7 @@ test.describe('Planning - Calendars', () => {
     await allure.tms(cu('z941abvf7w'), 'TC-CCE-01 (ClickUp)');
     await openCalendar(page, cal);
     await calendarDetailPage.openNewEntry();
-    await calendarDetailPage.expectFormOpen('New', 'calendar entry', cal);
+    await calendarDetailPage.expectFormOpen('New', 'calendar entry');
   });
 
   test('TC-CCE-02 Date is required; Why is optional', async ({ page, calendarDetailPage }) => {
@@ -459,6 +486,8 @@ test.describe('Planning - Calendars', () => {
     expect(code).toBeTruthy();
   });
 
+  // Since the 2026-10-28 dev deploy the refusal is the row's own message:
+  // "This calendar already has an entry for that date." (was a toast naming it).
   test('TC-CCE-03 Only one entry per date in a calendar', async ({ page, calendarDetailPage }) => {
     await allure.tms(cu('z941abvf7z'), 'TC-CCE-03 (ClickUp)');
     await openCalendar(page, cal);
@@ -466,7 +495,7 @@ test.describe('Planning - Calendars', () => {
     await calendarDetailPage.fillEntry({ day: 20, why: 'QA-AUTO duplicate date' });
     await calendarDetailPage.submitExpectingToast(
       'entry',
-      new RegExp(`Calendar "${cal}" already has an entry for`),
+      new RegExp(`(Calendar "${cal}"|This calendar) already has an entry for`),
     );
   });
 
@@ -510,7 +539,7 @@ test.describe('Planning - Calendars', () => {
     await calendarDetailPage.openNewEntry();
     await calendarDetailPage.fillEntry({ day: 22, dayType: 'Shutdown', why: 'QA-AUTO cancelled' });
     await calendarDetailPage.cancelForm();
-    await page.reload();
+    await calendarDetailPage.finishEditing();
     await calendarDetailPage.expectLoaded(cal);
     await calendarDetailPage.expectEntryRow(ENTRY);
     await calendarDetailPage.expectNoEntryRow('QA-AUTO cancelled');
@@ -545,7 +574,7 @@ test.describe('Planning - Calendars', () => {
     await allure.tms(cu('z941abvf8a'), 'TC-ECE-01 (ClickUp)');
     await openCalendar(page, cal);
     await calendarDetailPage.openEntryEdit(ENTRY);
-    await calendarDetailPage.expectFormOpen('Edit', 'calendar entry', cal);
+    await calendarDetailPage.expectFormOpen('Edit', 'calendar entry');
   });
 
   test('TC-ECE-02 Day type and Why persist after Save changes', async ({
@@ -560,7 +589,7 @@ test.describe('Planning - Calendars', () => {
     await calendarDetailPage.openEntryEdit('QA-AUTO before edit');
     await calendarDetailPage.fillEntry({ dayType: 'Half day', why: 'QA-AUTO after edit' });
     expect(await calendarDetailPage.saveChanges()).toBe('submitted');
-    await page.reload();
+    await calendarDetailPage.finishEditing();
     await calendarDetailPage.expectEntryRow('QA-AUTO after edit', { type: 'Half day' });
     await calendarDetailPage.expectNoEntryRow('QA-AUTO before edit');
   });
@@ -583,7 +612,7 @@ test.describe('Planning - Calendars', () => {
     await calendarDetailPage.fillEntry({ day: 17 });
     await calendarDetailPage.submitExpectingToast(
       'save',
-      new RegExp(`Calendar "${code}" already has an entry for`),
+      new RegExp(`(Calendar "${code}"|This calendar) already has an entry for`),
     );
   });
 
@@ -607,7 +636,7 @@ test.describe('Planning - Calendars', () => {
     await calendarDetailPage.openEntryEdit(ENTRY);
     await calendarDetailPage.fillEntry({ dayType: 'Working', why: 'QA-AUTO SHOULD NOT PERSIST' });
     await calendarDetailPage.cancelForm();
-    await page.reload();
+    await calendarDetailPage.finishEditing();
     await calendarDetailPage.expectLoaded(cal);
     await calendarDetailPage.expectEntryRow(ENTRY, { type: 'Holiday' });
   });

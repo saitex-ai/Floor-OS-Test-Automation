@@ -384,7 +384,9 @@ export class SetupDepartmentPage extends BasePage {
   /** Fills and submits the already-open inline recipe form. */
   async submitRecipe(name: string): Promise<string> {
     await this.recipe.name.fill(name);
-    expect(await submitForm(this.recipe.createButton), `create recipe ${name}`).toBe('submitted');
+    expect(await submitForm(this.locators.submitRecipeButton), `create recipe ${name}`).toBe(
+      'submitted',
+    );
     return this.cardCode(name);
   }
 
@@ -450,10 +452,10 @@ export class SetupDepartmentPage extends BasePage {
     await this.machineForm.setMachineType(machineType);
     await this.pick(this.machine.status, /^Active$/);
     await this.machineForm.addSystemLink('QA-AUTO', tag);
-    expect(await submitForm(this.machine.createButton), `create machine on ${centre}`).toBe(
+    expect(await submitForm(this.locators.submitMachineButton), `create machine on ${centre}`).toBe(
       'submitted',
     );
-    await expect(this.machine.createButton).toBeHidden({ timeout: WAIT.SERVER });
+    await expect(this.locators.submitMachineButton).toBeHidden({ timeout: WAIT.SERVER });
     // A machine has no name: its code is the only one in its new centre's machines section.
     await this.showMachines(centre);
     const code = this.locators.machinesSection(centre).getByText(CODE_TEXT).first();

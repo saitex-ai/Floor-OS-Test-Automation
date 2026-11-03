@@ -4,7 +4,6 @@ import { OperationsListPage } from '../../../src/pages/planning/operations-list.
 import { OperationDetailPage } from '../../../src/pages/planning/operation-detail.page';
 import {
   OPERATION_REQUIRED,
-  OperationMasterFormPage,
   type OperationMasterValues,
 } from '../../../src/pages/planning/operation-master-form.page';
 import {
@@ -15,9 +14,10 @@ import {
   openOperation,
   personaCredentials,
   personaSkipReason,
+  nameOf,
   setupPage,
   taggedName,
-  uniqueCode,
+  uniqueTag,
 } from './support/test-data';
 import { cleanUpAfterAll } from './support/cleanup';
 
@@ -27,7 +27,8 @@ import { cleanUpAfterAll } from './support/cleanup';
  *
  * Source of truth for these cases: test-cases/planning/operations.md
  * (ClickUp "Planning -Sprint -2 - Operations and Allowance"). Operations
- * are only ever created by this file (QA-AUTO tagged, code prefix QA-OP),
+ * are only ever created by this file (QA-AUTO tagged, a QA-OP… tag in the
+ * name; dev generates the code, OP-0001…, since the 2026-10-16 deploy),
  * never a seed operation beyond reading it. They can't be deleted, only
  * retired.
  *
@@ -49,33 +50,11 @@ test.describe('Planning - Operations', () => {
     // Builds this file's QA-AUTO fixtures through the UI (each create ~10–20 s on dev).
     test.setTimeout(300_000);
     const page = await setupPage(browser);
-    const form = new OperationMasterFormPage(page);
-    op = uniqueCode('QA-OP');
-    await form.open();
-    await form.fill({
-      code: op,
-      name: taggedName(op),
-      department: /^Sewing$/,
-      grade: OFF_MACHINE_GRADE,
-      skillGrade: /^S3/,
-      defaultSam: '1.1',
+    op = await createOperation(page, {}, (form) => form.addParameter('seam_cm', '12.5'));
+    studied = await createOperation(page, {}, async (form) => {
+      await form.setMotionStudy(true);
+      await form.pickLastStudiedOnToday();
     });
-    await form.addParameter('seam_cm', '12.5');
-    expect(await form.create(), `create operation ${op}`).toBe('submitted');
-
-    studied = uniqueCode('QA-OP');
-    await form.open();
-    await form.fill({
-      code: studied,
-      name: taggedName(studied),
-      department: /^Sewing$/,
-      grade: OFF_MACHINE_GRADE,
-      skillGrade: /^S3/,
-      defaultSam: '1.1',
-    });
-    await form.setMotionStudy(true);
-    await form.pickLastStudiedOnToday();
-    expect(await form.create(), `create studied operation ${studied}`).toBe('submitted');
     await page.close();
   });
 
@@ -109,14 +88,17 @@ test.describe('Planning - Operations', () => {
     // can't be left empty. Each other field is left empty on an otherwise
     // complete form (off-machine grade, so Machine type isn't needed).
     // Minimum skill grade has no asterisk and isn't required (the user,
-    // 2026-10-12): leaving it empty saves.
+    // 2026-10-12): leaving it empty saves. The code is generated on save
+    // since the 2026-10-16 dev deploy, so it isn't required any more.
     test.setTimeout(300_000);
+    await test.step('The code is generated, not required', async () => {
+      await operationMasterFormPage.open();
+      await operationMasterFormPage.expectCodeGenerated();
+    });
     for (const field of OPERATION_REQUIRED) {
       await test.step(`Empty ${field} blocks Create`, async () => {
-        const code = uniqueCode('QA-OP');
         const values: OperationMasterValues = {
-          code,
-          name: taggedName(code),
+          name: taggedName(uniqueTag('QA-OP')),
           department: /^Sewing$/,
           grade: OFF_MACHINE_GRADE,
           skillGrade: /^S3/,
@@ -129,11 +111,9 @@ test.describe('Planning - Operations', () => {
       });
     }
     await test.step('Empty Minimum skill grade (no asterisk) still saves', async () => {
-      const code = uniqueCode('QA-OP');
       await operationMasterFormPage.open();
       await operationMasterFormPage.fill({
-        code,
-        name: taggedName(code),
+        name: taggedName(uniqueTag('QA-OP')),
         department: /^Sewing$/,
         grade: OFF_MACHINE_GRADE,
       });
@@ -142,42 +122,20 @@ test.describe('Planning - Operations', () => {
   });
 
   test('TC-CO-03 Operation code must be unique, case-insensitively', async ({
+    page,
     operationMasterFormPage,
-    operationsListPage,
   }) => {
     await allure.tms(cu('z941abv8mx'), 'TC-CO-03 (ClickUp)');
-    // ClickUp status fail (2026-09-16), never filed: dev's message was the
-    // generic "This code is already taken"; the prototype names the colliding
-    // operation ("Already used by <name> — operation code must be unique").
-    // On dev 2026-10-12 the message names it, so this passes.
+    // Dev 2026-10-16: the code is generated on save (OP-0001…) and can't be
+    // typed, so a duplicate (in any case) can't be entered, and there is no
+    // "Already used by …" message left to check. Checks what replaces the
+    // rule: the code field is locked and each new operation gets its own
+    // upper-case code.
     await operationMasterFormPage.open();
-    await operationMasterFormPage.fill({
-      code: op.toLowerCase(),
-      name: taggedName(`${op}-DUP`),
-      department: /^Sewing$/,
-      grade: OFF_MACHINE_GRADE,
-      skillGrade: /^S3/,
-    });
-    expect(await operationMasterFormPage.create()).not.toBe('submitted');
-    await operationMasterFormPage.expectCodeTaken();
-    await test.step('No duplicate row was created', async () => {
-      await operationsListPage.findRow(op);
-      await expect.poll(() => operationsListPage.visibleRowCount()).toBe(1);
-    });
-    await test.step('The message names the colliding operation (prototype)', async () => {
-      await operationMasterFormPage.open();
-      await operationMasterFormPage.fill({
-        code: op.toLowerCase(),
-        name: taggedName(op.toLowerCase()),
-      });
-      await operationMasterFormPage.fill({
-        department: /^Sewing$/,
-        grade: OFF_MACHINE_GRADE,
-        skillGrade: /^S3/,
-      });
-      expect(await operationMasterFormPage.create()).not.toBe('submitted');
-      await operationMasterFormPage.expectCodeTakenNaming(taggedName(op));
-    });
+    await operationMasterFormPage.expectCodeGenerated();
+    const another = await createOperation(page);
+    for (const code of [op, another]) expect(code).toMatch(/^OP-\d+$/);
+    expect(another, 'each operation gets its own code').not.toBe(op);
   });
 
   test('TC-CO-04 Machine type is required unless the Difficulty grade is off-machine', async ({
@@ -187,12 +145,10 @@ test.describe('Planning - Operations', () => {
     operationsListPage,
   }) => {
     await allure.tms(cu('z941abv8my'), 'TC-CO-04 (ClickUp)');
-    const code = uniqueCode('QA-OP');
     await operationMasterFormPage.open();
     await test.step('On-machine grade with no Machine type is blocked', async () => {
       await operationMasterFormPage.fill({
-        code,
-        name: taggedName(code),
+        name: taggedName(uniqueTag('QA-OP')),
         department: /^Sewing$/,
         grade: ON_MACHINE_GRADE,
         skillGrade: /^S3/,
@@ -230,11 +186,9 @@ test.describe('Planning - Operations', () => {
     operationMasterFormPage,
   }) => {
     await allure.tms(cu('z941abv8n1'), 'TC-CO-07 (ClickUp)');
-    const code = uniqueCode('QA-OP');
     await operationMasterFormPage.open();
     await operationMasterFormPage.fill({
-      code,
-      name: taggedName(code),
+      name: taggedName(uniqueTag('QA-OP')),
       department: /^Sewing$/,
       grade: OFF_MACHINE_GRADE,
       skillGrade: /^S3/,
@@ -272,13 +226,13 @@ test.describe('Planning - Operations', () => {
     operationMasterFormPage,
   }) => {
     await allure.tms(cu('z941abv8n4'), 'TC-CO-09 (ClickUp)');
-    const code = uniqueCode('QA-OP');
+    const tag = uniqueTag('QA-OP');
     await operationMasterFormPage.open();
-    await operationMasterFormPage.fill({ code, name: taggedName(code), department: /^Sewing$/ });
+    await operationMasterFormPage.fill({ name: taggedName(tag), department: /^Sewing$/ });
     await operationMasterFormPage.cancel();
     await operationsListPage.expectLoaded();
-    await operationsListPage.search(code);
-    await operationsListPage.expectNoRow(code);
+    await operationsListPage.search(tag);
+    await operationsListPage.expectNoRowContaining(tag);
   });
 
   test('TC-CO-10 Only a user with write permission can create an operation', async ({
@@ -329,7 +283,8 @@ test.describe('Planning - Operations', () => {
   }) => {
     await allure.tms(cu('z941abv8nc'), 'TC-EO-02 (ClickUp)');
     const code = await createOperation(page);
-    const renamed = taggedName(`${code} edited`);
+    // Keeps the run tag in the name: cleanup finds the record by it.
+    const renamed = `${nameOf(code)} (edited)`;
     await openOperation(page, code);
     await operationDetailPage.startEditing();
     await operationMasterFormPage.expectOnEditPage();
@@ -371,6 +326,10 @@ test.describe('Planning - Operations', () => {
     await openOperation(page, op);
     await operationDetailPage.startEditing();
     await operationMasterFormPage.expectOnEditPage();
+    // Dev 2026-10-22: saved within ~1 s of opening, the form still treats
+    // Machine type as required for this off-machine grade (5 of 6 tries; 0 of
+    // 6 after 3 s). Wait for it to settle, as a user would.
+    await operationMasterFormPage.expectMachineTypeRequired(false);
     await operationMasterFormPage.clearName();
     await operationMasterFormPage.submitExpectingBlocked('save', 1);
     await operationMasterFormPage.expectFieldFlagged('name');
@@ -419,10 +378,10 @@ test.describe('Planning - Operations', () => {
     await openOperation(page, op);
     await operationDetailPage.startEditing();
     await operationMasterFormPage.expectOnEditPage();
-    await operationMasterFormPage.fill({ name: taggedName(`${op} cancelled`), defaultSam: '9.9' });
+    await operationMasterFormPage.fill({ name: `${nameOf(op)} (cancelled)`, defaultSam: '9.9' });
     await operationMasterFormPage.cancel();
     await openOperation(page, op);
-    await operationDetailPage.expectValue('Operation', taggedName(op));
+    await operationDetailPage.expectValue('Operation', nameOf(op));
     await operationDetailPage.expectValue('Default SAM', '1.100');
   });
 
@@ -473,7 +432,7 @@ test.describe('Planning - Operations', () => {
       await operationsListPage.expectEveryRowMatches(op);
     });
     await test.step('By operation name', async () => {
-      await operationsListPage.search(taggedName(op).slice(0, 25));
+      await operationsListPage.search(nameOf(op).slice(0, 25));
       await operationsListPage.expectRowVisible(op);
     });
     await test.step('By department', async () => {

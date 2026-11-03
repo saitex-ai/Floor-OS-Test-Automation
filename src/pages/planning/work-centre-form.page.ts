@@ -2,7 +2,7 @@ import { type Page, type Locator, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
 import { WorkCentreFormLocators } from '../../locators/planning/work-centre-form.locators';
 import { fieldAlert } from '../../locators/planning/form-field.locators';
-import { submitForm, type SubmitResult } from './form-submit';
+import { submitForm, submitStepped, type SubmitResult } from './form-submit';
 import { WAIT } from './waits';
 import { ensureRoute } from './navigation';
 import { expectAbsentOrDisabled } from './master-data-list.page';
@@ -19,9 +19,11 @@ export interface WorkCentreFieldValues {
   usedFor?: string;
 }
 
-/** The fields an empty create flags as "Required" (2026-10-12). */
+/**
+ * The fields an empty create flags as "Required" (2026-10-12; the code is
+ * generated on save since the 2026-10-16 dev deploy).
+ */
 export const WORK_CENTRE_REQUIRED = [
-  'code',
   'name',
   'owningDepartment',
   'usedFor',
@@ -113,7 +115,6 @@ export class WorkCentreFormPage extends BasePage {
   private control(field: WorkCentreRequiredField): Locator {
     const l = this.locators;
     return {
-      code: l.centreCode,
       name: l.name,
       owningDepartment: l.owningDepartment,
       usedFor: l.usedFor,
@@ -140,8 +141,7 @@ export class WorkCentreFormPage extends BasePage {
     options: { except?: WorkCentreRequiredField } = {},
   ): Promise<void> {
     const skip = (field: WorkCentreRequiredField) => options.except === field;
-    if (!skip('code') && values.code !== undefined)
-      await this.locators.centreCode.fill(values.code);
+    if (values.code !== undefined) await this.locators.centreCode.fill(values.code);
     if (!skip('name')) await this.locators.name.fill(values.name);
     if (!skip('owningDepartment'))
       await this.pick(this.locators.owningDepartment, values.owningDepartment ?? 'Sewing');
@@ -208,16 +208,21 @@ export class WorkCentreFormPage extends BasePage {
    * its name, so a case doesn't depend on one year-bound seed calendar.
    */
   async pickAnotherWorkingCalendar(): Promise<string> {
-    const current = (await this.locators.workingCalendar.innerText()).trim();
-    await this.locators.workingCalendar.click();
-    await expect(this.locators.options().first()).toBeVisible({ timeout: WAIT.SERVER });
-    const names = (await this.locators.options().allInnerTexts())
-      .map((t) => (t.split('\n')[0] ?? '').trim())
-      .filter((t) => t && t !== current && !/^(none|select)/i.test(t));
-    const [picked] = names;
-    if (!picked) throw new Error(`No working calendar other than "${current}" to pick`);
-    await this.locators.option(picked).click();
-    return picked;
+    const combo = this.locators.workingCalendar;
+    const current = (await combo.innerText()).trim();
+    // By keyboard: the list highlights its first option and doesn't show every
+    // option at once (dev 2026-10-29), so a pointer click on a name missed.
+    // The picked name is read back from the field.
+    for (let steps = 1; steps <= 3; steps += 1) {
+      await combo.click();
+      await expect(this.locators.options().first()).toBeVisible({ timeout: WAIT.SERVER });
+      for (let k = 0; k < steps; k += 1) await this.page.keyboard.press('ArrowDown');
+      await this.page.keyboard.press('Enter');
+      await expect(this.locators.options()).toHaveCount(0);
+      const picked = (await combo.innerText()).trim();
+      if (picked && picked !== current && !/^(none|select)/i.test(picked)) return picked;
+    }
+    throw new Error(`No working calendar other than "${current}" to pick`);
   }
 
   /** Smoke: just clicks Create — see expectCreatedSuccessfully(). */
@@ -226,11 +231,22 @@ export class WorkCentreFormPage extends BasePage {
   }
 
   async submitCreate(): Promise<SubmitResult> {
-    return submitForm(this.locators.createButton);
+    return this.submit(this.locators.createButton);
   }
 
   async saveChanges(): Promise<SubmitResult> {
-    return submitForm(this.locators.saveButton);
+    return this.submit(this.locators.saveButton);
+  }
+
+  /**
+   * A centre type with stations saves through "Save & continue" and then
+   * Done on the Stations step (see submitStepped()); any other type in one step.
+   */
+  private async submit(button: Locator): Promise<SubmitResult> {
+    await expect(button).toBeVisible();
+    return (await button.innerText()).trim() === 'Save & continue'
+      ? submitStepped(button, this.locators.doneButton)
+      : submitForm(button);
   }
 
   async cancel(): Promise<void> {
@@ -256,6 +272,13 @@ export class WorkCentreFormPage extends BasePage {
 
   async expectCodeTaken(): Promise<void> {
     await expect(this.locators.codeTaken.first()).toBeVisible({ timeout: WAIT.SERVER });
+  }
+
+  /** New form since the 2026-10-16 deploy: the code can't be typed, dev assigns it on save. */
+  async expectCodeGenerated(): Promise<void> {
+    await expect(this.locators.centreCode).toBeDisabled();
+    await expect(this.locators.centreCode).toHaveAttribute('placeholder', 'Auto-generated');
+    await expect(this.locators.codeGeneratedHelp).toBeVisible();
   }
 
   async expectCodeLocked(code: string): Promise<void> {

@@ -3,7 +3,7 @@ import { BasePage } from '../base.page';
 import { MachineFormLocators } from '../../locators/planning/machine-form.locators';
 import { dateTriggers, fieldAlert } from '../../locators/planning/form-field.locators';
 import { pickToday } from './date-picker';
-import { submitForm, type SubmitResult } from './form-submit';
+import { submitStepped, type SubmitResult } from './form-submit';
 import { WAIT } from './waits';
 import { ensureRoute } from './navigation';
 
@@ -20,8 +20,8 @@ export interface MachineFieldValues {
   status?: MachineStatus;
 }
 
-/** The fields an empty create flags as "Required". */
-export const MACHINE_REQUIRED = ['code', 'machineType', 'workCentre', 'status'] as const;
+/** The fields an empty create flags as "Required" (the asset code is generated since 2026-10-16). */
+export const MACHINE_REQUIRED = ['machineType', 'workCentre', 'status'] as const;
 export type MachineRequiredField = (typeof MACHINE_REQUIRED)[number];
 
 /**
@@ -29,9 +29,10 @@ export type MachineRequiredField = (typeof MACHINE_REQUIRED)[number];
  * Real routes: /planning/master-data/machines/new and
  * /machines/<uuid>/edit. Owned by the Planning QA. Element locators live
  * in MachineFormLocators (`this.locators`) — this class only holds
- * flows/actions/assertions built on top of them. A create returns to the
- * list ("Machine created."); Save changes returns to the detail page
- * ("Machine updated.").
+ * flows/actions/assertions built on top of them. Create and edit are two
+ * steps since the 2026-10-28 dev deploy: step 1's "Save & continue" saves
+ * ("Machine created." / "Machine updated."), step 2 holds the maintenance
+ * windows, and its Done opens the detail page.
  */
 export class MachineFormPage extends BasePage {
   readonly locators: MachineFormLocators;
@@ -84,7 +85,6 @@ export class MachineFormPage extends BasePage {
   private control(field: MachineRequiredField): Locator {
     const l = this.locators;
     return {
-      code: l.assetCode,
       machineType: l.machineType,
       workCentre: l.workCentre,
       status: l.status,
@@ -198,12 +198,13 @@ export class MachineFormPage extends BasePage {
     await this.locators.createButton.click();
   }
 
+  /** Step 1's "Save & continue", then Done on step 2 — see submitStepped(). */
   async submitCreate(): Promise<SubmitResult> {
-    return submitForm(this.locators.createButton);
+    return submitStepped(this.locators.createButton, this.locators.doneButton);
   }
 
   async saveChanges(): Promise<SubmitResult> {
-    return submitForm(this.locators.saveButton);
+    return submitStepped(this.locators.saveButton, this.locators.doneButton);
   }
 
   async cancel(): Promise<void> {
@@ -225,6 +226,13 @@ export class MachineFormPage extends BasePage {
 
   async expectCodeTaken(): Promise<void> {
     await expect(this.locators.codeTaken.first()).toBeVisible({ timeout: WAIT.SERVER });
+  }
+
+  /** New form since the 2026-10-16 deploy: the code can't be typed, dev assigns it on save. */
+  async expectCodeGenerated(): Promise<void> {
+    await expect(this.locators.assetCode).toBeDisabled();
+    await expect(this.locators.assetCode).toHaveAttribute('placeholder', 'Auto-generated');
+    await expect(this.locators.codeGeneratedHelp).toBeVisible();
   }
 
   async expectCodeLocked(code: string): Promise<void> {

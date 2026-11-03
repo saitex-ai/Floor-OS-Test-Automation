@@ -2,9 +2,10 @@ import { type Locator, type Page, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
 import { MasterDataListPage, becomesUsable, expectActionBlocked } from './master-data-list.page';
 import { ShiftsLocators } from '../../locators/planning/shifts.locators';
-import { detailValue, fieldAlert } from '../../locators/planning/form-field.locators';
+import { alertsIn, detailValue, fieldAlert } from '../../locators/planning/form-field.locators';
 import { pickTime } from './date-picker';
-import { submitForm, submitExpectingToast, type SubmitResult } from './form-submit';
+import { type SubmitResult, pressDone, submitExpectingToast, submitStepped } from './form-submit';
+import { InlineTable } from './inline-table';
 import { ensureRoute } from './navigation';
 import { WAIT } from './waits';
 
@@ -23,22 +24,6 @@ export class ShiftsListPage extends MasterDataListPage {
     this.locators = new ShiftsLocators(page);
     this.heading = this.locators.listHeading;
     this.newButton = this.locators.newShiftButton;
-  }
-
-  /**
-   * A just-created shift's generated code (SH-0001…): "Create shift" lands
-   * back on this list, so search for the shift's unique name and read the
-   * row's code cell.
-   */
-  async codeOf(name: string): Promise<string> {
-    await this.expectLoaded();
-    await this.search(name);
-    const row = this.grid.bodyRows().filter({ hasText: name }).first();
-    await expect(row).toBeVisible({ timeout: WAIT.SERVER });
-    const cells = (await row.getByRole('cell').allInnerTexts()).map((c) => c.trim());
-    const code = cells.find((c) => /^[A-Z][A-Z0-9_]*-\d+$/.test(c));
-    if (!code) throw new Error(`No shift code in row "${cells.join(' | ')}"`);
-    return code;
   }
 
   async expectNoMatchState(): Promise<void> {
@@ -100,8 +85,10 @@ async function pickTimes(
 /**
  * The shift create / edit form (/shifts/new, /shifts/<CODE>/edit). Owned by
  * the Planning QA. Gross minutes is derived and disabled; Paid minutes isn't
- * on the form (it shows on the detail page once saved). A create returns to
- * the list ("Shift created."); Save changes returns to the detail page.
+ * on the form (it shows on the detail page once saved). Create and edit are
+ * two steps since the 2026-10-28 dev deploy: step 1's "Save & continue"
+ * saves, step 2 holds the breaks (see ShiftDetailPage), and Done opens the
+ * detail page.
  */
 export class ShiftFormPage extends BasePage {
   readonly locators: ShiftsLocators;
@@ -185,12 +172,13 @@ export class ShiftFormPage extends BasePage {
     await expect(this.locators.crossesMidnight).toBeChecked({ checked: on });
   }
 
+  /** Step 1's "Save & continue", then Done on Breaks — see submitStepped(). */
   async create(): Promise<SubmitResult> {
-    return submitForm(this.locators.createButton);
+    return submitStepped(this.locators.createButton, this.locators.doneButton);
   }
 
   async saveChanges(): Promise<SubmitResult> {
-    return submitForm(this.locators.saveButton);
+    return submitStepped(this.locators.saveButton, this.locators.doneButton);
   }
 
   async createExpectingToast(text: string | RegExp): Promise<void> {
@@ -227,16 +215,20 @@ export class ShiftFormPage extends BasePage {
 /**
  * A shift's detail page (/shifts/<CODE>) and its break form. Owned by the
  * Planning QA. The summary shows Shift kind / Starts / Ends / Order in day /
- * Gross minutes ("540 (9h 00m)") / Paid minutes ("510 (8h 30m)") / Active;
- * "New break" and a row's "Edit" replace the Breaks grid on the same URL
- * under a "Breaks · <CODE>" breadcrumb. A break's Length is derived.
+ * Gross minutes ("540 (9h 00m)") / Paid minutes ("510 (8h 30m)") / Active,
+ * and a read-only Breaks grid. Since the 2026-10-28 dev deploy breaks are
+ * added and edited on step 2 of Edit shift, as rows of an inline table
+ * (each saves on its own, see InlineTable) — the break methods here work
+ * there. A break's Length is derived.
  */
 export class ShiftDetailPage extends BasePage {
   readonly locators: ShiftsLocators;
+  readonly breaks: InlineTable;
 
   constructor(page: Page) {
     super(page);
     this.locators = new ShiftsLocators(page);
+    this.breaks = new InlineTable(page, 'Breaks', 'break');
   }
 
   async open(code: string): Promise<void> {
@@ -279,7 +271,11 @@ export class ShiftDetailPage extends BasePage {
 
   async expectEditBlocked(): Promise<void> {
     await expect(this.locators.breaksHeading).toBeVisible({ timeout: WAIT.PAGE_LOAD });
-    await expectActionBlocked(this.page, this.locators.editButton, 'Save changes');
+    await expectActionBlocked(
+      this.page,
+      this.locators.editButton,
+      /^(Save changes|Save & continue)$/,
+    );
   }
 
   async expectValue(label: string, value: string | RegExp): Promise<void> {
@@ -328,79 +324,122 @@ export class ShiftDetailPage extends BasePage {
     await this.locators.breaksSearch.fill(term);
   }
 
+  /** Breaks are added on step 2 of Edit shift: opens it there (if not already), with the add row ready. */
   async openNewBreak(): Promise<void> {
-    await this.locators.newBreakButton.click();
+    if (!(await this.breaks.locators.addButton.isVisible())) {
+      await this.locators.editButton.click();
+      await expect(this.page).toHaveURL(/\/shifts\/[^/]+\/edit$/, { timeout: WAIT.NAVIGATION });
+      await this.locators.breaksStep.click();
+    }
+    await this.breaks.expectAddRow();
   }
 
+  /** Opens step 2 of Edit shift and the row's "Edit break". */
   async openBreakEdit(name: string): Promise<void> {
-    await this.locators.breakEditButton(name).click();
+    await this.openNewBreak();
+    await this.breaks.startEdit(name);
   }
 
+  /** Adding a break needs Edit shift. Watched for WAIT.PERMISSION_SETTLE — see becomesUsable(). */
   async isNewBreakAvailable(): Promise<boolean> {
     await expect(this.locators.breaksHeading).toBeVisible({ timeout: WAIT.PAGE_LOAD });
-    return becomesUsable(this.locators.newBreakButton);
+    return becomesUsable(this.locators.editButton);
   }
 
+  /** Editing a break also needs Edit shift (the grid here is read-only). */
   async isBreakEditAvailable(name: string): Promise<boolean> {
     await expect(this.locators.breakRow(name)).toBeVisible({ timeout: WAIT.SERVER });
-    return becomesUsable(this.locators.breakEditButton(name));
+    return becomesUsable(this.locators.editButton);
   }
 
-  async expectBreakFormOpen(kind: 'New' | 'Edit', code: string): Promise<void> {
-    await expect(this.locators.breakFormHeading).toHaveText(`${kind} break`, {
-      timeout: WAIT.NAVIGATION,
-    });
-    await expect(this.locators.breadcrumb).toHaveText(`Breaks · ${code}`);
+  /** "New": step 2 of Edit shift with the add row; "Edit": a saved row open with Save / Cancel. */
+  async expectBreakFormOpen(kind: 'New' | 'Edit'): Promise<void> {
+    await expect(this.locators.breaksStepTitle).toBeVisible({ timeout: WAIT.NAVIGATION });
+    if (kind === 'New') await this.breaks.expectAddRow();
+    else await expect(this.breaks.locators.editingRow).toBeVisible({ timeout: WAIT.NAVIGATION });
   }
 
+  /** The row's inputs; Length is derived text, never an input. */
   async expectBreakFields(): Promise<void> {
+    const row = await this.breaks.inputRow();
     const l = this.locators;
     for (const field of [
-      l.breakName,
-      l.starts,
-      l.ends,
-      l.fallsAfterMidnight,
-      l.length,
-      l.paid,
-      l.active,
+      l.breakName(row),
+      l.breakTime(row, 'Starts'),
+      l.breakTime(row, 'Ends'),
+      l.fallsAfterMidnight(row),
+      l.paid(row),
     ])
       await expect(field).toBeVisible();
-    await expect(l.length).toBeDisabled();
+    await expect(l.lengthInput(row)).toHaveCount(0);
   }
 
   async fillBreak(values: BreakValues): Promise<void> {
+    const row = await this.breaks.inputRow();
     const l = this.locators;
-    if (values.name !== undefined) await l.breakName.fill(values.name);
-    await pickTimes(this.page, l, values.starts, values.ends);
+    if (values.name !== undefined) await l.breakName(row).fill(values.name);
+    for (const [which, time] of [
+      ['Starts', values.starts],
+      ['Ends', values.ends],
+    ] as const) {
+      if (!time) continue;
+      const [hh = '00', mm = '00'] = time.split(':');
+      await pickTime(this.page, l.breakTime(row, which), hh, mm);
+    }
     if (values.fallsAfterMidnight !== undefined)
-      await setSwitch(l.fallsAfterMidnight, values.fallsAfterMidnight);
-    if (values.paid !== undefined) await setSwitch(l.paid, values.paid);
-    if (values.active !== undefined) await setSwitch(l.active, values.active);
+      await setSwitch(l.fallsAfterMidnight(row), values.fallsAfterMidnight);
+    if (values.paid !== undefined) await setSwitch(l.paid(row), values.paid);
+    if (values.active !== undefined) await setSwitch(l.breakActive(row), values.active);
   }
 
+  /** The derived Length the row shows for its times. */
   async lengthValue(): Promise<string> {
-    return this.locators.length.inputValue();
+    return (await this.locators.lengthCell(await this.breaks.inputRow()).innerText()).trim();
   }
 
+  /** "Add break" on the add row. */
   async createBreak(): Promise<SubmitResult> {
-    return submitForm(this.locators.createBreakButton);
+    return this.breaks.add();
   }
 
+  /** Save on the row being edited. */
   async saveBreak(): Promise<SubmitResult> {
-    return submitForm(this.locators.saveButton);
+    return this.breaks.save();
   }
 
+  /**
+   * A row being edited: its own Cancel. The add row: its "Clear" (✕) — the
+   * step's Cancel and Done refuse to leave while the add row holds input.
+   */
   async cancelBreak(): Promise<void> {
-    await this.locators.cancelButton.click();
-    await expect(this.locators.cancelButton).toBeHidden({ timeout: WAIT.NAVIGATION });
+    if ((await this.breaks.locators.editingRow.count()) > 0) await this.breaks.cancelEdit();
+    else await this.breaks.clearAddRow();
+  }
+
+  /** Done on step 2: leaves Edit shift for the detail page (rows are already saved). */
+  async finishEditing(): Promise<void> {
+    await pressDone(this.locators.doneButton);
+    await expect(this.locators.editButton).toBeVisible({ timeout: WAIT.NAVIGATION });
   }
 
   async expectBreakFieldFlagged(field: 'breakName' | 'starts' | 'ends'): Promise<void> {
-    await expect(fieldAlert(this.locators[field])).toBeVisible({ timeout: WAIT.VALIDATION });
+    await expect(alertsIn(this.breakCell(await this.breaks.inputRow(), field))).toBeVisible({
+      timeout: WAIT.VALIDATION,
+    });
   }
 
-  /** The inline message under the break name (e.g. a duplicate name in this shift). */
+  /** The message in the Break (name) cell (e.g. a duplicate name in this shift). */
   async expectBreakNameError(text: string | RegExp): Promise<void> {
-    await expect(fieldAlert(this.locators.breakName)).toHaveText(text, { timeout: WAIT.SERVER });
+    const cell = this.breakCell(await this.breaks.inputRow(), 'breakName');
+    await expect(alertsIn(cell)).toHaveText(text, { timeout: WAIT.SERVER });
+  }
+
+  private breakCell(row: Locator, field: 'breakName' | 'starts' | 'ends'): Locator {
+    const l = this.locators;
+    const control =
+      field === 'breakName'
+        ? l.breakName(this.page)
+        : l.breakTime(this.page, field === 'starts' ? 'Starts' : 'Ends');
+    return l.cellOf(row, control);
   }
 }

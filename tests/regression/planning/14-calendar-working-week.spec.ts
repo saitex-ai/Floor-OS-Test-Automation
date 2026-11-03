@@ -36,6 +36,8 @@ async function addLines(page: Page, lines: WeekLineValues[]): Promise<void> {
     await detail.fillWeekLine(line);
     expect(await detail.createWeekLine(), `line ${line.weekday} ${line.shift}`).toBe('submitted');
   }
+  // Lines are added on step 2 of Edit calendar; Done goes back to the detail page.
+  await detail.finishEditing();
 }
 
 test.describe('Planning - Calendar Working Week', () => {
@@ -118,10 +120,15 @@ test.describe('Planning - Calendar Working Week', () => {
     calendarDetailPage,
   }) => {
     await allure.tms(cu('z941abvnfy'), 'TC-LWK-05 (ClickUp)');
+    // The shifts are seed data whose times and breaks others change (dev
+    // 2026-10-29: NIGHT read "7h 30m paid", not "8h"), so this checks the
+    // cell's shape: window, "(+1d)" for the overnight NIGHT, then paid time.
     await openCalendar(page, week);
-    await calendarDetailPage.expectWeekRow('Monday', 'A', { shift: '07:30 → 16:30 · 8h 30m paid' });
+    await calendarDetailPage.expectWeekRow('Monday', 'A', {
+      shift: /\d\d:\d\d → \d\d:\d\d · \d+h( \d\dm)? paid/,
+    });
     await calendarDetailPage.expectWeekRow('Tuesday', 'NIGHT', {
-      shift: '22:00 → 06:00 · 8h paid',
+      shift: /\d\d:\d\d → \d\d:\d\d \(\+1d\) · \d+h( \d\dm)? paid/,
     });
   });
 
@@ -144,7 +151,7 @@ test.describe('Planning - Calendar Working Week', () => {
     await allure.tms(cu('z941abvng2'), 'TC-LWK-07 (ClickUp)');
     await openCalendar(page, week);
     await calendarDetailPage.openNewWeekLine();
-    await calendarDetailPage.expectFormOpen('New', 'working-week line', week);
+    await calendarDetailPage.expectFormOpen('New', 'working-week line');
   });
 
   test('TC-LWK-08 A weekday with no line is a non-working day', async ({
@@ -184,7 +191,7 @@ test.describe('Planning - Calendar Working Week', () => {
     await allure.tms(cu('z941abvng6'), 'TC-CWK-01 (ClickUp)');
     await openCalendar(page, week);
     await calendarDetailPage.openNewWeekLine();
-    await calendarDetailPage.expectFormOpen('New', 'working-week line', week);
+    await calendarDetailPage.expectFormOpen('New', 'working-week line');
     await calendarDetailPage.expectWeekLineFields();
   });
 
@@ -263,7 +270,7 @@ test.describe('Planning - Calendar Working Week', () => {
     await calendarDetailPage.openNewWeekLine();
     await calendarDetailPage.fillWeekLine({ weekday: 'Wednesday', shift: 'A_OT' });
     await calendarDetailPage.cancelForm();
-    await page.reload();
+    await calendarDetailPage.finishEditing();
     await calendarDetailPage.expectLoaded(week);
     await calendarDetailPage.expectWeekRow('Monday', 'A');
     await calendarDetailPage.expectNoWeekRow('Wednesday');
@@ -297,7 +304,7 @@ test.describe('Planning - Calendar Working Week', () => {
     await allure.tms(cu('z941abvnge'), 'TC-EWK-01 (ClickUp)');
     await openCalendar(page, week);
     await calendarDetailPage.openWeekLineEdit('Monday', 'A');
-    await calendarDetailPage.expectFormOpen('Edit', 'working-week line', week);
+    await calendarDetailPage.expectFormOpen('Edit', 'working-week line');
     await calendarDetailPage.expectWeekLineFields();
   });
 
@@ -308,7 +315,7 @@ test.describe('Planning - Calendar Working Week', () => {
     await calendarDetailPage.openWeekLineEdit('Monday', 'A');
     await calendarDetailPage.fillWeekLine({ shift: 'B', standingOvertime: true });
     expect(await calendarDetailPage.saveChanges()).toBe('submitted');
-    await page.reload();
+    await calendarDetailPage.finishEditing();
     await calendarDetailPage.expectWeekRow('Monday', 'B', { ot: 'Standing overtime' });
     await calendarDetailPage.expectNoWeekRow('Monday', 'A');
   });
@@ -356,7 +363,7 @@ test.describe('Planning - Calendar Working Week', () => {
     await calendarDetailPage.openWeekLineEdit('Monday', 'A');
     await calendarDetailPage.fillWeekLine({ standingOvertime: true, active: false });
     await calendarDetailPage.cancelForm();
-    await page.reload();
+    await calendarDetailPage.finishEditing();
     await calendarDetailPage.expectLoaded(week);
     await calendarDetailPage.expectWeekRow('Monday', 'A', { ot: 'Contracted', active: 'Active' });
   });

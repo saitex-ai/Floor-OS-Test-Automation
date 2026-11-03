@@ -2,10 +2,22 @@ import { type Locator, type Page, expect } from '@playwright/test';
 import { DatePickerLocators } from '../../locators/planning/form-field.locators';
 import { WAIT } from './waits';
 
+/**
+ * Opens a date / time field's picker from the keyboard. Once set, a trigger
+ * nests a "Clear date" / "Clear time" ✕, and in a narrow inline-table cell
+ * (dev 2026-10-30: a break's Starts is 118 px wide) the trigger's centre,
+ * where a click lands, is that ✕ — so a click would clear the value instead.
+ */
+async function openPicker(picker: DatePickerLocators, trigger: Locator): Promise<void> {
+  await trigger.focus();
+  await trigger.press('Enter');
+  await expect(picker.dialog).toBeVisible();
+}
+
 /** Opens a date field's picker and picks today. */
 export async function pickToday(page: Page, trigger: Locator): Promise<void> {
   const picker = new DatePickerLocators(page);
-  await trigger.click();
+  await openPicker(picker, trigger);
   await picker.today.click();
   // A date-only picker closes on the day click; a date-time one waits for Done.
   // Retried until it's closed, so a Done that renders a moment late still gets clicked.
@@ -23,7 +35,7 @@ export async function pickTodayAt(
   mm: string,
 ): Promise<void> {
   const picker = new DatePickerLocators(page);
-  await trigger.click();
+  await openPicker(picker, trigger);
   await picker.today.click();
   await picker.hour(hh).click();
   await picker.minute(mm).click();
@@ -42,7 +54,7 @@ export async function pickDayOfShownMonth(
   monthOffset = 0,
 ): Promise<void> {
   const picker = new DatePickerLocators(page);
-  await trigger.click();
+  await openPicker(picker, trigger);
   await expect(picker.grid).toBeVisible();
   const shown = await picker.grid.getAttribute('aria-label');
   for (let i = 0; i < Math.abs(monthOffset); i += 1)
@@ -63,7 +75,7 @@ export async function pickTime(
   mm: string,
 ): Promise<void> {
   const picker = new DatePickerLocators(page);
-  await trigger.click();
+  await openPicker(picker, trigger);
   await picker.hour(hh).click();
   await picker.minute(mm).click();
   // The time popover stays open after the minute click.
