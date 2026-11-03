@@ -6,7 +6,8 @@ import { ShellLoginLocators } from '../../locators/shell/shell-login.locators';
  * app-shell's pre-auth welcome page + Keycloak's hosted login form.
  * `goto('/')` lands on app-shell's own "Welcome to FloorOS!" screen first.
  * Since the 2026-10-22 design system it asks for the username there
- * ("Username or email" + "Continue"); Continue triggers the OIDC PKCE
+ * ("Username or email" on dev, "Username/Email" on uat since 2026-11-02,
+ * + "Continue"); Continue triggers the OIDC PKCE
  * redirect to Keycloak, whose form arrives with the username pre-filled
  * (login_hint), so only the password is entered (see floorOS
  * docs/handbook/14-frontends.md, "Authentication").
