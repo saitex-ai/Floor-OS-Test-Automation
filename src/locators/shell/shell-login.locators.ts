@@ -11,9 +11,17 @@ import { type Locator, type Page } from '@playwright/test';
  * "Sign in to your account" form with the username already filled in
  * (login_hint), where only the password is entered. Keycloak now lives
  * under /auth/realms/… rather than /realms/….
+ *
+ * 2026-11-02: uat's welcome page was redesigned again ("Sign In", "Welcome
+ * to Floor OS. Sign in to continue.") and the username box is now named
+ * "Username/Email"; dev still shows "Welcome to FloorOS!" and "Username or
+ * email". identifierInput matches both.
  */
 export class ShellLoginLocators {
-  /** Welcome page: the username box. Keycloak's own username box shares this name. */
+  /**
+   * Welcome page: the username box, "Username or email" on dev and
+   * "Username/Email" on uat. Keycloak's own username box shares dev's name.
+   */
   readonly identifierInput: Locator;
   readonly continueButton: Locator;
   /** Keycloak form. */
@@ -27,7 +35,7 @@ export class ShellLoginLocators {
   readonly userMenuButton: Locator;
 
   constructor(page: Page) {
-    this.identifierInput = page.getByRole('textbox', { name: 'Username or email' });
+    this.identifierInput = page.getByRole('textbox', { name: /^Username( or email|\/Email)$/ });
     this.continueButton = page.getByRole('button', { name: 'Continue', exact: true });
     this.passwordInput = page.getByLabel('Password', { exact: true });
     this.submitButton = page.getByRole('button', { name: 'Sign In', exact: true });
