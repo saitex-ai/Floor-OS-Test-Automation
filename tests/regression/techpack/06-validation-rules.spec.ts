@@ -147,15 +147,15 @@ test.describe('Techpack - Validation Rules', () => {
   test('TC:5 Verify selecting a status tab filters the grid', async ({ validationRulesPage }) => {
     test.setTimeout(120_000);
     await validationRulesPage.open();
-    await test.step('Click the "Active" tab — it becomes the pressed tab', async () => {
+    await test.step('Click the "Active" tab — it becomes the selected tab', async () => {
       await validationRulesPage.selectTab('Active');
       await expect(validationRulesPage.locators.statusTab('All')).toHaveAttribute(
-        'aria-pressed',
+        'aria-selected',
         'false',
       );
     });
     await test.step('Every visible row is Active', async () => {
-      // The tab flips to pressed before the grid re-renders — an immediate
+      // The tab flips to selected before the grid re-renders — an immediate
       // read still returned the All view's leading Archived rows on the
       // first real run (screenshot taken a moment later showed a correctly
       // filtered grid). Poll until the rows actually settle.

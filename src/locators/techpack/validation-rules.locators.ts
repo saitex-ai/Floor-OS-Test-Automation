@@ -11,8 +11,9 @@ import { type Locator, type Page } from '@playwright/test';
  * rules.snapshot.txt), and both New/Edit dialogs + the Archive confirmation
  * on uat 2026-10-01. Notable real DOM shapes:
  *
- * - Status tabs are plain `button`s whose accessible name carries a live
- *   count ("Active 32"); the selected one has `aria-pressed="true"`.
+ * - Status tabs are `role="tab"` (since the 2026-10-30 deploy; plain
+ *   `aria-pressed` buttons before) whose accessible name carries a live
+ *   count ("Active 32"); the selected one has `aria-selected="true"`.
  *   Disabled/Archived live behind a "+2 more" overflow button.
  * - Status and Customer column headers have NO sort button (plain text);
  *   Id/Name/Severity/Version/Updated each have one.
@@ -159,7 +160,7 @@ export class ValidationRulesLocators {
 
   /** A primary status tab ("All 33", "Active 32", ...) by its label prefix. */
   statusTab(tab: 'All' | 'Draft' | 'Suggested' | 'Active'): Locator {
-    return this.page.getByRole('button', { name: new RegExp(`^${tab} \\d+$`) });
+    return this.page.getByRole('tab', { name: new RegExp(`^${tab} \\d+$`) });
   }
 
   /**
