@@ -328,7 +328,7 @@ test.describe('Techpack - Canvas Review (AI Mode)', () => {
     await allure.owner('Techpack QA');
   });
 
-  test('TC:16 Verify "Re-extract" and "Ask about this techpack" appear on an AI-Mode-created techpack\'s canvas', async ({
+  test('TC:16 Verify "Re-extract" and the "Ask FloorOS AI" agent appear on an AI-Mode-created techpack\'s canvas', async ({
     aiModeCopilotPage,
     canvasPage,
   }) => {
@@ -362,7 +362,10 @@ test.describe('Techpack - Canvas Review (AI Mode)', () => {
     // The draft's READY isn't the end of extraction: the canvas shows
     // "Extracting…" until the file's own callout extraction finishes.
     await canvasPage.waitForExtraction();
-    await expect(canvasPage.locators.askAboutTechpackButton).toBeVisible();
+    // Since 2026-11-05 (uat) the toolbar's "Ask about this techpack" is gone;
+    // the top bar's "Ask FloorOS AI" opens an Agent chat for the draft.
+    await canvasPage.locators.askFloorOsAiButton.click();
+    await expect(canvasPage.locators.agentSummariseDraftButton).toBeVisible({ timeout: 30_000 });
   });
 });
 

@@ -793,6 +793,11 @@ test.describe('Techpack - New Techpack (AI Mode)', () => {
     });
 
     test('TC:22 Verify the chat can be reopened from "Ask FloorOS AI" after a reload', async () => {
+      // Parked 2026-11-05: uat's top bar now has "Assistant", a general help
+      // chatbot whose Conversations list doesn't include AI Mode chats, so
+      // there's no way back into the chat after a reload. Waiting on the devs
+      // to say how a chat is meant to be reopened.
+      test.fixme(true, 'uat has no way to reopen an AI Mode chat after a reload (2026-11-05)');
       const l = ai.locators;
       await page.goto(chatUrl);
       await expect(l.reviewCard.or(l.emptyDropzoneText)).toBeVisible({ timeout: 60_000 });
