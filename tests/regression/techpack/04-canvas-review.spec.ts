@@ -331,7 +331,6 @@ test.describe('Techpack - Canvas Review (AI Mode)', () => {
   test('TC:16 Verify "Re-extract" and "Ask about this techpack" appear on an AI-Mode-created techpack\'s canvas', async ({
     aiModeCopilotPage,
     canvasPage,
-    page,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abx71b', 'TC:16 bug (ClickUp)');
     // Since the 2026-10-22 redesign: attach a PDF AI Mode hasn't seen,
@@ -348,9 +347,8 @@ test.describe('Techpack - Canvas Review (AI Mode)', () => {
       'READY',
     );
     await aiModeCopilotPage.locators.openTechpackLink.click();
-    await expect(page).toHaveURL(/\/techpacks\/view\/[^/?#]+/, { timeout: 30_000 });
-    // "Open Techpack" opens the view; the same id opens the canvas.
-    await canvasPage.gotoCanvasById(page.url().match(/\/techpacks\/view\/([^/?#]+)/)![1]!);
+    // "Open Techpack" opens the view (dev) or the canvas (uat); the same id opens the canvas.
+    await canvasPage.gotoCanvasById(await aiModeCopilotPage.waitForOpenedTechpack());
 
     // Confirmed live 2026-09-10 by reading an existing AI-created record's
     // toolbar (Creator "copilot"): these two actions ARE genuinely

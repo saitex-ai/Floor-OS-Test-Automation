@@ -27,6 +27,9 @@ const REQUIRED_CARD_FIELDS = [
 /** A Review details picker that still shows its "Search …" placeholder is empty. */
 const EMPTY_FIELD = /^Search /;
 
+/** Where an opened draft lands: `/techpacks/view/{id}`, or `/techpacks/canvas/{id}` (uat since 2026-11-05). */
+const OPENED_TECHPACK = /\/techpacks\/(?:view|canvas)\/([^/?#]+)/;
+
 /**
  * "New Techpack" — AI Mode (`/techpacks/new/copilot`). Owned by the
  * Techpack QA. Element locators live in AiModeCopilotLocators
@@ -332,6 +335,17 @@ export class AiModeCopilotPage extends BasePage {
   async waitForDraftDone(timeout = 420_000): Promise<string> {
     await expect(this.locators.draftDoneText).toBeVisible({ timeout });
     return (await this.locators.draftDoneText.innerText()).match(/\((\w+)\)/)?.[1] ?? '';
+  }
+
+  /**
+   * Waits for an opened draft to reach its techpack and returns the
+   * techpack's id. "Open Techpack" and the Dashboard's draft row go through
+   * `/techpacks/drafts/{draftId}` first, then to `/techpacks/view/{id}` (dev,
+   * last seen 2026-11-03) or `/techpacks/canvas/{id}` (uat since 2026-11-05).
+   */
+  async waitForOpenedTechpack(timeout = 30_000): Promise<string> {
+    await expect(this.page).toHaveURL(OPENED_TECHPACK, { timeout });
+    return this.page.url().match(OPENED_TECHPACK)![1]!;
   }
 
   /** The new draft's id, from the "Open Techpack" link (`/techpacks/drafts/{id}`). */

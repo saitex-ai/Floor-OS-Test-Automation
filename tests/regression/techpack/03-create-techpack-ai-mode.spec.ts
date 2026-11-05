@@ -762,7 +762,7 @@ test.describe('Techpack - New Techpack (AI Mode)', () => {
     test("TC:39 Verify the Remark typed on the card is shown as the draft's Description", async () => {
       test.skip(!draftId, 'TC:8 did not create a draft');
       await ai.locators.openTechpackLink.click();
-      await expect(page).toHaveURL(/\/techpacks\/(view|drafts)\//, { timeout: 30_000 });
+      await ai.waitForOpenedTechpack();
       await expect(ai.locators.viewDescriptionInput).toHaveValue(remark, { timeout: 60_000 });
     });
 
@@ -773,7 +773,7 @@ test.describe('Techpack - New Techpack (AI Mode)', () => {
       await expect(techpackPage.locators.searchInput).toBeVisible({ timeout: 90_000 });
 
       await ai.locators.dashboardDraftButton(draftId).click();
-      await expect(page).toHaveURL(/\/techpacks\/view\/[^/?]+/, { timeout: 30_000 });
+      await ai.waitForOpenedTechpack();
       await expect(ai.locators.viewDescriptionInput).toHaveValue(remark, { timeout: 60_000 });
     });
 
@@ -785,7 +785,7 @@ test.describe('Techpack - New Techpack (AI Mode)', () => {
       await expect(l.uploadHeading).toBeVisible({ timeout: 30_000 });
 
       await ai.attach(pdf);
-      await expect(page).toHaveURL(/\/techpacks\/view\/[^/?]+/, { timeout: 60_000 });
+      await ai.waitForOpenedTechpack(60_000);
       await expect(l.viewDescriptionInput).toHaveValue(remark, { timeout: 60_000 });
       openQuestion(
         'Upload techpack opens the existing draft without saying the file was already in floorOS',
