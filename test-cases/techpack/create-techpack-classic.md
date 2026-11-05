@@ -283,3 +283,14 @@ Changes that affect every case:
 - **Statuses (TC:27):** options end with "Approved", "Draft" or "Rejected". On 2026-10-30 uat's pickers held only Approved values, and dev's held all three.
 - **Autosave timing (TC:36):** the form autosaves to the browser a moment after each change. A test that fills all 7 fields in about 3.5 s and creates straight away can reopen the form part-filled, because a save from the filling lands after the create has cleared it. At a person's pace it reopens empty (checked four ways on uat). TC:36 waits 2 s before Create (`waitForAutosave()`).
 - **Test data:** each run creates four more QA-AUTO techpacks (TC:35, 36, 38 and 39) on top of TC:7 and TC:8's, all tagged in the Description. Nothing is added to master data: TC:31 and TC:32 cancel their dialogs, and they check that no API write was sent.
+
+## Update 2026-11-05 — new Techpack build on dev and uat
+
+- **TC:1:** the form's way back is a "Tech Pack & BOM" button above the heading on dev and uat; the "Back to Techpacks"
+  link is gone. Expected result: h1 "New Techpack", the "Tech Pack & BOM" button, Close and the five sections.
+- **TC:7 / TC:35:** on uat a create lands on `/techpacks/canvas/{id}` (dev still `/techpacks/view/{id}`). Both are
+  accepted.
+- **TC:9 / [z941abxb20](https://app.clickup.com/t/z941abxb20) ("in testing"):** not reproduced on uat on 2026-11-05.
+  TC:9 passed 3 runs out of 3: the "Add techpack type" dialog stops a 25-character code, and Create shows no raw JSON. On
+  dev the same day the dialog still accepted a 25-character code (2 of 2 probes, nothing saved). TC:9 no longer expects
+  a failure; it still skips on dev because the over-length value it reuses exists only in uat's master data.

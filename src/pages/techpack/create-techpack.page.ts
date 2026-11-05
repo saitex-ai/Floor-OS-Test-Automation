@@ -2,6 +2,7 @@ import { type Page, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
 import { MODULES } from '../../config/modules';
 import { CreateTechpackLocators } from '../../locators/techpack/create-techpack.locators';
+import { TECHPACK_PAGE_URL } from '../../locators/techpack/techpack.locators';
 
 /** The server's real `techpackTypeCode` maxLength, from its own AJV error (TC:9). */
 export const TECHPACK_TYPE_CODE_MAX = 20;
@@ -677,9 +678,9 @@ export class CreateTechpackPage extends BasePage {
    * techpack"/stuck-"Opening canvas…" issues legacy seed records show.
    */
   async expectCreatedSuccessfully(): Promise<void> {
-    // As of the 2026-10-22 design-system release a new techpack opens at
-    // /techpacks/view/{id}; the pattern also still accepts the older
-    // /techpacks/{id} and /techpacks/canvas/{id}.
+    // A new techpack opens at /techpacks/view/{id} (dev) or
+    // /techpacks/canvas/{id} (uat, 2026-11-05); the pattern also still
+    // accepts the older /techpacks/{id}.
     await expect(this.page).toHaveURL(/\/techpacks\/(canvas\/|view\/)?[^/]+$/, {
       timeout: 30_000,
     });
@@ -687,9 +688,9 @@ export class CreateTechpackPage extends BasePage {
     await expect(this.page.getByText(/^TP\d+-\d+$/).first()).toBeVisible({ timeout: 30_000 });
   }
 
-  /** The new techpack's id, from the `/techpacks/view/{id}` URL a create lands on. */
+  /** The new techpack's id, from the TECHPACK_PAGE_URL a create lands on. */
   currentTechpackId(): string {
-    const id = this.page.url().match(/\/techpacks\/view\/([^/?#]+)/)?.[1];
+    const id = this.page.url().match(TECHPACK_PAGE_URL)?.[1];
     if (!id) throw new Error(`Not on a techpack view page: ${this.page.url()}`);
     return id;
   }

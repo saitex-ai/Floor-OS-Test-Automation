@@ -404,3 +404,8 @@ Changes that affect every case:
 
 - **All / Draft / Open / Approved** are tabs now (`role="tab"`, the selected one `aria-selected`), not `aria-pressed` buttons, on dev and uat. Steps and expected results are unchanged; the suite's locators follow (every case that opens the list, TC:1–TC:20).
 - **TC:14:** Grid View cards are named `Select <id> <name> <code>` (the id is the record's 26-character id); they used to start with the code. Expected result unchanged.
+
+## Update 2026-11-05 — uat opens techpacks on the canvas
+
+- **TC:10:** on uat a code opens `/techpacks/canvas/{id}`, not `/techpacks/view/{id}` (dev still opens the view). The
+  expected result accepts either; the h1 is still the code.

@@ -1,7 +1,7 @@
 import { type Download, type Page, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
 import { MODULES } from '../../config/modules';
-import { TechpackLocators } from '../../locators/techpack/techpack.locators';
+import { TECHPACK_PAGE_URL, TechpackLocators } from '../../locators/techpack/techpack.locators';
 
 type StatusTab = 'All' | 'Draft' | 'Open' | 'Approved';
 type ViewLayout = 'List View' | 'Vertical Split' | 'Grid View';
@@ -44,20 +44,25 @@ export class TechpackPage extends BasePage {
     await this.locators.searchInput.fill(query);
   }
 
-  /** Clicks a techpack's code button; it opens `/techpacks/view/{id}`. */
+  /** Clicks a techpack's code button; it opens TECHPACK_PAGE_URL. */
   async openCode(techpackCode: string): Promise<void> {
     await this.locators.codeButton(techpackCode).click();
   }
 
+  /** Waits until the browser is on a techpack's own page (TECHPACK_PAGE_URL). */
+  async expectOnTechpackPage(timeout = 30_000): Promise<void> {
+    await expect(this.page).toHaveURL(TECHPACK_PAGE_URL, { timeout });
+  }
+
   /**
    * Opens a techpack from its code and returns its id, read from the
-   * `/techpacks/view/{id}` URL it lands on. The same id opens the canvas
+   * TECHPACK_PAGE_URL it lands on. The same id opens the canvas
    * (`/techpacks/canvas/{id}`).
    */
   async openCodeAndReadId(techpackCode: string): Promise<string> {
     await this.openCode(techpackCode);
-    await expect(this.page).toHaveURL(/\/techpacks\/view\/[^/?#]+/, { timeout: 30_000 });
-    const id = this.page.url().match(/\/techpacks\/view\/([^/?#]+)/)?.[1];
+    await this.expectOnTechpackPage();
+    const id = this.page.url().match(TECHPACK_PAGE_URL)?.[1];
     if (!id) throw new Error(`No techpack id in ${this.page.url()}`);
     return id;
   }

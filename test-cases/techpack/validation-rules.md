@@ -284,3 +284,9 @@ The intro paragraph above, about the "WORKSPACE" section and "Open navigation", 
 
 - **All / Draft / Suggested / Active** are tabs now (`role="tab"`, `aria-selected`), not `aria-pressed` buttons. TC:5's check reads `aria-selected`.
 - **The grid has a new first column:** each row starts with a "Select row <id>" checkbox (header "Select all rows"). The suite's "grid has loaded" check used to read the first cell's text, so it never saw the data. It reads the whole row now. Steps and expected results are unchanged.
+
+## Update 2026-11-05 — "Settings" in the Techpack nav
+
+- **TC:1 / TC:28:** the Techpack left nav (dev and uat) has no "Validation rules" link. **Settings** at the bottom of
+  the nav opens `/techpacks/admin/validation-rules`. Step 2 is now "click Settings"; the expected result is unchanged.
+  bob (Qc-lead) sees the same Settings link.

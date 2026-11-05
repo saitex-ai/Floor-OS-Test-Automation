@@ -376,3 +376,26 @@ Changes that affect every case:
 - **Rewritten to the new behaviour:** TC:1 (layout reached via Open in canvas; h1 = code; no Back) and TC:16 (Re-extract only while an AI-Mode techpack is a draft).
 - **New, not yet automated:** TC:21-33 — Open in canvas, the code h1, approving a Classic techpack, the Approve dialog, Force release hidden once approved, the force-release banner, History after approval, Select revision, Copy as New without the PDF, and the AI-Mode draft path (extracted fields, Approve all, "Open Techpack", Move to Open gating).
 - **Open questions written into the Expected column:** TC:26 (banner persists), TC:27 (History empty), TC:33 (Move to Open blocked by draft master data).
+
+## Update 2026-11-05 — dev's and uat's new canvas
+
+Seen live on both environments on 2026-11-05: the canvas opens on its **Standard** view (the identity fields), not on File.
+Expected results are unchanged; steps change as below. The table above is left as it is because the open AI Mode PR
+(#59) rewrites it; the changes are listed here instead.
+
+- **Layout (TC:1):** the left pane has **Overview** (the 7 identity fields with an Approved/Pending badge each, the
+  Description and "Master data review") and **Files** (the uploads table) tabs. These replace the right panel's Headers
+  and Uploads sections. There's no "Back to techpacks" button; the breadcrumb's "Tech Pack & BOM" link goes back. Page
+  navigation, zoom and Add Pin show only in the **File** view, so TC:1 checks the panel in the view the canvas opens on,
+  then switches to File for the toolbar.
+- **Uploads (TC:4):** open the Files tab; the PDF's row has File type "Techpack".
+- **Field comments (TC:6/7):** only the Details rows (Techpack Code, Rev, Status, Lock Status, Create Date, Creator,
+  Approved Date, Approver) have a comment button now; Season moved to Overview without one. The cases comment on
+  **Creator**.
+- **Pins (TC:13/14):** switch to File first. Clicking the page opens a **"New comment"** dialog ("Comment" box, "Send
+  comment"), not "New annotation on page N" / "Submit". A placed pin's marker is "Comment by <author>". The pin's text
+  still shows in the Comments tab, which reads "Comments (1)".
+- **Route:** on uat a create or a code click lands on `/techpacks/canvas/{id}`; on dev it still lands on the view
+  `/techpacks/view/{id}`, which has none of the canvas's controls. Every case now opens the canvas by id after creating
+  its techpack, on both environments (the 2026-10-23 notes above already say a create opens the view).
+- Not changed here: TC:16 (AI Mode), which #59 covers.

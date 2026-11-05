@@ -80,7 +80,7 @@ test.describe('Techpack - Validation Rules', () => {
     page,
   }) => {
     test.setTimeout(120_000);
-    await test.step('Open the Techpack Dashboard, click "Validation rules" in the left nav', async () => {
+    await test.step('Open the Techpack Dashboard, click "Settings" (Validation rules) in the left nav', async () => {
       await validationRulesPage.openViaTechpackNav();
     });
     await test.step('Lands on /techpacks/admin/validation-rules', async () => {
@@ -793,7 +793,7 @@ test.describe('Techpack - Validation Rules', () => {
       const bob = await loginAsSecondUser(browser);
       try {
         const vr = new ValidationRulesPage(bob.page);
-        await test.step('As bob, click "Validation rules" in the Dashboard\'s left nav', async () => {
+        await test.step('As bob, click "Settings" (Validation rules) in the Dashboard\'s left nav', async () => {
           await vr.openViaTechpackNav();
         });
         await expect(bob.page).toHaveURL(/\/techpacks\/admin\/validation-rules\/?$/);

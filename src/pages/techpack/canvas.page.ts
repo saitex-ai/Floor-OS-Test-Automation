@@ -177,36 +177,59 @@ export class CanvasPage extends BasePage {
     return this.locators.uploadedFile(fileName);
   }
 
+  /** Shows the uploaded files, which are on the left pane's "Files" tab. */
+  async showUploads(): Promise<void> {
+    await this.locators.filesTab.click();
+  }
+
   /**
-   * Clicks somewhere inside the document viewer pane — computed relative to
-   * `main`'s own real bounding box (not a hardcoded absolute pixel pair),
-   * so this isn't tied to one specific viewport size. Confirmed live: a
-   * point well inside the left ~60% of `main` (offset 300,300 from its
-   * top-left) reliably lands on the rendered PDF content, not the
-   * toolbar or the right-hand panel.
+   * Switches the canvas to its "File" view (the document viewer: pages, zoom,
+   * Add Pin). Since the 2026-11-05 build (dev and uat) the canvas opens on
+   * "Standard" (the Overview / Files tabs).
    */
-  private async clickDocumentViewer(offsetX = 300, offsetY = 300): Promise<void> {
-    const main = this.page.locator('main').first();
-    const box = await main.boundingBox();
-    if (!box)
-      throw new Error('Could not find the canvas main content area to click for pin placement');
-    await this.page.mouse.click(box.x + offsetX, box.y + offsetY);
+  async showFileView(): Promise<void> {
+    await this.locators.fileViewToggle.click();
+    await expect(this.locators.addPinButton.or(this.locators.cancelPinButton)).toBeVisible({
+      timeout: 15_000,
+    });
+  }
+
+  /**
+   * Clicks a point a third of the way into the rendered document page. The
+   * "Annotation overlay" region covers exactly that page (2026-11-05, dev
+   * and uat: its centre is the PDF's <canvas>). This used to click 300,300
+   * into `main`, but `main` now starts at the top of the page, above the
+   * toolbar.
+   */
+  private async clickDocumentViewer(): Promise<void> {
+    const box = await this.locators.annotationOverlay.boundingBox();
+    if (!box) throw new Error('Could not find the document page to click for pin placement');
+    await this.page.mouse.click(box.x + box.width / 3, box.y + box.height / 3);
+  }
+
+  /**
+   * Waits until the PDF viewer has loaded the document: its page indicator
+   * only shows the total ("Page 1 of 33") once it has, and reads "Page 1 of …"
+   * while still loading. A pin click at a fixed point needs real content under it.
+   * Switches to the File view first (the canvas opens on Standard).
+   */
+  async waitForDocumentRendered(timeout = 45_000): Promise<void> {
+    await this.showFileView();
+    await expect(this.locators.pageIndicatorText).toHaveText(/Page \d+ of \d+/, { timeout });
   }
 
   /**
    * Full "Add Pin" flow: enters pin-placement mode, clicks a point in the
-   * document viewer (opens a "New annotation on page N" dialog), types a
-   * note, and submits.
+   * document viewer (opens a "New comment" dialog), types a note, and sends it.
    *
    * Confirmed live, not guessed:
    * - "Add Pin" is a toggle on the SAME button — clicking it renames it to
    *   "Cancel Pin" (pressed) rather than opening a separate control.
-   * - Clicking the document viewer while in placement mode opens a real
-   *   `dialog` (accessible name "Annotation", visible text "New annotation
-   *   on page N") with a `textbox` (visible placeholder "Type your
-   *   note…" — note the single "…" glyph, not three periods, matching
-   *   this module's other comment inputs) and a "Submit" button that
-   *   stays disabled until the textbox has content.
+   * - Clicking the document viewer while in placement mode opens a
+   *   `dialog "New comment"` with a "Comment" textbox (placeholder "Add your
+   *   comment ....") and a "Send comment" button that stays disabled until
+   *   the textbox has content (2026-11-05, dev and uat; it used to be a "New
+   *   annotation on page N" dialog with "Submit").
    * - **Pin-placement mode does NOT auto-exit after a successful
    *   submit** — the toolbar button stays "Cancel Pin", so multiple pins
    *   can be dropped in a row without re-clicking "Add Pin" each time.
@@ -214,28 +237,19 @@ export class CanvasPage extends BasePage {
    * - The new pin renders as a numbered marker directly on the document
    *   (confirmed via screenshot: a circular "1" badge at the clicked
    *   point) and a `region "Annotation overlay"` gains a
-   *   `button "N Annotation by <author>"`.
+   *   `button "Comment by <author>"` (was "N Annotation by <author>").
    * - The pin's text also surfaces in the aggregated Comments tab, whose
    *   own tab name grows a count badge ("Comments" -> "Comments (1)") —
    *   see commentsTab's own doc comment for why per-field comments don't
    *   do the same.
    */
-  /**
-   * Waits until the PDF viewer has loaded the document: its page indicator
-   * only shows the total ("Page 1 of 33") once it has, and reads "Page 1 of …"
-   * while still loading. A pin click at a fixed point needs real content under it.
-   */
-  async waitForDocumentRendered(timeout = 45_000): Promise<void> {
-    await expect(this.locators.pageIndicatorText).toHaveText(/Page \d+ of \d+/, { timeout });
-  }
-
   async postPinAnnotation(text: string): Promise<void> {
     await this.locators.addPinButton.click();
     await expect(this.locators.cancelPinButton).toBeVisible({ timeout: 10_000 });
     await this.clickDocumentViewer();
     await expect(this.locators.annotationDialog).toBeVisible({ timeout: 10_000 });
     await this.locators.annotationDialog.getByRole('textbox').fill(text);
-    await this.locators.annotationDialog.getByRole('button', { name: 'Submit' }).click();
+    await this.locators.annotationSubmitButton.click();
     await expect(this.locators.annotationDialog).toBeHidden({ timeout: 10_000 });
   }
 
@@ -272,6 +286,17 @@ export class CanvasPage extends BasePage {
    */
   async gotoCanvasById(id: string): Promise<void> {
     await this.gotoAuthenticated(`/techpacks/canvas/${id}`);
+  }
+
+  /**
+   * Opens a just-created techpack's canvas. A create lands on the techpack's
+   * own page (TECHPACK_PAGE_URL): the view on dev, which has none of the
+   * canvas's controls, and the canvas itself on uat (2026-11-05), so this
+   * opens the canvas by id either way.
+   */
+  async openForCreatedTechpack(id: string): Promise<void> {
+    await this.gotoCanvasById(id);
+    await this.expectLoaded();
   }
 
   /** Asserts the "Canvas not found" state (invalid/nonexistent canvas ID) is shown. */
