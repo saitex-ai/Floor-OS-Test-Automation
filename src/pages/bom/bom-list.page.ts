@@ -271,10 +271,60 @@ export class BomListPage extends BasePage {
     await expect(this.locators.newBomDialog).toBeHidden();
   }
 
-  /** Opens the techpack picker from the dialog's code field and waits for its list to load. */
+  /**
+   * What the dialog's code field shows: "< NEW >" or the picked code. It's
+   * the button's text on dev, and the searchbox's value or placeholder on uat
+   * (2026-11-05).
+   */
+  async techpackCodeFieldText(): Promise<string> {
+    const field = this.locators.selectTechpackButton;
+    const isInput = await field.evaluate((el) => el.tagName === 'INPUT');
+    if (!isInput) return (await field.innerText()).trim();
+    return (await field.inputValue()) || ((await field.getAttribute('placeholder')) ?? '');
+  }
+
+  /**
+   * Opens the techpack picker from the dialog's code field and waits for its
+   * list to load. Until `GET /api/bom-techpack/available-techpacks` answers,
+   * and for a moment after, the picker shows an empty state ("Pick a
+   * techpack(0)" and "Showing 0 of 0" or "No results"; dev and uat,
+   * 2026-11-05). It lists the response's techpacks with `hasBom: false`, so
+   * this waits for the first row, or for the empty state when there are none.
+   */
   async openTechpackPicker(): Promise<void> {
-    await this.locators.selectTechpackButton.click();
+    const [response] = await Promise.all([
+      this.page.waitForResponse(
+        (res) => new URL(res.url()).pathname === '/api/bom-techpack/available-techpacks',
+        { timeout: PICKER_LOAD_TIMEOUT },
+      ),
+      this.locators.selectTechpackButton.click(),
+    ]);
+    const { data } = (await response.json()) as { data: { hasBom: boolean }[] };
+    const offered = data.filter((t) => !t.hasBom).length;
+    await expect(
+      offered > 0
+        ? this.locators.techpackPickerRows.first()
+        : this.locators.techpackPickerNoResults,
+    ).toBeVisible({ timeout: PICKER_LOAD_TIMEOUT });
     await this.expectTechpackPickerLoaded();
+  }
+
+  /**
+   * Whether New BOM's picker offers this techpack. Opens and closes the New
+   * BOM dialog and its picker, leaving the list as it was. On uat a techpack
+   * gets its rev-0 BOM the moment it's approved (`createdBy:
+   * "system:autobom"`, 2026-11-05), so it's never offered there.
+   */
+  async isOfferedForNewBom(code: string): Promise<boolean> {
+    await this.openNewBomDialog();
+    await this.openTechpackPicker();
+    await this.searchTechpackPicker(code);
+    const row = this.locators.techpackPickerRow(code);
+    await expect(row.or(this.locators.techpackPickerNoResults)).toBeVisible();
+    const offered = await row.isVisible();
+    await this.closeTechpackPicker();
+    await this.cancelNewBomDialog();
+    return offered;
   }
 
   /**

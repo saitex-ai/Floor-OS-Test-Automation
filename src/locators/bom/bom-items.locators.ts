@@ -127,11 +127,17 @@ export class BomItemsLocators {
     this.discardDialog = page.getByRole('dialog', { name: /Discard staged edits/ });
 
     this.addInventoryDialog = page.getByRole('dialog', { name: 'Add Inventory Item' });
-    this.addInventorySearchBox = this.addInventoryDialog.getByRole('searchbox', {
-      name: 'Search inventory',
-    });
+    // uat's 2026-11-05 table component: a "Search" textbox, a plain "1-50 of
+    // 66,858" footer and "Select row <id>" checkboxes (dev: "Search
+    // inventory", a contentinfo footer, "Select <id>").
+    this.addInventorySearchBox = this.addInventoryDialog
+      .getByRole('searchbox', { name: 'Search inventory' })
+      .or(this.addInventoryDialog.getByRole('textbox', { name: 'Search', exact: true }));
     this.addInventoryTable = this.addInventoryDialog.getByRole('table');
-    this.addInventoryFooter = this.addInventoryDialog.getByRole('contentinfo');
+    this.addInventoryFooter = this.addInventoryDialog
+      .getByRole('contentinfo')
+      .or(this.addInventoryDialog.getByText(/^[\d,]+-[\d,]+ of [\d,]+$/))
+      .first();
     this.addSelectedButton = this.addInventoryDialog.getByRole('button', {
       name: /^Add Selected/,
     });
@@ -200,8 +206,12 @@ export class BomItemsLocators {
     this.copyBomDialog = page.getByRole('dialog').filter({
       has: page.getByRole('heading', { name: /^Copy B\.O\.M/ }),
     });
-    this.copySourceRows = this.copyBomDialog.getByRole('row', { name: /^Select row TP/ });
-    this.copySourceSearch = this.copyBomDialog.getByRole('textbox', { name: 'Search source BOMs' });
+    // Rows are "Select row TP…/<rev> …" on dev and "TP… <rev> …" on uat's 2026-11-05 table;
+    // its search is a plain "Search" textbox.
+    this.copySourceRows = this.copyBomDialog.getByRole('row', { name: /^(Select row )?TP\d/ });
+    this.copySourceSearch = this.copyBomDialog
+      .getByRole('textbox', { name: 'Search source BOMs' })
+      .or(this.copyBomDialog.getByRole('textbox', { name: 'Search', exact: true }));
   }
 
   /**
@@ -261,14 +271,13 @@ export class BomItemsLocators {
   /** The "Add Inventory Item" picker's row for one inventory code. */
   inventoryOptionRow(inventoryId: string): Locator {
     return this.addInventoryDialog.getByRole('row').filter({
-      has: this.page.getByRole('checkbox', { name: `Select ${inventoryId}`, exact: true }),
+      has: this.page.getByRole('checkbox', { name: new RegExp(`^Select (row )?${inventoryId}$`) }),
     });
   }
 
   inventoryOptionCheckbox(inventoryId: string): Locator {
     return this.addInventoryDialog.getByRole('checkbox', {
-      name: `Select ${inventoryId}`,
-      exact: true,
+      name: new RegExp(`^Select (row )?${inventoryId}$`),
     });
   }
 

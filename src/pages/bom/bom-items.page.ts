@@ -84,6 +84,17 @@ export class BomItemsPage extends BasePage {
     await expect(this.locators.addInventoryDialog).toBeVisible();
   }
 
+  /**
+   * Nothing is ticked, so nothing can be added: dev hides "Add Selected"
+   * until something is ticked; uat (2026-11-05) shows it disabled as "Add
+   * Selected (0)".
+   */
+  async expectNothingToAdd(): Promise<void> {
+    if ((await this.locators.addSelectedButton.count()) === 0) return;
+    await expect(this.locators.addSelectedButton).toBeDisabled();
+    await expect(this.locators.addSelectedButton).toHaveText('Add Selected (0)');
+  }
+
   async closeAddLine(): Promise<void> {
     await this.locators.addInventoryCloseButton.click();
     await expect(this.locators.addInventoryDialog).toBeHidden();
@@ -107,10 +118,10 @@ export class BomItemsPage extends BasePage {
     await expect(this.locators.addInventoryFooter).toContainText(/of \d+/i, {
       timeout: INVENTORY_SEARCH_TIMEOUT,
     });
-    // A result row's own checkbox ("Select FAB0000002"), not the header's "Select all visible items".
+    // A result row's own checkbox ("Select FAB0000002", uat: "Select row FAB0000002"), not the header's.
     await expect(
       this.locators.addInventoryDialog
-        .getByRole('checkbox', { name: /^Select [A-Z]{3}\d+/ })
+        .getByRole('checkbox', { name: /^Select (row )?[A-Z]{3}\d+/ })
         .first(),
     ).toBeVisible({
       timeout: INVENTORY_SEARCH_TIMEOUT,
@@ -407,7 +418,9 @@ export class BomItemsPage extends BasePage {
   async copyFrom(sourceCode: string, sourceRev: number): Promise<void> {
     await this.locators.copySourceSearch.fill(sourceCode);
     await this.locators.copyBomDialog
-      .getByRole('row', { name: new RegExp(`^Select row ${sourceCode}/${sourceRev}\\b`) })
+      .getByRole('row', {
+        name: new RegExp(`^(Select row ${sourceCode}/${sourceRev}\\b|${sourceCode} ${sourceRev} )`),
+      })
       .getByRole('cell')
       .nth(1)
       .click();

@@ -3,7 +3,11 @@ import { test, expect, type Page } from '@playwright/test';
 import { authFile } from '../../../src/fixtures/auth-setup';
 import { BomDetailPage } from '../../../src/pages/bom/bom-detail.page';
 import { BomItemsPage } from '../../../src/pages/bom/bom-items.page';
-import { createDisposableBom, DISPOSABLE_BOM_TIMEOUT } from './support/disposable-bom';
+import {
+  createDisposableBom,
+  DISPOSABLE_BOM_TIMEOUT,
+  MATERIALS_REDESIGN,
+} from './support/disposable-bom';
 
 /**
  * BOM — Items (the "B.O.M Items" table on an Open BOM).
@@ -47,6 +51,7 @@ test.describe('BOM - Items', () => {
     bomDetailPage = new BomDetailPage(page);
     bomItemsPage = new BomItemsPage(page);
     code = await createDisposableBom(page);
+    test.skip(await bomDetailPage.hasMaterialsWorkspace(), MATERIALS_REDESIGN);
     await bomItemsPage.addLines(BASELINE);
   });
 
@@ -75,13 +80,13 @@ test.describe('BOM - Items', () => {
       await expect(l.addInventoryFooter).toContainText(/of \d+/i);
     });
 
-    await test.step('"Add Selected" only appears once something is ticked, with the count', async () => {
-      await expect(l.addSelectedButton).toHaveCount(0);
+    await test.step('"Add Selected" is only usable once something is ticked, with the count', async () => {
+      await bomItemsPage.expectNothingToAdd();
       await bomItemsPage.searchInventory('CPT0000001');
       await l.inventoryOptionCheckbox('CPT0000001').check();
       await expect(l.addSelectedButton).toHaveText('Add Selected (1)');
       await l.inventoryOptionCheckbox('CPT0000001').uncheck();
-      await expect(l.addSelectedButton).toHaveCount(0);
+      await bomItemsPage.expectNothingToAdd();
     });
 
     await bomItemsPage.closeAddLine();

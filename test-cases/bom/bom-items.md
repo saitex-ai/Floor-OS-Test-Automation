@@ -69,3 +69,15 @@ Re-baselined from a live exploration of the redesigned UAT screens on 2026-10-23
 - The split-type **mutex** covers Item-level / Inseam / Waist / GMT size set only; Destination split and BPO split are separate flags that sit alongside them.
 - An edited line shows an "Edited" provenance badge next to its code — row lookups match the code as a prefix for that reason.
 - Not automated: booking-advance un-tick (admin-only) has no UI; duplicate-item rejection can't be reached (already-added items are hidden from Add line); stale-edit `If-Match` conflicts and the Customer-Supplied registry precedence need two sessions / a second BOM for the same buyer.
+
+## Update 2026-11-05 — dev and uat on different BOM builds
+
+- **Add Inventory Item (uat):** a "Search" textbox, row checkboxes "Select row <id>", a plain "1-50 of 66,858" footer,
+  and "Add Selected (0)" shown disabled until something is ticked (dev hides it). TC:1's expected result: "Add
+  Selected" can't be used until something is ticked, then reads "Add Selected (1)".
+- **Copy B.O.M (uat):** a "Search" textbox; source rows are named by their content ("TP… 0 BULK …").
+- **Setup:** on uat the disposable BOM is the one created automatically by approving the techpack.
+- **dev's BOM detail redesign:** "Add line" is replaced by **Add material** (a product catalogue picker: Category,
+  Supplier, colour, SKUs filled per size), plus "Sizes this BOM covers", "Items Confirmed", and "B.O.M Items N" /
+  "Split Details N" as tabs. uat still has "Add line". Cases written for "Add line" skip on a BOM that shows "Add
+  material", with that reason, until test cases for the redesign are written. On dev this whole spec skips.

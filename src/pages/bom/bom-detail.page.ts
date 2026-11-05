@@ -145,6 +145,19 @@ export class BomDetailPage extends BasePage {
     await expect(this.locators.addLineButton).toHaveCount(0);
   }
 
+  /**
+   * Whether this BOM shows dev's 2026-11-05 materials redesign ("Add
+   * material", sizes, product catalogue) instead of "Add line" and the MDM
+   * item picker. The item, lifecycle and permission cases are written for
+   * "Add line" and wait for new test cases, so they skip on such a BOM.
+   */
+  async hasMaterialsWorkspace(): Promise<boolean> {
+    await expect(this.locators.addLineButton.or(this.locators.addMaterialButton)).toBeVisible({
+      timeout: 30_000,
+    });
+    return this.locators.addMaterialButton.isVisible();
+  }
+
   /** Reads the live count out of the "B.O.M Items" tab's own name, e.g. "B.O.M Items 5" → 5. */
   async itemCount(): Promise<number> {
     const text = await this.locators.itemsTab.innerText();

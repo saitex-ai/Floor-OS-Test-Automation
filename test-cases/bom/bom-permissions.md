@@ -38,3 +38,11 @@ Re-baselined from a live exploration of the redesigned UAT screens on 2026-10-23
 ## Notes
 
 - **Open question for the user (not graded):** bob (Qc-lead) _can_ create BOMs, add/edit lines and open "Create Costing Request" — only the approve/reopen/complete/revise actions are blocked for him. Confirm whether Qc-lead is meant to have BOM write access before adding cases for it.
+
+## Update 2026-11-05 — dev and uat on different BOM builds
+
+- **Setup:** on uat the disposable BOM is the one created automatically by approving the techpack.
+- **dev's BOM detail redesign:** "Add line" is replaced by **Add material** (a product catalogue picker: Category,
+  Supplier, colour, SKUs filled per size), plus "Sizes this BOM covers", "Items Confirmed", and "B.O.M Items N" /
+  "Split Details N" as tabs. uat still has "Add line". Cases written for "Add line" skip on a BOM that shows "Add
+  material", with that reason, until test cases for the redesign are written. On dev this whole spec skips.
