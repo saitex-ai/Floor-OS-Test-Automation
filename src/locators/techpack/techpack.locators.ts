@@ -11,14 +11,21 @@ import { type Locator, type Page } from '@playwright/test';
  *   region (STEP 1-6 buttons that filter the grid) and the techpack grid.
  * - "Create New" replaced the "New Techpack" split button. It always opens
  *   AI Mode (`/techpacks/new/copilot`) and has no menu.
- * - Techpack codes in the grid are buttons, not links, and open
- *   `/techpacks/view/{id}`.
+ * - Techpack codes in the grid are buttons, not links, and open the
+ *   techpack's own page (see TECHPACK_PAGE_URL).
  * - Toolbar: Search, Filters (a "Filter" dialog, plus an "Advanced Filters"
  *   rule builder), Configure columns (a "Columns" dialog), View (a menu:
  *   List View / Vertical Split / Grid View) and Export. "Toggle cell
  *   filters" and the split buttons are gone.
  * - There are two nested <main> elements; the content is the last one.
  */
+/**
+ * A techpack's own page, where a code in the grid or a Classic create lands:
+ * `/techpacks/view/{id}` on dev, `/techpacks/canvas/{id}` on uat since its
+ * 2026-11-05 build. Group 1 is the id, which also opens the canvas.
+ */
+export const TECHPACK_PAGE_URL = /\/techpacks\/(?:view|canvas)\/([^/?#]+)/;
+
 export class TechpackLocators {
   readonly main: Locator;
   readonly heading: Locator;
@@ -169,14 +176,14 @@ export class TechpackLocators {
     this.openListbox = page.getByRole('listbox').last();
   }
 
-  /** A techpack's code button in the grid (clicking it opens `/techpacks/view/{id}`). */
+  /** A techpack's code button in the grid (clicking it opens TECHPACK_PAGE_URL). */
   codeButton(techpackCode: string): Locator {
     return this.table.getByRole('button', { name: techpackCode, exact: true });
   }
 
   /**
-   * A techpack page's <h1>, which is its code (`/techpacks/view/{id}`, where
-   * a code in the grid or a Classic create lands).
+   * A techpack page's <h1>, which is its code (TECHPACK_PAGE_URL, where a
+   * code in the grid or a Classic create lands).
    */
   techpackHeading(techpackCode: string): Locator {
     return this.page.getByRole('heading', { name: techpackCode, level: 1 });

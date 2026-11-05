@@ -44,7 +44,7 @@ export class ValidationRulesPage extends BasePage {
     await this.expectLoaded();
   }
 
-  /** TC:1/TC:28's real user path: Techpack Dashboard -> left nav "Validation rules". */
+  /** TC:1/TC:28's real user path: Techpack Dashboard -> left nav "Settings" (Validation rules). */
   async openViaTechpackNav(): Promise<void> {
     await this.gotoAuthenticated(MODULES['techpack'].path);
     await expect(this.locators.techpackDashboardHeading).toBeVisible({ timeout: 60_000 });

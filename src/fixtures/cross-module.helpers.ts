@@ -51,10 +51,11 @@ export async function deactivateDepartment(page: Page, code: string): Promise<vo
  * Approved techpack a BOM needs (a BOM can only be created for an Approved
  * techpack with no BOM yet). Returns the new techpack's code.
  *
- * Since the 2026-10-22 redesign, Create lands on `/techpacks/view/{id}` and
- * Approve lives on the canvas (`/techpacks/canvas/{id}`, same id). A fresh
- * record's Functions menu doesn't always offer Approve straight away (see
- * CanvasPage.approveTechpack()), so this tries up to 3 fresh techpacks.
+ * Create lands on the techpack's own page (`/techpacks/view/{id}` on dev,
+ * `/techpacks/canvas/{id}` on uat since 2026-11-05); Approve lives on the
+ * canvas, which this opens by id. A fresh record's Functions menu doesn't
+ * always offer Approve straight away (see CanvasPage.approveTechpack()), so
+ * this tries up to 3 fresh techpacks.
  */
 export async function createApprovedTechpack(
   page: Page,
@@ -70,10 +71,7 @@ export async function createApprovedTechpack(
     expect(await create.createExpectingResult()).toBe('created');
     await create.expectCreatedSuccessfully();
     const code = await create.currentTechpackCode();
-    const id = page.url().match(/\/techpacks\/view\/([^/?#]+)/)?.[1];
-    if (!id) throw new Error(`Create did not land on a techpack view page: ${page.url()}`);
-    await canvas.gotoCanvasById(id);
-    await canvas.expectLoaded();
+    await canvas.openForCreatedTechpack(create.currentTechpackId());
     if ((await canvas.approveTechpack()) === 'approved') {
       await expect
         .poll(async () => (await canvas.fieldRowText('Status')).split('\n').pop()!.trim(), {

@@ -3,7 +3,6 @@ import * as path from 'path';
 import * as allure from 'allure-js-commons';
 import type { Page } from '@playwright/test';
 import { test, expect } from '../../../src/fixtures/techpack.fixtures';
-import { knownBug } from '../../../src/utils/test-annotations';
 
 /**
  * Techpack — New Techpack (Classic manual form).
@@ -118,10 +117,10 @@ test.describe('Techpack - New Techpack (Classic)', () => {
       await aiModeCopilotPage.openManualFormFromAddFiles();
     });
 
-    await test.step('The form opens with its heading, Back link, Close and five sections', async () => {
+    await test.step('The form opens with its heading, "Tech Pack & BOM" back button, Close and five sections', async () => {
       await expect(page).toHaveURL(/\/techpacks\/new$/);
       await expect(createTechpackPage.locators.heading).toBeVisible({ timeout: 30_000 });
-      await expect(createTechpackPage.locators.backToTechpacksLink).toBeVisible();
+      await expect(createTechpackPage.locators.backToTechpacksButton).toBeVisible();
       await expect(createTechpackPage.locators.closeButton).toBeVisible();
       await createTechpackPage.expectFormSectionsVisible();
     });
@@ -267,7 +266,7 @@ test.describe('Techpack - New Techpack (Classic)', () => {
     const code =
       await test.step('It opens the techpack view: h1 = the new code, with a "created" toast', async () => {
         await createTechpackPage.expectCreatedSuccessfully();
-        await expect(page).toHaveURL(/\/techpacks\/view\/[^/]+$/);
+        await techpackPage.expectOnTechpackPage(15_000);
         const created = await createTechpackPage.currentTechpackCode();
         expect(created).toMatch(/^TP\d{6}-\d{6}$/);
         await expect(techpackPage.locators.techpackHeading(created)).toBeVisible();
@@ -368,12 +367,13 @@ test.describe('Techpack - New Techpack (Classic)', () => {
     page,
   }) => {
     await allure.tms('https://app.clickup.com/t/z941abxb20', 'TC:9 bug (ClickUp)');
-    knownBug('z941abxb20');
-    // Confirmed bug, ClickUp z941abxb20 (see test-case doc's own notes):
-    // the "Add techpack type" dialog has no client-side length check, so
-    // this flow can run all the way to filling the remaining 6 fields,
-    // uploading a real PDF, and clicking "Create techpack" — budgeted
-    // generously like TC:7/TC:8 do for that same shape of flow.
+    // ClickUp z941abxb20 ("in testing"): not reproduced on uat on 2026-11-05
+    // (3 runs; the dialog stops the 25-character code), so this asserts the
+    // fixed behaviour. dev's dialog still accepted it the same day, but the
+    // test skips on dev before asserting (the over-length value below exists
+    // on uat only). The flow can run all the way to filling the remaining 6
+    // fields, uploading a real PDF and clicking "Create techpack", so it's
+    // budgeted generously like TC:7/TC:8.
     test.setTimeout(180_000);
     await createTechpackPage.openFromTechpacksList();
 

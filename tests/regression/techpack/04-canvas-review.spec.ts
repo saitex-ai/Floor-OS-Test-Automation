@@ -15,7 +15,7 @@ import { test, expect } from '../../../src/fixtures/techpack.fixtures';
  * mutate the record.
  */
 test.describe('Techpack - Canvas Review', () => {
-  test.beforeEach(async ({ createTechpackPage }, testInfo) => {
+  test.beforeEach(async ({ createTechpackPage, canvasPage }, testInfo) => {
     // The create flow (list load + 7 random combobox picks, with Season's
     // own retry-for-a-customer-with-a-season loop + file upload + create)
     // can genuinely exceed the global 90s default on a slow dev day —
@@ -43,13 +43,25 @@ test.describe('Techpack - Canvas Review', () => {
       throw new Error(`beforeEach: expected a fresh techpack to be created, got: ${outcome}`);
     }
     await createTechpackPage.expectCreatedSuccessfully();
+    await canvasPage.openForCreatedTechpack(createTechpackPage.currentTechpackId());
   });
 
   test('TC:1 Verify the canvas layout right after creating a techpack', async ({ canvasPage }) => {
     await canvasPage.expectLoaded();
 
-    await test.step('Toolbar controls are visible', async () => {
-      await expect(canvasPage.locators.backButton).toBeVisible();
+    await test.step('Overview / Files tabs and the right panel are visible (in the view it opens on)', async () => {
+      await expect(canvasPage.locators.overviewTab).toBeVisible();
+      await expect(canvasPage.locators.filesTab).toBeVisible();
+      await expect(canvasPage.locators.detailsTab).toBeVisible();
+      await expect(canvasPage.locators.commentsTab).toBeVisible();
+      await expect(canvasPage.locators.historyTab).toBeVisible();
+      await expect(canvasPage.locators.detailsSectionHeader).toBeVisible();
+      await expect(canvasPage.locators.operationsSectionHeader).toBeVisible();
+    });
+
+    await test.step('Toolbar controls are visible (in the File view)', async () => {
+      await canvasPage.showFileView();
+      await expect(canvasPage.locators.backToList).toBeVisible();
       await expect(canvasPage.locators.fileViewToggle).toBeVisible();
       await expect(canvasPage.locators.standardViewToggle).toBeVisible();
       await expect(canvasPage.locators.addPinButton).toBeVisible();
@@ -60,16 +72,6 @@ test.describe('Techpack - Canvas Review', () => {
       await expect(canvasPage.locators.reportsButton).toBeVisible();
       await expect(canvasPage.locators.copyAsNewButton).toBeVisible();
       await expect(canvasPage.locators.forceReleaseButton).toBeVisible();
-    });
-
-    await test.step('Right panel tabs and sections are visible', async () => {
-      await expect(canvasPage.locators.detailsTab).toBeVisible();
-      await expect(canvasPage.locators.commentsTab).toBeVisible();
-      await expect(canvasPage.locators.historyTab).toBeVisible();
-      await expect(canvasPage.locators.detailsSectionHeader).toBeVisible();
-      await expect(canvasPage.locators.headersSectionHeader).toBeVisible();
-      await expect(canvasPage.locators.uploadsSectionHeader).toBeVisible();
-      await expect(canvasPage.locators.operationsSectionHeader).toBeVisible();
     });
   });
 
@@ -130,6 +132,7 @@ test.describe('Techpack - Canvas Review', () => {
   test('TC:4 Verify the Uploads section lists the uploaded techpack document', async ({
     canvasPage,
   }) => {
+    await canvasPage.showUploads();
     await expect(canvasPage.uploadedFile('sample-techpack.pdf')).toBeVisible();
     await expect(canvasPage.locators.techpackUploadTag).toBeVisible();
   });
@@ -154,7 +157,9 @@ test.describe('Techpack - Canvas Review', () => {
 
   test('TC:6 Verify posting a comment on a field', async ({ canvasPage }) => {
     const commentText = `QA field comment ${Date.now()}`;
-    await canvasPage.postFieldComment('Season', commentText);
+    // A Details field: since the 2026-11-05 build only the Details rows have
+    // comment buttons (Season, a header field, moved to Overview without one).
+    await canvasPage.postFieldComment('Creator', commentText);
     // The submitted textarea can stay populated after Enter alongside the
     // newly-rendered comment itself — both legitimately contain the text,
     // so .first() just confirms presence rather than requiring exactly one.
@@ -165,7 +170,7 @@ test.describe('Techpack - Canvas Review', () => {
     canvasPage,
   }) => {
     const commentText = `QA aggregated comment ${Date.now()}`;
-    await canvasPage.postFieldComment('Season', commentText);
+    await canvasPage.postFieldComment('Creator', commentText);
 
     await canvasPage.locators.commentsTab.click();
     await expect(canvasPage.locators.text(commentText).first()).toBeVisible();
@@ -243,9 +248,7 @@ test.describe('Techpack - Canvas Review', () => {
 
     await test.step('A numbered annotation marker appears on the canvas', async () => {
       await expect(canvasPage.locators.annotationOverlay).toBeVisible();
-      await expect(
-        canvasPage.locators.annotationOverlay.getByRole('button', { name: /Annotation by/ }),
-      ).toBeVisible();
+      await expect(canvasPage.locators.annotationMarker).toBeVisible();
     });
 
     await test.step('The pin appears in the aggregated Comments tab', async () => {
@@ -257,6 +260,7 @@ test.describe('Techpack - Canvas Review', () => {
   test('TC:14 Verify "Cancel Pin" exits placement mode without creating an annotation', async ({
     canvasPage,
   }) => {
+    await canvasPage.showFileView();
     await canvasPage.locators.addPinButton.click();
     await expect(canvasPage.locators.cancelPinButton).toBeVisible();
 
@@ -461,6 +465,7 @@ test.describe('Techpack - Canvas Review (Force Release + Approve)', () => {
       expect(outcome).toBe('created');
       await createTechpackPage.expectCreatedSuccessfully();
       techpackCode = await createTechpackPage.currentTechpackCode();
+      await canvasPage.openForCreatedTechpack(createTechpackPage.currentTechpackId());
 
       const creatorName = (await canvasPage.fieldRowText('Creator')).split('\n').pop()!.trim();
 

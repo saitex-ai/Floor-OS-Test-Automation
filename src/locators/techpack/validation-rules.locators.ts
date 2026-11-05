@@ -94,10 +94,12 @@ export class ValidationRulesLocators {
 
     this.techpackDashboardHeading = page.getByRole('heading', { name: 'Dashboard', level: 1 });
     // The module's left nav is docked open since the 2026-10-22 redesign
-    // (there is no "Open navigation" button any more).
+    // (there is no "Open navigation" button any more). The screen's nav link
+    // is "Settings" (`/techpacks/admin/validation-rules`), not "Validation
+    // rules": seen on uat 2026-11-03 and on dev 2026-11-05.
     this.validationRulesNavLink = page
       .getByRole('complementary', { name: 'Techpacks' })
-      .getByRole('link', { name: 'Validation rules', exact: true });
+      .getByRole('link', { name: 'Settings', exact: true });
 
     this.moreTabsButton = page.getByRole('button', { name: /^\+\d+ more$/ });
     this.filterInput = page.getByPlaceholder('Filter by id, name or description');
