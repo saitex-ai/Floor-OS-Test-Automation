@@ -1,40 +1,49 @@
 import { type Page, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
-import { MODULES } from '../../config/modules';
 import { AiModeCopilotLocators } from '../../locators/techpack/ai-mode-copilot.locators';
 
+/** A file handed to an `<input type="file">` without touching the disk. */
+export interface UploadFile {
+  name: string;
+  mimeType: string;
+  buffer: Buffer;
+}
+
 /**
- * "New Techpack" — AI Mode (the "Saitex AI" copilot). Owned by the
- * Techpack QA.
- *
- * Element locators live in AiModeCopilotLocators (`this.locators`) — see
- * that file's own doc comment for the full account of the 2026-09-29
- * redesign (upload → explicit "Start extraction" → a real chat panel with
- * a "Current step" field-picking region). Worth knowing here:
- *
- * - **Season is still the same dependent field**: no options until
- *   Customer is picked, and not every Customer has a Season.
- * - **Sample Request is no longer required** (confirmed 2026-09-29 — a
- *   change from the previously-documented "required in AI Mode, unlike
- *   Classic" behavior). REQUIRED_FIELD_LABELS below reflects the current
- *   7, not 8.
- * - **"Create draft" reproducibly failed live 2026-09-29**: with all 7
- *   required fields genuinely filled, clicking it neither navigated
- *   anywhere nor showed any visible error — the whole panel silently
- *   reset every field back to empty. `createDraftExpectingResult()`
- *   surfaces this as its own real outcome, `'silently-reset'`, rather
- *   than hanging or throwing an opaque timeout.
+ * The 7 Review details fields that must be filled before "Create draft".
+ * Customer comes before Season: Season only lists the picked customer's
+ * seasons, and some customers have none.
  */
-const REQUIRED_FIELD_LABELS = [
+const REQUIRED_CARD_FIELDS = [
   'Techpack type',
-  'Style #',
   'Customer',
-  'Fabric',
   'Season',
+  'Style #',
+  'Fabric',
   'Wash',
   'Product type',
 ] as const;
 
+/** A Review details picker that still shows its "Search …" placeholder is empty. */
+const EMPTY_FIELD = /^Search /;
+
+/** Where an opened draft lands: `/techpacks/view/{id}`, or `/techpacks/canvas/{id}` (uat since 2026-11-05). */
+const OPENED_TECHPACK = /\/techpacks\/(?:view|canvas)\/([^/?#]+)/;
+
+/**
+ * "New Techpack" — AI Mode (`/techpacks/new/copilot`). Owned by the
+ * Techpack QA. Element locators live in AiModeCopilotLocators
+ * (`this.locators`); its doc comment describes the screen's three states
+ * (landing, chat, Running Workflow) since the 2026-10-22 redesign.
+ *
+ * Worth knowing:
+ * - AI Mode skips a document it has seen before, by its bytes, so a test
+ *   that needs a fresh draft attaches a byte-unique PDF.
+ * - The "not in master data yet" question before the Review details card
+ *   depends on what the AI reads from the header on that run; it doesn't
+ *   always appear for the same file. `waitForReviewCard()` answers it with
+ *   "No, I’ll pick existing" (never "Yes, create": that writes master data).
+ */
 export class AiModeCopilotPage extends BasePage {
   readonly locators: AiModeCopilotLocators;
 
@@ -43,318 +52,319 @@ export class AiModeCopilotPage extends BasePage {
     this.locators = new AiModeCopilotLocators(page);
   }
 
-  /** Navigate to the list, then open AI Mode via the split button's default action. */
-  async openFromTechpacksList(): Promise<void> {
-    await this.gotoAuthenticated(MODULES['techpack'].path);
-    // Same "Loading Techpacks…" bundle-load wait as TechpackPage.expectLoaded()
-    // — reproduced twice needing more than 60s on dev, not a one-off fluke.
-    await expect(this.page.getByRole('heading', { name: 'TechPacks', level: 1 })).toBeVisible({
-      timeout: 90_000,
-    });
-    await this.page.getByRole('button', { name: 'New Techpack' }).click();
-    await expect(this.locators.heading).toBeVisible({ timeout: 30_000 });
+  /**
+   * Opens AI Mode directly and waits for the landing to be ready. The
+   * landing renders before `GET /api/techpacks/generation/capabilities`
+   * returns and, until then, takes documents only: a photo attached in that
+   * moment is refused as "not a supported file" (seen on uat 2026-10-30
+   * when the heading won the race by ~100 ms). So this waits for the
+   * capabilities, and for photo types to reach the file input when they
+   * are enabled.
+   */
+  async open(): Promise<void> {
+    const [response] = await Promise.all([
+      this.page.waitForResponse(
+        (r) => new URL(r.url()).pathname === '/api/techpacks/generation/capabilities',
+        { timeout: 90_000 },
+      ),
+      this.gotoAuthenticated('/techpacks/new/copilot'),
+    ]);
+    await expect(this.locators.heading).toBeVisible({ timeout: 60_000 });
+    const capabilities = (await response.json().catch(() => ({}))) as {
+      enabled?: boolean;
+      acceptedMimeTypes?: string[];
+    };
+    if (
+      capabilities.enabled &&
+      capabilities.acceptedMimeTypes?.some((m) => m.startsWith('image/'))
+    ) {
+      await expect(this.locators.fileInput).toHaveAttribute('accept', /image\//);
+    }
   }
 
   /**
-   * The landing's way to the Classic form (2026-10-22 redesign): Add files ›
-   * More tools (a submenu) › Manual form. The submenu is opened by clicking
-   * "More tools", not by hovering, which can close it on the way across.
+   * Add files › More tools › Manual form. Submenus are opened by clicking
+   * their item, not by hovering, which can close them on the way across.
    */
   async openManualFormFromAddFiles(): Promise<void> {
-    await this.locators.addFilesButton.click();
-    await this.locators.moreToolsMenuItem.click();
+    await this.openMoreTools();
     await this.locators.manualFormMenuItem.click();
   }
 
-  /** Click the "Use the manual form" link on the upload screen itself (found 2026-09-25). */
-  async useManualForm(): Promise<void> {
-    await this.locators.useManualFormLink.click();
+  /** Add files › More tools › Upload a tech pack file (opens `/techpacks/uploads/new`). */
+  async openUploadTechpackFromAddFiles(): Promise<void> {
+    await this.openMoreTools();
+    await this.locators.uploadTechpackFileMenuItem.click();
   }
 
-  /** Sets the file input, then waits for it to appear as a real uploaded entry with "Start extraction" ready. */
-  async uploadFile(file: { name: string; mimeType: string; buffer: Buffer }): Promise<void> {
-    await this.locators.fileInput.setInputFiles(file);
-    await this.locators.startExtractionButton.waitFor({ state: 'visible', timeout: 20_000 });
-  }
-
-  /** Clicks "Start extraction" — a real, separate step since the 2026-09-29 redesign (upload alone no longer starts it). */
-  async startExtraction(): Promise<void> {
-    await this.locators.startExtractionButton.click();
-  }
-
-  /**
-   * Clicks "Start extraction" and resolves which way the handoff went:
-   * - `'blocked'` — the immediate "Something went wrong starting the draft
-   *   session. Please retry." text — confirmed live 2026-09-29 as what a
-   *   genuinely invalid upload (e.g. a `.txt` file) hits right away.
-   * - `'stuck'` — the real "Still waiting on the agent..." message with
-   *   its own Retry button (confirmed live 2026-09-29 as a genuine
-   *   intermediate state on a *valid* file, not always a dead end — it
-   *   resolved into `'ready'` on its own without clicking Retry in one
-   *   observed run, but may not always).
-   * - `'ready'` — the chat panel's "Current step" region has a real
-   *   field button to interact with.
-   *
-   * One generous shared timeout, raced — not a fixed cutoff — matching
-   * this suite's own established lesson that this handoff's timing is
-   * highly variable (previously 15s-60s+ for the old flow; not yet
-   * fully characterized for this new one).
-   */
-  async waitForExtractionOutcome(timeout = 75_000): Promise<'blocked' | 'stuck' | 'ready'> {
-    const race = (budget: number) =>
-      Promise.race([
-        this.locators.invalidFileErrorText
-          .waitFor({ state: 'visible', timeout: budget })
-          .then((): 'blocked' => 'blocked'),
-        this.locators.agentStuckText
-          .waitFor({ state: 'visible', timeout: budget })
-          .then((): 'stuck' => 'stuck'),
-        this.locators
-          .fieldButton('Techpack type')
-          .waitFor({ state: 'visible', timeout: budget })
-          .then((): 'ready' => 'ready'),
-        this.locators.pickExistingInsteadButton
-          .waitFor({ state: 'visible', timeout: budget })
-          .then((): 'ready' => 'ready'),
-      ]);
-    const first = await race(timeout);
-    if (first !== 'stuck') return first;
-    // A real user has a "Retry" button right here rather than giving up —
-    // confirmed live 2026-09-29 that this state can resolve on its own,
-    // but don't just wait passively a second time; use the app's own
-    // recovery affordance the way a real user would.
-    await this.locators.retryButton.click().catch(() => {});
-    return race(timeout);
-  }
-
-  /** TC:4's assertion — an invalid file type is rejected up front, never reaching "Start extraction". */
-  async expectInvalidFileErrorVisible(fileName: string): Promise<void> {
-    await expect(this.locators.unsupportedFileMessage).toBeVisible();
-    await expect(this.locators.unsupportedFileMessage).toContainText(fileName);
-    await expect(this.locators.startExtractionButton).toHaveCount(0);
+  /** Opens Add files › More tools and returns the submenu's items. */
+  async openMoreTools(): Promise<string[]> {
+    await this.locators.addFilesButton.click();
+    await this.locators.moreToolsMenuItem.click();
+    await expect(this.locators.manualFormMenuItem).toBeVisible();
+    return this.openMenuItems();
   }
 
   /**
-   * Waits for the "Current step" field-picking panel to genuinely be
-   * ready, transparently clicking through an intermediate prompt if one
-   * appears first — see waitForExtractionOutcome()'s own doc comment for
-   * why this isn't a single fixed wait.
+   * Opens Add files › Create Visualize and returns the techpacks it offers
+   * that can be picked (an entry can be disabled, seen on dev 2026-10-30).
    */
-  async waitForPickAValueForm(timeout = 60_000): Promise<void> {
-    await Promise.race([
-      this.locators.fieldButton('Techpack type').waitFor({ state: 'visible', timeout }),
-      this.locators.pickExistingInsteadButton.waitFor({ state: 'visible', timeout }),
-    ]).catch(() => {});
-    if (await this.locators.pickExistingInsteadButton.isVisible().catch(() => false)) {
-      await this.locators.pickExistingInsteadButton.click();
-    }
-    await this.locators.fieldButton('Techpack type').waitFor({ state: 'visible', timeout });
-  }
-
-  /**
-   * Selects a specific option by its leading code/token (e.g. "IAV0000008").
-   * These comboboxes (cmdk-based) only render a default subset of options
-   * until you type into their own search input.
-   */
-  private async selectComboboxOption(labelText: string, token: string): Promise<void> {
-    await this.locators.fieldButton(labelText).click();
-    const searchInput = this.page.locator('[cmdk-input]').last();
-    await searchInput.fill(token);
-    const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const pattern = new RegExp(`^${escaped}(?:\\s|$)`);
-    await this.page
-      .getByRole('listbox')
-      .last()
-      .getByRole('option', { name: pattern })
-      .first()
-      .click();
-  }
-
-  async selectFirstAvailableOption(labelText: string): Promise<string> {
-    await this.locators.fieldButton(labelText).click();
-    const firstOption = this.page.getByRole('listbox').last().getByRole('option').first();
-    const text = await firstOption.innerText();
-    await firstOption.click();
-    return text;
-  }
-
-  /** Picks a random available option — see create-techpack.page.ts's identical
-   * method for why "first available" isn't safe for a create that must succeed. */
-  async selectRandomAvailableOption(labelText: string): Promise<string> {
-    await this.locators.fieldButton(labelText).click();
-    const listbox = this.page.getByRole('listbox').last();
-    const options = listbox.getByRole('option');
-    await options.first().waitFor({ state: 'visible', timeout: 20_000 });
-    const count = await options.count();
-    const index = Math.floor(Math.random() * count);
-    const chosen = options.nth(index);
-    const text = await chosen.innerText();
-    await chosen.click();
-    return text;
-  }
-
-  /**
-   * True once a field's own "Search <noun>..." trigger button no longer
-   * exists at all — confirmed live 2026-09-30 with a real, richer
-   * techpack PDF: extraction can auto-pick some fields with enough
-   * confidence that their placeholder button is simply gone, replaced by
-   * a button showing the picked value's own label (e.g. "CARVE DESIGNS
-   * CTC0000178" instead of "Search customers..."). A previous version of
-   * this page object assumed every field always starts unfilled and hung
-   * forever clicking a trigger that no longer existed once a field had
-   * already been auto-filled this way.
-   */
-  async fieldIsFilled(labelText: string): Promise<boolean> {
-    return (await this.locators.fieldButton(labelText).count()) === 0;
-  }
-
-  async comboboxHasNoOptions(labelText: string): Promise<boolean> {
-    await this.locators.fieldButton(labelText).click();
-    const listbox = this.page.getByRole('listbox').last();
-    const gotAnOption = await listbox
-      .getByRole('option')
-      .first()
-      .waitFor({ state: 'visible', timeout: 20_000 })
-      .then(() => true)
-      .catch(() => false);
-    await this.page.keyboard.press('Escape');
-    return !gotAnOption;
-  }
-
-  /** Each value is the option's leading code/token (e.g. "IAV0000008") — see selectComboboxOption(). */
-  async fillDetails(
-    details: Partial<Record<(typeof REQUIRED_FIELD_LABELS)[number], string>>,
-  ): Promise<void> {
-    for (const label of REQUIRED_FIELD_LABELS) {
-      const value = details[label];
-      if (value !== undefined) await this.selectComboboxOption(label, value);
-    }
-  }
-
-  /**
-   * Fills all 7 required fields (Customer before Season — see doc
-   * comment). Sample Request is no longer required (see this file's doc
-   * comment) and isn't touched here. Fields extraction already auto-picked
-   * (see `fieldIsFilled()`'s doc comment) are left as-is, not re-picked —
-   * there is no "clear and re-pick" affordance in this flow to override
-   * them anyway.
-   */
-  async fillAllRequiredWithRandomAvailable(): Promise<Record<string, string>> {
-    const picked: Record<string, string> = {};
-    for (const label of REQUIRED_FIELD_LABELS) {
-      if (await this.fieldIsFilled(label)) {
-        picked[label] = '(pre-filled by extraction)';
-        continue;
-      }
-      if (label === 'Season') {
-        let hasSeason = !(await this.comboboxHasNoOptions('Season'));
-        for (let attempt = 0; !hasSeason && attempt < 8; attempt++) {
-          if (await this.fieldIsFilled('Customer')) {
-            throw new Error(
-              'Season has no options for the Customer extraction already auto-picked, and there is no way to change an extraction-filled field in this flow',
-            );
-          }
-          picked['Customer'] = await this.selectRandomAvailableOption('Customer');
-          hasSeason = !(await this.comboboxHasNoOptions('Season'));
-        }
-        if (!hasSeason) {
-          throw new Error('Could not find a Customer with at least one Season after 8 attempts');
-        }
-      }
-      picked[label] = await this.selectRandomAvailableOption(label);
-    }
-    return picked;
-  }
-
-  async createDraft(): Promise<void> {
-    await this.locators.createDraftButton.click();
-  }
-
-  async expectCreateDraftDisabled(): Promise<void> {
-    await expect(this.locators.createDraftButton).toBeDisabled();
-  }
-
-  async expectCreateDraftEnabled(): Promise<void> {
-    await expect(this.locators.createDraftButton).toBeEnabled();
-  }
-
-  /**
-   * Clicks "Create draft" and resolves what actually happened:
-   * - `'created'` — the app navigated away from the blank copilot URL.
-   * - `'duplicate'` — a "There's already a techpack" chat message.
-   * - `'file-exists'` — the file-content dedup message.
-   * - `'create-failed'` — **one of two real, reproducible failure symptoms
-   *   found live 2026-09-29**: an explicit "I couldn't create the draft.
-   *   Please try again." chat message with a "Regenerate" action — the
-   *   picked field values stay visible/unchanged (confirmed via a full
-   *   accessibility-tree dump showing all 7 still set).
-   * - `'draft-with-warning'` — **a third real outcome, found live
-   *   2026-09-30 with a real, richer techpack PDF**: the "Current step"
-   *   region replaces itself with a completion card — "Draft `<ULID>`" /
-   *   "✓ Done (EXTRACTION_FAILED)" / a real "Open Techpack" link to
-   *   `/techpacks/drafts/<ULID>`. A real draft record was genuinely
-   *   created (unlike the two failure symptoms below), just tagged with
-   *   an extraction-status marker and requiring an explicit click rather
-   *   than an automatic navigation.
-   * - `'silently-reset'` — **found in a separate run**: none of the above
-   *   happened, and the "Create draft" button is disabled again shortly
-   *   after the click — the panel silently reset every field back to
-   *   empty, with no visible error at all.
-   * Both `'create-failed'` and `'silently-reset'` are genuine, reportable
-   * bug findings — callers should treat either as a real result, not
-   * retry past it as if it were a transient miss.
-   */
-  async createDraftExpectingResult(): Promise<
-    | 'created'
-    | 'duplicate'
-    | 'file-exists'
-    | 'create-failed'
-    | 'draft-with-warning'
-    | 'silently-reset'
-  > {
-    const blankUrl = this.page.url();
-    await this.createDraft();
-    // Generous window: on a large real PDF the reply ("This file is already
-    // in floorOS…", the completion card, …) can take well over 25s.
-    const wait = 90_000;
-    const outcome = await Promise.race([
-      this.page
-        .waitForURL((url) => url.toString() !== blankUrl, { timeout: wait })
-        .then((): 'created' => 'created')
-        .catch(() => null),
-      this.locators.duplicateMessage
-        .waitFor({ state: 'visible', timeout: wait })
-        .then((): 'duplicate' => 'duplicate')
-        .catch(() => null),
-      this.locators.fileAlreadyExistsMessage
-        .waitFor({ state: 'visible', timeout: wait })
-        .then((): 'file-exists' => 'file-exists')
-        .catch(() => null),
-      this.locators.createDraftFailedMessage
-        .waitFor({ state: 'visible', timeout: wait })
-        .then((): 'create-failed' => 'create-failed')
-        .catch(() => null),
-      this.locators.openTechpackLink
-        .waitFor({ state: 'visible', timeout: wait })
-        .then((): 'draft-with-warning' => 'draft-with-warning')
-        .catch(() => null),
-    ]);
-    if (outcome) return outcome;
-    // Before calling it a silent reset, re-check every known reply once more.
-    if (await this.locators.fileAlreadyExistsMessage.first().isVisible()) return 'file-exists';
-    if (await this.locators.duplicateMessage.first().isVisible()) return 'duplicate';
-    if (await this.locators.createDraftFailedMessage.first().isVisible()) return 'create-failed';
-    if (await this.locators.openTechpackLink.first().isVisible()) return 'draft-with-warning';
-    const stillOnBlankUrl = this.page.url() === blankUrl;
-    const disabledAgain = await this.locators.createDraftButton.isDisabled().catch(() => true);
-    if (stillOnBlankUrl && disabledAgain) return 'silently-reset';
-    throw new Error(
-      'createDraftExpectingResult: none of created/duplicate/file-exists/create-failed/draft-with-warning/silently-reset could be confirmed',
+  async openCreateVisualize(): Promise<string[]> {
+    await this.locators.addFilesButton.click();
+    await this.locators.createVisualizeMenuItem.click();
+    await expect(this.locators.openMenu).toContainText('On-model shots for');
+    return (await this.locators.enabledMenuItems.allInnerTexts()).map((t) =>
+      t.replace(/\s+/g, ' ').trim(),
     );
   }
 
-  async expectFileAlreadyExistsVisible(): Promise<void> {
-    await expect(this.locators.fileAlreadyExistsMessage).toBeVisible();
-    await expect(this.locators.openExistingFileLink).toBeVisible();
+  /** Opens the Add files menu and returns its items. */
+  async openAddFilesMenu(): Promise<string[]> {
+    await this.locators.addFilesButton.click();
+    await expect(this.locators.addFilesOrPhotosMenuItem).toBeVisible();
+    return this.openMenuItems();
+  }
+
+  private async openMenuItems(): Promise<string[]> {
+    return (await this.locators.openMenu.getByRole('menuitem').allInnerTexts()).map((t) =>
+      t.replace(/\s+/g, ' ').trim(),
+    );
+  }
+
+  /** Attaches one or more files through the drop zone's file input. */
+  async attach(files: UploadFile | UploadFile[]): Promise<void> {
+    await this.locators.fileInput.setInputFiles(files);
+  }
+
+  async removeAttachedFile(fileName: string): Promise<void> {
+    await this.locators.removeFileButton(fileName).click();
+  }
+
+  /** Fills the description box and clicks Generate. */
+  async generate(description: string): Promise<void> {
+    await this.locators.descriptionInput.fill(description);
+    await this.locators.generateButton.click();
+  }
+
+  /**
+   * Fills the description, clicks Generate and returns the status of the
+   * `POST /api/techpacks/generations` it sends (a photos-only Generate:
+   * 202 accepted, 422 for an unusable photo).
+   */
+  async generateAndReadStatus(description: string): Promise<number> {
+    const [response] = await Promise.all([
+      this.page.waitForResponse(
+        (r) =>
+          r.request().method() === 'POST' &&
+          new URL(r.url()).pathname === '/api/techpacks/generations',
+        { timeout: 60_000 },
+      ),
+      this.generate(description),
+    ]);
+    return response.status();
+  }
+
+  /** Clicks Add files › "Add files or photos" and reports whether its file chooser takes several files. */
+  async addFilesOrPhotosTakesSeveral(): Promise<boolean> {
+    const [chooser] = await Promise.all([
+      this.page.waitForEvent('filechooser'),
+      this.locators.addFilesOrPhotosMenuItem.click(),
+    ]);
+    return chooser.isMultiple();
+  }
+
+  /**
+   * Waits for the Review details card after a document Generate. If the
+   * assistant first asks about values missing from master data, answers
+   * "No, I’ll pick existing" and returns the question's text.
+   */
+  async waitForReviewCard(timeout = 180_000): Promise<{ masterDataQuestion: string | null }> {
+    await this.locators.reviewCard
+      .or(this.locators.pickExistingButton)
+      .first()
+      .waitFor({ state: 'visible', timeout });
+    let masterDataQuestion: string | null = null;
+    if (!(await this.locators.reviewCard.isVisible())) {
+      masterDataQuestion = (await this.locators.masterDataQuestion.innerText())
+        .replace(/\s+/g, ' ')
+        .trim();
+      await this.locators.pickExistingButton.click();
+    }
+    await expect(this.locators.reviewCard).toBeVisible({ timeout });
+    return { masterDataQuestion };
+  }
+
+  /** The card's summary as counts; a count the card leaves out is 0. */
+  async reviewCardCounts(): Promise<{ inferred: number; verify: number; pick: number }> {
+    await expect(this.locators.reviewCardSummary.first()).toBeVisible();
+    const parts = await this.locators.reviewCardSummary.allInnerTexts();
+    const count = (word: string) =>
+      Number(parts.find((p) => p.endsWith(word))?.match(/^\d+/)?.[0] ?? 0);
+    return { inferred: count('inferred'), verify: count('to verify'), pick: count('to pick') };
+  }
+
+  /**
+   * After a photos-only Generate, waits until the Running Workflow either
+   * opens the new techpack ('opened') or reports "Generation failed. Try
+   * again." ('failed').
+   */
+  async waitForPhotoWorkflow(timeout = 240_000): Promise<'opened' | 'failed'> {
+    let outcome: 'opened' | 'failed' | 'running' = 'running';
+    await expect
+      .poll(
+        async () => {
+          if (/\/techpacks\/view\/[^/?]+/.test(this.page.url())) outcome = 'opened';
+          else if (await this.locators.generationFailedMessage.isVisible()) outcome = 'failed';
+          return outcome;
+        },
+        { timeout, intervals: [2_000] },
+      )
+      .not.toBe('running');
+    return outcome as 'opened' | 'failed';
+  }
+
+  /**
+   * Opens a Review details picker's "Browse all in table". With a long list
+   * (187 techpack types on dev) the button sits below the viewport, where a
+   * mouse click can't reach it, and Enter picks the highlighted option
+   * instead; so the click is dispatched to the button itself.
+   */
+  async openCardBrowseAll(label: string): Promise<void> {
+    await this.locators.cardField(label).click();
+    await this.locators.pickerBrowseAllButton.dispatchEvent('click');
+    await expect(this.locators.browseAllDialog).toBeVisible();
+  }
+
+  /** What a Review details picker shows: its value, or its "Search …" placeholder. */
+  async cardFieldValue(label: string): Promise<string> {
+    return (await this.locators.cardField(label).innerText()).replace(/\s+/g, ' ').trim();
+  }
+
+  /** A Review details field's tag: "Inferred", "Verify" or "To pick" ("" for none). */
+  async cardFieldTag(label: string): Promise<string> {
+    const tag = this.locators.cardFieldTag(label);
+    return (await tag.count()) ? (await tag.innerText()).trim() : '';
+  }
+
+  /** Opens a Review details picker and returns its options' texts, then closes it. */
+  async cardPickerOptions(label: string): Promise<string[]> {
+    await this.locators.cardField(label).click();
+    await this.locators.pickerOptions
+      .first()
+      .waitFor({ state: 'visible', timeout: 20_000 })
+      .catch(() => {});
+    const texts = (await this.locators.pickerOptions.allInnerTexts()).map((t) =>
+      t.replace(/\s+/g, ' ').trim(),
+    );
+    await this.closePicker();
+    return texts;
+  }
+
+  /** Closes an open picker with Escape and waits for its options to go. */
+  async closePicker(): Promise<void> {
+    await this.page.keyboard.press('Escape');
+    await expect(this.locators.pickerOptions).toHaveCount(0);
+  }
+
+  /**
+   * Picks an option in a Review details picker: the first option `match`
+   * accepts, or a random Approved one. Returns the picked option's text, or
+   * null (picker closed again) when nothing qualifies.
+   */
+  async pickCardOption(label: string, match?: (option: string) => boolean): Promise<string | null> {
+    await this.locators.cardField(label).click();
+    const options = this.locators.pickerOptions;
+    await options
+      .first()
+      .waitFor({ state: 'visible', timeout: 20_000 })
+      .catch(() => {});
+    const texts = (await options.allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim());
+    let index = -1;
+    if (match) {
+      index = texts.findIndex(match);
+    } else {
+      const approved = texts.flatMap((t, i) => (/ Approved$/.test(t) ? [i] : []));
+      if (approved.length) index = approved[Math.floor(Math.random() * approved.length)]!;
+    }
+    if (index < 0) {
+      await this.closePicker();
+      return null;
+    }
+    await options.nth(index).click();
+    await expect(options).toHaveCount(0);
+    return texts[index]!;
+  }
+
+  /**
+   * Fills every required Review details field that is still empty with a
+   * random Approved value. When a customer has no seasons, picks another
+   * customer (up to 8 times).
+   */
+  async fillEmptyRequiredFields(): Promise<void> {
+    for (const label of REQUIRED_CARD_FIELDS) {
+      if (!EMPTY_FIELD.test(await this.cardFieldValue(label))) continue;
+      let picked = await this.pickCardOption(label);
+      for (let i = 0; label === 'Season' && !picked && i < 8; i++) {
+        await this.pickCardOption('Customer');
+        picked = await this.pickCardOption('Season');
+      }
+      if (!picked) throw new Error(`No Approved option to pick for "${label}"`);
+    }
+  }
+
+  /**
+   * Clicks "Create draft" and returns what the chat answered: 'created'
+   * ("Draft <id> created"), 'file-exists' ("This file is already in
+   * floorOS") or 'failed' ("I couldn’t create the draft").
+   */
+  async createDraft(): Promise<'created' | 'file-exists' | 'failed'> {
+    await this.locators.createDraftButton.click();
+    const created = this.locators.draftCreatedText;
+    const exists = this.locators.fileAlreadyExistsMessage;
+    const failed = this.locators.createDraftFailedMessage;
+    await created.or(exists).or(failed).first().waitFor({ state: 'visible', timeout: 120_000 });
+    if (await created.isVisible()) return 'created';
+    if (await exists.isVisible()) return 'file-exists';
+    return 'failed';
+  }
+
+  /**
+   * Waits for the draft's extraction to end and returns its status: "READY",
+   * or what went wrong (e.g. "EXTRACTION_FAILED", seen on dev 2026-10-30).
+   */
+  async waitForDraftDone(timeout = 420_000): Promise<string> {
+    await expect(this.locators.draftDoneText).toBeVisible({ timeout });
+    return (await this.locators.draftDoneText.innerText()).match(/\((\w+)\)/)?.[1] ?? '';
+  }
+
+  /**
+   * Waits for an opened draft to reach its techpack and returns the
+   * techpack's id. "Open Techpack" and the Dashboard's draft row go through
+   * `/techpacks/drafts/{draftId}` first, then to `/techpacks/view/{id}` (dev,
+   * last seen 2026-11-03) or `/techpacks/canvas/{id}` (uat since 2026-11-05).
+   */
+  async waitForOpenedTechpack(timeout = 30_000): Promise<string> {
+    await expect(this.page).toHaveURL(OPENED_TECHPACK, { timeout });
+    return this.page.url().match(OPENED_TECHPACK)![1]!;
+  }
+
+  /** The new draft's id, from the "Open Techpack" link (`/techpacks/drafts/{id}`). */
+  async createdDraftId(): Promise<string> {
+    const href = (await this.locators.openTechpackLink.getAttribute('href')) ?? '';
+    const id = href.match(/\/techpacks\/drafts\/([^/?#]+)/)?.[1];
+    if (!id) throw new Error(`No draft id in the "Open Techpack" link: "${href}"`);
+    return id;
+  }
+
+  /** The Progress region's text, e.g. "Creating techpack 50% 01 Upload … 04 Open draft". */
+  async progressText(): Promise<string> {
+    return (await this.locators.progressRegion.innerText()).replace(/\s+/g, ' ').trim();
+  }
+
+  /** The percentage in the Progress region's "Creating techpack N%". */
+  async progressPercent(): Promise<number> {
+    const match = (await this.progressText()).match(/(\d+)%/);
+    if (!match) throw new Error(`No percentage in the Progress region`);
+    return Number(match[1]);
   }
 }
