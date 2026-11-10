@@ -3,9 +3,9 @@ import { MillScreenPage } from './mill-screen.page';
 import { FinishingLocators } from '../../locators/mill/finishing.locators';
 
 /**
- * Finishing production screen (/mill/finishing) — Consume inputs,
- * Record output, Orders. Owned by the Fabric Mill QA. Element locators
- * live in FinishingLocators (`this.locators`).
+ * Finishing production screen (/mill/finishing) — Orders and Production
+ * tabs, plus a "Record output" popup. Owned by the Fabric Mill QA.
+ * Element locators live in FinishingLocators (`this.locators`).
  */
 export class FinishingPage extends MillScreenPage {
   protected readonly subPath = '/finishing';
