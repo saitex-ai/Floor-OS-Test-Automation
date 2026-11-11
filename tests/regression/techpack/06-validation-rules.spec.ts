@@ -5,6 +5,7 @@ import { env } from '../../../src/config/env';
 import { loginAsUser, secondUserCredentials } from '../../../src/fixtures/multi-user';
 import { ShellHeaderPage } from '../../../src/pages/shell/shell-header.page';
 import { ValidationRulesPage } from '../../../src/pages/techpack/validation-rules.page';
+import { openQuestion } from '../../../src/utils/test-annotations';
 
 /**
  * Techpack — Validation Rules (`/techpacks/admin/validation-rules`).
@@ -80,9 +81,14 @@ test.describe('Techpack - Validation Rules', () => {
     page,
   }) => {
     test.setTimeout(120_000);
-    await test.step('Open the Techpack Dashboard, click "Validation rules" in the left nav', async () => {
-      await validationRulesPage.openViaTechpackNav();
-    });
+    const route =
+      await test.step('Open the Techpack Dashboard, click "Validation rules" in the left nav', async () =>
+        validationRulesPage.openViaTechpackNav());
+    if (route === 'preferences') {
+      openQuestion(
+        'No "Validation rules" link in the Techpack left nav (dev, 2026-11-11); the screen was reached from user menu › Preferences › "Open validation rules". Is that its intended entry point?',
+      );
+    }
     await test.step('Lands on /techpacks/admin/validation-rules', async () => {
       await expect(page).toHaveURL(/\/techpacks\/admin\/validation-rules\/?$/);
       await expect(validationRulesPage.locators.heading).toBeVisible();
@@ -793,9 +799,14 @@ test.describe('Techpack - Validation Rules', () => {
       const bob = await loginAsSecondUser(browser);
       try {
         const vr = new ValidationRulesPage(bob.page);
-        await test.step('As bob, click "Validation rules" in the Dashboard\'s left nav', async () => {
-          await vr.openViaTechpackNav();
-        });
+        const route =
+          await test.step('As bob, click "Validation rules" in the Dashboard\'s left nav', async () =>
+            vr.openViaTechpackNav());
+        if (route === 'preferences') {
+          openQuestion(
+            'No "Validation rules" link in the Techpack left nav (dev, 2026-11-11); bob reached the screen from user menu › Preferences.',
+          );
+        }
         await expect(bob.page).toHaveURL(/\/techpacks\/admin\/validation-rules\/?$/);
       } finally {
         await bob.close();

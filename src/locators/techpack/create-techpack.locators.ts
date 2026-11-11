@@ -28,7 +28,7 @@ export class CreateTechpackLocators {
   /** Every open listbox, including one still fading out after a pick. */
   readonly listboxes: Locator;
   readonly closeButton: Locator;
-  readonly backToTechpacksLink: Locator;
+  readonly backToTechpacksButton: Locator;
   /** The sonner toast after a successful create, "Techpack TP202610-000132 created". */
   readonly createdToast: Locator;
 
@@ -119,7 +119,10 @@ export class CreateTechpackLocators {
     this.heading = page.getByRole('heading', { name: 'New Techpack', level: 1 });
     this.listboxes = page.getByRole('listbox');
     this.closeButton = page.getByRole('button', { name: 'Close' });
-    this.backToTechpacksLink = page.getByRole('link', { name: 'Back to Techpacks' });
+    // Replaced the "Back to Techpacks" link in the 2026-11-05 build (dev and uat).
+    this.backToTechpacksButton = page
+      .getByRole('main')
+      .getByRole('button', { name: 'Tech Pack & BOM', exact: true });
     this.createdToast = page
       .locator('[data-sonner-toast]')
       .filter({ hasText: /^Techpack TP\d{6}-\d+ created/ });

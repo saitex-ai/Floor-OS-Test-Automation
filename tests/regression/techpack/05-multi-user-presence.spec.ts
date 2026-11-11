@@ -44,7 +44,7 @@ test.describe('Techpack - Canvas Multi-User Presence', () => {
         throw new Error(`expected a fresh techpack to be created, got: ${outcome}`);
       }
       await createTechpackPage.expectCreatedSuccessfully();
-      await canvasPage.expectLoaded();
+      await canvasPage.openForCreatedTechpack(createTechpackPage.currentTechpackId());
     });
 
     await test.step('Own identity shown; the presence indicator reads zero other participants', async () => {
@@ -85,7 +85,7 @@ test.describe('Techpack - Canvas Multi-User Presence', () => {
           throw new Error(`expected a fresh techpack to be created, got: ${outcome}`);
         }
         await createTechpackPage.expectCreatedSuccessfully();
-        await canvasPage.expectLoaded();
+        await canvasPage.openForCreatedTechpack(createTechpackPage.currentTechpackId());
         return page.url();
       });
 

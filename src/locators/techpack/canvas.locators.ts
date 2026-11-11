@@ -10,6 +10,12 @@ import { type Locator, type Page } from '@playwright/test';
 export class CanvasLocators {
   readonly heading: Locator;
   readonly backButton: Locator;
+  /**
+   * The breadcrumb's "Tech Pack & BOM" link: the canvas's way back to the list
+   * since the 2026-11-05 build (dev and uat). backButton ("Back to
+   * techpacks") is now only on the "Canvas not found" page.
+   */
+  readonly backToList: Locator;
 
   // Toolbar
   readonly fileViewToggle: Locator;
@@ -35,9 +41,14 @@ export class CanvasLocators {
 
   // Techpack Details tabpanel — section headers
   readonly detailsSectionHeader: Locator;
-  readonly headersSectionHeader: Locator;
-  readonly uploadsSectionHeader: Locator;
   readonly operationsSectionHeader: Locator;
+  /**
+   * Since the 2026-11-05 build (dev and uat) the left pane has "Overview" (the
+   * 7 identity fields, Description, master data review) and "Files" (the
+   * uploads) tabs; they replace the right panel's Headers and Uploads sections.
+   */
+  readonly overviewTab: Locator;
+  readonly filesTab: Locator;
   readonly operationsTable: Locator;
   /** Details' own Description box: a textarea (the Operations rows' "Description" boxes are inputs). */
   readonly detailsDescriptionInput: Locator;
@@ -50,7 +61,10 @@ export class CanvasLocators {
   // comment for the full mechanism.
   readonly cancelPinButton: Locator;
   readonly annotationDialog: Locator;
+  readonly annotationSubmitButton: Locator;
   readonly annotationOverlay: Locator;
+  /** A placed pin's marker on the document. */
+  readonly annotationMarker: Locator;
 
   // Multi-user presence widget (top-right of the toolbar) — see
   // test-cases/techpack/multi-user-presence.md for the full DOM structure
@@ -102,6 +116,9 @@ export class CanvasLocators {
   constructor(private readonly page: Page) {
     this.heading = page.getByRole('heading', { name: 'Techpack canvas', level: 1 });
     this.backButton = page.getByRole('button', { name: 'Back to techpacks' });
+    this.backToList = page
+      .getByRole('navigation', { name: 'Breadcrumb' })
+      .getByRole('link', { name: 'Tech Pack & BOM' });
 
     this.fileViewToggle = page.getByRole('button', { name: 'File', exact: true });
     this.standardViewToggle = page.getByRole('button', { name: 'Standard', exact: true });
@@ -131,8 +148,8 @@ export class CanvasLocators {
     this.historyTab = page.getByRole('tab', { name: 'History' });
 
     this.detailsSectionHeader = page.getByRole('button', { name: 'Details', exact: true });
-    this.headersSectionHeader = page.getByRole('button', { name: 'Headers', exact: true });
-    this.uploadsSectionHeader = page.getByRole('button', { name: 'Uploads', exact: true });
+    this.overviewTab = page.getByRole('button', { name: 'Overview', exact: true });
+    this.filesTab = page.getByRole('button', { name: 'Files', exact: true });
     this.operationsSectionHeader = page.getByRole('button', { name: 'Operations', exact: true });
     // Scoped by content (not position) since it's the only table on the
     // page with these labels. Note this is genuinely the same real
@@ -162,12 +179,18 @@ export class CanvasLocators {
     // not a separate button. addPinButton (declared above) only matches
     // the pre-click state; this one is for the active-placement state.
     this.cancelPinButton = page.getByRole('button', { name: 'Cancel Pin' });
-    // The dialog's own accessible name is "Annotation" (confirmed via a
-    // real ariaSnapshot() dump), but scoping by its visible content text
-    // instead ("New annotation on page N") is what was actually proven
-    // live during exploration — kept as the filter to match that.
-    this.annotationDialog = page.getByRole('dialog').filter({ hasText: 'New annotation on page' });
+    // Since the 2026-11-05 build (dev and uat) a pin opens a "New comment"
+    // dialog ("Comment" textbox, "Send comment" button), which replaced the
+    // "New annotation on page N" dialog and its "Submit" button.
+    this.annotationDialog = page.getByRole('dialog', { name: 'New comment' });
+    this.annotationSubmitButton = this.annotationDialog.getByRole('button', {
+      name: 'Send comment',
+    });
     this.annotationOverlay = page.getByRole('region', { name: 'Annotation overlay' });
+    // Was "N Annotation by <author>" before the 2026-11-05 build.
+    this.annotationMarker = this.annotationOverlay.getByRole('button', {
+      name: /^Comment by /,
+    });
 
     // This session's own identity is always shown, e.g. "Signed in as
     // Alice". The "other participants" container is ALSO always present
@@ -190,7 +213,8 @@ export class CanvasLocators {
     this.canvasNotFoundHeading = page.getByText('Canvas not found', { exact: true });
     this.loadErrorText = page.getByText('Could not load techpack');
     this.openingCanvasText = page.getByText('Opening canvas…');
-    this.techpackUploadTag = page.getByText('TECHPACK', { exact: true });
+    // The Files tab's "File type" cell (the old Uploads section tagged it "TECHPACK").
+    this.techpackUploadTag = page.getByRole('cell', { name: 'Techpack', exact: true });
     // AI-Mode-only toolbar actions (see canvas-review.md TC:15/TC:16).
     this.reExtractButton = page.getByRole('button', { name: 'Re-extract' });
     this.askAboutTechpackButton = page.getByRole('button', { name: 'Ask about this techpack' });

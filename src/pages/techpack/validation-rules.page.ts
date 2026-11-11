@@ -2,6 +2,7 @@ import { type Page, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
 import { MODULES } from '../../config/modules';
 import { ValidationRulesLocators } from '../../locators/techpack/validation-rules.locators';
+import { ShellHeaderPage } from '../shell/shell-header.page';
 
 export const VALIDATION_RULES_PATH = '/techpacks/admin/validation-rules';
 
@@ -44,13 +45,24 @@ export class ValidationRulesPage extends BasePage {
     await this.expectLoaded();
   }
 
-  /** TC:1/TC:28's real user path: Techpack Dashboard -> left nav "Validation rules". */
-  async openViaTechpackNav(): Promise<void> {
+  /**
+   * TC:1/TC:28's real user path: Techpack Dashboard -> left nav "Validation
+   * rules". Without that link (dev, 2026-11-11) it goes user menu ›
+   * Preferences › "Open validation rules" instead, and says which way it went.
+   */
+  async openViaTechpackNav(): Promise<'nav' | 'preferences'> {
     await this.gotoAuthenticated(MODULES['techpack'].path);
     await expect(this.locators.techpackDashboardHeading).toBeVisible({ timeout: 60_000 });
-    await expect(this.locators.validationRulesNavLink).toBeVisible({ timeout: 10_000 });
-    await this.locators.validationRulesNavLink.click();
+    await expect(this.locators.dashboardNavLink).toBeVisible();
+    if (await this.locators.validationRulesNavLink.isVisible()) {
+      await this.locators.validationRulesNavLink.click();
+      await this.expectLoaded();
+      return 'nav';
+    }
+    await new ShellHeaderPage(this.page).openPreferences();
+    await this.locators.preferencesValidationRulesLink.click();
     await this.expectLoaded();
+    return 'preferences';
   }
 
   async expectLoaded(): Promise<void> {

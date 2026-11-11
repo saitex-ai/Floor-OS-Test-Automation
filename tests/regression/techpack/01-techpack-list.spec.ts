@@ -310,7 +310,7 @@ test.describe('Techpack - Techpacks List', () => {
     });
 
     await test.step("The techpack's page loads cleanly", async () => {
-      await expect(page).toHaveURL(/\/techpacks\/view\/[^/]+$/, { timeout: 30_000 });
+      await techpackPage.expectOnTechpackPage();
       await expect(techpackPage.locators.techpackHeading(code)).toBeVisible({ timeout: 30_000 });
       await expect(canvasPage.locators.loadErrorText).toBeHidden();
       await expect(canvasPage.locators.openingCanvasText).toBeHidden({ timeout: 30000 });
