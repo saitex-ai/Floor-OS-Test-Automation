@@ -35,7 +35,7 @@ test.describe.serial('BOM - Create BOM', () => {
   let bomItemsPage: BomItemsPage;
   let shellHeaderPage: ShellHeaderPage;
   let techpackCode = '';
-  /** Approving already created the techpack's BOM (uat), so the manual-create cases can't run. */
+  /** Approving already created the techpack's BOM (uat; dev too by 2026-11-11), so the manual-create cases can't run. */
   let autoBom = false;
 
   test.beforeAll(async ({ browser }) => {
@@ -104,8 +104,14 @@ test.describe.serial('BOM - Create BOM', () => {
     await bomListPage.openNewBomDialog();
     await bomListPage.openTechpackPicker();
 
+    const statuses = await bomListPage.techpackPickerColumnValues('Status');
+    // With the automatic BOM every approved techpack can already have one, so
+    // the picker offers nothing (dev, 2026-11-11: "Pick a techpack (0)").
+    test.skip(
+      autoBom && statuses.length === 0,
+      `${AUTO_BOM} The picker offers no techpack at all, so there is nothing to check.`,
+    );
     await test.step('Every offered techpack is Approved, and the footer total matches the title count', async () => {
-      const statuses = await bomListPage.techpackPickerColumnValues('Status');
       expect(statuses.length).toBeGreaterThan(0);
       expect(new Set(statuses)).toEqual(new Set(['Approved']));
       const total = await bomListPage.techpackPickerTotal();

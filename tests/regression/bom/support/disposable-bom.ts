@@ -45,7 +45,7 @@ export const MATERIALS_REDESIGN =
 
 /** Skip reason for the manual Create BOM cases when approving already created the BOM. */
 export const AUTO_BOM =
-  'Approving this techpack already created its rev-0 BOM ("system:autobom"; uat, 2026-11-05), so New BOM ' +
+  'Approving this techpack already created its rev-0 BOM ("system:autobom"; uat since 2026-11-05, dev by 2026-11-11), so New BOM ' +
   "doesn't offer it. These manual-create cases wait for test cases for the automatic BOM.";
 
 /** Generous budget for the whole setup chain, for callers' hooks. */

@@ -87,10 +87,14 @@ test.describe('BOM - Bill of Materials List', () => {
       await bomListPage.selectStatusTab(bomListPage.locators.openTab);
     });
 
-    await test.step('Every visible row is Open', async () => {
+    // The materials redesign adds an "Items Confirmed" status (dev and uat,
+    // 2026-11-11). Such a BOM isn't approved yet and the list's summary
+    // counts it as Open (`byStatus` has only Open / Approved / Cancelled), so
+    // the Open tab lists it too.
+    await test.step('Every visible row is Open (or Items Confirmed)', async () => {
       const statuses = await bomListPage.columnValues('Status');
       expect(statuses.length).toBeGreaterThan(0);
-      expect(new Set(statuses)).toEqual(new Set(['Open']));
+      for (const status of new Set(statuses)) expect(['Open', 'Items Confirmed']).toContain(status);
     });
   });
 
@@ -333,7 +337,7 @@ test.describe('BOM - Bill of Materials List', () => {
       await expect(l.tabNamed(/^Mở [\d,]+$/)).toBeVisible();
       await expect(l.tabNamed(/^Đã duyệt [\d,]+$/)).toBeVisible();
       await expect(l.buttonNamed('BOM mới')).toBeVisible();
-      await expect(l.buttonNamed('Xuất CSV')).toBeVisible();
+      await expect(l.exportCsvNamed('Xuất CSV')).toBeVisible();
       await expect(l.searchByPlaceholder('Tìm theo mã, khách hàng, mùa...')).toBeVisible();
       await expect(l.columnHeaderButton('Mã Tài liệu kỹ thuật')).toBeVisible();
       await expect(l.columnHeaderButton('Người duyệt')).toBeVisible();

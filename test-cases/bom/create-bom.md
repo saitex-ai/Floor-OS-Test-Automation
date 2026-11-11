@@ -63,3 +63,12 @@ Re-baselined from a live exploration of the redesigned UAT screens on 2026-10-23
   Supplier, colour, SKUs filled per size), plus "Sizes this BOM covers", "Items Confirmed", and "B.O.M Items N" /
   "Split Details N" as tabs. uat still has "Add line". Cases written for "Add line" skip on a BOM that shows "Add
   material", with that reason, until test cases for the redesign are written. TC:7's last step ("no items yet") skips on dev for this reason.
+
+## Update 2026-11-11 — dev has uat's Create BOM dialog and the automatic BOM
+
+- dev now has the "Select techpack" search box and the "Pick a techpack" table that uat got on 2026-11-05.
+- dev now creates a techpack's rev-0 BOM when it is approved, as uat does: TC:3–6 skip on both environments with the
+  automatic-BOM reason, and TC:7 records "Created by N/A" as an open question.
+- **TC:2:** on dev the picker offered no techpack at all on 2026-11-11 ("Pick a techpack (0)"): every approved techpack
+  already has a BOM. With the automatic BOM and an empty picker there is nothing to check, so the case skips with that
+  reason. With any techpack offered, every one must still be Approved.

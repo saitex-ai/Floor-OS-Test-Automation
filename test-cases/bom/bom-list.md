@@ -66,3 +66,12 @@ Re-baselined from a live exploration of the redesigned UAT screens on 2026-10-23
 - BOM has only **All / Open / Approved** tabs (no Draft, no Cancelled — a Cancelled BOM is only findable through the Status column filter, and the UI has no Cancel action at all).
 - The tab badges load separately from the grid rows; `BomListPage.waitForTabCounts()` waits for them before any count is read.
 - Rewritten 2026-10-08 against the UAT build (`build/uat`, 2026-10-01). Supersedes the 2026-09-25 doc-only catalogue.
+
+## Update 2026-11-11 — dev's list toolbar, and the "Items Confirmed" status
+
+- **TC:13 / TC:14 / TC:17 (dev):** the toolbar's CSV export button reads **Export** ("Xuất" in Vietnamese); "Export CSV"
+  ("Xuất CSV") is its title. It still downloads `bom-list.csv`. The suite finds it by name (uat) or title (dev), and
+  the selection bar's own "Export" is the one without that title. Expected results are unchanged.
+- **TC:3 (dev and uat):** the materials redesign adds an **Items Confirmed** BOM status. Such a BOM isn't approved yet, and
+  the list's summary counts it as Open, so the Open tab lists it too. Expected result: every row on the Open tab is
+  Open or Items Confirmed.
