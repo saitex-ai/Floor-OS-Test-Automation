@@ -33,10 +33,15 @@ export const TEST_DATA_TAG =
 
 const SAMPLE_PDF = path.join(__dirname, '..', '..', 'techpack', 'fixtures', 'sample-techpack.pdf');
 
-/** Skip reason for the "Add line" cases on a BOM that shows the materials redesign. */
+/**
+ * Skip reason for the "Add line" cases on a BOM that shows the materials
+ * redesign (dev 2026-11-05, uat by 2026-11-11): "Add material", product
+ * lines, sizes, an "Items Confirmed" status, and Costing Approve blocked
+ * until the BOM's issues are resolved.
+ */
 export const MATERIALS_REDESIGN =
-  'This BOM shows the 2026-11-05 materials redesign ("Add material", sizes, product catalogue; dev). ' +
-  'These "Add line" cases wait for new test cases for it.';
+  'This BOM shows the materials redesign ("Add material", product lines, "Items Confirmed"; dev and uat ' +
+  'since 2026-11-11). These "Add line" cases wait for new test cases written from its prototype.';
 
 /** Skip reason for the manual Create BOM cases when approving already created the BOM. */
 export const AUTO_BOM =

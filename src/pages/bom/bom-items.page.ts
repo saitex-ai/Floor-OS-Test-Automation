@@ -6,6 +6,9 @@ import { BomItemsLocators, type BomSplitType } from '../../locators/bom/bom-item
 /** The "Add Inventory Item" list is a live MDM search — allow it time on a cold remote. */
 const INVENTORY_SEARCH_TIMEOUT = 30_000;
 
+/** "Add material" fills from the product catalogue; same allowance. */
+const CATALOGUE_TIMEOUT = 30_000;
+
 /**
  * A BOM detail page's "B.O.M Items" table and the dialogs it opens. Owned
  * by the BOM QA. Element locators live in BomItemsLocators
@@ -237,6 +240,164 @@ export class BomItemsPage extends BasePage {
     return changed;
   }
 
+  // ---- Add material (the materials redesign) ----
+
+  /** Opens "Add material" and waits for the catalogue: product rows, or its "No material matches" state. */
+  async openAddMaterial(): Promise<void> {
+    await this.detail.addMaterialButton.click();
+    await expect(this.locators.addMaterialDialog).toBeVisible();
+    await expect(
+      this.locators.materialPickCheckboxes.first().or(this.locators.materialNoMatchHeading),
+    ).toBeVisible({ timeout: CATALOGUE_TIMEOUT });
+  }
+
+  async closeAddMaterial(): Promise<void> {
+    await this.locators.addMaterialDialog
+      .getByRole('button', { name: 'Cancel', exact: true })
+      .click();
+    await expect(this.locators.addMaterialDialog).toBeHidden();
+  }
+
+  /**
+   * Product codes "Add material" lets you pick right now, in table order
+   * (the Product cell's first word). A product already on the BOM is still
+   * listed, with its Pick disabled and "On this BOM · line N" (2026-11-11).
+   */
+  async offeredMaterialCodes(): Promise<string[]> {
+    return this.productCodesIn(
+      this.locators.addMaterialDialog
+        .getByRole('row')
+        .filter({ has: this.page.getByRole('checkbox', { name: /^Pick /, disabled: false }) }),
+    );
+  }
+
+  /** The first word of each row's second cell: the product code of a material or product line. */
+  private async productCodesIn(rows: Locator): Promise<string[]> {
+    const codes: string[] = [];
+    for (const row of await rows.all()) {
+      const text = await row.getByRole('cell').nth(1).innerText();
+      codes.push(text.trim().split(/\s+/)[0] ?? '');
+    }
+    return codes;
+  }
+
+  /** Searches "Add material" for one product code and waits for its row. */
+  async searchMaterial(productCode: string): Promise<void> {
+    await this.locators.materialSearchBox.fill(productCode);
+    await expect(this.locators.materialRow(productCode).first()).toBeVisible({
+      timeout: CATALOGUE_TIMEOUT,
+    });
+  }
+
+  /** Ticks `productCodes` in the open "Add material" and checks the button counts them. */
+  async pickMaterials(productCodes: string[]): Promise<void> {
+    for (const code of productCodes) {
+      await this.locators.materialPickCheckbox(code).first().check();
+    }
+    await expect(this.locators.addLinesButton).toHaveText(
+      new RegExp(`^Add ${productCodes.length} lines?$`),
+    );
+    await expect(this.locators.addLinesButton).toBeEnabled();
+  }
+
+  async unpickMaterial(productCode: string): Promise<void> {
+    await this.locators.materialPickCheckbox(productCode).first().uncheck();
+  }
+
+  /** Adds `productCodes` through "Add material", one line each, and waits for the lines. */
+  async addMaterials(productCodes: string[]): Promise<void> {
+    await this.openAddMaterial();
+    await this.pickMaterials(productCodes);
+    await Promise.all([
+      this.page.waitForResponse(
+        (res) =>
+          res.request().method() === 'POST' &&
+          new URL(res.url()).pathname.endsWith('/product-lines') &&
+          res.ok(),
+        { timeout: CATALOGUE_TIMEOUT },
+      ),
+      this.locators.addLinesButton.click(),
+    ]);
+    await expect(this.locators.addMaterialDialog).toBeHidden();
+    for (const code of productCodes) {
+      await expect(this.locators.productLine(code).first()).toBeVisible();
+    }
+  }
+
+  /** Product codes of the BOM's product lines, in table order, once the table matches the tab's count. */
+  async productLineCodes(): Promise<string[]> {
+    // The header renders before the lines: wait for the table or its empty state.
+    await expect(this.locators.productLinesTable.or(this.locators.noProductLinesText)).toBeVisible({
+      timeout: CATALOGUE_TIMEOUT,
+    });
+    const tab = await this.detail.itemsTab.innerText();
+    await expect(this.locators.productLineRows).toHaveCount(Number(tab.match(/(\d+)/)?.[1] ?? 0));
+    return this.productCodesIn(this.locators.productLineRows);
+  }
+
+  /** A product code with a line on this BOM, adding the first material offered if it has none. */
+  async ensureProductLine(): Promise<string> {
+    const [line] = await this.productLineCodes();
+    if (line) return line;
+    await this.openAddMaterial();
+    const [first] = await this.offeredMaterialCodes();
+    await this.closeAddMaterial();
+    if (!first) throw new Error('"Add material" offers no product to add');
+    await this.addMaterials([first]);
+    return first;
+  }
+
+  async openDeleteProductLine(productCode: string): Promise<void> {
+    await this.locators.productLineDeleteButton(productCode).first().click();
+    await expect(this.locators.deleteLineDialog).toBeVisible();
+  }
+
+  async deleteProductLine(productCode: string): Promise<void> {
+    const before = await this.locators.productLine(productCode).count();
+    await this.openDeleteProductLine(productCode);
+    await this.locators.deleteLineDialog
+      .getByRole('button', { name: 'Delete', exact: true })
+      .click();
+    await expect(this.locators.deleteLineDialog).toBeHidden();
+    await expect(this.locators.productLine(productCode)).toHaveCount(before - 1);
+  }
+
+  /** The line counts of the category header rows ("Trims & labels 1 line"; upper-cased by CSS). */
+  async categoryLineCounts(): Promise<number[]> {
+    const headers = await this.locators.productCategoryRows.allInnerTexts();
+    return headers.map((h) => Number(h.match(/(\d+)\s+lines?\s*$/i)?.[1] ?? NaN));
+  }
+
+  /** The "Split Details" table's column names (each header also holds an unnamed resize button). */
+  async splitDetailsColumnHeaders(): Promise<string[]> {
+    const headers = await this.locators.splitDetailsTable.getByRole('columnheader').allInnerTexts();
+    return headers.map((h) => h.trim());
+  }
+
+  /** Types a Remark into a product line and leaves the box; it saves on its own (PATCH). */
+  async setProductLineRemark(productCode: string, remark: string): Promise<void> {
+    const input = this.locators.productLineRemarkInput(productCode).first();
+    await input.fill(remark);
+    await Promise.all([this.waitForProductLineSave(), input.press('Tab')]);
+  }
+
+  async toggleCustomerSupplied(productCode: string): Promise<void> {
+    await Promise.all([
+      this.waitForProductLineSave(),
+      this.locators.productLineCustomerSuppliedCheckbox(productCode).first().click(),
+    ]);
+  }
+
+  private waitForProductLineSave() {
+    return this.page.waitForResponse(
+      (res) =>
+        res.request().method() === 'PATCH' &&
+        /\/product-lines\/\d+$/.test(new URL(res.url()).pathname) &&
+        res.ok(),
+      { timeout: CATALOGUE_TIMEOUT },
+    );
+  }
+
   // ---- Delete ----
 
   async openDeleteDialog(inventoryId: string): Promise<void> {
@@ -396,6 +557,12 @@ export class BomItemsPage extends BasePage {
   async openSplitDetails(): Promise<void> {
     await this.detail.splitDetailsTab.click();
     await expect(this.locators.splitDetailsDialog).toBeVisible();
+  }
+
+  /** The materials redesign's "Split Details" tab: a table in place of the items, not a dialog. */
+  async showSplitDetailsTab(): Promise<void> {
+    await this.detail.splitDetailsTab.click();
+    await expect(this.locators.splitDetailsTable).toBeVisible();
   }
 
   async openThreadItems(): Promise<void> {

@@ -132,11 +132,14 @@ export class BomDetailLocators {
     this.createRevisionButton = page.getByRole('button', { name: 'Create Revision', exact: true });
     this.createCostingRequestButton = page.getByRole('button', { name: 'Create Costing Request' });
 
-    // A button, or a tab on dev's 2026-11-05 redesign ("B.O.M Items 0").
+    // A button, or a tab in the "BOM sections" tablist on the materials
+    // redesign ("B.O.M Items 0", "Split Details 0"; dev 2026-11-05, uat by 2026-11-11).
     this.itemsTab = page
       .getByRole('button', { name: /^B\.O\.M Items/ })
       .or(page.getByRole('tab', { name: /^B\.O\.M Items/ }));
-    this.splitDetailsTab = page.getByRole('button', { name: /^Split Details/ });
+    this.splitDetailsTab = page
+      .getByRole('button', { name: /^Split Details/ })
+      .or(page.getByRole('tab', { name: /^Split Details/ }));
     this.threadItemsTab = page.getByRole('button', { name: /^Thread Items/ });
 
     this.costingApproveDialog = page.getByRole('dialog', { name: 'Costing Approve' });

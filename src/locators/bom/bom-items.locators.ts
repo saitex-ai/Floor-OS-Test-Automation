@@ -9,6 +9,9 @@ export type BomSplitType =
   | 'BPO split'
   | 'Destination split';
 
+/** A product code as a literal in a RegExp (catalogue codes can hold ".", "+" or brackets). */
+const literal = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /**
  * Raw element locators for a BOM detail page's "B.O.M Items" table and the
  * dialogs it opens (Add line, edit reasons, delete, split details, thread
@@ -92,6 +95,24 @@ export class BomItemsLocators {
   readonly copyBomDialog: Locator;
   readonly copySourceRows: Locator;
   readonly copySourceSearch: Locator;
+
+  // The materials redesign (dev 2026-11-05, uat by 2026-11-11): "Add material"
+  // picks products from the product catalogue; each becomes one product line.
+  readonly addMaterialDialog: Locator;
+  readonly materialSearchBox: Locator;
+  readonly materialCategorySelect: Locator;
+  readonly showAwaitingApprovalCheckbox: Locator;
+  readonly materialPickCheckboxes: Locator;
+  /** "Add lines" (disabled) with nothing picked, then "Add 1 line", "Add 2 lines"… */
+  readonly addLinesButton: Locator;
+  readonly materialNoMatchHeading: Locator;
+  readonly productLinesTable: Locator;
+  /** The empty "B.O.M Items" tab: "No materials on this BOM yet. Use Add material to pick products." */
+  readonly noProductLinesText: Locator;
+  readonly productLineRows: Locator;
+  readonly productLineColumnHeaders: Locator;
+  readonly productCategoryRows: Locator;
+  readonly splitDetailsTable: Locator;
 
   constructor(private readonly page: Page) {
     this.itemsTable = page.getByRole('main').getByRole('table').first();
@@ -202,7 +223,10 @@ export class BomItemsLocators {
     });
     this.bulkPasteDialog = page.getByRole('dialog', { name: 'Bulk paste BOM lines' });
     this.bulkPasteInput = this.bulkPasteDialog.getByRole('textbox').first();
-    this.parseRowsButton = this.bulkPasteDialog.getByRole('button', { name: 'Parse rows' });
+    // "Read rows" on the materials redesign.
+    this.parseRowsButton = this.bulkPasteDialog.getByRole('button', {
+      name: /^(Parse rows|Read rows)$/,
+    });
     this.copyBomDialog = page.getByRole('dialog').filter({
       has: page.getByRole('heading', { name: /^Copy B\.O\.M/ }),
     });
@@ -212,6 +236,78 @@ export class BomItemsLocators {
     this.copySourceSearch = this.copyBomDialog
       .getByRole('textbox', { name: 'Search source BOMs' })
       .or(this.copyBomDialog.getByRole('textbox', { name: 'Search', exact: true }));
+
+    this.addMaterialDialog = page.getByRole('dialog', { name: 'Add material' });
+    this.materialSearchBox = this.addMaterialDialog.getByRole('searchbox', {
+      name: 'Search materials',
+    });
+    this.materialCategorySelect = this.addMaterialDialog.getByRole('combobox', {
+      name: 'Category',
+    });
+    this.showAwaitingApprovalCheckbox = this.addMaterialDialog.getByRole('checkbox', {
+      name: 'Show SKUs awaiting approval',
+    });
+    this.materialPickCheckboxes = this.addMaterialDialog.getByRole('checkbox', { name: /^Pick / });
+    this.addLinesButton = this.addMaterialDialog.getByRole('button', {
+      name: /^Add (\d+ )?lines?$/,
+    });
+    this.materialNoMatchHeading = this.addMaterialDialog.getByRole('heading', {
+      name: /^No material matches/,
+    });
+    this.productLinesTable = page.getByRole('table', { name: 'BOM items' });
+    this.noProductLinesText = page.getByText('No materials on this BOM yet.');
+    // A product line has "Delete line N"; category rows ("Trims & labels 1 line") don't.
+    this.productLineRows = this.productLinesTable
+      .getByRole('row')
+      .filter({ has: page.getByRole('button', { name: /^Delete line \d+$/ }) });
+    this.productLineColumnHeaders = this.productLinesTable.getByRole('columnheader');
+    this.productCategoryRows = this.productLinesTable.getByRole('row', { name: /^.+ \d+ lines?$/ });
+    this.splitDetailsTable = page.getByRole('table', { name: 'Split details' });
+  }
+
+  /** A product's row in "Add material", by its product code (the Product cell reads "<code> <name>"). */
+  materialRow(productCode: string): Locator {
+    return this.addMaterialDialog.getByRole('row').filter({
+      has: this.page.getByRole('cell', { name: new RegExp(`^${literal(productCode)} `) }),
+    });
+  }
+
+  /** A product line by its product code (its Material cell reads "<code> <name>"). */
+  productLine(productCode: string): Locator {
+    return this.productLineRows.filter({
+      has: this.page.getByRole('cell', { name: new RegExp(`^${literal(productCode)} `) }),
+    });
+  }
+
+  /** A "Split Details" row of one product (its Material cell holds the product code). */
+  splitDetailsRow(productCode: string): Locator {
+    return this.splitDetailsTable.getByRole('row').filter({
+      has: this.page.getByRole('cell', { name: productCode, exact: true }),
+    });
+  }
+
+  /** A product's "Pick" checkbox in "Add material". */
+  materialPickCheckbox(productCode: string): Locator {
+    return this.materialRow(productCode).getByRole('checkbox', { name: /^Pick / });
+  }
+
+  /** A product's Status cell in "Add material", e.g. "On this BOM · line 2". */
+  materialStatusCell(productCode: string): Locator {
+    return this.materialRow(productCode).getByRole('cell', { name: /^On this BOM/ });
+  }
+
+  productLineDeleteButton(productCode: string): Locator {
+    return this.productLine(productCode).getByRole('button', { name: /^Delete line \d+$/ });
+  }
+
+  productLineRemarkInput(productCode: string): Locator {
+    return this.productLine(productCode).getByRole('textbox', { name: /^Remark, line \d+$/ });
+  }
+
+  productLineCustomerSuppliedCheckbox(productCode: string): Locator {
+    return this.productLine(productCode).getByRole('checkbox', {
+      name: /^Customer supplied, line \d+$/,
+    });
   }
 
   /**
