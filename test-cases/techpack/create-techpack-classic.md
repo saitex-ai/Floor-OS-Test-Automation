@@ -294,3 +294,12 @@ Changes that affect every case:
   TC:9 passed 3 runs out of 3: the "Add techpack type" dialog stops a 25-character code, and Create shows no raw JSON. On
   dev the same day the dialog still accepted a 25-character code (2 of 2 probes, nothing saved). TC:9 no longer expects
   a failure; it still skips on dev because the over-length value it reuses exists only in uat's master data.
+  z941abxb20 stays open until dev has the fix.
+
+## Update 2026-11-11 — TC:7's "Open" check
+
+- **TC:7:** on dev a create came out Draft in 1 of 5 runs (2026-11-11), as on the 2026-11-10 review run. The canvas
+  showed a "Draft" badge on Season*: the randomly picked Customer had only Draft seasons, and one Draft value leaves a
+  techpack Draft. The random picks now re-pick the Customer until its Season list has an Approved option, so every
+  picked value is Approved and the expected result ("Open") is unchanged. On 2026-11-11, 15 of dev's first 25
+  customers and 21 of uat's had an Approved season.

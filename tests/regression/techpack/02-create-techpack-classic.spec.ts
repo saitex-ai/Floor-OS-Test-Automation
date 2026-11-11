@@ -277,8 +277,9 @@ test.describe('Techpack - New Techpack (Classic)', () => {
       });
 
     // Open because every picked value is Approved master data (the random
-    // picks prefer Approved values); one Draft value would leave it Draft
-    // with "Move to Open — Pending approval: <field>".
+    // picks prefer Approved values, and re-pick the Customer until its
+    // Season list has one); one Draft value would leave it Draft with "Move
+    // to Open — Pending approval: <field>".
     await test.step(`${code} is Open, not Draft (its canvas Details)`, async () => {
       await canvasPage.gotoCanvasById(createTechpackPage.currentTechpackId());
       await canvasPage.expectLoaded();
@@ -371,7 +372,8 @@ test.describe('Techpack - New Techpack (Classic)', () => {
     // (3 runs; the dialog stops the 25-character code), so this asserts the
     // fixed behaviour. dev's dialog still accepted it the same day, but the
     // test skips on dev before asserting (the over-length value below exists
-    // on uat only). The flow can run all the way to filling the remaining 6
+    // on uat only). z941abxb20 stays open until dev has the fix too (PR #62
+    // review, 2026-11-10). The flow can run all the way to filling the remaining 6
     // fields, uploading a real PDF and clicking "Create techpack", so it's
     // budgeted generously like TC:7/TC:8.
     test.setTimeout(180_000);

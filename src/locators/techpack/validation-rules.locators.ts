@@ -3,8 +3,8 @@ import { type Locator, type Page } from '@playwright/test';
 /**
  * Techpack — Validation rules (`/techpacks/admin/validation-rules`), element
  * locators only; see src/pages/techpack/validation-rules.page.ts for
- * actions/assertions. Reached via the Techpack module's own collapsed
- * "WORKSPACE" nav drawer (not a separate module).
+ * actions/assertions. Reached via the Techpack module's own left nav, or
+ * the Preferences page where that nav has no link (not a separate module).
  *
  * Confirmed live via real ariaSnapshot() dumps, not guessed — list page on
  * dev 2026-09-30 (local exploration evidence (not committed)
@@ -34,7 +34,10 @@ export class ValidationRulesLocators {
   // Techpack module nav drawer (for TC:1/TC:28)
   /** The Techpack module landing's <h1>, "Dashboard" since the 2026-10-22 redesign. */
   readonly techpackDashboardHeading: Locator;
+  readonly dashboardNavLink: Locator;
   readonly validationRulesNavLink: Locator;
+  /** The Preferences page's "Validation rules" section link (dev since 2026-11-10). */
+  readonly preferencesValidationRulesLink: Locator;
 
   // List toolbar
   readonly moreTabsButton: Locator;
@@ -94,12 +97,17 @@ export class ValidationRulesLocators {
 
     this.techpackDashboardHeading = page.getByRole('heading', { name: 'Dashboard', level: 1 });
     // The module's left nav is docked open since the 2026-10-22 redesign
-    // (there is no "Open navigation" button any more). The screen's nav link
-    // is "Settings" (`/techpacks/admin/validation-rules`), not "Validation
-    // rules": seen on uat 2026-11-03 and on dev 2026-11-05.
-    this.validationRulesNavLink = page
-      .getByRole('complementary', { name: 'Techpacks' })
-      .getByRole('link', { name: 'Settings', exact: true });
+    // (there is no "Open navigation" button any more). On 2026-11-11 uat's
+    // nav has "Validation rules" again, beside a "Settings" link that now
+    // opens /preferences; dev's nav has neither, and its Preferences page
+    // links to the screen instead.
+    const nav = page.getByRole('complementary', { name: 'Techpacks' });
+    this.dashboardNavLink = nav.getByRole('link', { name: 'Dashboard', exact: true });
+    this.validationRulesNavLink = nav.getByRole('link', { name: 'Validation rules', exact: true });
+    this.preferencesValidationRulesLink = page.getByRole('link', {
+      name: 'Open validation rules',
+      exact: true,
+    });
 
     this.moreTabsButton = page.getByRole('button', { name: /^\+\d+ more$/ });
     this.filterInput = page.getByPlaceholder('Filter by id, name or description');

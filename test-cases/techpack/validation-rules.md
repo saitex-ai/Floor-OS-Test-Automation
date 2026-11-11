@@ -290,3 +290,13 @@ The intro paragraph above, about the "WORKSPACE" section and "Open navigation", 
 - **TC:1 / TC:28:** the Techpack left nav (dev and uat) has no "Validation rules" link. **Settings** at the bottom of
   the nav opens `/techpacks/admin/validation-rules`. Step 2 is now "click Settings"; the expected result is unchanged.
   bob (Qc-lead) sees the same Settings link.
+
+## Update 2026-11-11 — the nav changed again on both environments
+
+- **uat:** the Techpack left nav has a "Validation rules" link again, which opens `/techpacks/admin/validation-rules`.
+  **Settings** now opens `/preferences`.
+- **dev:** the Techpack left nav has no link to this screen (Dashboard, Brand Requests, Recents, Brands, Trash). It is
+  reached from user menu › **Preferences** › "Open validation rules".
+- **TC:1 / TC:28:** step 2 is "click Validation rules in the left nav". Where the nav has no such link, the test goes
+  through user menu › Preferences › "Open validation rules" and records an open question (is that the intended entry
+  point?). The expected result is unchanged.

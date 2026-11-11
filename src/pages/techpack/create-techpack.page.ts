@@ -65,6 +65,19 @@ const REQUIRED_COMBOBOX_LABELS = [
 /** How long waitForAutosave() gives the form's pending browser saves. */
 const AUTOSAVE_SETTLE_MS = 2_000;
 
+/**
+ * An option's last line is its master-data status ("Approved", "Draft",
+ * …). A techpack is created Open only when every picked value is
+ * Approved; one Draft value leaves it Draft, with "Move to Open — Pending
+ * approval: <field>" (seen on dev 2026-10-26).
+ */
+const optionStatus = (text: string): string =>
+  text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .pop() ?? '';
+
 export class CreateTechpackPage extends BasePage {
   readonly locators: CreateTechpackLocators;
 
@@ -146,22 +159,13 @@ export class CreateTechpackPage extends BasePage {
       const lines = text.split('\n').map((l) => l.trim());
       return (lines.length > 1 ? lines[1] : lines[0]) ?? '';
     };
-    // An option's last line is its master-data status ("Approved", "Draft",
-    // …). A techpack is created Open only when every picked value is
-    // Approved; one Draft value leaves it Draft, with "Move to Open — Pending
-    // approval: <field>" (seen on dev 2026-10-26). So prefer Approved values.
-    const statusOf = (text: string) =>
-      text
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean)
-        .pop() ?? '';
+    // Prefer Approved values (see optionStatus()).
     const valid = texts
       .map((text, index) => ({ text, index }))
       .filter(({ text }) =>
         labelText !== 'Techpack Type*' ? true : codeOf(text).length <= TECHPACK_TYPE_CODE_MAX,
       );
-    const approved = valid.filter(({ text }) => statusOf(text) === 'Approved');
+    const approved = valid.filter(({ text }) => optionStatus(text) === 'Approved');
     const usable = approved.length > 0 ? approved : valid;
     const pool = usable.length > 0 ? usable : texts.map((text, index) => ({ text, index }));
     const pick = pool[Math.floor(Math.random() * pool.length)]!;
@@ -193,6 +197,21 @@ export class CreateTechpackPage extends BasePage {
     await this.page.keyboard.press('Escape');
     await this.expectListboxClosed();
     return !gotAnOption;
+  }
+
+  /** True if a field's combobox offers at least one Approved option (same Season caveat as above). */
+  async comboboxHasApprovedOption(labelText: string): Promise<boolean> {
+    await this.locators.fieldTrigger(labelText).click();
+    const options = this.page.getByRole('listbox').last().getByRole('option');
+    const gotAnOption = await options
+      .first()
+      .waitFor({ state: 'visible', timeout: 20_000 })
+      .then(() => true)
+      .catch(() => false);
+    const texts = gotAnOption ? await options.allInnerTexts() : [];
+    await this.page.keyboard.press('Escape');
+    await this.expectListboxClosed();
+    return texts.some((text) => optionStatus(text) === 'Approved');
   }
 
   async fillDetails(details: TechpackCreateDetails): Promise<void> {
@@ -228,10 +247,12 @@ export class CreateTechpackPage extends BasePage {
    * picked before Season, since Season has no options until a Customer is
    * selected — REQUIRED_COMBOBOX_LABELS is already ordered for this.
    *
-   * Not every Customer has at least one Season (confirmed: picking one at
-   * random can land on "0 seasons" for that customer). When that happens,
-   * this re-picks a different random Customer and checks again, up to 8
-   * tries, rather than failing outright.
+   * Not every Customer has an Approved Season (confirmed: picking one at
+   * random can land on "0 seasons", or only Draft ones, for that customer —
+   * a Draft Season left Classic TC:7's techpack Draft on dev, 2026-11-10).
+   * When that happens, this re-picks a different random Customer and checks
+   * again, up to 8 tries, rather than failing outright. On 2026-11-11, 15
+   * of dev's first 25 customers and 21 of uat's had an Approved Season.
    */
   async fillAllRequiredWithRandomAvailable(
     skipLabels: readonly string[] = [],
@@ -240,13 +261,13 @@ export class CreateTechpackPage extends BasePage {
     for (const label of REQUIRED_COMBOBOX_LABELS) {
       if (skipLabels.includes(label)) continue;
       if (label === 'Season*') {
-        let hasSeason = !(await this.comboboxHasNoOptions('Season*'));
+        let hasSeason = await this.comboboxHasApprovedOption('Season*');
         for (let attempt = 0; !hasSeason && attempt < 8; attempt++) {
           picked['Customer*'] = await this.selectRandomAvailableOption('Customer*');
-          hasSeason = !(await this.comboboxHasNoOptions('Season*'));
+          hasSeason = await this.comboboxHasApprovedOption('Season*');
         }
         if (!hasSeason) {
-          throw new Error('Could not find a Customer with at least one Season after 8 attempts');
+          throw new Error('Could not find a Customer with an Approved Season after 8 attempts');
         }
       }
       picked[label] = await this.selectRandomAvailableOption(label);
@@ -679,12 +700,11 @@ export class CreateTechpackPage extends BasePage {
    */
   async expectCreatedSuccessfully(): Promise<void> {
     // A new techpack opens at /techpacks/view/{id} (dev) or
-    // /techpacks/canvas/{id} (uat, 2026-11-05); the pattern also still
-    // accepts the older /techpacks/{id}.
-    await expect(this.page).toHaveURL(/\/techpacks\/(canvas\/|view\/)?[^/]+$/, {
-      timeout: 30_000,
-    });
-    await expect(this.page).not.toHaveURL(/\/techpacks\/new$/);
+    // /techpacks/canvas/{id} (uat, 2026-11-05). TECHPACK_PAGE_URL can't match
+    // /techpacks/new itself: the old pattern did, so this check passed before
+    // the app navigated and a slow dev create failed the 15 s "not /new" check
+    // after it (canvas TC:13, PR #62 review, 2026-11-10).
+    await expect(this.page).toHaveURL(TECHPACK_PAGE_URL, { timeout: 60_000 });
     await expect(this.page.getByText(/^TP\d+-\d+$/).first()).toBeVisible({ timeout: 30_000 });
   }
 

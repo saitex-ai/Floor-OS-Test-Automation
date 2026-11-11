@@ -2,6 +2,9 @@ import { type Locator, type Page, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
 import { CanvasLocators } from '../../locators/techpack/canvas.locators';
 
+/** How long forceRelease() waits for the banner or the "Could not release" error after a click. */
+const FORCE_RELEASE_TIMEOUT = 60_000;
+
 /**
  * Techpack canvas (`/techpacks/canvas/{id}` on dev, `/techpacks/{id}` on local) — the review
  * screen landed on right after creating a techpack (Classic or AI Mode), or after clicking an
@@ -357,7 +360,10 @@ export class CanvasPage extends BasePage {
    * stay filled) instead of releasing — not every attempt, and simply
    * clicking "Release lock" again resolved it live every time it was hit.
    * This is a release-action-specific backend hiccup, unrelated to the
-   * gating logic itself.
+   * gating logic itself. Only that error is retried: on a slow dev the
+   * release itself can take over 10 s, and a second click then waited on a
+   * button whose dialog was closing, until the 300 s test timeout (PR #62
+   * review, 2026-11-10).
    */
   async forceRelease(reason: string, maxAttempts = 3): Promise<void> {
     await this.locators.forceReleaseButton.click();
@@ -372,19 +378,19 @@ export class CanvasPage extends BasePage {
       await this.locators.forceReleaseConfirmButton.click();
       const outcome = await Promise.race([
         this.locators.forceReleaseBanner
-          .waitFor({ state: 'visible', timeout: 10_000 })
+          .waitFor({ state: 'visible', timeout: FORCE_RELEASE_TIMEOUT })
           .then((): 'released' => 'released')
           .catch(() => null),
         this.page
           .getByText('Could not release')
-          .waitFor({ state: 'visible', timeout: 10_000 })
+          .waitFor({ state: 'visible', timeout: FORCE_RELEASE_TIMEOUT })
           .then((): 'transient-error' => 'transient-error')
           .catch(() => null),
       ]);
       if (outcome === 'released') return;
-      if (attempt === maxAttempts - 1) {
+      if (outcome === null || attempt === maxAttempts - 1) {
         throw new Error(
-          `forceRelease: no force-release banner after ${maxAttempts} attempts ` +
+          `forceRelease: no force-release banner after ${attempt + 1} attempt(s) ` +
             `(last outcome: ${outcome ?? 'neither the banner nor an error appeared'})`,
         );
       }

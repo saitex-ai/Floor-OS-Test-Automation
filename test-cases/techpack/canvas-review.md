@@ -399,3 +399,15 @@ Expected results are unchanged; steps change as below. The table above is left a
   `/techpacks/view/{id}`, which has none of the canvas's controls. Every case now opens the canvas by id after creating
   its techpack, on both environments (the 2026-10-23 notes above already say a create opens the view).
 - Not changed here: TC:16 (AI Mode), which #59 covers.
+
+## Update 2026-11-11 — slow-dev fixes for TC:13 and TC:19
+
+Steps and expected results are unchanged. Two waits in the suite were too short for a slow dev (PR #62 review run,
+2026-11-10):
+
+- **Every case's setup (TC:13 failed there):** after Create, the suite checked the URL with a pattern that
+  `/techpacks/new` itself matched. A create that took over 15 s to leave the form failed the setup. It now waits up to
+  60 s for `/techpacks/canvas/{id}` or `/techpacks/view/{id}`.
+- **TC:19 (Force release):** when the release took over 10 s, the suite clicked "Release lock" again while its dialog was
+  closing, and waited for that button until the 300 s test timeout. It now waits up to 60 s for the banner, and clicks
+  again only after the app's own "Could not release" error.
