@@ -198,23 +198,27 @@ test.describe('Fabric Mill Smoke', () => {
   });
 
   test.describe('Finishing', () => {
-    test('SM-MILL-11: Finishing loads with the Finishing order and Greige roll cards', async () => {
+    test('SM-MILL-11: Finishing loads with Orders and Production tabs and the Record output action', async () => {
       const l = finishingPage.locators;
       await finishingPage.openViaNav();
-      await expect(l.consumeInputsTab).toHaveAttribute('aria-selected', 'true');
-      await expect(l.recordOutputTab).toBeVisible();
-      await expect(l.ordersTab).toBeVisible();
-      await expect(l.finishingOrderCard).toBeVisible();
-      await expect(l.greigeRollCard).toBeVisible();
+      // Redesigned on dev (2026-11): the Consume inputs and Record output
+      // tabs are gone; Record output is a header button that opens a popup.
+      await expect(l.ordersTab).toHaveAttribute('aria-selected', 'true');
+      await expect(l.productionTab).toBeVisible();
+      await expect(l.pullFromSapButton).toBeVisible();
+      await expect(l.recordOutputButton).toBeVisible();
     });
 
-    test('SM-MILL-12: Doff finished roll is blocked until a finished length is entered', async () => {
+    test('SM-MILL-12: Record output asks for the greige roll before a finished length can be entered', async () => {
       const l = finishingPage.locators;
       await finishingPage.openViaNav();
-      await finishingPage.selectTab(l.recordOutputTab);
-      await expect(l.finishedLengthInput).toBeVisible();
-      await expect(l.finishedLengthInput).toBeEmpty();
-      await expect(l.doffToQcButton).toBeDisabled();
+      // No roll is scanned here, so nothing is saved.
+      await l.recordOutputButton.click();
+      await expect(l.recordOutputDialog).toBeVisible();
+      await expect(l.scanGreigeRollInput).toBeVisible();
+      await expect(l.finishedLengthInput).toHaveCount(0);
+      await l.recordOutputDialog.getByRole('button', { name: 'Close' }).click();
+      await expect(l.recordOutputDialog).toBeHidden();
     });
   });
 
@@ -222,14 +226,19 @@ test.describe('Fabric Mill Smoke', () => {
     test('SM-MILL-13: Goods requests loads with the All filter selected and New request, Receive Goods and Direct transfer actions', async () => {
       const l = requestsPage.locators;
       await requestsPage.openViaNav();
-      // Mill CR round (2026-10): no tabs — status filter pills. Receive Goods
-      // and Direct transfer open popups; New request opens its own page,
-      // /mill/requests/new (since 2026-10-26).
-      await expect(l.allStatusFilter).toHaveAttribute('aria-pressed', 'true');
-      await expect(l.pendingStatusFilter).toHaveAttribute('aria-pressed', 'false');
+      // Status filter tabs (pills until 2026-11). Receive Goods and Direct
+      // transfer moved into the "More actions" menu (2026-11) and open
+      // popups; New request opens its own page, /mill/requests/new.
+      await expect(l.allStatusFilter).toHaveAttribute('aria-selected', 'true');
+      await expect(l.pendingStatusFilter).toHaveAttribute('aria-selected', 'false');
       await expect(l.newRequestButton).toBeVisible();
-      await expect(l.receiveGoodsButton).toBeVisible();
-      await expect(l.directTransferButton).toBeVisible();
+      await l.moreActionsButton.click();
+      await expect(l.receiveGoodsMenuItem).toBeVisible();
+      await expect(l.directTransferMenuItem).toBeVisible();
+      // Close the menu without picking anything — left open, it blocks the
+      // next check on this shared tab.
+      await page.keyboard.press('Escape');
+      await expect(l.receiveGoodsMenuItem).toBeHidden();
     });
 
     test('SM-MILL-14: New request refuses a zero quantity', async () => {
