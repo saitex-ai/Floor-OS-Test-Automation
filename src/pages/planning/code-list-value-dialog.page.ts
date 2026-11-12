@@ -103,7 +103,11 @@ export class CodeListValueDialogPage extends BasePage {
   ): Promise<void> {
     const button = action === 'create' ? this.locators.createButton : this.locators.saveButton;
     await button.click();
-    await expect(fieldAlert(this.locators[field])).toBeVisible({ timeout: WAIT.VALIDATION });
+    // Display order is a number box (its own wrapper), so its alert is two levels up.
+    const levels = field === 'displayOrder' ? 2 : 1;
+    await expect(fieldAlert(this.locators[field], levels)).toBeVisible({
+      timeout: WAIT.VALIDATION,
+    });
     await expect(button).toBeVisible();
   }
 
