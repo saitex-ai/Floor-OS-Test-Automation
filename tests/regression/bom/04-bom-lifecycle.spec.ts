@@ -8,7 +8,7 @@ import { ShellHeaderPage } from '../../../src/pages/shell/shell-header.page';
 import {
   createDisposableBom,
   DISPOSABLE_BOM_TIMEOUT,
-  MATERIALS_REDESIGN,
+  APPROVE_FLOW_REDESIGN,
 } from './support/disposable-bom';
 
 /**
@@ -43,7 +43,7 @@ test.describe.serial('BOM - Lifecycle', () => {
     bomDetailPage = new BomDetailPage(page);
     bomItemsPage = new BomItemsPage(page);
     code = await createDisposableBom(page);
-    test.skip(await bomDetailPage.hasMaterialsWorkspace(), MATERIALS_REDESIGN);
+    test.skip(await bomDetailPage.hasMaterialsWorkspace(), APPROVE_FLOW_REDESIGN);
   });
 
   test.afterAll(async () => {
@@ -380,7 +380,7 @@ test.describe('BOM - Lifecycle (older revisions)', () => {
     page = await browser.newPage({ storageState: authFile('bom') });
     bomDetailPage = new BomDetailPage(page);
     code = await createDisposableBom(page);
-    test.skip(await bomDetailPage.hasMaterialsWorkspace(), MATERIALS_REDESIGN);
+    test.skip(await bomDetailPage.hasMaterialsWorkspace(), APPROVE_FLOW_REDESIGN);
     const items = new BomItemsPage(page);
     await items.addLines(LINES);
     await items.assignSuppliersWhereRequired();

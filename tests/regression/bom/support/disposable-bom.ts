@@ -43,6 +43,12 @@ export const MATERIALS_REDESIGN =
   'This BOM shows the materials redesign ("Add material", product lines, "Items Confirmed"; dev and uat ' +
   'since 2026-11-11). These "Add line" cases wait for new test cases written from its prototype.';
 
+/** Skip reason for the lifecycle and permissions cases, which walk the old approve flow. */
+export const APPROVE_FLOW_REDESIGN =
+  'This BOM shows the materials redesign (dev and uat since 2026-11-11), which changes the approve flow: ' +
+  '"Items Confirmed" comes first, and Costing Approve stays disabled while "N issue(s) block Costing Approve". ' +
+  'These approve-flow cases wait for new test cases written from its prototype.';
+
 /** Skip reason for the manual Create BOM cases when approving already created the BOM. */
 export const AUTO_BOM =
   'Approving this techpack already created its rev-0 BOM ("system:autobom"; uat since 2026-11-05, dev by 2026-11-11), so New BOM ' +
