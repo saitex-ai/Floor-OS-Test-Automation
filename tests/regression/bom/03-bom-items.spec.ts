@@ -3,7 +3,11 @@ import { test, expect, type Page } from '@playwright/test';
 import { authFile } from '../../../src/fixtures/auth-setup';
 import { BomDetailPage } from '../../../src/pages/bom/bom-detail.page';
 import { BomItemsPage } from '../../../src/pages/bom/bom-items.page';
-import { createDisposableBom, DISPOSABLE_BOM_TIMEOUT } from './support/disposable-bom';
+import {
+  createDisposableBom,
+  DISPOSABLE_BOM_TIMEOUT,
+  MATERIALS_REDESIGN,
+} from './support/disposable-bom';
 
 /**
  * BOM — Items (the "B.O.M Items" table on an Open BOM).
@@ -11,19 +15,28 @@ import { createDisposableBom, DISPOSABLE_BOM_TIMEOUT } from './support/disposabl
  * Source of truth for these cases: test-cases/bom/bom-items.md.
  *
  * Every case runs on a disposable BOM this file builds for itself
- * (support/disposable-bom.ts) — never someone else's — seeded with a
- * baseline of four real MDM items from different categories (fabric,
- * thread, label, packaging). Cases that need more items add their own,
- * from codes no other case touches, so they don't depend on each
- * other's order. One browser tab is shared across the file (as in the
- * BOM smoke suite); default (not serial) mode, so one failure doesn't
- * skip the rest — a fresh worker just builds a fresh BOM.
+ * (support/disposable-bom.ts) — never someone else's. One browser tab is
+ * shared across the file (as in the BOM smoke suite); default (not
+ * serial) mode, so one failure doesn't skip the rest — a fresh worker
+ * just builds a fresh BOM.
+ *
+ * Since the materials redesign (dev 2026-11-05, uat by 2026-11-11) items
+ * are added with "Add material": products from the product catalogue,
+ * one product line each. Which products the catalogue offers is data
+ * (13 on dev, 1 on uat on 2026-11-11), so cases pick whatever it offers
+ * and a case that needs a line adds the first offered product when the
+ * BOM has none. The cases written for "Add line" with no equivalent on
+ * the redesign (description and UOM edits with a reason, split-type
+ * checkboxes, destination split, the items filter, the alternate-code
+ * split form, Thread Items) skip on it with MATERIALS_REDESIGN until new
+ * cases are written from its prototype.
  */
 
 /**
- * Baseline lines seeded in beforeAll — MDM codes present on both uat and
- * dev (dev has no ZIP0000004/BUT0000002). THD is a thread item — it can't
- * be destination-split.
+ * Baseline lines for the "Add line" cases, seeded only on a BOM without
+ * the materials redesign — MDM codes present on both uat and dev (dev has
+ * no ZIP0000004/BUT0000002). THD is a thread item — it can't be
+ * destination-split.
  */
 const FABRIC = 'FAB0000002';
 const THREAD = 'THD0000001';
@@ -40,6 +53,7 @@ test.describe('BOM - Items', () => {
   let bomDetailPage: BomDetailPage;
   let bomItemsPage: BomItemsPage;
   let code = '';
+  let redesign = false;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(DISPOSABLE_BOM_TIMEOUT);
@@ -47,7 +61,8 @@ test.describe('BOM - Items', () => {
     bomDetailPage = new BomDetailPage(page);
     bomItemsPage = new BomItemsPage(page);
     code = await createDisposableBom(page);
-    await bomItemsPage.addLines(BASELINE);
+    redesign = await bomDetailPage.hasMaterialsWorkspace();
+    if (!redesign) await bomItemsPage.addLines(BASELINE);
   });
 
   test.afterAll(async () => {
@@ -62,110 +77,109 @@ test.describe('BOM - Items', () => {
     await bomDetailPage.open(code, 0);
   });
 
-  test('TC:1 Verify "Add line" opens the "Add Inventory Item" MDM picker', async () => {
+  test('TC:1 Verify "Add material" opens the product catalogue picker', async () => {
     const l = bomItemsPage.locators;
-    await bomItemsPage.openAddLine();
+    await bomItemsPage.openAddMaterial();
 
-    await test.step('Title, description, search box and the paged MDM item table', async () => {
-      await expect(l.addInventoryDialog).toContainText(
-        'Pick an item from MDM. Already-added items are hidden.',
-      );
-      await expect(l.addInventorySearchBox).toBeVisible();
-      await expect(l.addInventoryTable).toBeVisible();
-      await expect(l.addInventoryFooter).toContainText(/of \d+/i);
+    await test.step('Title, search box, Category filter, "Show SKUs awaiting approval" and the product table', async () => {
+      await expect(l.addMaterialDialog).toContainText('Pick the materials.');
+      await expect(l.materialSearchBox).toBeVisible();
+      await expect(l.materialCategorySelect).toBeVisible();
+      await expect(l.showAwaitingApprovalCheckbox).toBeVisible();
+      await expect(l.materialPickCheckboxes.first()).toBeVisible();
     });
 
-    await test.step('"Add Selected" only appears once something is ticked, with the count', async () => {
-      await expect(l.addSelectedButton).toHaveCount(0);
-      await bomItemsPage.searchInventory('CPT0000001');
-      await l.inventoryOptionCheckbox('CPT0000001').check();
-      await expect(l.addSelectedButton).toHaveText('Add Selected (1)');
-      await l.inventoryOptionCheckbox('CPT0000001').uncheck();
-      await expect(l.addSelectedButton).toHaveCount(0);
+    await test.step('"Add lines" is disabled until a product is picked, then counts it', async () => {
+      await expect(l.addLinesButton).toBeDisabled();
+      const [first] = await bomItemsPage.offeredMaterialCodes();
+      await bomItemsPage.pickMaterials([first!]);
+      await bomItemsPage.unpickMaterial(first!);
+      await expect(l.addLinesButton).toBeDisabled();
     });
 
-    await bomItemsPage.closeAddLine();
+    await test.step('A search with no match says so', async () => {
+      await l.materialSearchBox.fill(`QA-AUTO no such material ${Date.now()}`);
+      await expect(l.materialNoMatchHeading).toBeVisible();
+    });
+
+    await bomItemsPage.closeAddMaterial();
   });
 
-  test('TC:2 Verify adding a single line asks to confirm, then adds it and bumps the item count', async () => {
-    const id = 'LIN0000002';
+  test('TC:2 Verify adding one material adds one product line and bumps the item count', async () => {
     const before = await bomDetailPage.itemCount();
-    await bomItemsPage.openAddLine();
+    await bomItemsPage.openAddMaterial();
+    const [product] = await bomItemsPage.offeredMaterialCodes();
+    await bomItemsPage.closeAddMaterial();
 
-    await test.step('Clicking the item opens "Confirm item"', async () => {
-      await bomItemsPage.pickSingleInventory(id);
-      await expect(bomItemsPage.locators.confirmItemDialog).toContainText(`Add ${id} to this BOM?`);
-    });
-
-    await test.step('"Add line" adds it to the table, and B.O.M Items counts it', async () => {
-      await bomItemsPage.locators.confirmItemAddButton.click();
-      await bomItemsPage.expectItemPresent(id);
-      await bomDetailPage.expectItemCount(before + 1);
-    });
+    await bomItemsPage.addMaterials([product!]);
+    await bomDetailPage.expectToast('Added 1 line.');
+    await bomDetailPage.expectItemCount(before + 1);
   });
 
-  test('TC:3 Verify adding several lines goes through an "Add N items" review where lines can be removed', async () => {
-    const keep = ['PKT0000001', 'PKT0000002'];
-    const removed = 'TAG0000001';
+  test('TC:3 Verify adding several materials at once adds one line per product', async () => {
+    const onBom = await bomItemsPage.productLineCodes();
+    await bomItemsPage.openAddMaterial();
+    const fresh = [...new Set(await bomItemsPage.offeredMaterialCodes())].filter(
+      (product) => !onBom.includes(product),
+    );
+    await bomItemsPage.closeAddMaterial();
+    test.skip(
+      fresh.length < 2,
+      `"Add material" offers ${fresh.length} product(s) not on this BOM yet; this case needs 2 (catalogue data).`,
+    );
+
     const before = await bomDetailPage.itemCount();
-    await bomItemsPage.openAddLine();
-
-    await test.step('Tick three items — "Add Selected (3)" opens the review', async () => {
-      await bomItemsPage.selectInventoryForReview([...keep, removed]);
-      await expect(bomItemsPage.locators.addItemsReviewDialog).toContainText(
-        'Review items — remove any before adding.',
-      );
-    });
-
-    await test.step('Remove one, then "Add 2 lines"', async () => {
-      await bomItemsPage.removeFromReview(removed);
-      await bomItemsPage.confirmReview(keep.length);
-    });
-
-    await test.step('Only the two kept items were added', async () => {
-      for (const id of keep) await bomItemsPage.expectItemPresent(id);
-      await bomItemsPage.expectItemAbsent(removed);
-      await bomDetailPage.expectItemCount(before + keep.length);
-    });
+    await bomItemsPage.addMaterials(fresh.slice(0, 2));
+    await bomDetailPage.expectToast(/^Added 2 lines?\./);
+    await bomDetailPage.expectItemCount(before + 2);
   });
 
-  test('TC:4 Verify an item already on the BOM is hidden from "Add line"', async () => {
-    await bomItemsPage.openAddLine();
-    expect(await bomItemsPage.isInventoryOffered(FABRIC)).toBe(false);
-    await bomItemsPage.closeAddLine();
+  test('TC:4 Verify a product already on the BOM can\'t be picked again in "Add material"', async () => {
+    const product = await bomItemsPage.ensureProductLine();
+    await bomItemsPage.openAddMaterial();
+    await bomItemsPage.searchMaterial(product);
+    // "Add line" hid items already on the BOM; "Add material" lists them
+    // with Pick disabled and the line they're on (dev and uat, 2026-11-11).
+    await expect(bomItemsPage.locators.materialPickCheckbox(product).first()).toBeDisabled();
+    await expect(bomItemsPage.locators.materialStatusCell(product).first()).toHaveText(
+      /^On this BOM · line \d+$/,
+    );
+    await bomItemsPage.closeAddMaterial();
   });
 
-  test('TC:5 Verify lines are grouped under category headers with their line counts', async () => {
-    for (const category of ['Fabric', 'Thread', 'Labels', 'Packaging']) {
-      await bomItemsPage.expectCategoryHeader(category);
-    }
+  test('TC:5 Verify product lines are grouped under category headers whose counts add up', async () => {
+    await bomItemsPage.ensureProductLine();
+    const lines = (await bomItemsPage.productLineCodes()).length;
+    const counts = await bomItemsPage.categoryLineCounts();
+    expect(counts.length).toBeGreaterThan(0);
+    expect(counts.reduce((sum, n) => sum + n, 0)).toBe(lines);
   });
 
   test('TC:6 Verify deleting a line asks to confirm, Cancel keeps it, and Delete removes it', async () => {
-    const id = 'LBL0000002';
-    await bomItemsPage.addLine(id);
+    const product = await bomItemsPage.ensureProductLine();
     const before = await bomDetailPage.itemCount();
 
     await test.step('Delete asks to confirm, warning it also removes splits', async () => {
-      await bomItemsPage.openDeleteDialog(id);
+      await bomItemsPage.openDeleteProductLine(product);
       await expect(bomItemsPage.locators.deleteLineDialog).toContainText(
-        `Delete "${id}"? This removes the line and all its splits — this cannot be undone.`,
+        `Delete "${product}"? This removes the line and all its splits — this cannot be undone.`,
       );
     });
 
     await test.step('Cancel keeps the line', async () => {
       await bomItemsPage.cancelDelete();
-      await bomItemsPage.expectItemPresent(id);
+      await expect(bomItemsPage.locators.productLine(product).first()).toBeVisible();
     });
 
-    await test.step('Delete removes it, with a "Deleted" toast', async () => {
-      await bomItemsPage.deleteLine(id);
-      await bomDetailPage.expectToast(`Deleted ${id}.`);
+    await test.step('Delete removes it', async () => {
+      await bomItemsPage.deleteProductLine(product);
       await bomDetailPage.expectItemCount(before - 1);
     });
   });
 
   test('TC:7 Verify editing a description cannot be saved without a reason', async () => {
+    // Materials redesign: No description edit on a product line (the material comes from the catalogue).
+    test.skip(redesign, MATERIALS_REDESIGN);
     const l = bomItemsPage.locators;
     await bomItemsPage.openEditDescription(FABRIC);
 
@@ -198,6 +212,8 @@ test.describe('BOM - Items', () => {
   });
 
   test('TC:8 Verify a description edit with a reason is staged, then saved with a confirmation', async () => {
+    // Materials redesign: No description edit on a product line (the material comes from the catalogue).
+    test.skip(redesign, MATERIALS_REDESIGN);
     const description = `QA regression description ${Date.now()}`;
 
     await test.step('The edit is staged behind "1 change pending"', async () => {
@@ -221,6 +237,8 @@ test.describe('BOM - Items', () => {
   });
 
   test('TC:9 Verify discarding a staged edit restores the original value', async () => {
+    // Materials redesign: No staged edits on a product line.
+    test.skip(redesign, MATERIALS_REDESIGN);
     const original = await bomItemsPage.descriptionOf(LABEL);
     await bomItemsPage.stageDescription(
       LABEL,
@@ -235,6 +253,8 @@ test.describe('BOM - Items', () => {
   });
 
   test('TC:10 Verify changing a UOM asks why first, and cannot be staged without a reason', async () => {
+    // Materials redesign: The UOM comes from the product; there is no UOM change with a reason.
+    test.skip(redesign, MATERIALS_REDESIGN);
     const l = bomItemsPage.locators;
     const original = await bomItemsPage.uomOf(PACKAGING);
     const other = (await bomItemsPage.uomOptions(PACKAGING)).find(
@@ -260,20 +280,17 @@ test.describe('BOM - Items', () => {
     });
   });
 
-  test('TC:11 Verify a Remark saves on its own, without a reason or a staged change', async () => {
-    const remark = `QA remark ${Date.now()}`;
-    await bomItemsPage.setRemark(PACKAGING, remark);
-    await expect(bomItemsPage.locators.pendingChanges).toBeHidden();
-
-    await expect
-      .poll(async () => {
-        await bomDetailPage.refresh();
-        return bomItemsPage.remarkOf(PACKAGING);
-      })
-      .toBe(remark);
+  test('TC:11 Verify a Remark saves on its own and is still there after a refresh', async () => {
+    const product = await bomItemsPage.ensureProductLine();
+    const remark = `QA-AUTO remark ${Date.now()}`;
+    await bomItemsPage.setProductLineRemark(product, remark);
+    await bomDetailPage.refresh();
+    await expect(bomItemsPage.locators.productLineRemarkInput(product).first()).toHaveValue(remark);
   });
 
   test('TC:12 Verify the split types are mutually exclusive — ticking Waist split replaces Item-level split', async () => {
+    // Materials redesign: Split-type checkboxes became the "Changes with" select (No split / Inseam / Waist / Inseam + Waist).
+    test.skip(redesign, MATERIALS_REDESIGN);
     await test.step('A new line starts on Item-level split only', async () => {
       expect(await bomItemsPage.activeSplitTypes(LABEL)).toEqual(['Item-level split']);
     });
@@ -293,12 +310,16 @@ test.describe('BOM - Items', () => {
   });
 
   test('TC:13 Verify unticking the active split type falls back to Item-level split', async () => {
+    // Materials redesign: Split-type checkboxes became the "Changes with" select (No split / Inseam / Waist / Inseam + Waist).
+    test.skip(redesign, MATERIALS_REDESIGN);
     await bomItemsPage.switchSplitType(PACKAGING, 'Inseam split');
     await bomItemsPage.clickCheckbox(PACKAGING, 'Inseam split');
     await expect.poll(() => bomItemsPage.activeSplitTypes(PACKAGING)).toEqual(['Item-level split']);
   });
 
   test('TC:14 Verify "Show barcode" is only available on a GMT size set line', async () => {
+    // Materials redesign: No "Show barcode" / GMT size set on a product line.
+    test.skip(redesign, MATERIALS_REDESIGN);
     const barcode = bomItemsPage.locators.rowCheckbox(PACKAGING, 'Show barcode');
 
     await test.step('Disabled while the line is Item-level split', async () => {
@@ -317,6 +338,8 @@ test.describe('BOM - Items', () => {
   });
 
   test('TC:15 Verify a thread (THD) item cannot be destination-split', async () => {
+    // Materials redesign: Destination split became the "Destinations" column (z941aby8eb was about the old checkbox).
+    test.skip(redesign, MATERIALS_REDESIGN);
     await allure.tms('https://app.clickup.com/t/z941aby8eb', 'TC:15 bug (ClickUp)');
     // Regression check for ClickUp z941aby8eb (2026-10-08: ticking
     // Destination split on a THD line saved silently). In every run since
@@ -368,6 +391,8 @@ test.describe('BOM - Items', () => {
   });
 
   test('TC:16 Verify "Pick country" turns on Destination split and opens the country picker', async () => {
+    // Materials redesign: Destination split became the "Destinations" column; no "Pick country".
+    test.skip(redesign, MATERIALS_REDESIGN);
     const l = bomItemsPage.locators;
 
     await test.step('"Pick country" on a non-thread line opens "Select a country"', async () => {
@@ -387,22 +412,28 @@ test.describe('BOM - Items', () => {
   });
 
   test('TC:17 Verify "Customer supplied" can be ticked and unticked, and sticks', async () => {
-    await test.step('Tick it — still ticked after a refresh', async () => {
-      await bomItemsPage.clickCheckbox(LABEL, 'Customer supplied');
-      await expect(bomItemsPage.locators.rowCheckbox(LABEL, 'Customer supplied')).toBeChecked();
+    const product = await bomItemsPage.ensureProductLine();
+    const box = bomItemsPage.locators.productLineCustomerSuppliedCheckbox(product).first();
+    const initial = await box.isChecked();
+
+    await test.step('Toggle it — still toggled after a refresh', async () => {
+      await bomItemsPage.toggleCustomerSupplied(product);
+      await expect(box).toBeChecked({ checked: !initial });
       await bomDetailPage.refresh();
-      await expect(bomItemsPage.locators.rowCheckbox(LABEL, 'Customer supplied')).toBeChecked();
+      await expect(box).toBeChecked({ checked: !initial });
     });
 
-    await test.step('Untick it — still unticked after a refresh', async () => {
-      await bomItemsPage.clickCheckbox(LABEL, 'Customer supplied');
-      await expect(bomItemsPage.locators.rowCheckbox(LABEL, 'Customer supplied')).not.toBeChecked();
+    await test.step('Toggle it back — still back after a refresh', async () => {
+      await bomItemsPage.toggleCustomerSupplied(product);
+      await expect(box).toBeChecked({ checked: initial });
       await bomDetailPage.refresh();
-      await expect(bomItemsPage.locators.rowCheckbox(LABEL, 'Customer supplied')).not.toBeChecked();
+      await expect(box).toBeChecked({ checked: initial });
     });
   });
 
   test('TC:18 Verify the items filter narrows the table', async () => {
+    // Materials redesign: No items filter on the product lines table.
+    test.skip(redesign, MATERIALS_REDESIGN);
     await bomItemsPage.filterItems(THREAD);
     await expect.poll(() => bomItemsPage.itemIds()).toEqual([THREAD]);
     await bomItemsPage.filterItems('');
@@ -410,6 +441,8 @@ test.describe('BOM - Items', () => {
   });
 
   test("TC:19 Verify a line's alternate code opens the split form for its split type", async () => {
+    // Materials redesign: The alternate-code split form became the "Variants & consumption" dialog.
+    test.skip(redesign, MATERIALS_REDESIGN);
     await bomItemsPage.openSplitForm(FABRIC, 'Item Level Split Screen Form');
     await expect(
       bomItemsPage.locators.splitFormDialog('Item Level Split Screen Form'),
@@ -419,20 +452,27 @@ test.describe('BOM - Items', () => {
     );
   });
 
-  test('TC:20 Verify "Split Details" opens the BOM-wide split list, empty for a BOM with no splits', async () => {
-    const l = bomItemsPage.locators;
-    const dialog = l.splitDetailsDialog;
-    await bomItemsPage.openSplitDetails();
-    await expect(dialog).toContainText(`${code} · rev 0 · 0 active`);
-    await expect(dialog).toContainText('No split items found in this BOM.');
-    await expect(l.splitDetailsDeleteButton).toHaveText('Delete (0)');
-    await expect(l.splitDetailsDeleteButton).toBeDisabled();
-    await expect(l.splitDetailsDeactivateButton).toHaveText('DeActive (0)');
-    await expect(l.splitDetailsDeactivateButton).toBeDisabled();
-    await bomItemsPage.closeDialog(dialog);
+  test('TC:20 Verify the "Split Details" tab lists the BOM\'s split rows', async () => {
+    const product = await bomItemsPage.ensureProductLine();
+    await bomItemsPage.showSplitDetailsTab();
+    expect(await bomItemsPage.splitDetailsColumnHeaders()).toEqual(
+      expect.arrayContaining([
+        'Material',
+        'SKU',
+        'Filled by',
+        'Colour',
+        'Size',
+        'Changes with',
+        'Destinations',
+        'Std cons',
+      ]),
+    );
+    await expect(bomItemsPage.locators.splitDetailsRow(product).first()).toBeVisible();
   });
 
   test('TC:21 Verify "Thread Items" opens the thread workspace listing the BOM\'s thread line', async () => {
+    // Materials redesign: No "Thread Items" tab; Thread is a catalogue category.
+    test.skip(redesign, MATERIALS_REDESIGN);
     const l = bomItemsPage.locators;
     const dialog = l.threadItemsDialog;
     await bomItemsPage.openThreadItems();
@@ -442,14 +482,14 @@ test.describe('BOM - Items', () => {
     await bomItemsPage.closeDialog(dialog);
   });
 
-  test('TC:22 Verify "Bulk paste" only lets you parse once something is pasted', async () => {
+  test('TC:22 Verify "Bulk paste" only lets you read rows once something is pasted', async () => {
     const l = bomItemsPage.locators;
     await bomItemsPage.openBulkPaste();
     await expect(l.bulkPasteDialog).toContainText(
-      'Paste rows from Excel, Google Sheets, or any techpack export. TSV and CSV are both supported.',
+      'One row per material, from Excel or Google Sheets',
     );
     await expect(l.parseRowsButton).toBeDisabled();
-    await l.bulkPasteInput.fill('Inventory ID\tBase Unit\nCPT0000001\tPCS');
+    await l.bulkPasteInput.fill('Alternate Code\tColour\tStd cons\nQA-AUTO-0001\t\t1');
     await expect(l.parseRowsButton).toBeEnabled();
     await bomItemsPage.closeDialog(l.bulkPasteDialog);
   });
@@ -466,7 +506,8 @@ test.describe('BOM - Items', () => {
   });
 
   test('TC:24 Verify a BOM line has no "Section" field any more', async () => {
-    const headers = await bomItemsPage.locators.itemColumnHeaders.allInnerTexts();
+    await bomItemsPage.ensureProductLine();
+    const headers = await bomItemsPage.locators.productLineColumnHeaders.allInnerTexts();
     expect(headers.length).toBeGreaterThan(5);
     expect(headers.some((h) => /^section$/i.test(h.trim()))).toBe(false);
   });

@@ -43,3 +43,32 @@ Re-baselined from a live exploration of the redesigned UAT screens on 2026-10-23
 - The create request only ever sends `{ techpackCode }` — every header field is server-derived from the techpack.
 - The picker's footer renders before its table; `BomListPage.expectTechpackPickerLoaded()` waits for the table's header row too.
 - Not automated (no UI path): the server-only rejections (`TECHPACK_NOT_APPROVED`, `BEFORE_BOM_EFFECTIVE_DATE`, `BOM_ALREADY_EXISTS` race) — the picker never offers those techpacks.
+
+## Update 2026-11-05 — dev and uat on different BOM builds
+
+- **Create dialog (uat):** "Select techpack" is a searchbox ("< NEW >" is its placeholder; the picked code is its
+  value). It opens a reworked "Pick a techpack(N)" picker: a "Search" textbox, sortable column headers, and "No results"
+  (not "Showing 0 of 0") when nothing matches. Expected results are unchanged otherwise; TC:3 and TC:9 accept either
+  empty-state text.
+- **The picker loads after it opens (both envs):** it shows "Pick a techpack(0)" and its empty state until
+  `GET /api/bom-techpack/available-techpacks` answers and the rows render. It lists the techpacks marked
+  `hasBom: false`.
+- **Automatic BOM (uat):** approving a techpack creates its rev-0 BOM straight away (`createdBy: "system:autobom"`), so
+  New BOM never offers a freshly approved techpack. On such a run TC:2's "the just-approved techpack is offered" step,
+  TC:3's narrowing step, and TC:4-6 skip with that reason; TC:7-10 run on the automatic BOM.
+- **Open questions (uat):** TC:1 — the empty dialog marks only B.O.M Code as required; Customer, Season, Style, Fabric,
+  Wash and Product Type show "*" only once a techpack is picked. TC:7 — an automatically created BOM shows Created by
+  "N/A".
+- **dev's BOM detail redesign:** "Add line" is replaced by **Add material** (a product catalogue picker: Category,
+  Supplier, colour, SKUs filled per size), plus "Sizes this BOM covers", "Items Confirmed", and "B.O.M Items N" /
+  "Split Details N" as tabs. uat still has "Add line". Cases written for "Add line" skip on a BOM that shows "Add
+  material", with that reason, until test cases for the redesign are written. TC:7's last step ("no items yet") skips on dev for this reason.
+
+## Update 2026-11-11 — dev has uat's Create BOM dialog and the automatic BOM
+
+- dev now has the "Select techpack" search box and the "Pick a techpack" table that uat got on 2026-11-05.
+- dev now creates a techpack's rev-0 BOM when it is approved, as uat does: TC:3–6 skip on both environments with the
+  automatic-BOM reason, and TC:7 records "Created by N/A" as an open question.
+- **TC:2:** on dev the picker offered no techpack at all on 2026-11-11 ("Pick a techpack (0)"): every approved techpack
+  already has a BOM. With the automatic BOM and an empty picker there is nothing to check, so the case skips with that
+  reason. With any techpack offered, every one must still be Approved.

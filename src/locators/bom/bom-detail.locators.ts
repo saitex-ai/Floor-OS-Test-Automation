@@ -35,6 +35,12 @@ export class BomDetailLocators {
 
   // Toolbar
   readonly addLineButton: Locator;
+  /**
+   * dev's 2026-11-05 BOM detail redesign replaces "Add line" with "Add
+   * material" (a product catalogue picker, SKUs per size). See
+   * BomDetailPage.hasMaterialsWorkspace().
+   */
+  readonly addMaterialButton: Locator;
   readonly bulkPasteButton: Locator;
   readonly copyBomButton: Locator;
   readonly copySplitDetailButton: Locator;
@@ -104,6 +110,7 @@ export class BomDetailLocators {
     this.notCompletedIcon = page.getByRole('img', { name: 'Not completed' });
 
     this.addLineButton = page.getByRole('button', { name: /Add line$/ }).first();
+    this.addMaterialButton = page.getByRole('button', { name: 'Add material', exact: true });
     this.bulkPasteButton = page.getByRole('button', { name: 'Bulk paste' });
     this.copyBomButton = page.getByRole('button', { name: 'Copy B.O.M', exact: true });
     this.copySplitDetailButton = page.getByRole('button', {
@@ -125,8 +132,14 @@ export class BomDetailLocators {
     this.createRevisionButton = page.getByRole('button', { name: 'Create Revision', exact: true });
     this.createCostingRequestButton = page.getByRole('button', { name: 'Create Costing Request' });
 
-    this.itemsTab = page.getByRole('button', { name: /^B\.O\.M Items/ });
-    this.splitDetailsTab = page.getByRole('button', { name: /^Split Details/ });
+    // A button, or a tab in the "BOM sections" tablist on the materials
+    // redesign ("B.O.M Items 0", "Split Details 0"; dev 2026-11-05, uat by 2026-11-11).
+    this.itemsTab = page
+      .getByRole('button', { name: /^B\.O\.M Items/ })
+      .or(page.getByRole('tab', { name: /^B\.O\.M Items/ }));
+    this.splitDetailsTab = page
+      .getByRole('button', { name: /^Split Details/ })
+      .or(page.getByRole('tab', { name: /^Split Details/ }));
     this.threadItemsTab = page.getByRole('button', { name: /^Thread Items/ });
 
     this.costingApproveDialog = page.getByRole('dialog', { name: 'Costing Approve' });

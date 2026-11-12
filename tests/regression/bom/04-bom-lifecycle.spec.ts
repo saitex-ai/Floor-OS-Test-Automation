@@ -4,7 +4,12 @@ import { authFile } from '../../../src/fixtures/auth-setup';
 import { BomListPage } from '../../../src/pages/bom/bom-list.page';
 import { BomDetailPage } from '../../../src/pages/bom/bom-detail.page';
 import { BomItemsPage } from '../../../src/pages/bom/bom-items.page';
-import { createDisposableBom, DISPOSABLE_BOM_TIMEOUT } from './support/disposable-bom';
+import { ShellHeaderPage } from '../../../src/pages/shell/shell-header.page';
+import {
+  createDisposableBom,
+  DISPOSABLE_BOM_TIMEOUT,
+  APPROVE_FLOW_REDESIGN,
+} from './support/disposable-bom';
 
 /**
  * BOM — Lifecycle (approve, complete, reopen, revise, reports).
@@ -38,6 +43,7 @@ test.describe.serial('BOM - Lifecycle', () => {
     bomDetailPage = new BomDetailPage(page);
     bomItemsPage = new BomItemsPage(page);
     code = await createDisposableBom(page);
+    test.skip(await bomDetailPage.hasMaterialsWorkspace(), APPROVE_FLOW_REDESIGN);
   });
 
   test.afterAll(async () => {
@@ -83,7 +89,6 @@ test.describe.serial('BOM - Lifecycle', () => {
 
   test('TC:4 Verify "Costing Approve" approves and locks rev 0, stamping who and when', async () => {
     await bomDetailPage.open(code, 0);
-    const createdBy = await bomDetailPage.headerField('Created by');
 
     await test.step('Approve', async () => {
       await bomDetailPage.costingApprove();
@@ -93,7 +98,11 @@ test.describe.serial('BOM - Lifecycle', () => {
       await bomDetailPage.refresh();
       expect(await bomDetailPage.status()).toBe('Approved');
       expect(await bomDetailPage.headerField('Lock Status')).toBe('LOCKED');
-      expect(await bomDetailPage.headerField('Approved By')).toBe(createdBy);
+      // The approver is the signed-in user. (Not "Created by": on uat a BOM can be
+      // created by approving its techpack, and then reads "N/A".)
+      const approvedBy = await bomDetailPage.headerField('Approved By');
+      expect(approvedBy).not.toMatch(/^(N\/A|—|)$/);
+      expect(await new ShellHeaderPage(page).signedInUserText()).toContain(approvedBy);
       expect(await bomDetailPage.headerField('Approved Date')).toBe(
         await bomDetailPage.headerField('Created Date'),
       );
@@ -371,6 +380,7 @@ test.describe('BOM - Lifecycle (older revisions)', () => {
     page = await browser.newPage({ storageState: authFile('bom') });
     bomDetailPage = new BomDetailPage(page);
     code = await createDisposableBom(page);
+    test.skip(await bomDetailPage.hasMaterialsWorkspace(), APPROVE_FLOW_REDESIGN);
     const items = new BomItemsPage(page);
     await items.addLines(LINES);
     await items.assignSuppliersWhereRequired();

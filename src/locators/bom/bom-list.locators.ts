@@ -28,6 +28,13 @@ export class BomListLocators {
   readonly noTechpackSelected: Locator;
   readonly createBomButton: Locator;
   readonly cancelButton: Locator;
+  /**
+   * The dialog's techpack code field, which opens the picker: a "Select
+   * techpack" button on dev, a "Select techpack" searchbox on uat
+   * (2026-11-05). "< NEW >" is the button's text but the searchbox's
+   * placeholder, and a picked code its text or its value (see
+   * BomListPage.techpackCodeFieldText()).
+   */
   readonly selectTechpackButton: Locator;
   readonly searchTechpacksButton: Locator;
 
@@ -35,13 +42,15 @@ export class BomListLocators {
   // (as a BOM switcher) from a BOM detail page's "B.O.M Code" button. A
   // table, not a listbox: a single row click picks a techpack. Its
   // "Showing 1-4 of 4" footer is the reliable "finished loading" signal —
-  // it renders "Showing 0 of 0" when nothing is eligible, where waiting
-  // on a row would just hang.
+  // it renders "Showing 0 of 0" when nothing is eligible (uat, 2026-11-05:
+  // "No results"), where waiting on a row would just hang.
   readonly techpackPickerDialog: Locator;
   readonly techpackPickerSearch: Locator;
   readonly techpackPickerHeaderCells: Locator;
   readonly techpackPickerRows: Locator;
   readonly techpackPickerFooter: Locator;
+  /** The footer when nothing matches: "Showing 0 of 0" (dev) or "No results" (uat, 2026-11-05). */
+  readonly techpackPickerNoResults: Locator;
   readonly techpackPickerCloseButton: Locator;
 
   // Toolbar — the same shared list-screen framework as the Techpacks list.
@@ -100,15 +109,18 @@ export class BomListLocators {
     this.noTechpackSelected = this.newBomDialog.getByText('No techpack selected.');
     this.createBomButton = this.newBomDialog.getByRole('button', { name: 'Create BOM' });
     this.cancelButton = this.newBomDialog.getByRole('button', { name: 'Cancel' });
-    this.selectTechpackButton = this.newBomDialog.getByRole('button', { name: 'Select techpack' });
+    this.selectTechpackButton = this.newBomDialog
+      .getByRole('button', { name: 'Select techpack' })
+      .or(this.newBomDialog.getByRole('searchbox', { name: 'Select techpack' }));
     this.searchTechpacksButton = this.newBomDialog.getByRole('button', {
       name: 'Search techpacks',
     });
 
     this.techpackPickerDialog = page.getByRole('dialog', { name: /^Pick a techpack/ });
-    this.techpackPickerSearch = this.techpackPickerDialog.getByRole('searchbox', {
-      name: 'Search techpacks',
-    });
+    // dev: a "Search techpacks" searchbox; uat (2026-11-05): a "Search" textbox.
+    this.techpackPickerSearch = this.techpackPickerDialog
+      .getByRole('searchbox', { name: 'Search techpacks' })
+      .or(this.techpackPickerDialog.getByRole('textbox', { name: 'Search', exact: true }));
     // Header rows hold columnheaders; data rows hold cells.
     this.techpackPickerHeaderCells = this.techpackPickerDialog
       .getByRole('table')
@@ -124,10 +136,15 @@ export class BomListLocators {
       name: 'Close',
       exact: true,
     });
-    this.techpackPickerFooter = this.techpackPickerDialog.getByText(/^Showing [\d-]+ of \d+$/);
+    this.techpackPickerNoResults = this.techpackPickerDialog
+      .getByText('Showing 0 of 0', { exact: true })
+      .or(this.techpackPickerDialog.getByText('No results', { exact: true }));
+    this.techpackPickerFooter = this.techpackPickerDialog
+      .getByText(/^Showing [\d-]+ of \d+$/)
+      .or(this.techpackPickerDialog.getByText('No results', { exact: true }));
 
     this.filtersButton = page.getByRole('button', { name: /^Filters/ });
-    this.exportCsvButton = page.getByRole('button', { name: 'Export CSV' });
+    this.exportCsvButton = this.exportCsvNamed('Export CSV');
     this.configureColumnsButton = page.getByRole('button', { name: 'Configure columns' });
     this.applyButton = page.getByRole('button', { name: 'Apply', exact: true });
     this.filterDialog = page.getByRole('dialog', { name: 'Filter', exact: true });
@@ -168,7 +185,10 @@ export class BomListLocators {
     // The count badge ("1") and "item selected" are separate elements; the
     // bar is the innermost element holding both the label and its Export.
     this.selectionLabel = page.getByText(/^items? selected$/);
-    this.exportSelectedButton = page.getByRole('button', { name: 'Export', exact: true });
+    // dev's toolbar "Export CSV" also reads "Export" since 2026-11-11, so it's excluded by its title.
+    this.exportSelectedButton = page
+      .getByRole('button', { name: 'Export', exact: true })
+      .and(page.locator('button:not([title="Export CSV"])'));
     this.selectionBar = page
       .locator('div')
       .filter({ has: this.selectionLabel })
@@ -185,6 +205,15 @@ export class BomListLocators {
   /** A toolbar button by its (possibly translated) accessible name. */
   buttonNamed(name: string | RegExp): Locator {
     return this.page.getByRole('main').getByRole('button', { name });
+  }
+
+  /**
+   * The toolbar's CSV export, "Export CSV" (or "Xuất CSV"): its name on uat,
+   * its title on dev since 2026-11-11, where the button itself reads
+   * "Export" ("Xuất").
+   */
+  exportCsvNamed(name: string): Locator {
+    return this.buttonNamed(name).or(this.page.getByRole('main').getByTitle(name, { exact: true }));
   }
 
   /** A status tab by its (possibly translated) accessible name. */

@@ -60,3 +60,21 @@ Re-baselined from a live exploration of the redesigned UAT screens on 2026-10-23
 
 - There is **no Cancel BOM** action and **no Lock/Unlock** button in the UI (the API has both). Approve / Costing Approve / complete / Create Revision show **no success toast**; Create Revision stays on the current revision and offers "Open latest".
 - The revisions picker shows DRAFT for an Open revision and VALIDATED for an Approved one.
+
+## Update 2026-11-05 — dev and uat on different BOM builds
+
+- **TC:4:** "Approved By" is checked against the signed-in user, not against "Created by": on uat a BOM can be created
+  by approving its techpack, and then "Created by" reads "N/A".
+- **Setup:** on uat the disposable BOM is the one created automatically by approving the techpack.
+- **dev's BOM detail redesign:** "Add line" is replaced by **Add material** (a product catalogue picker: Category,
+  Supplier, colour, SKUs filled per size), plus "Sizes this BOM covers", "Items Confirmed", and "B.O.M Items N" /
+  "Split Details N" as tabs. uat still has "Add line". Cases written for "Add line" skip on a BOM that shows "Add
+  material", with that reason, until test cases for the redesign are written. On dev this whole spec skips.
+
+## Update 2026-11-11 — the materials redesign is on dev and uat
+
+uat now has the same BOM detail page as dev ("Add material", product lines, "Items Confirmed"). The redesign also changes
+the lifecycle: "Items Confirmed" sets a new **Items Confirmed** status, and **Costing Approve** stays disabled while
+"N issue(s) block Costing Approve" (a line with no Std cons, for one), with a "Resolve all" button. These cases were
+written for "Add line" and the old approve flow, so the whole spec skips on both environments, with that reason, until
+new cases are written from the redesign's prototype.

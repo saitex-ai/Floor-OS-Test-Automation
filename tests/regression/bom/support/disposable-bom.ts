@@ -3,6 +3,7 @@ import * as path from 'path';
 import { type Page, test } from '@playwright/test';
 import { createApprovedTechpack as createApprovedTechpackViaTechpack } from '../../../../src/fixtures/cross-module.helpers';
 import { BomListPage, CreateBomError } from '../../../../src/pages/bom/bom-list.page';
+import { BomDetailPage } from '../../../../src/pages/bom/bom-detail.page';
 
 /**
  * Test data for the BOM suite. A BOM can only be created for an Approved
@@ -32,6 +33,27 @@ export const TEST_DATA_TAG =
 
 const SAMPLE_PDF = path.join(__dirname, '..', '..', 'techpack', 'fixtures', 'sample-techpack.pdf');
 
+/**
+ * Skip reason for the "Add line" cases on a BOM that shows the materials
+ * redesign (dev 2026-11-05, uat by 2026-11-11): "Add material", product
+ * lines, sizes, an "Items Confirmed" status, and Costing Approve blocked
+ * until the BOM's issues are resolved.
+ */
+export const MATERIALS_REDESIGN =
+  'This BOM shows the materials redesign ("Add material", product lines, "Items Confirmed"; dev and uat ' +
+  'since 2026-11-11). These "Add line" cases wait for new test cases written from its prototype.';
+
+/** Skip reason for the lifecycle and permissions cases, which walk the old approve flow. */
+export const APPROVE_FLOW_REDESIGN =
+  'This BOM shows the materials redesign (dev and uat since 2026-11-11), which changes the approve flow: ' +
+  '"Items Confirmed" comes first, and Costing Approve stays disabled while "N issue(s) block Costing Approve". ' +
+  'These approve-flow cases wait for new test cases written from its prototype.';
+
+/** Skip reason for the manual Create BOM cases when approving already created the BOM. */
+export const AUTO_BOM =
+  'Approving this techpack already created its rev-0 BOM ("system:autobom"; uat since 2026-11-05, dev by 2026-11-11), so New BOM ' +
+  "doesn't offer it. These manual-create cases wait for test cases for the automatic BOM.";
+
 /** Generous budget for the whole setup chain, for callers' hooks. */
 export const DISPOSABLE_BOM_TIMEOUT = 420_000;
 
@@ -50,7 +72,8 @@ export async function createApprovedTechpack(page: Page): Promise<string> {
 /**
  * Builds a disposable BOM: an approved techpack, then "New BOM" for it.
  * Leaves the page on the new BOM's detail page (rev 0, Open, no items)
- * and returns its techpack code.
+ * and returns its techpack code. Where approving already created the BOM
+ * (uat, 2026-11-05: "system:autobom"), it opens that BOM instead.
  *
  * Create BOM has answered 500 INTERNAL_ERROR now and then on uat under 2
  * workers (2026-10-27, 2026-10-28; the second created nothing), so this
@@ -60,6 +83,11 @@ export async function createApprovedTechpack(page: Page): Promise<string> {
 export async function createDisposableBom(page: Page): Promise<string> {
   const code = await createApprovedTechpack(page);
   const list = new BomListPage(page);
+  await list.open();
+  if (!(await list.isOfferedForNewBom(code))) {
+    await new BomDetailPage(page).open(code, 0);
+    return code;
+  }
   for (let attempt = 1; ; attempt++) {
     await list.open();
     await list.openNewBomDialog();
