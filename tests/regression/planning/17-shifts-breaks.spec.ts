@@ -9,7 +9,6 @@ import {
   addBreak,
   asPersona,
   createShift,
-  knownBug,
   nameOf,
   personaCredentials,
   personaSkipReason,
@@ -108,15 +107,13 @@ test.describe('Planning - Shifts & Breaks', () => {
   test('TC-LSH-02 Standard / Overtime / Night tabs partition All', async ({ page }) => {
     await allure.tms(cu('z941abw5nk'), 'TC-LSH-02 (ClickUp)');
     await allure.tms(cu('z941ac06dz'), 'TC-LSH-02 bug (ClickUp)');
-    // Confirmed bug, ClickUp z941ac06dz (2026-10-29): the list has no
-    // "Overtime" tab although Overtime shifts exist (seed A_OT among them), so
-    // the kind tabs don't add up to All. Marked with knownBug() until fixed.
-    knownBug('z941ac06dz');
+    // ClickUp z941ac06dz (2026-10-29: no "Overtime" tab, so the kind tabs
+    // didn't add up to All) was fixed on dev and closed on 2026-11-12.
     const list = new ShiftsListPage(page);
     await list.open();
     await list.expectLoaded();
-    // The tabs that do exist are found first, so the expected failure is the
-    // missing Overtime tab itself, never the tab lookup.
+    // Overtime is checked on its own, so a missing Overtime tab (the old bug)
+    // reads as that, never as a failed tab lookup.
     await list.expectTabs(['All', 'Standard', 'Night']);
     await list.expectTabs(['Overtime']);
     // Re-read together: other tests in this file create shifts meanwhile.
