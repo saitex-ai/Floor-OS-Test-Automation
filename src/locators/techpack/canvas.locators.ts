@@ -82,7 +82,10 @@ export class CanvasLocators {
   readonly openingCanvasText: Locator;
   readonly techpackUploadTag: Locator;
   readonly reExtractButton: Locator;
-  readonly askAboutTechpackButton: Locator;
+  /** The shell top bar's "Ask FloorOS AI" button; on a canvas it opens the "Agent chat" panel. */
+  readonly askFloorOsAiButton: Locator;
+  /** The "Agent chat" panel's "Summarise this draft" suggestion. */
+  readonly agentSummariseDraftButton: Locator;
   readonly anyReExtractText: Locator;
   readonly anyAskAboutTechpackText: Locator;
   readonly canvasNotFoundMessage: Locator;
@@ -217,7 +220,12 @@ export class CanvasLocators {
     this.techpackUploadTag = page.getByRole('cell', { name: 'Techpack', exact: true });
     // AI-Mode-only toolbar actions (see canvas-review.md TC:15/TC:16).
     this.reExtractButton = page.getByRole('button', { name: 'Re-extract' });
-    this.askAboutTechpackButton = page.getByRole('button', { name: 'Ask about this techpack' });
+    // Since 2026-11-05 (uat) the toolbar has no "Ask about this techpack";
+    // the top bar's "Ask FloorOS AI" opens an Agent chat for the draft.
+    this.askFloorOsAiButton = page.getByRole('button', { name: 'Ask FloorOS AI' });
+    this.agentSummariseDraftButton = page
+      .getByLabel('Agent chat', { exact: true })
+      .getByRole('button', { name: 'Summarise this draft' });
     this.anyReExtractText = page.getByText(/re-?extract/i);
     this.anyAskAboutTechpackText = page.getByText(/ask about this techpack/i);
     this.canvasNotFoundMessage = page.getByText(

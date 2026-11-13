@@ -49,6 +49,19 @@ export class CanvasPage extends BasePage {
     await expect(this.locators.detailsSectionHeader).toBeVisible({ timeout });
   }
 
+  /**
+   * Waits for an AI-created draft's file extraction: the toolbar shows a
+   * disabled "Extracting…" until `GET /api/techpacks/extractions/{fileId}`
+   * (polled every 5 s) reports `ready`, then "Re-extract". That runs past the
+   * draft's own READY: on dev, 2026-11-02, it stayed `extracting_callouts`
+   * for 50 s after READY, longer when other drafts were extracting.
+   */
+  async waitForExtraction(timeout = 300_000): Promise<void> {
+    await expect(this.locators.reExtractButton, 'the canvas still shows "Extracting…"').toBeVisible(
+      { timeout },
+    );
+  }
+
   /** Reads a field row's full text (label + value together, e.g. "Status Draft"). */
   async fieldRowText(label: string): Promise<string> {
     return this.locators.fieldRow(label).innerText();

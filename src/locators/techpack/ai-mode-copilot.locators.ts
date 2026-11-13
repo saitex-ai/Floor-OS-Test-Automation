@@ -1,179 +1,289 @@
 import { type Locator, type Page } from '@playwright/test';
 
 /**
- * Raw element locators for "New Techpack" — AI Mode (the "Saitex AI"
- * copilot). No actions or assertions here, see
+ * Raw element locators for "New Techpack" — AI Mode (`/techpacks/new/copilot`),
+ * the Dashboard's "Create New". No actions or assertions here, see
  * src/pages/techpack/ai-mode-copilot.page.ts for those.
  *
- * **Substantially redesigned since 2026-09-25, confirmed live on uat
- * 2026-09-29** — this is now a real chat-based copilot interface, not a
- * simple upload-then-form flow:
- * 1. Upload no longer auto-starts extraction. A file appears in a small
- *    list with its own "Remove <name>" button, alongside a new, separate
- *    **"Start extraction"** button that must be clicked explicitly.
- * 2. Clicking it can first show a real "still working" state — "Uploading
- *    the file and opening the draft session…" / "Still waiting on the
- *    agent. The file may be large, or the agent could be unreachable. You
- *    can keep waiting, or retry the handoff." with its own "Retry" button.
- *    **Re-confirmed live 2026-09-29 that the older "Something went wrong
- *    starting the draft session. Please retry." text is NOT gone** — an
- *    earlier version of this comment wrongly assumed it had been replaced
- *    everywhere. It's a distinct, separate outcome: a genuinely invalid
- *    upload (e.g. a `.txt` file) hits it immediately, while a valid file
- *    that the agent can't pick up in time hits the "Still waiting..."
- *    text instead — kept as two separate locators (`invalidFileErrorText`
- *    vs `agentStuckText`) rather than merged into one.
- * 3. Once it resolves, the whole screen becomes a chat panel (a greeting,
- *    suggested prompts, the uploaded file as a message, an assistant
- *    reply) with a separate `region "Current step"` on the right holding
- *    the actual field-picking UI for the current step — a real ARIA
- *    landmark, not the old nested-div structure this file's `fieldTrigger`
- *    used to need. Each field now renders as flat siblings inside that
- *    region: a label/status text, then a button named literally
- *    `"Search <field>..."` (`techpack types`, `customers`, `seasons`,
- *    `style #s`, `fabrics`, `washs` — sic, a real typo in the app itself,
- *    not this file's — `product types`, `sample requests`).
- * 4. **Sample Request is no longer required here** — it shows without a
- *    "To pick" status, unlike the other 7 fields, and the panel's own
- *    "Pick a value for: ..." summary line omits it. A new optional
- *    "Remark" textbox was also added. This is a real behavior change from
- *    the previously-documented "Sample Request required in AI Mode,
- *    unlike Classic" finding — re-verify before assuming either way if
- *    this matters to a test.
- * 5. **"Create draft" reproducibly failed live 2026-09-29 — confirmed via
- *    two distinct, separately-observed symptoms of what looks like the
- *    same underlying break**:
- *    a) With all 7 required fields genuinely filled (confirmed via a full
- *       field-by-field read-back before clicking), clicking it did not
- *       navigate anywhere and did not show any visible error — the entire
- *       "Current step" panel silently reset every field back to "To
- *       pick", as if nothing had ever been selected. No toast, no banner,
- *       confirmed via repeated `ariaSnapshot()` dumps over 20s+ after the
- *       click.
- *    b) On a later run (same day, real fixture PDF, real filled fields
- *       still visible and NOT reset), the chat instead posted an explicit
- *       "I couldn't create the draft. Please try again." message with its
- *       own "Regenerate" action — a real, distinct failure surface, not a
- *       silent one.
- *    Both may be the same underlying gap as the already-filed "copilot
- *    service temporarily unavailable" ClickUp bug, or separate symptoms of
- *    it — either way, treat AI Mode's "Create draft" as currently broken
- *    until this is reconfirmed working, and expect either symptom on any
- *    given run.
+ * Rewritten for the FloorOS redesign (2026-10-22), from the live screens on
+ * uat, 2026-10-23 and 2026-10-30. The screen has three states:
+ *
+ * 1. **Landing.** A drop zone (`button "Add reference photos or tech pack
+ *    files"`) that lists attached files as list items (name, size, "header
+ *    comes from this one" / "Take the header from this", "Remove <name>"), a
+ *    description box, Voice input, the "Add files" (+) menu, the "What to
+ *    create" radios and "Generate".
+ * 2. **Chat** (`?cid=<id>`, after Generate with a document). A "Progress"
+ *    region (01 Upload … 04 Open draft), the conversation, and the
+ *    assistant's cards as list items: an optional "A few items aren’t in
+ *    master data yet" question, then the "Review details" card with the 7
+ *    required pickers, Sample Request, Remark, Cancel and "Create draft".
+ *    Each picker is the button that follows its label; it opens a dialog
+ *    of options.
+ * 3. **Running Workflow** (`?run=<id>&draft=<id>`, after Generate with
+ *    photos only): 01 Reviewing / 02 Building / 03 Polishing, then the new
+ *    techpack's view opens.
  */
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 export class AiModeCopilotLocators {
+  /** The landing's h1. */
   readonly heading: Locator;
+  readonly breadcrumbHomeLink: Locator;
+  readonly closeButton: Locator;
+
+  // Landing: files
+  readonly dropzone: Locator;
+  readonly fileInput: Locator;
+  readonly emptyDropzoneText: Locator;
+  readonly moreFilesDropzoneText: Locator;
+  readonly attachedFiles: Locator;
+  readonly removeFileButtons: Locator;
+  /** Shown once two or more documents are attached. */
+  readonly pickHeaderDocumentText: Locator;
+  readonly unsupportedFileMessage: Locator;
+  readonly photoLimitMessage: Locator;
+  readonly documentOnPhotosMessage: Locator;
+  readonly photoUnusableMessage: Locator;
+  readonly rendersFromViewerHint: Locator;
+
+  // Landing: description, voice, menu, options, Generate
+  readonly descriptionInput: Locator;
+  readonly voiceInputButton: Locator;
+  readonly stopVoiceInputButton: Locator;
   readonly addFilesButton: Locator;
+  readonly addFilesOrPhotosMenuItem: Locator;
+  readonly createVisualizeMenuItem: Locator;
   readonly moreToolsMenuItem: Locator;
   readonly manualFormMenuItem: Locator;
-  readonly subheading: Locator;
-  readonly progressStepper: Locator;
+  readonly uploadTechpackFileMenuItem: Locator;
+  /** The most recently opened (sub)menu. */
+  readonly openMenu: Locator;
+  /** The open (sub)menu's items that aren't disabled. */
+  readonly enabledMenuItems: Locator;
+  readonly whatToCreateGroup: Locator;
+  readonly generateButton: Locator;
+  readonly generatingButton: Locator;
+
+  // Chat
+  readonly progressRegion: Locator;
   readonly useManualFormLink: Locator;
-  readonly closeLink: Locator;
-  readonly fileInput: Locator;
-  readonly dropzoneText: Locator;
-  readonly fileTypeHint: Locator;
-  readonly cancelButton: Locator;
-  readonly duplicateMessage: Locator;
+  readonly conversation: Locator;
+  readonly masterDataQuestion: Locator;
+  readonly pickExistingButton: Locator;
+  readonly pickExistingReply: Locator;
+  /** The latest "Review details" card. */
+  readonly reviewCard: Locator;
+  /** The card's summary counts, each its own element: "3 inferred", "3 to verify", "1 to pick". */
+  readonly reviewCardSummary: Locator;
+  /** A Verify field's hint, 'Header says "…".' */
+  readonly headerSaysHints: Locator;
+  readonly pickValueLine: Locator;
+  readonly remarkInput: Locator;
+  readonly cardCancelButton: Locator;
+  readonly createDraftButton: Locator;
+  readonly cancelledText: Locator;
+  readonly draftCreatedText: Locator;
+  /** "✓ Done (<status>)" once extraction ends: READY, or e.g. EXTRACTION_FAILED. */
+  readonly draftDoneText: Locator;
+  readonly openTechpackLink: Locator;
   readonly fileAlreadyExistsMessage: Locator;
   readonly openExistingFileLink: Locator;
-  readonly pickExistingInsteadButton: Locator;
   readonly createDraftFailedMessage: Locator;
-  readonly openTechpackLink: Locator;
+  readonly destructiveActionRefusal: Locator;
+  /** The open picker's options (a card picker opens a dialog). */
+  readonly pickerOptions: Locator;
+  readonly pickerBrowseAllButton: Locator;
+  readonly pickerAddNewButton: Locator;
+  readonly browseAllDialog: Locator;
 
-  // Upload → Start extraction
-  readonly uploadedFileEntry: Locator;
-  readonly startExtractionButton: Locator;
+  // Chat composer and reply actions
+  readonly composerInput: Locator;
+  readonly attachAFileButton: Locator;
+  readonly sendMessageButton: Locator;
+  readonly copyReplyButtons: Locator;
+  readonly regenerateButtons: Locator;
+  readonly goodResponseButtons: Locator;
+  readonly badResponseButtons: Locator;
+  readonly feedbackThanksToast: Locator;
 
-  // Two distinct hard/soft failure states after "Start extraction" — see
-  // this file's doc comment point 2 for why they're kept separate.
-  readonly invalidFileErrorText: Locator;
-  readonly unsupportedFileMessage: Locator;
-  readonly agentWaitingText: Locator;
-  readonly agentStuckText: Locator;
-  readonly retryButton: Locator;
+  /** The shell top bar's "Ask FloorOS AI" button, which opens the conversations panel. */
+  readonly askFloorOsAiButton: Locator;
+  /** Any "Create draft" button on the page, including one in the Ask FloorOS AI panel. */
+  readonly anyCreateDraftButton: Locator;
+  /** The draft's view (`/techpacks/view/{id}`): Tech Pack Information › Description. */
+  readonly viewDescriptionInput: Locator;
+  /** The techpack view's h1 (its name). */
+  readonly viewHeading: Locator;
 
-  // The chat panel + its own "Current step" field-picking region.
-  readonly chatGreeting: Locator;
-  readonly currentStepRegion: Locator;
-  readonly createDraftButton: Locator;
-  readonly pickAValueSummary: Locator;
-  readonly sampleRequestLabel: Locator;
+  // Running Workflow (photos only)
+  readonly runningWorkflowText: Locator;
+  readonly notAGarmentMessage: Locator;
+  readonly generationFailedMessage: Locator;
+
+  // Upload techpack (/techpacks/uploads/new)
+  readonly uploadHeading: Locator;
+  readonly uploadLimitsText: Locator;
+  readonly uploadUnsupportedFormatText: Locator;
 
   constructor(private readonly page: Page) {
-    // As of the 2026-10-22 design-system release the AI Mode landing's h1 is
-    // "Got any ideas we could work on today?" (it was "New techpack").
+    const main = page.getByRole('main').last();
+
     this.heading = page.getByRole('heading', {
       name: 'Got any ideas we could work on today?',
       level: 1,
     });
-    // "Add files" (+) opens a menu; "More tools" is a submenu holding
-    // "Manual form" (→ /techpacks/new) and "Upload a tech pack file".
+    this.breadcrumbHomeLink = page
+      .getByRole('navigation', { name: 'Breadcrumb' })
+      .getByRole('link', { name: 'Tech Pack & BOM' });
+    this.closeButton = main.getByRole('button', { name: 'Close' });
+
+    this.dropzone = page.getByRole('button', { name: 'Add reference photos or tech pack files' });
+    this.fileInput = page.locator('input[type="file"]').first();
+    this.emptyDropzoneText = page.getByText('Drop your files here to start creating.');
+    this.moreFilesDropzoneText = page.getByText('Drop more files here, or use + to add them.');
+    this.attachedFiles = this.dropzone.getByRole('listitem');
+    this.removeFileButtons = main.getByRole('button', { name: /^Remove / });
+    this.pickHeaderDocumentText = page.getByText(/^Pick the techpack document/);
+    // The advice after the dash changed on uat on 2026-10-30 ("upload a PDF or
+    // Excel (.xlsx, .xls)" → "add reference photos (JPG, PNG, WebP) or a tech
+    // pack document (PDF, XLSX, XLS)"), so only the stable part is matched.
+    this.unsupportedFileMessage = page.getByText(/" is not a supported file - /);
+    this.photoLimitMessage = page.getByText(
+      'Only 4 reference photos can be used. The others were left out.',
+    );
+    this.documentOnPhotosMessage = page.getByText(
+      'Remove the staged photos to upload a tech pack document.',
+    );
+    this.photoUnusableMessage = page.getByText('A photo is too small or too large to use.');
+    this.rendersFromViewerHint = page.getByText(
+      'Drawings and renders can be generated from the viewer after the tech pack is created.',
+    );
+
+    this.descriptionInput = page.getByRole('textbox', { name: /Describe what you/ });
+    this.voiceInputButton = page.getByRole('button', { name: 'Voice input', exact: true });
+    this.stopVoiceInputButton = page.getByRole('button', { name: 'Stop voice input' });
     this.addFilesButton = page.getByRole('button', { name: 'Add files', exact: true });
+    this.addFilesOrPhotosMenuItem = page.getByRole('menuitem', { name: 'Add files or photos' });
+    this.createVisualizeMenuItem = page.getByRole('menuitem', { name: /^Create Visualize/ });
     this.moreToolsMenuItem = page.getByRole('menuitem', { name: /^More tools/ });
     this.manualFormMenuItem = page.getByRole('menuitem', { name: 'Manual form' });
-    this.subheading = page.getByText('Upload the techpack files');
-    this.progressStepper = page.getByRole('list', { name: 'Progress' });
+    this.uploadTechpackFileMenuItem = page.getByRole('menuitem', {
+      name: 'Upload a tech pack file',
+    });
+    this.openMenu = page.getByRole('menu').last();
+    this.enabledMenuItems = this.openMenu.locator('[role="menuitem"]:not([aria-disabled="true"])');
+    this.whatToCreateGroup = page.getByRole('radiogroup', { name: 'What to create' });
+    this.generateButton = page.getByRole('button', { name: 'Generate', exact: true });
+    this.generatingButton = page.getByRole('button', { name: 'Generating…' });
+
+    this.progressRegion = page.getByRole('region', { name: 'Progress' });
     this.useManualFormLink = page.getByRole('link', { name: 'Use the manual form' });
-    this.closeLink = page.getByRole('link', { name: 'Close' });
-
-    this.fileInput = page.locator('input[type="file"]');
-    this.dropzoneText = page.getByText('Drop your PDFs or Excel files here, or browse files');
-    this.fileTypeHint = page.getByText('PDF or Excel (.xlsx, .xls)');
-    this.cancelButton = page.getByRole('button', { name: 'Cancel' });
-
-    this.duplicateMessage = page.getByText(/There's already a techpack/i);
+    this.conversation = main;
+    this.masterDataQuestion = page
+      .getByRole('listitem')
+      .filter({ hasText: 'A few items aren’t in master data yet' })
+      .last();
+    this.pickExistingButton = page.getByRole('button', { name: /^No, I.ll pick existing$/ }).last();
+    this.pickExistingReply = page.getByText(
+      'No problem — pick from existing or leave the missing fields blank.',
+    );
+    this.reviewCard = page
+      .getByRole('listitem')
+      .filter({ has: page.getByRole('button', { name: 'Create draft' }) })
+      .last();
+    this.reviewCardSummary = this.reviewCard.getByText(/^\d+ (inferred|to verify|to pick)$/);
+    this.headerSaysHints = this.reviewCard.getByText(/^Header says "/);
+    this.pickValueLine = this.reviewCard.getByText(/^Pick a value for:/);
+    this.remarkInput = this.reviewCard.getByRole('textbox', { name: 'Remark' });
+    this.cardCancelButton = this.reviewCard.getByRole('button', { name: 'Cancel' });
+    this.createDraftButton = this.reviewCard.getByRole('button', { name: 'Create draft' });
+    this.cancelledText = page.getByText('✕ Cancelled draft creation');
+    this.draftCreatedText = page.getByText(/^Draft \w+ created/).last();
+    this.draftDoneText = page.getByText(/^✓ Done \(\w+\)$/).last();
+    this.openTechpackLink = page.getByRole('link', { name: 'Open Techpack' }).last();
     this.fileAlreadyExistsMessage = page.getByText('This file is already in floorOS');
     this.openExistingFileLink = page.getByTestId('open-existing-techpack-link');
-    this.pickExistingInsteadButton = page.getByRole('button', { name: /pick existing/i });
-    this.createDraftFailedMessage = page.getByText(/I couldn't create the draft/i);
-    // The "Current step" region's completion card — confirmed live
-    // 2026-09-30 with a real, richer PDF: "Draft <ULID>" / "✓ Done
-    // (EXTRACTION_FAILED)" / a real "Open Techpack" link to
-    // /techpacks/drafts/<ULID>. A genuine third outcome, distinct from
-    // both previously-seen failure symptoms — the draft record itself
-    // got created, just tagged with an extraction-status marker, and
-    // needs an explicit click rather than an automatic navigation.
-    this.openTechpackLink = page.getByRole('link', { name: 'Open Techpack' });
+    this.createDraftFailedMessage = page.getByText(/I couldn.t create the draft/i);
+    this.destructiveActionRefusal = page.getByText(/can.t take destructive actions/i);
+    this.pickerOptions = page.getByRole('dialog').last().getByRole('option');
+    this.pickerBrowseAllButton = page
+      .getByRole('dialog')
+      .last()
+      .getByRole('button', { name: 'Browse all in table' });
+    this.pickerAddNewButton = page
+      .getByRole('dialog')
+      .last()
+      .getByRole('button', { name: /^Add new / });
+    this.browseAllDialog = page.getByRole('dialog').filter({
+      has: page.getByRole('heading', { name: /^Select / }),
+    });
 
-    this.uploadedFileEntry = page.getByRole('button', { name: /^Remove /i });
-    this.startExtractionButton = page.getByRole('button', { name: 'Start extraction' });
+    this.composerInput = page.getByRole('textbox', { name: /Ask anything/ });
+    this.attachAFileButton = page.getByRole('button', { name: 'Attach a file' });
+    this.sendMessageButton = page.getByRole('button', { name: 'Send message' });
+    this.copyReplyButtons = main.getByRole('button', { name: 'Copy', exact: true });
+    this.regenerateButtons = main.getByRole('button', { name: 'Regenerate', exact: true });
+    this.goodResponseButtons = main.getByRole('button', { name: 'Good response', exact: true });
+    this.badResponseButtons = main.getByRole('button', { name: 'Bad response', exact: true });
+    this.feedbackThanksToast = page
+      .locator('[data-sonner-toast]')
+      .filter({ hasText: 'Thanks for the feedback' });
 
-    this.invalidFileErrorText = page.getByText(/Something went wrong starting the draft session/i);
-    // Replaced the generic error above for invalid file types, confirmed live 2026-10-01.
-    this.unsupportedFileMessage = page.getByText(
-      /is not a supported file - upload a PDF or Excel/i,
-    );
-    this.agentWaitingText = page.getByText(/Uploading the file and opening the draft session/i);
-    this.agentStuckText = page.getByText(/Still waiting on the agent/i);
-    this.retryButton = page.getByRole('button', { name: 'Retry' });
+    this.askFloorOsAiButton = page.getByRole('button', { name: 'Ask FloorOS AI' });
+    this.anyCreateDraftButton = page.getByRole('button', { name: 'Create draft' });
+    this.viewDescriptionInput = page.getByRole('textbox', { name: 'Description', exact: true });
+    this.viewHeading = page.getByRole('heading', { level: 1 }).first();
 
-    this.chatGreeting = page.getByText(/How can I help you today/i);
-    this.currentStepRegion = page.getByRole('region', { name: 'Current step' });
-    this.createDraftButton = this.currentStepRegion.getByRole('button', { name: 'Create draft' });
-    this.sampleRequestLabel = page.getByText('Sample Request', { exact: true }).first();
-    this.pickAValueSummary = this.currentStepRegion.getByText(/^Pick a value for:/);
+    this.runningWorkflowText = page.getByText('Running Workflow');
+    this.notAGarmentMessage = page.getByText('These photos do not look like a garment.');
+    this.generationFailedMessage = page.getByText('Generation failed. Try again.').last();
+
+    this.uploadHeading = page.getByRole('heading', { name: 'Upload techpack' });
+    this.uploadLimitsText = page.getByText('Supports .xlsx, .xlsm, .csv, .pdf ≤ 200 MB.');
+    this.uploadUnsupportedFormatText = page.getByText(/^Unsupported format: /);
+  }
+
+  /** An attached file's list item in the drop zone, by file name. */
+  attachedFile(fileName: string): Locator {
+    return this.attachedFiles.filter({ hasText: fileName });
+  }
+
+  /** The "Remove <file name>" button beside an attached file. */
+  removeFileButton(fileName: string): Locator {
+    return this.page.getByRole('button', { name: `Remove ${fileName}`, exact: true });
+  }
+
+  /** A "What to create" option: "Tech Pack", "Technical Drawing" or "3D Renders". */
+  whatToCreate(option: string): Locator {
+    return this.whatToCreateGroup.getByRole('radio', { name: option });
   }
 
   /**
-   * A field's own search-trigger button inside the "Current step" region,
-   * e.g. `fieldButton('Techpack type')` → `button "Search techpack
-   * types..."`. Confirmed live: these are flat siblings now, no ancestor
-   * climbing needed (unlike this form's pre-2026-09-29 shape).
+   * A Review details picker, by its label ("Techpack type", "Customer",
+   * "Season", "Style #", "Fabric", "Wash", "Product type", "Sample
+   * Request"): the button right after the `<label>`.
    */
-  fieldButton(label: string): Locator {
-    const plural: Record<string, string> = {
-      'Techpack type': 'techpack types',
-      Customer: 'customers',
-      Season: 'seasons',
-      'Style #': 'style #s',
-      Fabric: 'fabrics',
-      Wash: 'washs', // sic — a real typo in the app's own button text
-      'Product type': 'product types',
-      'Sample Request': 'sample requests',
-    };
-    const noun = plural[label];
-    if (!noun) throw new Error(`No known field button mapping for "${label}"`);
-    return this.currentStepRegion.getByRole('button', { name: `Search ${noun}...`, exact: true });
+  cardField(label: string): Locator {
+    return this.cardFieldLabel(label).locator('xpath=following::button[1]');
+  }
+
+  /** A Review details field's `<label>`. */
+  cardFieldLabel(label: string): Locator {
+    return this.reviewCard
+      .locator('label')
+      .filter({ hasText: new RegExp(`^${escapeRegExp(label)}$`) });
+  }
+
+  /** The tag badge beside a field's label: "Inferred", "Verify" or "To pick" (none on Sample Request). */
+  cardFieldTag(label: string): Locator {
+    return this.cardFieldLabel(label).locator(
+      'xpath=following-sibling::span[@data-slot="badge"][1]',
+    );
+  }
+
+  /** A Dashboard row button for an AI draft, "DRAFT/<first 12 characters of its id>". */
+  dashboardDraftButton(draftId: string): Locator {
+    return this.page.getByRole('button', { name: `DRAFT/${draftId.slice(0, 12)}` });
   }
 }
