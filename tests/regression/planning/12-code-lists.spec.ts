@@ -7,7 +7,6 @@ import {
   CODE_LIST_A,
   CODE_LIST_B,
   createCodeListValue,
-  knownBug,
   openCodeListValue,
   personaCredentials,
   personaSkipReason,
@@ -340,10 +339,9 @@ test.describe('Planning - Code Lists', () => {
     await allure.tms(cu('z941abvh2b'), 'TC-CCV-02 (ClickUp)');
     await allure.tms(cu('z941abyqd7'), 'TC-CCV-02 bug (ClickUp)');
     test.setTimeout(300_000);
-    // Confirmed bug, ClickUp z941abyqd7 (2026-10-14): a cleared Display order
-    // doesn't block Create — dev saves the value with order 99 (Sept: blocked).
-    // Marked with knownBug() until fixed.
-    knownBug('z941abyqd7');
+    // ClickUp z941abyqd7 (2026-10-14: a cleared Display order saved as 99) was
+    // fixed on dev and closed on 2026-11-12: Create is blocked with "Required"
+    // under Display order, so this asserts the fixed behaviour again.
     const values = new CodeListValuesPage(page, CODE_LIST_A);
     const dialog = new CodeListValueDialogPage(page);
     for (const field of ['value', 'shownAs', 'whatItMeans', 'displayOrder'] as const) {
