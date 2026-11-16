@@ -48,17 +48,6 @@ test.describe('CRM - Notify about a Key Meeting Notes', () => {
       referredBy: 'Jordan Smith',
       crmStage: 'Lead',
     });
-    // Confirmed against the running app + source (svc-notification's
-    // registry — recipientsForEmails resolves from
-    // `crm.account_assignee.employee`): automatic in-app notifications on
-    // this record go to the CUSTOMER'S OWN ASSIGNEES, not broadly to every
-    // CRM user. A customer with none configured gets zero recipients and
-    // therefore zero notifications — not a missing feature, an empty
-    // audience. "Alice" (this suite's logged-in test user — see
-    // auth-setup.ts) is herself a seeded employee in the "Sewing"
-    // department, so assigning her here is what lets TC:1/TC:2 see the
-    // notification land in their OWN Inbox.
-    await createCustomerPage.addBusinessProcessWithAssignee('Sewing', 'Alice');
     await createCustomerPage.save();
     // A plain `.isVisible()` doesn't wait — it raced ahead of the
     // duplicate-check API response under 5-way parallel load (confirmed:

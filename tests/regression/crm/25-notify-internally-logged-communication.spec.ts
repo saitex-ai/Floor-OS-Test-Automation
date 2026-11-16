@@ -95,7 +95,6 @@ test.describe('CRM - Notify Internally about a Logged Communication', () => {
       referredBy: 'Jordan Smith',
       crmStage: 'Lead',
     });
-    await createCustomerPage.addBusinessProcessWithAssignee('Cutting', 'Anjali Krishnakumar');
     await createCustomerPage.save();
     if (await createCustomerPage.locators.duplicateWarningModal.isVisible().catch(() => false)) {
       await createCustomerPage.locators.saveAnywayButton.click();
@@ -214,7 +213,7 @@ test.describe('CRM - Notify Internally about a Logged Communication', () => {
   test('TC:3 Verify audit history logging', () => {
     test.fixme(
       true,
-      'Confirmed directly against the running app (2026-09-25): a logged communication\'s own detail screen has NO audit-history affordance anywhere — no tab, section, or icon button leads to one (checked via a full ariaSnapshot() of the screen and every button\'s accessible name). This is a genuine product gap in this environment, not a locator guess gone wrong — see log-communication.locators.ts\'s class doc.',
+      "Confirmed directly against the running app (2026-09-25): a logged communication's own detail screen has NO audit-history affordance anywhere — no tab, section, or icon button leads to one (checked via a full ariaSnapshot() of the screen and every button's accessible name). This is a genuine product gap in this environment, not a locator guess gone wrong — see log-communication.locators.ts's class doc.",
     );
   });
 
@@ -249,7 +248,9 @@ test.describe('CRM - Notify Internally about a Logged Communication', () => {
       // earlier save() in this same test session is not what's being
       // checked here, so this is scoped to that specific text rather
       // than asserting a bare zero-toast count.
-      await expect(page.locator('[data-sonner-toast]', { hasText: 'Notifications sent' })).toHaveCount(0);
+      await expect(
+        page.locator('[data-sonner-toast]', { hasText: 'Notifications sent' }),
+      ).toHaveCount(0);
     });
   });
 

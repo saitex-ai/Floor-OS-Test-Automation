@@ -27,7 +27,6 @@ export class CreateCustomerLocators {
   // Form sections (layout check — TC:1)
   readonly profileSection: Locator;
   readonly managementSection: Locator;
-  readonly departmentsSection: Locator;
   readonly linkContactsSection: Locator;
 
   // Profile fields
@@ -52,9 +51,6 @@ export class CreateCustomerLocators {
   readonly originTypeCombobox: Locator;
   readonly originCombobox: Locator;
   readonly buyerCombobox: Locator;
-
-  // Business Process / Department rows
-  readonly addBusinessProcessButton: Locator;
 
   // Link Contacts
   readonly linkContactsCombobox: Locator;
@@ -83,8 +79,6 @@ export class CreateCustomerLocators {
 
     this.profileSection = page.getByRole('heading', { name: 'Customer Profile' });
     this.managementSection = page.getByRole('heading', { name: 'Customer Management' });
-    // Not a heading in the real DOM — a plain paragraph.
-    this.departmentsSection = page.getByText('Departments and Assignees');
     this.linkContactsSection = page.getByRole('heading', { name: 'Link Contacts' });
 
     // A textbox, so it can't match the Customers list's "Resize Customer
@@ -125,8 +119,6 @@ export class CreateCustomerLocators {
     this.originTypeCombobox = page.getByRole('combobox', { name: 'Origin Type', exact: true });
     this.originCombobox = page.getByRole('combobox', { name: 'Origin', exact: true });
     this.buyerCombobox = page.getByRole('combobox', { name: 'Buyer', exact: true });
-
-    this.addBusinessProcessButton = page.getByRole('button', { name: 'Add', exact: true });
 
     this.linkContactsCombobox = page.getByRole('combobox', { name: 'Contacts to link' });
 

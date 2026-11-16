@@ -500,6 +500,12 @@ test.describe('CRM - External Event Planning (Sprint 5)', () => {
     await allure.tms('https://app.clickup.com/t/z941abyq84', 'TC:17 (ClickUp)');
     const l = externalEventsPage.locators;
 
+    await externalEventsPage.openList();
+    test.skip(
+      !(await externalEventsPage.hasOverflowStatusTab('Elapsed')),
+      'Dev has no elapsed External Event (no Elapsed status tab; seen 2026-11-16) — nothing to check.',
+    );
+
     let row: Awaited<ReturnType<typeof externalEventsPage.openFirstAiEventInTab>> = null;
     await test.step('The event is listed under Elapsed with status "Planning · Elapsed"', async () => {
       await externalEventsPage.openStatusTab('Elapsed');

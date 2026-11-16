@@ -55,11 +55,12 @@ export class ProspectToCustomerConversionLocators {
 
   /**
    * The same stage tab once promoted to the tab bar. Confirmed on dev:
-   * selecting an overflow tab moves it into the bar as a pressed button
-   * ("Prospects 44" [pressed]) and the overflow shrinks to "+1 more".
+   * selecting an overflow tab moves it into the bar as the selected tab
+   * ("Prospects 44" [selected]; `role="tab"` since the 2026-11-16 dev
+   * deploy, a pressed button before) and the overflow shrinks to "+1 more".
    */
   promotedStageTab(tab: OverflowStageTab): Locator {
-    return this.page.getByRole('button', { name: new RegExp(`^${tab} \\d+$`) });
+    return this.page.getByRole('tab', { name: new RegExp(`^${tab} \\d+$`) });
   }
 
   /** The Customers list data row for one Customer, matched by its (unique) name. */

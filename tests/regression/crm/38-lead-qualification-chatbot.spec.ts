@@ -937,11 +937,13 @@ test.describe('CRM - Lead Qualification Chatbot', () => {
       for (const section of DEV_AI_SECTION_TITLES) await lq.expectAiSectionWithContent(section);
     });
 
-    await test.step('No Assistant (AI Chatbot) button and no ⌖ target controls (dev 2026-10-22)', async () => {
-      // QA decision: dev's current behaviour (no AI Chatbot on a Qualified
-      // Lead) is accepted; this records what dev does today.
-      await expect(lq.locators.assistantButton).toHaveCount(0);
-      await lq.expectNoTargetControls();
+    await test.step('The AI Chatbot is still offered and opens on this record (dev 2026-11-16)', async () => {
+      // QA decision 2026-10-16: the AI Chatbot (with its Markup tool) stays
+      // available on a Qualified Lead because AI enhancement is still
+      // needed there; the qualification itself is read-only. Until
+      // 2026-11-16 dev hid the Assistant button on these records, and this
+      // step asserted that; now it shows, matching the decision.
+      await lq.openAiChatbot();
     });
   });
 

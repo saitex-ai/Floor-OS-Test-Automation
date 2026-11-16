@@ -215,7 +215,9 @@ export class ExternalEventsLocators {
     this.createEventButton = page.getByRole('button', { name: 'Create Event' });
 
     this.pageHeading = page.getByRole('heading', { name: 'External Events', level: 1 });
-    this.moreStatusTabsButton = page.getByRole('button', { name: '+2 more' });
+    // "+2 more" (Not Attending, Elapsed) until dev 2026-11-16; "+1 more"
+    // once dev had no elapsed event left, so the count isn't pinned.
+    this.moreStatusTabsButton = page.getByRole('button', { name: /^\+\d+ more$/ });
     this.searchInput = page.getByRole('textbox', { name: 'Search' });
     this.configureColumnsButton = page.getByRole('button', { name: 'Configure columns' });
     this.columnsDialog = page.getByRole('dialog', { name: 'Columns' });
@@ -386,9 +388,12 @@ export class ExternalEventsLocators {
     return this.page.getByRole('option', { name, exact: true });
   }
 
-  /** A status tab button on the List screen, by its bare name (e.g. "Planning") — accessible name carries a live count suffix, e.g. "Planning 5". */
+  /**
+   * A status tab on the List screen, by its bare name (e.g. "Planning") — accessible name carries a live count suffix, e.g. "Planning 5".
+   * Since the 2026-11-16 dev deploy these are `role="tab"` (selected = aria-selected), no longer pressed buttons.
+   */
   statusTab(name: string): Locator {
-    return this.page.getByRole('button', { name: new RegExp(`^${name} \\d+$`) });
+    return this.page.getByRole('tab', { name: new RegExp(`^${name} \\d+$`) });
   }
 
   /** A row in the events table, by its Event title. */

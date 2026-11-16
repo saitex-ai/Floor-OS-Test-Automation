@@ -173,8 +173,13 @@ export class LeadQualificationLocators {
     this.noDossierHeading = page.getByRole('heading', { name: 'No dossier for this account yet' });
     // Dev (2026-10-21) reworded this to "Nothing has analysed this account
     // yet. …" (Web Form Leads also get a "Get Dossier" button); the
-    // optional "yet" keeps the older wording matching too.
-    this.noDossierParagraph = page.getByText(/^Nothing has analysed this account( yet)?\./);
+    // optional "yet" keeps the older wording matching too. Since dev
+    // 2026-11-16 a lead that arrived before lead info was fetched
+    // automatically reads "No lead info for this lead. It arrived before …"
+    // instead (seen on Web Form leads).
+    this.noDossierParagraph = page.getByText(
+      /^(Nothing has analysed this account( yet)?|No lead info for this lead)\./,
+    );
 
     // WEB FORM (Sprint 5, confirmed on dev 2026-10-15):
     // - Every card on the tab (form card, AI sections, the Lead

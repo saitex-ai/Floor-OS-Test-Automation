@@ -108,36 +108,13 @@ test.describe('CRM - Customer Creation Screen', () => {
     });
   });
 
-  test('TC:4 Verify Business Process / Department row assignee validation', async ({
-    createCustomerPage,
-  }) => {
+  test('TC:4 Verify Business Process / Department row assignee validation', async () => {
     await allure.tms('https://app.clickup.com/t/z941abt7ah', 'TC:4 (ClickUp)');
-    await createCustomerPage.openFromCrmHome();
-
-    // Matches create-customer.spec.ts's TC:4 exactly — confirmed passing
-    // against dev directly.
-    await test.step('Fill required Customer details', async () => {
-      await createCustomerPage.fillProfile({
-        name: 'Acme Textiles',
-        email: 'acme-textiles@example.com',
-        city: 'Coimbatore',
-        country: 'India',
-        originType: 'Referral',
-        origin: 'Internal Referral',
-        buyer: 'Fabric',
-        referredBy: 'Jordan Smith',
-        crmStage: 'Lead',
-      });
-    });
-
-    await test.step('Add a Business Process/Department line with no assignee', async () => {
-      await createCustomerPage.addBusinessProcessWithoutAssignee('Cutting');
-      await createCustomerPage.save();
-    });
-
-    await test.step('Save is blocked: at least one assignee is required', async () => {
-      await createCustomerPage.expectFieldError(/at least one assignee/i);
-    });
+    test.skip(
+      true,
+      'The Departments and Assignees section was removed from Create Customer on purpose (dev, 2026-11-16) — ' +
+        'there is no Business Process / Department assignee restriction left to test.',
+    );
   });
 
   test('TC:5 Verify searching and multi-selecting unlinked Contacts for linkage', async ({

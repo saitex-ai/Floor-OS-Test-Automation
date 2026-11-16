@@ -612,8 +612,11 @@ test.describe('CRM - [Origin Type = Social Media Post] Lead Qualification', () =
       await lq.expectQualificationInputsUnavailable();
     });
 
-    await test.step('No Assistant (AI Chatbot) button, and no comment or message can be sent', async () => {
-      await lq.expectAssistantNotOffered();
+    // The AI Chatbot stays available past the Lead stage on purpose (QA
+    // decision 2026-10-16: AI enhancement is still needed there). From dev
+    // 2026-11-16 the shell's Assistant button shows on these records, so it
+    // is no longer asserted absent here.
+    await test.step('No comment or message can be sent', async () => {
       await lq.expectOnlyViewOnPlatformAction(data.socialInteractions.length);
       await lq.expectNoTextboxOnTab();
     });

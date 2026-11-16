@@ -258,9 +258,20 @@ export class KeyMeetingNotesLocators {
     this.toast = page.locator('[data-sonner-toast]').first();
   }
 
-  /** A Key Meeting Notes entry's row in the Communication history, by its title. */
+  /**
+   * A Key Meeting Notes entry in the Communication history, by its title: the
+   * entry's own "Open <title>" button inside the list's tabpanel. A loose
+   * page-wide getByText(title).first() could land on another element with
+   * the same text, so the click intermittently left the list open
+   * (dev 2026-11-16, 15 TC:2/TC:3).
+   */
   keyMeetingNotesEntry(title: string): Locator {
-    return this.page.getByText(title, { exact: false }).first();
+    return this.page
+      .getByRole('tabpanel')
+      .getByRole('listitem')
+      .filter({ hasText: title })
+      .getByRole('button', { name: /^Open / })
+      .first();
   }
 
   /**

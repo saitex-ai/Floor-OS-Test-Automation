@@ -159,8 +159,14 @@ export class KeyMeetingNotesPage extends BasePage {
 
   /** Opens the Key Meeting Notes detail dialog from its Communication-history entry. */
   async openDetailFromHistory(title: string): Promise<void> {
+    // Callers may still be on a note's inline detail (e.g. straight after
+    // generating it); go back to the list first so this really opens the
+    // note from its history entry.
+    if (await this.locators.backToNotesListLink.isVisible()) await this.backToNotesList();
     await this.locators.keyMeetingNotesEntry(title).click();
-    await expect(this.locators.detailDialog).toBeVisible();
+    // The detail renders inline (detailDialog is just <body>), so its own
+    // "Back to Key Meeting Notes" link is the proof the detail opened.
+    await expect(this.locators.backToNotesListLink).toBeVisible();
   }
 
   async expectDetailSectionsVisible(): Promise<void> {

@@ -361,10 +361,6 @@ export class SocialMediaLeadQualificationPage extends LeadQualificationPage {
     await expect(this.locators.cardHeadings.first()).toBeVisible();
   }
 
-  async expectAssistantNotOffered(): Promise<void> {
-    await expect(this.locators.assistantButton).toHaveCount(0);
-  }
-
   async expectAiChatbotGreeting(customerName: string): Promise<void> {
     await expect(this.social.aiChatbotGreeting).toContainText(customerName);
   }
@@ -386,8 +382,18 @@ export class SocialMediaListeningPage extends BasePage {
     await expect(this.locators.postRows.first()).toBeVisible({ timeout: 60_000 });
   }
 
+  /**
+   * Narrows the list with its "Search brand" box; the list is paged, so a post
+   * may not be on page 1. It matches the brand (Customer) name: "Nudie Jeans"
+   * finds the post, its author "Nudie Jeans Co" does not (dev 2026-11-16).
+   */
+  async search(text: string): Promise<void> {
+    await this.locators.searchInput.fill(text);
+  }
+
   /** The list row for a post: author, handle and channel as captured. */
   async expectPostRow(post: SocialPost, customerName: string): Promise<void> {
+    await this.search(customerName);
     const row = this.locators.postRow(post.content.author.name).filter({ hasText: customerName });
     await expect(row).toHaveCount(1);
     await expect(row).toContainText(post.content.author.handle);
@@ -395,6 +401,7 @@ export class SocialMediaListeningPage extends BasePage {
   }
 
   async openPost(post: SocialPost, customerName: string): Promise<void> {
+    await this.search(customerName);
     await this.locators
       .postRow(post.content.author.name)
       .filter({ hasText: customerName })

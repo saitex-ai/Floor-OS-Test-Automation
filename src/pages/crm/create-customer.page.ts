@@ -121,26 +121,6 @@ export class CreateCustomerPage extends BasePage {
     await inDialog.or(anywhere).first().click();
   }
 
-  /**
-   * Adds a Business Process/Department row without assigning anyone
-   * (TC:4). "Department" and "Assignees" are both comboboxes — same
-   * selectComboboxOption() pattern as Country/CRM Stage/etc, not fillable
-   * text inputs (confirmed directly: the previous .fill() attempt
-   * resolved to the row's "Remove department" button instead, since that
-   * button's aria-label also matched a loose /department/i search).
-   */
-  async addBusinessProcessWithoutAssignee(department: string): Promise<void> {
-    await this.locators.addBusinessProcessButton.click();
-    const departmentCombobox = this.page.getByRole('combobox', { name: 'Department' }).last();
-    await this.selectComboboxOption(departmentCombobox, department);
-  }
-
-  async addBusinessProcessWithAssignee(department: string, assignee: string): Promise<void> {
-    await this.addBusinessProcessWithoutAssignee(department);
-    const assigneeCombobox = this.page.getByRole('combobox', { name: 'Assignees' }).last();
-    await this.selectComboboxOption(assigneeCombobox, assignee);
-  }
-
   async linkExistingContact(contactName: string): Promise<void> {
     await this.selectComboboxOption(this.locators.linkContactsCombobox, contactName);
   }
@@ -228,7 +208,6 @@ export class CreateCustomerPage extends BasePage {
   async expectFormSectionsVisible(): Promise<void> {
     await expect(this.locators.profileSection).toBeVisible();
     await expect(this.locators.managementSection).toBeVisible();
-    await expect(this.locators.departmentsSection).toBeVisible();
     await expect(this.locators.linkContactsSection).toBeVisible();
   }
 

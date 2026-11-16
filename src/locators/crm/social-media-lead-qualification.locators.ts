@@ -135,6 +135,7 @@ export class SocialMediaLeadQualificationLocators {
  */
 export class SocialMediaListeningLocators {
   readonly postRows: Locator;
+  readonly searchInput: Locator;
   readonly detailHeading: Locator;
   readonly detailPostSection: Locator;
   readonly detailPostText: Locator;
@@ -145,6 +146,9 @@ export class SocialMediaListeningLocators {
 
   constructor(private readonly page: Page) {
     this.postRows = page.getByRole('row').filter({ has: page.getByRole('cell') });
+    // The list pages 25 rows at a time (dev 2026-11-16), so a post is
+    // searched for rather than expected on page 1.
+    this.searchInput = page.getByPlaceholder('Search brand');
     this.detailHeading = page.getByRole('heading', { level: 1 });
     this.detailPostSection = page
       .locator('section')

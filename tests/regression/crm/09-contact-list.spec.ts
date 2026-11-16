@@ -97,13 +97,13 @@ test.describe('CRM - Contact List', () => {
 
     await test.step('Switch to the Linked tab', async () => {
       await contactListPage.selectRelationshipTab('Linked');
-      await expect(contactListPage.locators.linkedTab).toHaveAttribute('aria-pressed', 'true');
+      await expect(contactListPage.locators.linkedTab).toHaveAttribute('aria-selected', 'true');
     });
 
     await test.step('Switch to the Unlinked tab', async () => {
       await contactListPage.selectRelationshipTab('Unlinked');
-      await expect(contactListPage.locators.unlinkedTab).toHaveAttribute('aria-pressed', 'true');
-      await expect(contactListPage.locators.linkedTab).not.toHaveAttribute('aria-pressed', 'true');
+      await expect(contactListPage.locators.unlinkedTab).toHaveAttribute('aria-selected', 'true');
+      await expect(contactListPage.locators.linkedTab).not.toHaveAttribute('aria-selected', 'true');
     });
 
     // NOTE: with zero contacts in the current data, "only contacts in the
