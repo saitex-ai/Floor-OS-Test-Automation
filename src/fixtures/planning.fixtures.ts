@@ -1,6 +1,9 @@
 import { test as base } from '@playwright/test';
 import { PersonaSessions } from './planning-personas';
 import { PlanningPage } from '../pages/planning/planning.page';
+import { TransitionRulesListPage } from '../pages/planning/transition-rules-list.page';
+import { TransitionRuleEditorPage } from '../pages/planning/transition-rule-editor.page';
+import { TransitionRuleViewPage } from '../pages/planning/transition-rule-view.page';
 import { CalendarsListPage } from '../pages/planning/calendars-list.page';
 import { CalendarFormPage } from '../pages/planning/calendar-form.page';
 import { WorkCentresListPage } from '../pages/planning/work-centres-list.page';
@@ -28,6 +31,9 @@ import { CalendarDetailPage } from '../pages/planning/calendar-detail.page';
 
 interface PlanningFixtures {
   planningPage: PlanningPage;
+  transitionRulesListPage: TransitionRulesListPage;
+  transitionRuleEditorPage: TransitionRuleEditorPage;
+  transitionRuleViewPage: TransitionRuleViewPage;
   calendarsListPage: CalendarsListPage;
   calendarFormPage: CalendarFormPage;
   workCentresListPage: WorkCentresListPage;
@@ -76,6 +82,18 @@ export const test = base.extend<PlanningFixtures, PlanningWorkerFixtures>({
 
   planningPage: async ({ page }, use) => {
     await use(new PlanningPage(page));
+  },
+
+  transitionRulesListPage: async ({ page }, use) => {
+    await use(new TransitionRulesListPage(page));
+  },
+
+  transitionRuleEditorPage: async ({ page }, use) => {
+    await use(new TransitionRuleEditorPage(page));
+  },
+
+  transitionRuleViewPage: async ({ page }, use) => {
+    await use(new TransitionRuleViewPage(page));
   },
 
   calendarsListPage: async ({ page }, use) => {
