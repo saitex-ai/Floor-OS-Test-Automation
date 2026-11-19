@@ -133,22 +133,15 @@ export class BizDocPage extends BasePage {
   }
 
   /**
-   * Confirmed current dev behavior (2026-10-15): the Orders tile is a
-   * read-only placeholder — a `note` whose own text says Purchase Orders
-   * isn't available in floorOS yet — and no "Create Order" action exists
-   * on the Biz Docs sub-tab. Orders are created in Master Data → Sales
-   * Order instead, and the tile STILL reads "—" after a Sales Order exists
-   * for the Customer (the "BUG:" steps in
-   * 34-prospect-to-customer-conversion.spec.ts).
+   * The Orders tile counts the Customer's Sales Orders and, once clicked,
+   * lists each one by its Order # (dev 2026-11-16; a "not available in
+   * floorOS yet" placeholder before that).
    */
-  async expectOrdersTileIsUnavailablePlaceholder(): Promise<void> {
-    await expect(this.locators.ordersTile).toBeVisible();
-    await expect(this.locators.ordersTile).toHaveAccessibleName(/not available in floorOS yet/i);
-    await expect(this.locators.createOrderButton).toHaveCount(0);
-    // Clicking the tile itself opens nothing either (no dialog, no
-    // Create Order action) — confirmed by diffing the page before/after.
+  async expectOrdersListed(orderNos: string[]): Promise<void> {
+    await expect(this.locators.ordersTile).toHaveAccessibleName(`Orders: ${orderNos.length}`);
     await this.locators.ordersTile.click();
-    await expect(this.locators.anyDialog).toHaveCount(0);
-    await expect(this.locators.createOrderButton).toHaveCount(0);
+    for (const orderNo of orderNos) {
+      await expect(this.page.getByRole('row').filter({ hasText: orderNo })).toHaveCount(1);
+    }
   }
 }

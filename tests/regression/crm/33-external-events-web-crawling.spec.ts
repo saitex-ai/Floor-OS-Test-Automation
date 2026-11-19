@@ -43,7 +43,7 @@ test.describe('CRM - Build External Events List with Web Crawling', () => {
 
     await test.step('The screen loads with the All tab active and no search/filter applied', async () => {
       await externalEventsPage.expectListLoaded();
-      await expect(l.statusTab('All')).toHaveAttribute('aria-pressed', 'true');
+      await expect(l.statusTab('All')).toHaveAttribute('aria-selected', 'true');
       await expect(l.searchInput).toHaveValue('');
       // No "(N applied)" suffix on the Filters toggle = no filter active.
       await expect(l.filtersButton).toHaveAccessibleName('Filters');
@@ -134,7 +134,7 @@ test.describe('CRM - Build External Events List with Web Crawling', () => {
     await test.step(`Filter by Type "${type}" — only rows matching BOTH type and status remain`, async () => {
       await externalEventsPage.filterByType(type);
       await expect(l.filtersButton).toHaveAccessibleName('Filters (1 applied)');
-      await expect(l.statusTab('Attended')).toHaveAttribute('aria-pressed', 'true');
+      await expect(l.statusTab('Attended')).toHaveAttribute('aria-selected', 'true');
       await expect
         .poll(() => externalEventsPage.readPaginationTotal())
         .toBeLessThanOrEqual(attendedTotal);
@@ -291,7 +291,7 @@ test.describe('CRM - Build External Events List with Web Crawling', () => {
     const expectStatePreserved = async (): Promise<void> => {
       await expect(l.searchInput).toHaveValue(keyword);
       await expect(l.removeFilterChip(externalEventsPage.typeFilterLabel(type))).toBeVisible();
-      await expect(l.statusTab('Attended')).toHaveAttribute('aria-pressed', 'true');
+      await expect(l.statusTab('Attended')).toHaveAttribute('aria-selected', 'true');
       await externalEventsPage.expectPaginationTotal(total);
     };
 

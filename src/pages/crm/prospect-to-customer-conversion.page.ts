@@ -68,7 +68,7 @@ export class ProspectToCustomerConversionPage extends BasePage {
       await this.locators.moreStageTabsButton.click();
       await this.locators.overflowStageTab(tab).click();
     }
-    await expect(promoted).toHaveAttribute('aria-pressed', 'true');
+    await expect(promoted).toHaveAttribute('aria-selected', 'true');
   }
 
   async searchCustomer(customerName: string): Promise<void> {

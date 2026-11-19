@@ -9,8 +9,8 @@ import { test, expect } from '../../../src/fixtures/crm.fixtures';
  * external-events.locators.ts's class doc for the corrections that made:
  * notably, "AI Relevance" is a real, sortable column but hidden by
  * default (must be toggled on via Configure Columns), and only 4 of the
- * 6 status tabs render as top-level buttons — Not Attending/Elapsed sit
- * behind a "+2 more" menu.
+ * 6 status tabs render as top-level tabs — Not Attending/Elapsed sit
+ * behind a "+N more" menu (Elapsed only when an elapsed event exists).
  */
 test.describe('CRM - External Events List screen', () => {
   test.beforeEach(async () => {
@@ -42,7 +42,7 @@ test.describe('CRM - External Events List screen', () => {
     await test.step('Select the Planning status tab', async () => {
       await externalEventsPage.selectStatusTab('Planning');
       await expect(externalEventsPage.locators.statusTab('Planning')).toHaveAttribute(
-        'aria-pressed',
+        'aria-selected',
         'true',
       );
     });
@@ -86,16 +86,19 @@ test.describe('CRM - External Events List screen', () => {
       const afterLastDot = firstRowText.split(' · ').pop() ?? '';
       const afterLastComma = afterLastDot.split(',').pop() ?? afterLastDot;
       keyword = afterLastComma.trim();
-      expect(keyword.length, 'expected a real city/venue keyword to extract from the first row').toBeGreaterThan(0);
+      expect(
+        keyword.length,
+        'expected a real city/venue keyword to extract from the first row',
+      ).toBeGreaterThan(0);
       await externalEventsPage.search(keyword);
     });
 
     await test.step('The grid shows only rows matching both the tab and the keyword', async () => {
       await expect(rows.first()).toBeVisible();
-      const count = await rows.count();
-      for (let i = 0; i < count; i++) {
-        await expect(rows.nth(i)).toContainText(keyword);
-      }
+      // Retrying assertion, not a count-then-loop: the filter is debounced,
+      // and a row counted before it settled could vanish mid-loop (seen on
+      // dev 2026-11-16).
+      await expect(rows.filter({ hasNotText: keyword })).toHaveCount(0);
     });
   });
 
@@ -158,15 +161,17 @@ test.describe('CRM - External Events List screen', () => {
       const toAttend = await readCount('To Attend');
       const attended = await readCount('Attended');
 
+      // The overflow menu only lists statuses that have events: Elapsed
+      // is absent when dev has no elapsed event (seen 2026-11-16), and
+      // then counts as 0.
+      const overflowCount = async (name: string): Promise<number> => {
+        const item = page.getByRole('menuitem', { name: new RegExp(`^${name} \\d+$`) });
+        return (await item.count()) ? Number((await item.innerText()).replace(/\D/g, '')) : 0;
+      };
       await externalEventsPage.locators.moreStatusTabsButton.click();
-      const notAttendingText = await page
-        .getByRole('menuitem', { name: /^Not Attending \d+$/ })
-        .innerText();
-      const elapsedText = await page
-        .getByRole('menuitem', { name: /^Elapsed \d+$/ })
-        .innerText();
-      const notAttending = Number(notAttendingText.replace(/\D/g, ''));
-      const elapsed = Number(elapsedText.replace(/\D/g, ''));
+      await expect(page.getByRole('menuitem').first()).toBeVisible();
+      const notAttending = await overflowCount('Not Attending');
+      const elapsed = await overflowCount('Elapsed');
       await page.keyboard.press('Escape');
 
       // Confirmed against the running app: a genuinely undecided event

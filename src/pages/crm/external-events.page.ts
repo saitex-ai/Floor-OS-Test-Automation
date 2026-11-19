@@ -127,7 +127,7 @@ export class ExternalEventsPage extends BasePage {
   }
 
   /**
-   * Not Attending/Elapsed are tucked behind "+2 more", not top-level tabs —
+   * Not Attending/Elapsed are tucked behind "+N more", not top-level tabs —
    * confirmed against the running app. Confirmed directly (2026-09-25):
    * the table re-renders after a brief delay following the click — reading
    * rows immediately after this without a settle wait can catch the grid
@@ -143,7 +143,7 @@ export class ExternalEventsPage extends BasePage {
   async selectStatusTab(name: 'All' | 'Planning' | 'To Attend' | 'Attended'): Promise<void> {
     const tab = this.locators.statusTab(name);
     await tab.click();
-    await expect(tab).toHaveAttribute('aria-pressed', 'true');
+    await expect(tab).toHaveAttribute('aria-selected', 'true');
     await expect
       .poll(
         async () => {
@@ -159,8 +159,35 @@ export class ExternalEventsPage extends BasePage {
 
   async selectOverflowStatusTab(name: 'Not Attending' | 'Elapsed'): Promise<void> {
     await this.locators.moreStatusTabsButton.click();
-    await this.page.getByRole('menuitem', { name: new RegExp(`^${name} \\d+$`) }).click();
-    await this.page.waitForTimeout(600);
+    const item = this.page.getByRole('menuitem', { name: new RegExp(`^${name} \\d+$`) });
+    const expected = Number((await item.innerText()).replace(/\D/g, ''));
+    await item.click();
+    // Same refetch wait as selectStatusTab(): a fixed 600 ms let TC:16 read
+    // the All rows under Not Attending on dev (2026-11-16).
+    await expect
+      .poll(
+        async () => {
+          if (expected === 0) return (await this.locators.dataRows.count()) === 0;
+          if (!(await this.locators.paginationSummary.isVisible())) return false;
+          return (await this.readPaginationTotal()) === expected;
+        },
+        { message: `grid total should match the "${name}" count`, timeout: 15_000 },
+      )
+      .toBe(true);
+  }
+
+  /**
+   * Whether an overflow status ("+N more") is offered at all. Elapsed is
+   * absent from the menu when dev has no elapsed event (seen 2026-11-16:
+   * "+1 more" holding only Not Attending). Leaves the menu closed.
+   */
+  async hasOverflowStatusTab(name: 'Not Attending' | 'Elapsed'): Promise<boolean> {
+    await this.locators.moreStatusTabsButton.click();
+    const item = this.page.getByRole('menuitem', { name: new RegExp(`^${name} \\d+$`) });
+    await expect(this.page.getByRole('menuitem').first()).toBeVisible();
+    const present = (await item.count()) > 0;
+    await this.page.keyboard.press('Escape');
+    return present;
   }
 
   /** Confirmed against the running app: the live filter is debounced — a brief settle wait avoids reading the table mid-filter. */

@@ -157,14 +157,10 @@ test.describe.serial('CRM Sanity', () => {
 
   /**
    * Shared by the tests migrated from smoke-recent.spec.ts below — a
-   * plain Lead-stage Customer, optionally with a department assignee
-   * added first (needed for the Communicator dropdown on Log a
-   * Communication/Notify Internally; see 13-log-a-communication.spec.ts's
-   * own createTestCustomer).
+   * plain Lead-stage Customer (the Departments and Assignees section it
+   * used to fill in was removed from Create Customer on 2026-11-16).
    */
-  async function createLeadCustomer(
-    withAssignee = false,
-  ): Promise<{ customerId: string; customerName: string }> {
+  async function createLeadCustomer(): Promise<{ customerId: string; customerName: string }> {
     const customerName = `Playwright Sanity Customer ${Date.now()}`;
     await createCustomerPage.openFromCrmHome();
     await createCustomerPage.fillProfile({
@@ -178,9 +174,6 @@ test.describe.serial('CRM Sanity', () => {
       referredBy: 'Jordan Smith',
       crmStage: 'Lead',
     });
-    if (withAssignee) {
-      await createCustomerPage.addBusinessProcessWithAssignee('Cutting', 'Anjali Krishnakumar');
-    }
     await createCustomerPage.save();
     if (await createCustomerPage.locators.duplicateWarningModal.isVisible().catch(() => false)) {
       await createCustomerPage.locators.saveAnywayButton.click();
@@ -327,7 +320,7 @@ test.describe.serial('CRM Sanity', () => {
   /** From 13-log-a-communication.spec.ts TC-3. */
   test('Log a Communication: successful saving and audit stamping', async () => {
     await allure.feature('Log a Communication');
-    const { customerId } = await createLeadCustomer(true);
+    const { customerId } = await createLeadCustomer();
 
     const title = `Playwright Sanity Communication ${Date.now()}`;
     await logCommunicationPage.openFromCustomerDetail(customerId);
@@ -355,7 +348,7 @@ test.describe.serial('CRM Sanity', () => {
   /** From 25-notify-internally-logged-communication.spec.ts TC:1. */
   test('Notify Internally: automatic internal notifications on logging a communication', async () => {
     await allure.feature('Notify Internally');
-    const { customerId } = await createLeadCustomer(true);
+    const { customerId } = await createLeadCustomer();
 
     const title = `Playwright Sanity Notify Comm Log ${Date.now()}`;
     await logCommunicationPage.openFromCustomerDetail(customerId);

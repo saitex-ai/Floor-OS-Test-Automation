@@ -19,8 +19,8 @@ import type {
  *
  * Confirmed on dev (2026-10-15): the trigger is a Sales Order created in
  * Master Data → Sales Order Management → Sales Order (Order Type SMS =
- * sample, BULK = bulk) — not CRM's Biz Docs tab, whose Orders tile is
- * still a read-only placeholder. A Sales Order needs a Customer Season, so
+ * sample, BULK = bulk) — not CRM's Biz Docs tab, whose Orders tile only
+ * lists them (since dev 2026-11-16). A Sales Order needs a Customer Season, so
  * every TC creates, through the UI and with unique names: its own CRM
  * Customer at stage Prospect → a Season for it → the order(s). Nothing
  * pre-existing is touched.
@@ -194,21 +194,19 @@ async function expectStageOnDetails(
 }
 
 /**
- * The TCs expect the order under Customer Details → Biz Docs → Orders, but
- * that tile is not implemented yet (confirmed with the team 2026-10-15):
- * it still reads "Orders: —. Purchase Orders is not available in floorOS
- * yet." even after a Sales Order exists. Not a bug — this checks the
- * placeholder, and will fail (as a signal to extend the TC) once the
- * Orders tile ships.
+ * The TCs expect each order under Customer Details → Biz Docs → Orders. That
+ * tile was a "not available in floorOS yet" placeholder until dev
+ * 2026-11-16; it now counts the Customer's Sales Orders and lists them.
  */
-async function ordersTileNotYetImplemented(
+async function expectOrdersOnBizDocs(
   bizDocPage: BizDocPage,
   prospect: ConvertibleProspect,
+  orderNos: string[],
 ): Promise<void> {
-  await test.step('Biz Docs Orders tile is not implemented yet — still the "not available in floorOS yet" placeholder', async () => {
+  await test.step(`Biz Docs → Orders lists ${orderNos.join(', ')}`, async () => {
     await bizDocPage.openFromCustomerDetails(prospect.id);
     await bizDocPage.waitForDocumentsLoaded();
-    await bizDocPage.expectOrdersTileIsUnavailablePlaceholder();
+    await bizDocPage.expectOrdersListed(orderNos);
   });
 }
 
@@ -241,10 +239,10 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
       },
       'TC1',
     );
-    await placeOrder(salesOrderPage, createdRecords, prospect, 'SMS', 'first');
+    const orderNo = await placeOrder(salesOrderPage, createdRecords, prospect, 'SMS', 'first');
 
     await expectStageOnDetails(prospectToCustomerConversionPage, prospect, 'Customer');
-    await ordersTileNotYetImplemented(bizDocPage, prospect);
+    await expectOrdersOnBizDocs(bizDocPage, prospect, [orderNo]);
   });
 
   test('TC:2 verify UI Consistency Across Views', async ({
@@ -448,7 +446,7 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
         bulkOrderNo,
       );
     });
-    await ordersTileNotYetImplemented(bizDocPage, prospect);
+    await expectOrdersOnBizDocs(bizDocPage, prospect, [sampleOrderNo, bulkOrderNo]);
   });
 
   test('TC:6 Sample Order After Initial Bulk Order Conversion (Bulk --->Sample)', async ({
@@ -492,7 +490,7 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
         sampleOrderNo,
       );
     });
-    await ordersTileNotYetImplemented(bizDocPage, prospect);
+    await expectOrdersOnBizDocs(bizDocPage, prospect, [bulkOrderNo, sampleOrderNo]);
   });
 
   test('TC:7 Verify First Order Created is a Bulk Order', async ({
@@ -526,6 +524,6 @@ test.describe('CRM - Prospect to Customer Conversion', () => {
         orderNo,
       );
     });
-    await ordersTileNotYetImplemented(bizDocPage, prospect);
+    await expectOrdersOnBizDocs(bizDocPage, prospect, [orderNo]);
   });
 });

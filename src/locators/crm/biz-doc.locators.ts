@@ -8,10 +8,11 @@ import { type Locator, type Page } from '@playwright/test';
  *
  * Confirmed against the running app: only these THREE are real, clickable
  * type toggles. The ClickUp text's "Sample Orders" and "Purchase Orders"
- * do not exist as distinct entries — there is a fourth item, "Orders", but
- * it renders as a non-interactive `note` (not a button/link) whose own
- * text says "Purchase Orders is not available in floorOS yet". It is
- * therefore not part of this read-only *viewing* journey at all.
+ * do not exist as distinct entries — there is a fourth item, "Orders". It
+ * was a non-interactive "not available in floorOS yet" `note` until dev
+ * 2026-11-16 and is now a real tile listing the Customer's Sales Orders;
+ * it is checked by the Prospect -> Customer conversion spec (34), not
+ * added to this viewing journey yet.
  */
 export const BIZ_DOC_TYPES = ['Sample Requests', 'Tech Packs', 'Quotes'] as const;
 
@@ -66,31 +67,18 @@ export class BizDocLocators {
    */
   readonly loadingDocumentsText: Locator;
   /**
-   * The fourth, "Orders" tile. Confirmed on dev (2026-10-15): a
-   * non-interactive `note` (not a button), accessible name
-   * "Orders: —. Purchase Orders is not available in floorOS yet." — even
-   * after a Sales Order (Master Data) exists for the Customer, which the
-   * Prospect -> Customer conversion TCs expect it to list
-   * (34-prospect-to-customer-conversion.spec.ts).
+   * The Orders tile. A plain `note` placeholder ("Orders: —. Purchase Orders
+   * is not available in floorOS yet.") until dev 2026-11-16; since then a
+   * button like the other tiles, named "Orders: <count>", that counts the
+   * Customer's Sales Orders and lists them when clicked.
    */
   readonly ordersTile: Locator;
-  /**
-   * A "Create Order" control anywhere on the page. NOT present on dev
-   * (2026-10-15) — used only to assert its absence; re-derive its real
-   * shape once order creation ships.
-   */
-  readonly createOrderButton: Locator;
-  /** Any open `dialog` — used only to assert clicking the Orders tile opens none. */
-  readonly anyDialog: Locator;
-
   constructor(private readonly page: Page) {
     this.detailsHeading = page.getByRole('heading', { level: 1 });
     this.bizDocsTabButton = page.getByRole('button', { name: 'Biz Docs', exact: true });
     this.communicationTabButton = page.getByRole('button', { name: 'Communication', exact: true });
     this.loadingDocumentsText = page.getByText('Loading documents…');
-    this.ordersTile = page.getByRole('note', { name: /^Orders:/ });
-    this.createOrderButton = page.getByRole('button', { name: /create order/i });
-    this.anyDialog = page.getByRole('dialog');
+    this.ordersTile = page.getByRole('button', { name: /^Orders: / });
   }
 
   /**
@@ -133,8 +121,15 @@ export class BizDocLocators {
     return this.detailsHeading.locator('..');
   }
 
-  /** Any Create/Edit/Delete/Save/Update control within a given container. */
+  /**
+   * Any Create/Edit/Delete/Save/Update control within a given container.
+   * Leaves out the Customer header's own "Delete lead" action (dev
+   * 2026-11-16): it belongs to the Customer, not to the Biz Docs, and the
+   * container is the whole page.
+   */
   readOnlyControlButtons(container: Locator): Locator {
-    return container.getByRole('button', { name: /^(Create|Edit|Delete|Save|Update)\b/i });
+    return container.getByRole('button', {
+      name: /^(Create|Edit|Delete(?! lead$)|Save|Update)\b/i,
+    });
   }
 }

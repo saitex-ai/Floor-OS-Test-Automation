@@ -51,9 +51,9 @@ export class ContactListLocators {
   constructor(private readonly page: Page) {
     this.heading = page.getByRole('heading', { name: 'Contacts', level: 1 });
 
-    this.allTab = page.getByRole('button', { name: /^All \d/ });
-    this.linkedTab = page.getByRole('button', { name: /^Linked \d/ });
-    this.unlinkedTab = page.getByRole('button', { name: /^Unlinked \d/ });
+    this.allTab = page.getByRole('tab', { name: /^All \d/ });
+    this.linkedTab = page.getByRole('tab', { name: /^Linked \d/ });
+    this.unlinkedTab = page.getByRole('tab', { name: /^Unlinked \d/ });
 
     this.searchInput = page.getByRole('textbox', { name: 'Search' });
     this.filtersButton = page.getByRole('button', { name: 'Filters', exact: true });

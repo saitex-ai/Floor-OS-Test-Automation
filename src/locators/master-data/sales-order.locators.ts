@@ -101,9 +101,15 @@ export class SalesOrderLocators {
       .getByRole('option', { name: new RegExp(` ${escapeRegExp(code)}$`) });
   }
 
-  /** The Customer/Season field once a value is picked: a button reading "<Name> <Code>". */
+  /**
+   * The Customer/Season field once a value is picked: a button carrying the
+   * code as a whole word. It read "<Name> <Code>" until dev 2026-11-16, when
+   * the Customer button switched to "<Code> <Name>", so the position isn't pinned.
+   */
   pickedValueButton(code: string): Locator {
-    return this.dialog.getByRole('button', { name: new RegExp(` ${escapeRegExp(code)}$`) });
+    return this.dialog.getByRole('button', {
+      name: new RegExp(`(^| )${escapeRegExp(code)}( |$)`),
+    });
   }
 
   /** The list row for one order, matched by its (unique) description. */

@@ -48,7 +48,6 @@ test.describe('CRM - Log a Communication', () => {
       referredBy: 'Jordan Smith',
       crmStage: 'Lead',
     });
-    await createCustomerPage.addBusinessProcessWithAssignee('Cutting', 'Anjali Krishnakumar');
     await createCustomerPage.save();
     if (await createCustomerPage.locators.duplicateWarningModal.isVisible().catch(() => false)) {
       await createCustomerPage.locators.saveAnywayButton.click();
