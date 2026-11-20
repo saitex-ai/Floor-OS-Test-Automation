@@ -28,7 +28,10 @@ export async function spacedText(locator: Locator): Promise<string> {
     };
     walk(root as unknown as TextNode);
     // The level badge is two spans ("L" "1"); read it as "L1".
-    return parts.join(' ').replace(/\s+/g, ' ').replace(/\bL (\d)/g, 'L$1');
+    return parts
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .replace(/\bL (\d)/g, 'L$1');
   });
 }
 

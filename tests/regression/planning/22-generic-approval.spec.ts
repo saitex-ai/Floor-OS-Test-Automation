@@ -1,5 +1,5 @@
 import * as allure from 'allure-js-commons';
-import { test, expect } from '../../../src/fixtures/planning-approvals.fixtures';
+import { test, expect } from './support/approvals.fixtures';
 import { ApprovalPoliciesPage } from '../../../src/pages/planning/approval-policies.page';
 import { ApprovalPanelPage } from '../../../src/pages/planning/approval-panel.page';
 import { ApprovalsInboxPage } from '../../../src/pages/planning/approvals-inbox.page';
