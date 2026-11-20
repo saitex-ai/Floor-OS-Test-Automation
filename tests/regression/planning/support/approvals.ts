@@ -118,7 +118,7 @@ export async function createActivity(page: Page): Promise<CreatedActivity> {
   const list = new ActivitiesListPage(page);
   const form = new ActivityFormPage(page);
   await list.open();
-  await list.expectLoaded();
+  await list.expectLoadedOrEmpty();
   await list.openNew();
   await form.expectOnCreatePage();
   await form.fillAllRequired(name);

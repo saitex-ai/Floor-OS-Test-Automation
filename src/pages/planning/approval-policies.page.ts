@@ -115,9 +115,16 @@ export class ApprovalPoliciesPage extends MasterDataListPage {
     await expect(this.locators.refreshing).toHaveCount(0, { timeout: WAIT.PAGE_LOAD });
   }
 
+  /** Loaded: the heading and either rows or an empty grid (uat has no policies until a suite makes some). */
+  async expectLoaded(): Promise<void> {
+    await this.expectLoadedOrEmpty();
+  }
+
   /** Every visible row's `column` reads `value`. */
   async expectEveryRowHas(column: string, value: string): Promise<void> {
     await this.settle();
+    // A tab with no policies has no row to check.
+    if (await this.gridIsEmpty()) return;
     await expect(this.grid.bodyRows().first()).toBeVisible({ timeout: WAIT.SERVER });
     await expect
       // Rows scrolled out of the grid's viewport render empty cells: skip those.
