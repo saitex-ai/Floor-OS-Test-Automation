@@ -471,11 +471,10 @@ test.describe('Planning - Generic Approval Workflow', () => {
         'add approvers',
         'replace approvers',
       ]);
-      expect(await approvalPolicyFormPage.escalateToOptions()).toEqual([
-        'A permission',
-        'A group',
-        'Users',
-      ]);
+      // Dev later added "A resolver"; the three original kinds must stay offered.
+      expect(await approvalPolicyFormPage.escalateToOptions()).toEqual(
+        expect.arrayContaining(['A permission', 'A group', 'Users']),
+      );
       // The step has no name or target yet: refused, nothing saved.
       await approvalPolicyFormPage.saveExpectingBlocked();
       await approvalPolicyFormPage.expectEscalationStepMessage();
@@ -594,10 +593,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
         await approvalPolicyFormPage.saveExpectingBlocked();
         await approvalPolicyFormPage.expectPriorityRangeMessage();
       });
-      // Confirmed bug, ClickUp z941abyqjp (retest 2026-11-12: blank and "abc"
-      // fixed, "-5" still loses its minus and saves as 5). Marked here, after
-      // the parts that work, so a regression in them still fails the case.
-      knownBug('z941abyqjp');
+      // ClickUp z941abyqjp (blank, "abc" and "-5" all saved wrongly) is fixed on dev, so no knownBug().
       await test.step('"-5" is refused, not saved as 5', async () => {
         await approvalPolicyFormPage.typePriority('-5');
         const outcome = await approvalPolicyFormPage.save();
