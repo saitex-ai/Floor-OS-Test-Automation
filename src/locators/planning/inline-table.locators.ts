@@ -34,15 +34,16 @@ export class InlineTableLocators {
     scope?: Locator,
   ) {
     const root = scope ?? page.getByRole('main').last();
-    const name = new RegExp(`^${escapeRegExp(title)} \\(\\d+\\)`);
+    // Recipe detail's "Operations" became "Operations and activities" in the November builds.
+    const name = new RegExp(`^${escapeRegExp(title)}( and activities)? \\(\\d+\\)`);
     this.table = root.getByRole('table', { name });
     this.heading = root.getByRole('heading', { name });
     // A `has:` filter is queried inside each row, so its inner locator
     // starts from the page, not from the table.
-    const add = page.getByRole('button', { name: `Add ${noun}`, exact: true });
+    const add = page.getByRole('button', { name: this.verb('Add', noun) });
     const save = page.getByRole('button', { name: 'Save', exact: true });
     this.addRow = this.table.getByRole('row').filter({ has: add });
-    this.addButton = this.addRow.getByRole('button', { name: `Add ${noun}`, exact: true });
+    this.addButton = this.addRow.getByRole('button', { name: this.verb('Add', noun) });
     this.clearButton = this.addRow.getByRole('button', { name: 'Clear', exact: true });
     this.editingRow = this.table.getByRole('row').filter({ has: save });
     this.saveButton = this.editingRow.getByRole('button', { name: 'Save', exact: true });
@@ -61,8 +62,13 @@ export class InlineTableLocators {
     });
   }
 
+  /** "Add operation" (older builds) or "Add operation or activity" (November builds). */
+  private verb(action: string, noun: string): RegExp {
+    return new RegExp(`^${action} ${escapeRegExp(noun)}( or activity)?$`);
+  }
+
   editButton(key: string): Locator {
-    return this.row(key).getByRole('button', { name: `Edit ${this.noun}`, exact: true });
+    return this.row(key).getByRole('button', { name: this.verb('Edit', this.noun) });
   }
 
   /** The saved rows: every body row except the add row and the empty-table message. */
@@ -72,7 +78,7 @@ export class InlineTableLocators {
       .nth(1)
       .getByRole('row')
       .filter({
-        hasNot: this.page.getByRole('button', { name: `Add ${this.noun}`, exact: true }),
+        hasNot: this.page.getByRole('button', { name: this.verb('Add', this.noun) }),
       })
       .filter({ hasNot: this.page.getByRole('cell', { name: /^No .+\.$/ }) });
   }

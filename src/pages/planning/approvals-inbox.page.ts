@@ -96,15 +96,27 @@ export class ApprovalsInboxPage extends MasterDataListPage {
   /** Filters → a rule "`attribute` contains `value`" → Apply (closes the panel). */
   async addRule(attribute: string, value: string): Promise<void> {
     await this.openRuleBuilder();
-    await this.addFilterRule(attribute, value);
+    await this.grid.addRuleButton.click();
+    await this.grid.ruleAttribute.click();
+    await this.page.getByRole('option', { name: attribute, exact: true }).click();
+    await this.grid.ruleValue.click();
+    await this.page.keyboard.type(value);
+    await this.page.getByRole('option').first().click();
+    await this.applyFilters();
+  }
+
+  /** The Inbox's Filters panel names its button "Apply filters". */
+  private async applyFilters(): Promise<void> {
+    await this.page.getByRole('button', { name: 'Apply filters', exact: true }).click();
+    // Applying closes the panel on its own.
+    await expect(this.grid.filtersDialog).toBeHidden();
   }
 
   /** Filters → removes the rule → Apply (closes the panel). */
   async clearRule(): Promise<void> {
     await this.openRuleBuilder();
     await this.grid.removeRuleButton.click();
-    await this.grid.applyButton.click();
-    await this.closeFilters();
+    await this.applyFilters();
   }
 
   /**

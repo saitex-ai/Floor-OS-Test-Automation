@@ -117,7 +117,9 @@ export class RecipeDetailPage extends BasePage {
    */
   async expectOperationsHeading(count: number, totalMinutes?: number): Promise<void> {
     await expect(
-      this.page.getByRole('heading', { name: new RegExp(`^Operations \\(${count}\\)`) }),
+      this.page.getByRole('heading', {
+        name: new RegExp(`^Operations( and activities)? \\(${count}\\)`),
+      }),
     ).toBeVisible({ timeout: WAIT.SERVER });
     if (totalMinutes === undefined) return;
     if (/\/edit$/.test(new URL(this.page.url()).pathname)) await this.finishEditing();

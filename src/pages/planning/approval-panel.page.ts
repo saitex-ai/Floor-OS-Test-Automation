@@ -27,7 +27,8 @@ export async function spacedText(locator: Locator): Promise<string> {
       Array.from(node.childNodes).forEach(walk);
     };
     walk(root as unknown as TextNode);
-    return parts.join(' ').replace(/\s+/g, ' ');
+    // The level badge is two spans ("L" "1"); read it as "L1".
+    return parts.join(' ').replace(/\s+/g, ' ').replace(/\bL (\d)/g, 'L$1');
   });
 }
 
@@ -37,16 +38,11 @@ export async function expectSpacedText(
   text: string | RegExp,
   { not = false, timeout = WAIT.SERVER }: { not?: boolean; timeout?: number } = {},
 ): Promise<void> {
-  await expect
-    .poll(
-      async () => {
-        const actual = (await locator.count()) ? await spacedText(locator.first()) : '';
-        const hit = typeof text === 'string' ? actual.includes(text) : text.test(actual);
-        return hit !== not;
-      },
-      { message: `${not ? 'no ' : ''}"${String(text)}" in the text`, timeout },
-    )
-    .toBe(true);
+  const read = async () => ((await locator.count()) ? spacedText(locator.first()) : '');
+  const poll = expect.poll(read, { timeout });
+  // String: a substring; RegExp: a match. The failure shows the text read.
+  if (typeof text === 'string') await (not ? poll.not.toContain(text) : poll.toContain(text));
+  else await (not ? poll.not.toMatch(text) : poll.toMatch(text));
 }
 
 export type DecisionButton = 'Approve' | 'Approve and add levels' | 'Reject' | 'Withdraw';
