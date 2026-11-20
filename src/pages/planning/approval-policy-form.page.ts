@@ -231,8 +231,15 @@ export class ApprovalPolicyFormPage extends BasePage {
     // timed out, and keyboard focus kept resetting), so the option gets a
     // dispatched click, repeated until the pick shows.
     await expect(async () => {
-      if ((await picked.count()) === 0)
+      if ((await picked.count()) === 0) {
+        // The list can close or re-render under load: reopen Who and retype.
+        if ((await option.count()) === 0) {
+          await this.locators.who.click();
+          await this.page.keyboard.type(term);
+          await expect(option).toBeVisible({ timeout: WAIT.RETRY_STEP });
+        }
         await option.dispatchEvent('click', undefined, { timeout: WAIT.RETRY_STEP });
+      }
       await expect(picked.first()).toBeVisible({ timeout: WAIT.RETRY_STEP });
     }).toPass({ timeout: WAIT.NAVIGATION });
     await this.page.keyboard.press('Escape');
