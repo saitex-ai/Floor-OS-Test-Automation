@@ -157,7 +157,11 @@ test.describe('Planning - Alert Timers', () => {
     await list.expectLoaded();
     await list.expectTabCountsAddUp(['Real time', 'Daily', 'Weekly', 'Off']);
     const off = firstWhere((t) => !t.isEnabled);
-    test.skip(!off, noTimer('that is Off'));
+    if (!off) {
+      // The sum is checked above; only the "counts once" half needs an Off timer.
+      test.info().annotations.push({ type: 'note', description: noTimer('that is Off') });
+      return;
+    }
     // The Off row keeps its stored cadence, but is counted (and listed) only under Off.
     await list.search(off!.username!);
     await net.listResponseWith('search', off!.username!);
