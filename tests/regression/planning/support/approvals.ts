@@ -108,6 +108,16 @@ export async function editPolicy(
   return (await form.saveIfChanged()).version;
 }
 
+/** "Cutting" where the environment has it (dev), else its first department (uat has only Sewing). */
+async function usableDepartment(page: Page, form: ActivityFormPage): Promise<string> {
+  await form.locators.owningDepartment.click();
+  const options = page.getByRole('option');
+  await expect(options.first()).toBeVisible({ timeout: 30_000 });
+  const names = (await options.allInnerTexts()).map((t) => t.trim().split(/\s|\n/)[0]!);
+  await page.keyboard.press('Escape');
+  return names.includes('Cutting') ? 'Cutting' : names[0]!;
+}
+
 /**
  * Creates a QA-AUTO activity draft with everything Send for approval needs
  * and returns its generated code and its page's path.
@@ -121,7 +131,7 @@ export async function createActivity(page: Page): Promise<CreatedActivity> {
   await list.expectLoadedOrEmpty();
   await list.openNew();
   await form.expectOnCreatePage();
-  await form.fillAllRequired(name);
+  await form.fillAllRequired(name, { department: await usableDepartment(page, form) });
   expect(await form.create(), `create activity ${tag}`).toBe('submitted');
   await form.expectCreatedAsDraft();
   const code = await list.codeOf(tag);
