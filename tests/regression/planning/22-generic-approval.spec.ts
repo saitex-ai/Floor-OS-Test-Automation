@@ -1289,11 +1289,16 @@ test.describe('Planning - Generic Approval Workflow', () => {
 
     test('TC-XAP-09 Self-approval is blocked by default', async ({ page, approvalRequestPage }) => {
       await allure.tms(cu('z941abyuat'), 'TC-XAP-09 (ClickUp)');
+      await allure.tms(cu('z941ac28wn'), 'TC-XAP-09 bug (ClickUp)');
       // L1 = Alice + Carol with Self-approval Blocked: alice's own request
       // should seat only Carol (as on 2026-10-13).
       const sent = await sendFresh(page, [pBoth], { selfApproval: false });
       await approvalRequestPage.openFromInbox(sent.request);
       await approvalRequestPage.expectTextContains('Carol Pending');
+      // Confirmed bug, ClickUp z941ac28wn (2026-11-23, dev and uat): with
+      // Self-approval Blocked the submitter is still seated "Pending".
+      // Marked after the part that works.
+      knownBug('z941ac28wn');
       await approvalRequestPage.expectTextLacks(/Alice (Pending|Approved)/);
     });
 
@@ -1382,9 +1387,14 @@ test.describe('Planning - Generic Approval Workflow', () => {
       approvalPanelPage,
     }) => {
       await allure.tms(cu('z941abyunb'), 'TC-XAP-15 (ClickUp)');
+      await allure.tms(cu('z941ac28wp'), 'TC-XAP-15 bug (ClickUp)');
       const both = { selfApproval: true };
       const first = await sendFresh(page, [pBoth], both);
       const second = await sendFresh(page, [pBoth], both);
+      // Open question, ClickUp z941ac28wp (2026-11-23, dev and uat): Alice's
+      // single approval completes the level "as administrator" and Carol is
+      // Skipped. The case asserts the quorum until that is answered.
+      knownBug('z941ac28wp');
       for (const sent of [first, second]) {
         await approvalPanelPage.open(sent.path);
         await approvalPanelPage.approve();
