@@ -83,3 +83,89 @@ export async function createApprovedTechpack(
   }
   throw new Error('Could not approve a fresh techpack in 3 attempts');
 }
+
+/**
+ * Master Data > Employees: creates an employee (Maintained by "By hand") in
+ * the department the picker offers as `department` after searching
+ * `departmentSearch` (the picker pages its options: 15 of 58 on dev,
+ * 2026-11-17), and returns the number and
+ * department name Master Data gave it (from the create response). Used by
+ * suites whose records hang off an employee (Planning's operator profiles):
+ * each creates its own QA-AUTO employee rather than touching real ones.
+ */
+export async function createEmployee(
+  page: Page,
+  fullName: string,
+  departmentSearch: string,
+  department: RegExp,
+): Promise<{ employeeNo: string; department: string }> {
+  const employees = new EmployeesListPage(page);
+  const employee = new EmployeeFormPage(page);
+  await employees.open();
+  await employees.expectLoaded();
+  await employees.expectRowsLoaded();
+  await employees.openNewEmployee();
+  await employee.expectOnCreatePage();
+  await employee.locators.fullName.fill(fullName);
+  // The picker's departments can take over 15 s to arrive on a slow dev (2026-11-18).
+  await expect(async () => {
+    if (await employee.locators.departmentDialog.isVisible()) await page.keyboard.press('Escape');
+    await employee.openDepartmentPickerOptions();
+  }).toPass({ timeout: 90_000 });
+  await employee.searchDepartmentPicker(departmentSearch);
+  await employee.locators.departmentOption(department).first().click();
+  await employee.locators.maintainedBy.click();
+  await employee.locators.departmentOption('By hand').click();
+  const [response] = await Promise.all([
+    page.waitForResponse(
+      (r) => new URL(r.url()).pathname === '/api/employees' && r.request().method() === 'POST',
+      { timeout: 30_000 },
+    ),
+    employee.create(),
+  ]);
+  expect(response.status(), `create employee "${fullName}"`).toBe(201);
+  const body = (await response.json()) as { employeeNo: string; departmentName: string };
+  await employee.expectCreatedSuccessfully();
+  return { employeeNo: body.employeeNo, department: body.departmentName };
+}
+
+/**
+ * Master Data > Employees: moves one of the caller's own employees to the
+ * first other department the picker offers, and returns that department's
+ * name — or null, leaving the employee untouched, when the picker offers no
+ * other department.
+ */
+export async function moveEmployeeToAnotherDepartment(
+  page: Page,
+  fullName: string,
+  currentDepartment: string,
+): Promise<string | null> {
+  const employees = new EmployeesListPage(page);
+  const employee = new EmployeeFormPage(page);
+  await employees.open();
+  await employees.expectLoaded();
+  await employees.expectRowsLoaded();
+  await employees.openEmployeeByName(fullName);
+  await employee.expectOnDetailPage();
+  await employee.clickEdit();
+  const options = await employee.openDepartmentPickerOptions();
+  const other = options.find((o) => !o.trim().startsWith(`${currentDepartment} `));
+  if (!other) {
+    await page.keyboard.press('Escape');
+    await employee.cancel();
+    return null;
+  }
+  await employee.locators.departmentOption(other.trim()).first().click();
+  const [response] = await Promise.all([
+    page.waitForResponse(
+      (r) =>
+        /^\/api\/employees\/[^/]+$/.test(new URL(r.url()).pathname) &&
+        /^(PUT|PATCH)$/.test(r.request().method()),
+      { timeout: 30_000 },
+    ),
+    employee.saveChanges(),
+  ]);
+  expect(response.ok(), `move "${fullName}" to ${other}`).toBe(true);
+  await employee.expectUpdatedSuccessfully();
+  return ((await response.json()) as { departmentName: string }).departmentName;
+}
