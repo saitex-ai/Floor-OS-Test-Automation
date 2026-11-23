@@ -154,10 +154,12 @@ test.describe('Fabric Mill Smoke', () => {
   });
 
   test.describe('Weaving', () => {
-    test('SM-MILL-08: Weaving loads with the Weaving order, Warp beam and Weft yarn input cards', async () => {
+    test('SM-MILL-08: Weaving loads with the Loom, Warp beam and Weft yarn input cards', async () => {
       const l = weavingPage.locators;
       await weavingPage.openViaNav();
-      // Mill CR round (2026-10): tabs are Consume inputs / Orders / Production.
+      // Tabs are Consume inputs / Orders / Production. Redesigned on dev
+      // (2026-11): the "Weaving order" card is gone and the loom scan box now
+      // sits in the Loom card.
       await expect(l.consumeInputsTab).toHaveAttribute('aria-selected', 'true');
       await expect(l.ordersTab).toBeVisible();
       await expect(l.productionTab).toBeVisible();
@@ -165,7 +167,7 @@ test.describe('Fabric Mill Smoke', () => {
       if (await l.noOpenOrders.isVisible()) {
         test.skip(true, 'No open weaving order on dev, so the input cards do not render');
       }
-      await expect(l.weavingOrderCard).toBeVisible();
+      await expect(l.loomCard).toBeVisible();
       await expect(l.weftYarnCard).toBeVisible();
       await expect(l.scanLoomInput).toBeVisible();
     });
@@ -184,15 +186,16 @@ test.describe('Fabric Mill Smoke', () => {
     test('SM-MILL-10: Record Output asks for the loom before an output length can be entered', async () => {
       const l = weavingPage.locators;
       await weavingPage.openViaNav();
-      // Mill CR round (2026-10): greige output is recorded from the Orders
-      // tab's "Record Output" popup — scan the loom first, then the length
-      // field opens (WV-01-01). No loom is scanned here, so nothing is saved.
-      await weavingPage.selectTab(l.ordersTab);
+      // Greige output is recorded from the "Record Output" popup — scan the
+      // loom first, then the length field opens (WV-01-01). Redesigned on dev
+      // (2026-11): the button moved from the Orders tab to the Production tab.
+      // No loom is scanned here, so nothing is saved.
+      await weavingPage.selectTab(l.productionTab);
       await l.recordOutputButton.click();
       await expect(l.recordOutputDialog).toBeVisible();
-      await expect(l.scanLoomInput).toBeVisible();
+      await expect(l.recordOutputScanLoomInput).toBeVisible();
       await expect(l.outputLengthInput).toHaveCount(0);
-      await l.recordOutputDialog.getByRole('button', { name: 'Close' }).click();
+      await l.recordOutputCloseButton.click();
       await expect(l.recordOutputDialog).toBeHidden();
     });
   });

@@ -3,9 +3,9 @@ import { MillScreenPage } from './mill-screen.page';
 import { WeavingLocators } from '../../locators/mill/weaving.locators';
 
 /**
- * Weaving production screen (/mill/weaving) — Consume inputs, Record
- * output, Orders. Owned by the Fabric Mill QA. Element locators live in
- * WeavingLocators (`this.locators`).
+ * Weaving production screen (/mill/weaving) — Consume inputs, Orders,
+ * Production (with the Record Output popup). Owned by the Fabric Mill QA.
+ * Element locators live in WeavingLocators (`this.locators`).
  */
 export class WeavingPage extends MillScreenPage {
   protected readonly subPath = '/weaving';

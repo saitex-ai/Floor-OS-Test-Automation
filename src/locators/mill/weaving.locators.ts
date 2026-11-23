@@ -8,26 +8,30 @@ import { type Locator, type Page } from '@playwright/test';
 export class WeavingLocators {
   readonly heading: Locator;
 
-  // Tabs (mill CR round, 2026-10: Consume inputs / Orders / Production —
-  // the old "Record output" tab became a "Record Output" button on Orders)
+  // Tabs: Consume inputs / Orders / Production. Redesigned on dev (2026-11):
+  // Orders is now an orders table with its own All / Fulfilled / Running /
+  // Open status tabs, and the "Record Output" button moved to Production.
   readonly consumeInputsTab: Locator;
   readonly ordersTab: Locator;
   readonly productionTab: Locator;
 
-  // Consume inputs tab
+  // Consume inputs tab: Loom, Warp beam and Weft yarn cards (the "Weaving
+  // order" card is gone; the loom scan box now sits in the Loom card).
   readonly noOpenOrders: Locator;
-  readonly weavingOrderCard: Locator;
+  readonly loomCard: Locator;
   readonly warpBeamCard: Locator;
   readonly weftYarnCard: Locator;
   readonly scanLoomInput: Locator;
   readonly conesToConsumeInput: Locator;
   readonly scanWeftYarnInput: Locator;
 
-  // Orders tab → "Record Output" popup: the loom is scanned first, and only
-  // then does the output length field open (WV-01-01).
+  // Production tab → "Record Output" popup: the loom is scanned first, and
+  // only then does the output length field open (WV-01-01).
   readonly recordOutputButton: Locator;
   readonly recordOutputDialog: Locator;
+  readonly recordOutputScanLoomInput: Locator;
   readonly outputLengthInput: Locator;
+  readonly recordOutputCloseButton: Locator;
 
   constructor(page: Page) {
     this.heading = page.getByRole('heading', { level: 1, name: 'Weaving' });
@@ -37,7 +41,7 @@ export class WeavingLocators {
     this.productionTab = page.getByRole('tab', { name: /^Production/ });
 
     this.noOpenOrders = page.getByText('No open orders');
-    this.weavingOrderCard = page.getByRole('heading', { name: 'Weaving order' });
+    this.loomCard = page.getByRole('heading', { name: 'Loom', exact: true });
     this.warpBeamCard = page.getByRole('heading', { name: 'Warp beam' });
     this.weftYarnCard = page.getByRole('heading', { name: 'Weft yarn' });
     this.scanLoomInput = page.getByLabel('Scan the loom');
@@ -46,6 +50,8 @@ export class WeavingLocators {
 
     this.recordOutputButton = page.getByRole('button', { name: 'Record Output' });
     this.recordOutputDialog = page.getByRole('dialog', { name: 'Record Output' });
+    this.recordOutputScanLoomInput = this.recordOutputDialog.getByLabel('Scan the loom');
     this.outputLengthInput = this.recordOutputDialog.getByLabel(/Output length/i);
+    this.recordOutputCloseButton = this.recordOutputDialog.getByRole('button', { name: 'Close' });
   }
 }
