@@ -19,7 +19,7 @@ export class OperationFormLocators {
   readonly stepTakenMessage: Locator;
 
   constructor(private readonly page: Page) {
-    this.stepTitle = page.getByText('STEP 2 OF 2 · OPERATIONS');
+    this.stepTitle = page.getByText(/STEP 2 OF 2 · OPERATIONS( AND ACTIVITIES)?/);
     this.cancelButton = page.getByRole('button', { name: 'Cancel', exact: true }).last();
     this.stepTakenMessage = page.getByText(/Step \d+ is already used in this recipe|already used/i);
   }
@@ -32,8 +32,9 @@ export class OperationFormLocators {
     return this.combobox(row, 'Master operation');
   }
 
+  /** "Name" since the November builds (was "Operation"). */
   operation(row: Scope): Locator {
-    return this.textbox(row, 'Operation');
+    return row.getByRole('textbox', { name: /^(Name|Operation)$/ });
   }
 
   machineType(row: Scope): Locator {

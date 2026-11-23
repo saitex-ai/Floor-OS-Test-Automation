@@ -1,6 +1,7 @@
 import * as allure from 'allure-js-commons';
 import { test, expect } from './support/approvals.fixtures';
 import { ApprovalPoliciesPage } from '../../../src/pages/planning/approval-policies.page';
+import { RecipeDetailPage } from '../../../src/pages/planning/recipe-detail.page';
 import { ApprovalPanelPage } from '../../../src/pages/planning/approval-panel.page';
 import { ApprovalsInboxPage } from '../../../src/pages/planning/approvals-inbox.page';
 import { ApprovalRequestPage } from '../../../src/pages/planning/approval-request.page';
@@ -1208,6 +1209,8 @@ test.describe('Planning - Generic Approval Workflow', () => {
       // alice decides it at once, as an Approvals admin if she isn't on it.
       const recipe = await createRecipe(page);
       await addOperation(page, { step: '10', name: 'QA-AUTO approval op', cycleTime: '30' });
+      // Operations are added on step 2 of Edit recipe; Done returns to the detail page.
+      await new RecipeDetailPage(page).finishEditing();
       const request = await approvalPanelPage.trySendForApproval();
       test.skip(!request, 'No planning · recipe approval policy is active on this environment.');
       await approvalPanelPage.reload();
