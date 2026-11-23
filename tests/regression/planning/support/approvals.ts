@@ -10,6 +10,8 @@ import {
   type PolicyChanges,
   type PolicySpec,
 } from '../../../../src/pages/planning/approval-policy-form.page';
+import { RecipesListPage } from '../../../../src/pages/planning/recipes-list.page';
+import { RecipeFormPage } from '../../../../src/pages/planning/recipe-form.page';
 import { ApprovalPanelPage } from '../../../../src/pages/planning/approval-panel.page';
 import { setupPage, uniqueTag } from './test-data';
 
@@ -246,4 +248,22 @@ async function cleanUp(browser: Browser): Promise<void> {
     await page.close();
     if (done.length) console.log(`QA-AUTO cleanup (generic-approval): ${done.join(', ')}`);
   }
+}
+
+/**
+ * Whether the environment has the "Cutting" department the shared recipe
+ * helper creates recipes under (uat has only Sewing, and no CUT-BULK activity).
+ */
+export async function cuttingRecipeSeedAvailable(page: Page): Promise<boolean> {
+  const list = new RecipesListPage(page);
+  const form = new RecipeFormPage(page);
+  await list.open();
+  await list.expectLoadedOrEmpty();
+  await list.openNew();
+  await form.locators.owningDepartment.click();
+  const options = page.getByRole('option');
+  await expect(options.first()).toBeVisible({ timeout: 30_000 });
+  const found = (await options.allInnerTexts()).some((t) => t.trim() === 'Cutting');
+  await page.keyboard.press('Escape');
+  return found;
 }

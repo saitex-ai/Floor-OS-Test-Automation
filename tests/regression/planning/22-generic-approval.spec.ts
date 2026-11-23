@@ -32,6 +32,7 @@ import {
   gaName,
   policyName,
   sendFresh,
+  cuttingRecipeSeedAvailable,
   sendUnder,
 } from './support/approvals';
 
@@ -1207,6 +1208,10 @@ test.describe('Planning - Generic Approval Workflow', () => {
       // The recipe goes through the environment's own planning · recipe policy
       // (dev: "Recipe approvals", priority 0 — not this suite's, never edited);
       // alice decides it at once, as an Approvals admin if she isn't on it.
+      test.skip(
+        !(await cuttingRecipeSeedAvailable(page)),
+        'The recipe helper needs the Cutting department and the CUT-BULK activity; this environment has neither (uat: Sewing only).',
+      );
       const recipe = await createRecipe(page);
       await addOperation(page, { step: '10', name: 'QA-AUTO approval op', cycleTime: '30' });
       // Operations are added on step 2 of Edit recipe; Done returns to the detail page.

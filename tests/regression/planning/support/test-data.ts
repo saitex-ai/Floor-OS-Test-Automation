@@ -268,7 +268,7 @@ export async function createRecipe(page: Page, overrides: RecipeFieldValues = {}
   const list = new RecipesListPage(page);
   const form = new RecipeFormPage(page);
   await list.open();
-  await list.expectLoaded();
+  await list.expectLoadedOrEmpty();
   await list.openNew();
   await form.expectOnCreatePage();
   await form.fillAllRequired(name, overrides);
