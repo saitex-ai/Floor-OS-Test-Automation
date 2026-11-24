@@ -1347,6 +1347,16 @@ test.describe('Planning - Transition rules', () => {
     transitionRuleEditorPage: editor,
   }) => {
     await allure.tms(cu('z941aby4em'), 'TC-LTR-02 (ClickUp)');
+    // Open bug z941ac2eh1 (intermittent on dev): while the list loads the cards read the raw keys
+    // repeat/similar/new_variant/new_product, and on dev the list sometimes stays loading for
+    // 2+ minutes. Not knownBug(): it fails only some runs (5 of 16), so test.fail() would turn
+    // every passing run into an "unexpected pass". The case keeps asserting the correct labels;
+    // a red run on the raw keys is this bug (the full-page screenshot is attached below).
+    await allure.tms(cu('z941ac2eh1'), 'Bug z941ac2eh1 (ClickUp)');
+    test.info().annotations.push({
+      type: 'issue',
+      description: 'https://app.clickup.com/t/z941ac2eh1',
+    });
     const expectCardsMatchActiveRows = async () => {
       await expect(async () => {
         await list.open();
