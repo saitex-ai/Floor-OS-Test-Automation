@@ -872,11 +872,7 @@ export class TransitionRuleEditorPage extends BasePage {
   }
 
   async expectActiveHint(): Promise<void> {
-    await expect(
-      this.l.main.getByRole('button', {
-        name: 'Inactive rules stop matching. Blocks already on them keep their ramp.',
-      }),
-    ).toBeVisible();
+    await expect(this.l.activeHint).toBeVisible();
   }
 
   async expectDeactivateAvailable(available: boolean): Promise<void> {

@@ -34,6 +34,10 @@ export class TransitionRulesListLocators {
   readonly bulkDeactivateButton: Locator;
   readonly bulkActivateButton: Locator;
   readonly duplicateAction: Locator;
+  /** A row's right-click menu. */
+  readonly rowMenu: Locator;
+  /** The split views' preview pane (the page's main area). */
+  readonly previewPane: Locator;
   /** The split views' "N records" count (the List view has a table instead). */
   readonly splitRecords: Locator;
   /** The Master Data hub's Transition rules tile. */
@@ -61,6 +65,8 @@ export class TransitionRulesListLocators {
     this.duplicateAction = page
       .getByRole('menuitem', { name: /^Duplicate/ })
       .or(page.getByRole('button', { name: /^Duplicate/ }));
+    this.rowMenu = page.getByRole('menu');
+    this.previewPane = page.getByRole('main').last();
     this.splitRecords = page.getByText(/^\d+ records?$/);
     this.hubTile = page.getByRole('link', { name: /^Transition rules/ });
   }
@@ -183,6 +189,7 @@ export class TransitionRuleEditorLocators {
   readonly createButton: Locator;
   readonly saveButton: Locator;
   readonly deactivateButton: Locator;
+  readonly activeHint: Locator;
 
   // Applies when
   readonly addConditionButton: Locator;
@@ -278,6 +285,9 @@ export class TransitionRuleEditorLocators {
     this.createButton = this.main.getByRole('button', { name: 'Create', exact: true });
     this.saveButton = this.main.getByRole('button', { name: 'Save', exact: true });
     this.deactivateButton = this.main.getByRole('button', { name: 'Deactivate', exact: true });
+    this.activeHint = this.main.getByRole('button', {
+      name: 'Inactive rules stop matching. Blocks already on them keep their ramp.',
+    });
 
     this.addConditionButton = this.main.getByRole('button', { name: '+ Add condition' });
     this.removeConditionButtons = this.main.getByRole('button', { name: 'Remove condition' });

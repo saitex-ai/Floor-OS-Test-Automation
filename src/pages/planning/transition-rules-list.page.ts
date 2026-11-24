@@ -104,7 +104,12 @@ export class TransitionRulesListPage extends MasterDataListPage {
         .catch(() => null),
       this.grid.searchInput.fill(term),
     ]);
-    if (!response) return;
+    if (!response) {
+      // No request: the page served this search from its cache. Don't judge the old grid:
+      // wait for the network to settle, then the caller's own row check decides.
+      await this.page.waitForLoadState('networkidle');
+      return;
+    }
     const { items } = (await response.json()) as { items: { code: string }[] };
     if (!items.length) {
       await expect(this.l.noMatchState).toBeVisible({ timeout: WAIT.SERVER });
@@ -287,7 +292,7 @@ export class TransitionRulesListPage extends MasterDataListPage {
 
   /** The preview pane (main, beside the cards) holds `text`. */
   async expectPreviewShows(text: string | RegExp): Promise<void> {
-    await expect(this.page.getByRole('main').last()).toContainText(text);
+    await expect(this.l.previewPane).toContainText(text);
   }
 
   async expectEmptyState(): Promise<void> {
@@ -342,10 +347,9 @@ export class TransitionRulesListPage extends MasterDataListPage {
   /** Whether the list offers a Duplicate action on a row (right-click menu or row action). */
   async hasDuplicateAction(code: string): Promise<boolean> {
     await this.ruleRow(code).click({ button: 'right' });
-    const offered = await this.l.duplicateAction
-      .first()
-      .isVisible()
-      .catch(() => false);
+    // Wait for the menu to open first: a menu that opens late must not read as "no Duplicate".
+    await expect(this.l.rowMenu).toBeVisible({ timeout: WAIT.SERVER });
+    const offered = (await this.l.duplicateAction.count()) > 0;
     await this.page.keyboard.press('Escape');
     return offered;
   }

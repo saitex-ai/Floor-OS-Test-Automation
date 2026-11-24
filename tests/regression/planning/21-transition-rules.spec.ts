@@ -173,7 +173,7 @@ test.describe('Planning - Transition rules', () => {
     });
   });
 
-  test('TC-CTR-03 Code is required and forced to `[A-Z0-9-]` as you type', async ({
+  test('TC-CTR-03 Code is assigned automatically (TR-nnnn) and cannot be typed', async ({
     transitionRuleEditorPage: editor,
     transitionRuleViewPage: view,
   }) => {
@@ -190,7 +190,7 @@ test.describe('Planning - Transition rules', () => {
     await editor.expectCodeGenerated(full.code);
   });
 
-  test('TC-CTR-04 Code must be unique', async () => {
+  test('TC-CTR-04 Each new rule gets its own auto-generated code', async () => {
     await allure.tms(cu('z941aby4cv'), 'TC-CTR-04 (ClickUp)');
     // The code is generated on save, so a duplicate can't be entered: each
     // new rule gets its own code (this worker's three beforeAll rules).
@@ -700,8 +700,10 @@ test.describe('Planning - Transition rules', () => {
       await editorForCentre.openNew();
       await editorForCentre.chooseOneCentre();
       const centres = await editorForCentre.scopeOptions();
-      // Prefer a test centre, so a real line's planning is untouched.
-      const centre = centres.find((c) => /QA-AUTO|Playwright/.test(c)) ?? centres[0]!;
+      // Only a test centre: never attach a rule to a real sewing line.
+      const centre = centres.find((c) => /QA-AUTO|Playwright/.test(c));
+      test.skip(!centre, 'No QA-AUTO/Playwright sewing-line centre on this environment');
+      if (!centre) return;
       await fillNewRule(page, { centre });
       const rule = await editor.create();
       trackRule(rule);
@@ -895,7 +897,7 @@ test.describe('Planning - Transition rules', () => {
     await list.expectSingleRow(rule.code);
   });
 
-  test('TC-ETR-05 The code can be renamed, and references to the rule survive', async ({
+  test('TC-ETR-05 The code stays locked on Edit and survives a save', async ({
     page,
     transitionRuleEditorPage: editor,
     transitionRuleViewPage: view,
@@ -927,6 +929,7 @@ test.describe('Planning - Transition rules', () => {
     // 0 min with no activity (the old values aren't kept).
     const editorForRule = await fillNewRule(page, { changeover: [3, 0], curve: {} });
     const activities = await editorForRule.activityOptions();
+    test.skip(activities.length < 2, 'No activity beyond "None" is offered on this environment');
     await editorForRule.setActivity(activities[1]!);
     const rule = await editorForRule.create();
     trackRule(rule);
@@ -1329,14 +1332,9 @@ test.describe('Planning - Transition rules', () => {
     personas,
   }) => {
     await allure.tms(cu('z941aby4ek'), 'TC-LTR-01 (ClickUp)');
+    test.skip(!personaCredentials('NOACCESS'), personaSkipReason('NOACCESS'));
     await list.openFromHub();
     await list.expectHeader();
-    if (!personaCredentials('NOACCESS')) {
-      test
-        .info()
-        .annotations.push({ type: 'skipped step', description: personaSkipReason('NOACCESS') });
-      return;
-    }
     await asPersona(personas, 'NOACCESS', async (page) => {
       await new TransitionRulesListPage(page).expectNoAccess();
     });
@@ -1586,7 +1584,7 @@ test.describe('Planning - Transition rules', () => {
     await list.expectRule(bare.code);
   });
 
-  test('TC-LTR-10 The Duplicate row action copies the whole rule into a new one', async ({
+  test('TC-LTR-10 The list offers no Duplicate row action', async ({
     transitionRulesListPage: list,
   }) => {
     await allure.tms(cu('z941aby4ew'), 'TC-LTR-10 (ClickUp)');
