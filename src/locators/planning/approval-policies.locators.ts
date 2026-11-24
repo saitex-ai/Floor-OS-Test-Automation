@@ -19,8 +19,11 @@ export class ApprovalPoliciesLocators {
   /** The Approvals app's side navigation. */
   readonly inboxNavLink: Locator;
   readonly policiesNavLink: Locator;
+  /** The split view's detail "Edit" button. */
+  readonly editButton: Locator;
 
-  constructor(page: Page) {
+  constructor(private readonly page: Page) {
+    this.editButton = page.getByRole('button', { name: 'Edit', exact: true });
     this.heading = page.getByRole('heading', { name: 'Policies', exact: true });
     this.subtitle = page.getByText(
       'Which chain a record goes through, per app and entity type. A policy is chosen at submit time and frozen onto the request, so editing one never changes a review already under way.',
@@ -33,9 +36,18 @@ export class ApprovalPoliciesLocators {
     this.inboxNavLink = nav.getByRole('link', { name: 'Inbox', exact: true });
     this.policiesNavLink = nav.getByRole('link', { name: 'Policies', exact: true });
   }
+
+  /** An option of an open cell-filter dropdown. */
+  filterOption(name: string): Locator {
+    return this.page.getByRole('option', { name, exact: true });
+  }
+
+  /** The open cell-filter dropdown's options. */
+  filterOptions(): Locator {
+    return this.page.getByRole('listbox').last().getByRole('option');
+  }
 }
 
-/** The New / Edit policy form. */
 export class ApprovalPolicyFormLocators {
   readonly newHeading: Locator;
   readonly editHeading: Locator;
@@ -81,8 +93,11 @@ export class ApprovalPolicyFormLocators {
   readonly cancelButton: Locator;
   readonly saveButton: Locator;
   readonly suggestions: Locator;
+  /** The Policies grid's heading, back on screen once the form closes. */
+  readonly policiesHeading: Locator;
 
   constructor(private readonly page: Page) {
+    this.policiesHeading = page.getByRole('heading', { name: 'Policies', exact: true });
     this.newHeading = page.getByRole('heading', { name: 'New policy', level: 1 });
     this.editHeading = page.getByRole('heading', { name: 'Edit policy', level: 1 });
     this.versionHelp = page.getByText(

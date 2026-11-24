@@ -73,7 +73,7 @@ export class ApprovalPanelPage extends BasePage {
     await expect(
       this.locators.pendingBanner
         .or(this.locators.sendForApprovalButton)
-        .or(this.page.getByText('Approval chain', { exact: true }))
+        .or(this.locators.chainLabel)
         .first(),
     ).toBeVisible({ timeout: WAIT.PAGE_LOAD });
   }
@@ -117,7 +117,7 @@ export class ApprovalPanelPage extends BasePage {
     await expect(this.locators.heading.or(this.locators.pendingBanner).first()).toBeVisible({
       timeout: WAIT.PAGE_LOAD,
     });
-    await expectAbsentOrDisabled(this.page.getByRole('button', { name: /^Save (draft|changes)$/ }));
+    await expectAbsentOrDisabled(this.locators.saveButton);
   }
 
   /** "Send for approval" with no policy in force: refused with the readable message. */
@@ -176,15 +176,15 @@ export class ApprovalPanelPage extends BasePage {
 
   /** The record's status word in its header ("Pending approval", "Draft", "Active"). */
   async expectRecordStatus(status: string): Promise<void> {
-    await expectSpacedText(this.page.getByRole('main').last(), new RegExp(`\\b${status}\\b`));
+    await expectSpacedText(this.locators.main, new RegExp(`\\b${status}\\b`));
   }
 
   async expectPanelText(text: string | RegExp): Promise<void> {
-    await expectSpacedText(this.page.getByRole('main').last(), text);
+    await expectSpacedText(this.locators.main, text);
   }
 
   async expectPanelTextLacks(text: string | RegExp): Promise<void> {
-    await expectSpacedText(this.page.getByRole('main').last(), text, { not: true });
+    await expectSpacedText(this.locators.main, text, { not: true });
   }
 
   /**

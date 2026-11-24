@@ -221,4 +221,17 @@ export class RecipeFormPage extends BasePage {
   async expectCodeTaken(): Promise<void> {
     await expect(this.locators.codeTakenMessage.first()).toBeVisible({ timeout: WAIT.SERVER });
   }
+
+  /**
+   * The departments the "Owning department" dropdown offers, by first word
+   * ("Cutting", "Sewing"); closes the dropdown again.
+   */
+  async owningDepartmentNames(): Promise<string[]> {
+    await this.locators.owningDepartment.click();
+    const options = this.locators.options();
+    await expect(options.first()).toBeVisible({ timeout: WAIT.NAVIGATION });
+    const names = (await options.allInnerTexts()).map((t) => t.trim().split(/\s|\n/)[0]!);
+    await this.page.keyboard.press('Escape');
+    return names;
+  }
 }

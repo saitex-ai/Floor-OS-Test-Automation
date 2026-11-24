@@ -26,6 +26,11 @@ export class ApprovalPanelLocators {
   readonly requestStatus: Locator;
   /** "Approval chain L1 · QA L1 Reviewing Carol Pending → L2 · …" */
   readonly chain: Locator;
+  readonly chainLabel: Locator;
+  /** The record's own save button ("Save draft" / "Save changes") on its edit page. */
+  readonly saveButton: Locator;
+  /** The record page's main area, read whole with spacedText(). */
+  readonly main: Locator;
   readonly noPolicyToast: Locator;
   readonly backToApproval: Locator;
   readonly dialog: Locator;
@@ -62,7 +67,10 @@ export class ApprovalPanelLocators {
       .filter({ has: page.getByText(/^APR-\d{4}-\d{6}$/) })
       .last();
     // The "Approval chain" label's parent: the label, then one box per level.
-    this.chain = page.getByText('Approval chain', { exact: true }).locator('..');
+    this.chainLabel = page.getByText('Approval chain', { exact: true });
+    this.chain = this.chainLabel.locator('..');
+    this.saveButton = page.getByRole('button', { name: /^Save (draft|changes)$/ });
+    this.main = page.getByRole('main').last();
     this.noPolicyToast = page.getByText(/^No approval policy is set up for \w+ yet\./);
     this.backToApproval = page.getByRole('link', { name: 'Back to approval' });
     this.dialog = page.getByRole('dialog').first();

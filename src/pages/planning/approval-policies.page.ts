@@ -94,13 +94,13 @@ export class ApprovalPoliciesPage extends MasterDataListPage {
   /** A dropdown cell filter ("Filter Status" …): picks `value` ("All Status" clears it). */
   async filterColumnBy(column: string, value: string): Promise<void> {
     await this.grid.table.getByRole('combobox', { name: `Filter ${column}`, exact: true }).click();
-    await this.page.getByRole('option', { name: value, exact: true }).click();
+    await this.locators.filterOption(value).click();
   }
 
   /** The options a dropdown cell filter offers. */
   async columnFilterOptions(column: string): Promise<string[]> {
     await this.grid.table.getByRole('combobox', { name: `Filter ${column}`, exact: true }).click();
-    const options = this.page.getByRole('listbox').last().getByRole('option');
+    const options = this.locators.filterOptions();
     await expect(options.first()).toBeVisible();
     const texts = (await options.allInnerTexts()).map((t) => t.trim());
     await this.page.keyboard.press('Escape');
@@ -152,7 +152,7 @@ export class ApprovalPoliciesPage extends MasterDataListPage {
    * selected policy's detail, which offers Edit and Deactivate / Activate.
    */
   async expectSplitDetail(): Promise<void> {
-    await expect(this.page.getByRole('button', { name: 'Edit', exact: true })).toBeVisible({
+    await expect(this.locators.editButton).toBeVisible({
       timeout: WAIT.SERVER,
     });
     await expect(this.grid.showingText).toBeVisible();

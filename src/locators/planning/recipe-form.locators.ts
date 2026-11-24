@@ -81,4 +81,9 @@ export class RecipeFormLocators {
   combobox(name: string): Locator {
     return this.page.getByRole('combobox', { name, exact: true });
   }
+
+  /** Every option of the open dropdown. */
+  options(): Locator {
+    return this.page.getByRole('option');
+  }
 }

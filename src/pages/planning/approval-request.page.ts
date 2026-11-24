@@ -32,7 +32,7 @@ export class ApprovalRequestPage extends BasePage {
     await expect(this.page).toHaveURL(/\/approvals\/requests\/[\w-]+$/, {
       timeout: WAIT.NAVIGATION,
     });
-    await expect(this.page.getByRole('heading', { name: code, level: 1 })).toBeVisible({
+    await expect(this.locators.codeHeading(code)).toBeVisible({
       timeout: WAIT.PAGE_LOAD,
     });
     await expect(this.locators.historyHeading).toBeVisible({ timeout: WAIT.PAGE_LOAD });
@@ -106,6 +106,6 @@ export class ApprovalRequestPage extends BasePage {
   /** No decision or withdraw buttons on the request page. */
   async expectNoActions(): Promise<void> {
     for (const name of ['Approve', 'Approve and add levels', 'Reject', 'Withdraw'])
-      await expect(this.page.getByRole('button', { name, exact: true })).toHaveCount(0);
+      await expect(this.locators.actionButton(name)).toHaveCount(0);
   }
 }

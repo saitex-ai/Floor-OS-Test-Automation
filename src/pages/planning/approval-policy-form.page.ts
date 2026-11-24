@@ -85,7 +85,7 @@ export class ApprovalPolicyFormPage extends BasePage {
 
   async expectClosed(): Promise<void> {
     await expect(this.locators.saveButton).toBeHidden({ timeout: WAIT.NAVIGATION });
-    await expect(this.page.getByRole('heading', { name: 'Policies', exact: true })).toBeVisible();
+    await expect(this.locators.policiesHeading).toBeVisible();
   }
 
   // ── Fields ────────────────────────────────────────────────────────────

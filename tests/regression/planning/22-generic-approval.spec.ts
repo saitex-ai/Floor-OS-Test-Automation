@@ -1212,7 +1212,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
         !(await cuttingRecipeSeedAvailable(page)),
         'The recipe helper needs the Cutting department and the CUT-BULK activity; this environment has neither (uat: Sewing only).',
       );
-      const recipe = await createRecipe(page);
+      await createRecipe(page);
       await addOperation(page, { step: '10', name: 'QA-AUTO approval op', cycleTime: '30' });
       // Operations are added on step 2 of Edit recipe; Done returns to the detail page.
       await new RecipeDetailPage(page).finishEditing();
@@ -1228,10 +1228,8 @@ test.describe('Planning - Generic Approval Workflow', () => {
       // user ID. Marked after the parts that work.
       knownBug('z941abyqjm');
       await approvalPanelPage.expectPanelText(`Approved by ${ALICE}`);
-      expect(
-        await page.getByRole('main').last().innerText(),
-        `${recipe}: no raw user ID after "Approved by"`,
-      ).not.toMatch(/Approved by [0-9a-f]{8}-[0-9a-f]{4}-/);
+      // No raw user ID (a UUID) after "Approved by" anywhere on the recipe's page.
+      await approvalPanelPage.expectPanelTextLacks(/Approved by [0-9a-f]{8}-[0-9a-f]{4}-/);
     });
 
     test('TC-XAP-06 Reject ends the request and records the reason', async ({

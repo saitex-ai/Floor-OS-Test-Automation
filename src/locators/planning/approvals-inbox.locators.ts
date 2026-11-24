@@ -29,6 +29,18 @@ export class ApprovalsInboxLocators {
   moreTabItem(name: string): Locator {
     return this.page.getByRole('menuitem', { name: new RegExp(`^${escapeRegExp(name)}( \\d+)?$`) });
   }
+
+  /** An option of the open rule-builder dropdown; with no name, every option. */
+  option(name?: string): Locator {
+    return name
+      ? this.page.getByRole('option', { name, exact: true })
+      : this.page.getByRole('option');
+  }
+
+  /** The Filters panel's "Apply filters" button. */
+  applyFiltersButton(): Locator {
+    return this.page.getByRole('button', { name: 'Apply filters', exact: true });
+  }
 }
 
 /** A request's page. */
@@ -44,7 +56,7 @@ export class ApprovalRequestLocators {
   readonly subject: Locator;
   readonly main: Locator;
 
-  constructor(page: Page) {
+  constructor(private readonly page: Page) {
     this.main = page.getByRole('main').last();
     this.backToInbox = page.getByRole('link', { name: 'Back to inbox' });
     this.openRecord = page.getByRole('link', { name: 'Open the record' });
@@ -57,5 +69,15 @@ export class ApprovalRequestLocators {
       .filter({ has: page.getByText(/^Policy: .+ \(v\d+\)$/) })
       .last();
     this.subject = page.getByRole('heading', { level: 3 }).first();
+  }
+
+  /** The request's own heading, its code ("APR-2026-000057"). */
+  codeHeading(code: string): Locator {
+    return this.page.getByRole('heading', { name: code, level: 1 });
+  }
+
+  /** A decision or withdraw button, by its exact name. */
+  actionButton(name: string): Locator {
+    return this.page.getByRole('button', { name, exact: true });
   }
 }
