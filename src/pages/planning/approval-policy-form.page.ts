@@ -91,8 +91,15 @@ export class ApprovalPolicyFormPage extends BasePage {
   // ── Fields ────────────────────────────────────────────────────────────
 
   private async select(field: Locator, option: string): Promise<void> {
-    await field.click();
-    await this.locators.option(option).click();
+    const choice = this.locators.option(option);
+    // The popover sometimes doesn't open on dev under parallel workers (CAP-13,
+    // 2026-11-25): open it again until the option shows, never click blind.
+    await expect(async () => {
+      if (!(await choice.isVisible()) && (await field.getAttribute('aria-expanded')) !== 'true')
+        await field.click();
+      await expect(choice).toBeVisible({ timeout: WAIT.SERVER });
+    }).toPass({ timeout: WAIT.NAVIGATION });
+    await choice.click();
     await expect(field).toContainText(option);
   }
 
