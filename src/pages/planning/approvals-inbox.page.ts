@@ -174,4 +174,20 @@ export class ApprovalsInboxPage extends MasterDataListPage {
     for (let i = 1; i < dates.length; i += 1)
       expect(dates[i]!, 'newest first').toBeLessThanOrEqual(dates[i - 1]!);
   }
+
+  /**
+   * Decided requests (Approved / Rejected) on the open tab show a dash for Due. The tab
+   * also lists requests still pending a later level that this user already approved, so
+   * only decided rows count. Re-read until the grid settles: rows re-render between reads.
+   */
+  async expectDecidedRowsHaveNoDue(): Promise<void> {
+    await expect(async () => {
+      const status = await this.columnValues('Status');
+      const due = await this.columnValues('Due');
+      const timed = due.filter(
+        (d, i) => d && d !== '—' && /^(Approved|Rejected)/.test(status[i] ?? ''),
+      );
+      expect(timed, 'decided requests with a Due time').toEqual([]);
+    }).toPass({ timeout: WAIT.SERVER });
+  }
 }

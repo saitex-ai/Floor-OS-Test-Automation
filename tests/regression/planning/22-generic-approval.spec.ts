@@ -194,7 +194,10 @@ test.describe('Planning - Generic Approval Workflow', () => {
       await approvalPoliciesPage.expectEveryRowHas('Status', 'Inactive');
       await approvalPoliciesPage.filterColumn('Applies to', '');
       await approvalPoliciesPage.filterColumnBy('Status', 'All Status');
-      await expect.poll(async () => (await approvalPoliciesPage.showing()).total).toBe(all);
+      // Policies are only ever added (never deleted) while other workers create theirs.
+      await expect
+        .poll(async () => (await approvalPoliciesPage.showing()).total)
+        .toBeGreaterThanOrEqual(all);
     });
 
     test('TC-LAP-06 Sortable columns sort the policies', async ({ approvalPoliciesPage }) => {
@@ -277,7 +280,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
       await approvalPoliciesPage.expectLoaded();
       await expect(approvalPoliciesPage.grid.rowsPerPage).toContainText('25');
       const { from, to, total } = await approvalPoliciesPage.showing();
-      expect(from).toBe(1);
+      expect(from).toBe(total === 0 ? 0 : 1); // an empty grid (uat before any suite runs) shows 0-0 of 0
       expect(to).toBe(Math.min(25, total));
       if (total <= 25) await expect(approvalPoliciesPage.grid.nextPageButton).toBeDisabled();
       else await expect(approvalPoliciesPage.grid.nextPageButton).toBeEnabled();
@@ -392,7 +395,8 @@ test.describe('Planning - Generic Approval Workflow', () => {
         await approvalPolicyFormPage.expectWhoPlaceholder('Select a permission…');
         const roles = await approvalPolicyFormPage.whoSuggestions();
         expect(roles.length).toBeGreaterThan(0);
-        for (const role of roles) expect(role).toMatch(/^\S+ — .+/);
+        // "<role> — <description>"; a role without a description shows just its name
+        for (const role of roles) expect(role).toMatch(/^\S+( — .+)?$/);
       });
       await test.step('A group: its own picker and the direct-members hint', async () => {
         await approvalPolicyFormPage.setApproverSource('A group');
@@ -1072,11 +1076,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
       );
       await approvalsInboxPage.clearSearch();
       await approvalsInboxPage.selectTab('Approved');
-      await expect
-        .poll(async () =>
-          (await approvalsInboxPage.columnValues('Due')).filter((d) => d && d !== '—'),
-        )
-        .toEqual([]);
+      await approvalsInboxPage.expectDecidedRowsHaveNoDue();
     });
 
     test('TC-LAR-07 Clicking a request opens its page', async ({
