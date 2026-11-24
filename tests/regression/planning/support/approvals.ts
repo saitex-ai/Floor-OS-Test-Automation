@@ -13,7 +13,15 @@ import {
 import { RecipesListPage } from '../../../../src/pages/planning/recipes-list.page';
 import { RecipeFormPage } from '../../../../src/pages/planning/recipe-form.page';
 import { ApprovalPanelPage } from '../../../../src/pages/planning/approval-panel.page';
-import { setupPage, uniqueTag } from './test-data';
+import { ShellHeaderPage } from '../../../../src/pages/shell/shell-header.page';
+import type { PersonaSessions } from '../../../../src/fixtures/planning-personas';
+import {
+  asPersona,
+  personaCredentials,
+  personaSkipReason,
+  setupPage,
+  uniqueTag,
+} from './test-data';
 
 /**
  * Test data for the Generic Approval suite (22-generic-approval.spec.ts).
@@ -26,7 +34,11 @@ import { setupPage, uniqueTag } from './test-data';
  * case needs to send its own QA-AUTO activity — then off again in the same
  * call. The suite never edits or switches a policy it didn't create.
  * Policies can't be deleted, only deactivated; afterAll checks none of this
- * worker's is left active and withdraws any request still pending.
+ * worker's is left active (and throws if one is), withdraws any request
+ * still pending. A run killed mid-send
+ * (Ctrl-C, a CI cancel, a sleeping Mac) skips all of that, so the first
+ * worker of every run also sweeps the suite's leftover active policies
+ * (sweepStrayPolicies).
  */
 export const GA_TAG = 'QA-AUTO — generic-approval test data (pw-hybrid-framework). Safe to delete.';
 
@@ -40,10 +52,76 @@ export function policyName(label: string): string {
   return gaName(`${uniqueTag('GA-P')} ${label}`);
 }
 
-/** The people the suite routes approvals to (display names, as the pickers show them). */
+/** The policies' scope: the one consumer the suite switches on (planning · activity). */
+export const APPLIES_TO = 'planning · activity';
+
+/** What every QA-AUTO policy's name carries (see gaName): a policy with this is the suite's own. */
+const GA_NAME_MARK = 'generic-approval test data';
+
+/** Splits active policy names into the suite's own (a leak) and everyone else's (real policies). */
+export function splitActivePolicies(names: string[]): { ours: string[]; others: string[] } {
+  return {
+    ours: names.filter((n) => n.includes(GA_NAME_MARK)),
+    others: names.filter((n) => !n.includes(GA_NAME_MARK)),
+  };
+}
+
+/**
+ * For the cases that need "no policy in force": fails when one of the suite's
+ * own policies is still active (a leak: cleanup did not stick), skips when a
+ * real policy is — a send would then go through and sending isn't ours to block.
+ */
+export async function skipWhenRealPolicyActive(list: ApprovalPoliciesPage): Promise<void> {
+  const { ours, others } = splitActivePolicies(await list.activePoliciesFor(APPLIES_TO));
+  expect(ours, 'a QA-AUTO policy is still ACTIVE (a leaked one): switch it off by hand').toEqual(
+    [],
+  );
+  test.skip(
+    others.length > 0,
+    `A real active ${APPLIES_TO} policy is in force (${others.join(', ')}), so a send would go through.`,
+  );
+}
+
+/** The main Planning login (an Approvals admin), as the pickers show it. */
 export const ALICE = 'Alice Planner';
-export const CAROL = 'Carol Planner';
-export const DAVE = 'Dave QCLead';
+
+/**
+ * The second approver — the READONLY persona (approval.user), whose display
+ * name is read from her user menu by resolveApprover() so no name is
+ * written into the suite. Without that login it falls back to alice, which
+ * is enough for the Policies cases that only need *an* approver; every case
+ * that needs a second person or acts as her skips with needsApprover().
+ */
+export const people = { approver: ALICE, hasApprover: false };
+
+/** beforeAll (before any case reads `people`): reads the READONLY persona's display name. */
+export async function resolveApprover(personas: PersonaSessions): Promise<void> {
+  if (!personaCredentials('READONLY')) return;
+  await asPersona(personas, 'READONLY', async (page) => {
+    const header = new ShellHeaderPage(page);
+    await header.gotoAuthenticated('/approvals');
+    // The menu reads e.g. "<initials> <name> <role> <email>", one item per line.
+    const lines = (await header.signedInUserText())
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+    const name = lines.find((l) => !/^[A-Z]{1,3}$/.test(l) && !l.includes('@'));
+    expect(
+      name,
+      `the READONLY login's display name in the user menu: ${lines.join(' | ')}`,
+    ).toBeTruthy();
+    people.approver = name!;
+    people.hasApprover = true;
+  });
+}
+
+/** How a seat in the approval chain names a person: the first name ("Alice Pending"). */
+export const seat = (displayName: string): string => displayName.split(' ')[0]!;
+
+/** Skips the running case when it needs the second approver (the READONLY persona). */
+export function needsApprover(): void {
+  test.skip(!people.hasApprover, personaSkipReason('READONLY'));
+}
 
 /**
  * Makes `make()`'s result once per test run (per `key`) and hands the same
@@ -153,33 +231,73 @@ export async function sendUnder(
   changes: PolicyChanges = {},
 ): Promise<string> {
   const panel = new ApprovalPanelPage(page);
+  let request: string;
   try {
     for (const name of policyNames) await editPolicy(page, name, { ...changes, active: true });
     await panel.open(activity.path);
-    return await panel.sendForApproval();
-  } finally {
-    await deactivate(page, policyNames);
+    request = await panel.sendForApproval();
+  } catch (error) {
+    // Off again even when the send failed. If that fails too the leak is the
+    // bigger problem: both reasons are thrown, never just warned.
+    try {
+      await deactivate(page, policyNames);
+    } catch (leak) {
+      throw new Error(
+        `${String(leak)} (the send itself failed first: ${String(error).split('\n')[0]})`,
+      );
+    }
+    throw error;
   }
+  await deactivate(page, policyNames);
+  return request;
 }
 
 /**
- * Switches the suite's policies off. Called from `finally`: a failure here
- * is logged, not thrown, so it can't hide the case's own error (afterAll
- * checks again).
+ * Switches the suite's policies off, retrying each three times (a policy left
+ * active would route other people's activity sends). Throws when one
+ * still is active afterwards.
  */
-async function deactivate(page: Page, names: string[]): Promise<void> {
+export async function deactivate(page: Page, names: string[]): Promise<void> {
+  const stuck: string[] = [];
   for (const name of names) {
-    // Retried: a policy left active would route other people's activity sends.
+    let reason = '';
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       try {
         await editPolicy(page, name, { active: false });
+        reason = '';
         break;
       } catch (error) {
-        console.warn(
-          `QA-AUTO: deactivating "${name}" failed (attempt ${attempt}/3): ${String(error).split('\n')[0]}`,
-        );
+        reason = String(error).split('\n')[0]!;
       }
     }
+    if (reason) stuck.push(`"${name}" (${reason})`);
+  }
+  if (stuck.length)
+    throw new Error(`QA-AUTO policy left ACTIVE, switch it off by hand: ${stuck.join('; ')}`);
+}
+
+/**
+ * Start of the run: switches off any active planning · activity policy the
+ * suite itself made (its name carries the QA-AUTO marker) that a killed run
+ * left on. Only the first worker of a run sweeps (an exclusive marker file,
+ * like oncePerRun's), so a later worker can't switch off a policy the
+ * running worker has on for a send. Never touches anyone else's policy.
+ */
+export async function sweepStrayPolicies(page: Page): Promise<void> {
+  const claim = path.join(os.tmpdir(), `pw-generic-approval-${process.ppid}-sweep`);
+  try {
+    if (fs.existsSync(claim) && Date.now() - fs.statSync(claim).mtimeMs > 6 * 60 * 60 * 1000)
+      fs.unlinkSync(claim);
+    fs.writeFileSync(claim, '', { flag: 'wx' });
+  } catch {
+    return; // another worker of this run already sweeps
+  }
+  const stray = splitActivePolicies(
+    await new ApprovalPoliciesPage(page).activePoliciesFor(APPLIES_TO),
+  ).ours;
+  if (stray.length) {
+    await deactivate(page, stray);
+    console.log(`QA-AUTO sweep (generic-approval): switched off leftover ${stray.join(', ')}`);
   }
 }
 
@@ -199,7 +317,8 @@ export async function sendFresh(
  * withdrawn (an Approvals admin may withdraw any), drafts are deleted, and
  * any of this worker's policies still active is switched off. Approved
  * activities can't be deleted and stay Active (they carry the QA-AUTO marker).
- * Best effort: a failure is logged, never a test failure.
+ * Every failure is collected and thrown once everything has been tried: a
+ * policy that stays on affects other people, so it must fail the run.
  */
 export function cleanUpApprovalsAfterAll(): void {
   test.afterAll(async ({ browser }) => {
@@ -212,6 +331,7 @@ async function cleanUp(browser: Browser): Promise<void> {
   const page = await setupPage(browser);
   page.setDefaultTimeout(30_000);
   const done: string[] = [];
+  const problems: string[] = [];
   try {
     for (const activity of activities.splice(0)) {
       try {
@@ -225,7 +345,7 @@ async function cleanUp(browser: Browser): Promise<void> {
           await new ActivityFormPage(page).deleteDraft();
         done.push(activity.code);
       } catch (error) {
-        console.warn(`QA-AUTO cleanup: ${activity.code}: ${String(error).split('\n')[0]}`);
+        problems.push(`${activity.code}: ${String(error).split('\n')[0]}`);
       }
     }
     const list = new ApprovalPoliciesPage(page);
@@ -237,13 +357,15 @@ async function cleanUp(browser: Browser): Promise<void> {
           done.push(`policy "${name}" deactivated`);
         }
       } catch (error) {
-        console.warn(`QA-AUTO cleanup: policy "${name}": ${String(error).split('\n')[0]}`);
+        problems.push(`policy "${name}": ${String(error).split('\n')[0]}`);
       }
     }
   } finally {
     await page.close();
     if (done.length) console.log(`QA-AUTO cleanup (generic-approval): ${done.join(', ')}`);
   }
+  if (problems.length)
+    throw new Error(`QA-AUTO cleanup (generic-approval) did not stick: ${problems.join(' | ')}`);
 }
 
 /**

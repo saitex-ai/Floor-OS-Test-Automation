@@ -18,13 +18,15 @@ export class ApprovalPanelLocators {
   readonly editButton: Locator;
   readonly deleteDraftButton: Locator;
   readonly retireButton: Locator;
+  /** Shown beside the confirming "Retire" once Retire is clicked. */
+  readonly retireCancelButton: Locator;
   /** "Waiting for approval in APR-2026-000057. It cannot be changed until the request is decided." */
   readonly pendingBanner: Locator;
   /** "Draft, returned from approval APR-…. Change it before sending it again." */
   readonly returnedBanner: Locator;
-  /** "APR-2026-000057 Pending", "APR-… Rejected by Carol Planner", "APR-… Approved by …" */
+  /** "APR-2026-000057 Pending", "APR-… Rejected by <approver>", "APR-… Approved by …" */
   readonly requestStatus: Locator;
-  /** "Approval chain L1 · QA L1 Reviewing Carol Pending → L2 · …" */
+  /** "Approval chain L1 · QA L1 Reviewing <first name> Pending → L2 · …" */
   readonly chain: Locator;
   readonly chainLabel: Locator;
   /** The record's own save button ("Save draft" / "Save changes") on its edit page. */
@@ -57,6 +59,7 @@ export class ApprovalPanelLocators {
     this.editButton = page.getByRole('button', { name: /^Edit (activity|recipe|revision)$/ });
     this.deleteDraftButton = page.getByRole('button', { name: 'Delete draft' });
     this.retireButton = page.getByRole('button', { name: 'Retire', exact: true });
+    this.retireCancelButton = page.getByRole('button', { name: 'Cancel', exact: true });
     this.pendingBanner = page.getByText(/^Waiting for approval in APR-\d{4}-\d{6}\./);
     this.returnedBanner = page.getByText(/^Draft, returned from approval APR-\d{4}-\d{6}\./);
     // The status row and the chain are rows of separate spans (code, status
@@ -94,7 +97,7 @@ export class ApprovalPanelLocators {
     this.notificationsButton = page.getByRole('button', { name: /^Notifications/ });
   }
 
-  /** A person offered by an approver picker ("Dave QCLead · dave@flooros.dev"). */
+  /** A person offered by an approver picker ("<name> · <email>"). */
   personOption(name: string): Locator {
     return this.page.getByRole('option', { name: new RegExp(`^${name}\\b`) });
   }

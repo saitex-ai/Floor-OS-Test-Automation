@@ -95,14 +95,7 @@ export class ApprovalsInboxPage extends MasterDataListPage {
 
   /** A tab with no requests has no row to check (uat holds few). */
   override async expectEveryRowMatches(term: string): Promise<void> {
-    await expect
-      .poll(
-        async () => (await this.grid.bodyRows().first().isVisible()) || (await this.gridIsEmpty()),
-        {
-          timeout: WAIT.SERVER,
-        },
-      )
-      .toBe(true);
+    await this.expectLoadedOrEmpty();
     if (await this.gridIsEmpty()) return;
     await super.expectEveryRowMatches(term);
   }

@@ -7,6 +7,7 @@ import { DifficultyGradeListPage } from '../../../../src/pages/planning/difficul
 import { DifficultyGradeFormPage } from '../../../../src/pages/planning/difficulty-grade-form.page';
 import { RecipesListPage } from '../../../../src/pages/planning/recipes-list.page';
 import { RecipeDetailPage } from '../../../../src/pages/planning/recipe-detail.page';
+import { ApprovalPanelPage } from '../../../../src/pages/planning/approval-panel.page';
 import { MachinesListPage } from '../../../../src/pages/planning/machines-list.page';
 import { MachineDetailPage } from '../../../../src/pages/planning/machine-detail.page';
 import { MachineFormPage } from '../../../../src/pages/planning/machine-form.page';
@@ -97,8 +98,20 @@ async function deleteActivityDraft(page: Page, code: string): Promise<void> {
   await new ActivityFormPage(page).deleteDraft();
 }
 
+/**
+ * A draft is deleted; a recipe that went through approval (Generic Approval's
+ * TC-XAP-05) is Active and can only be retired, which takes it out of the
+ * lists and pickers real planners use.
+ */
 async function deleteRecipeDraft(page: Page, code: string): Promise<void> {
   await openRecipe(page, code);
+  const panel = new ApprovalPanelPage(page);
+  if (await panel.canRetire()) {
+    await panel.retire();
+    await panel.reload();
+    await panel.expectRecordStatus('Retired');
+    return;
+  }
   await new RecipeDetailPage(page).deleteDraft();
 }
 

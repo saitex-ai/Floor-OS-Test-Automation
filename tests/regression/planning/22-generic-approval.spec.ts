@@ -19,8 +19,7 @@ import {
 import { cleanUpAfterAll } from './support/cleanup';
 import {
   ALICE,
-  CAROL,
-  DAVE,
+  APPLIES_TO,
   GA_TAG,
   type CreatedActivity,
   cleanUpApprovalsAfterAll,
@@ -28,11 +27,18 @@ import {
   oncePerRun,
   watchPolicies,
   createPolicy,
+  deactivate,
   editPolicy,
   gaName,
   policyName,
   sendFresh,
   cuttingRecipeSeedAvailable,
+  needsApprover,
+  seat,
+  people,
+  resolveApprover,
+  skipWhenRealPolicyActive,
+  sweepStrayPolicies,
   sendUnder,
 } from './support/approvals';
 
@@ -49,12 +55,11 @@ import {
  *
  * Policies are shared state. Every policy this file touches is its own,
  * created inactive, and switched on only around its own sends
- * (support/approvals.ts). alice (Approvals admin) sends; carol (the
- * READONLY persona, approval.user) approves.
+ * (support/approvals.ts). alice (Approvals admin) sends; the
+ * READONLY persona (approval.user) is the second approver.
  */
 const cu = (id: string) => `https://app.clickup.com/t/${id}`;
 
-const APPLIES_TO = 'planning · activity';
 const READONLY_SKIP = personaSkipReason('READONLY');
 
 test.describe('Planning - Generic Approval Workflow', () => {
@@ -62,6 +67,20 @@ test.describe('Planning - Generic Approval Workflow', () => {
   // the regression suite's usual cleanup (the XAP-05 recipe).
   cleanUpApprovalsAfterAll();
   cleanUpAfterAll();
+
+  // Before any group's own beforeAll: the second approver's name (read from the
+  // READONLY login's user menu) and, once per run, the sweep of a killed run's
+  // leftover QA-AUTO policies.
+  test.beforeAll(async ({ browser, personas }) => {
+    test.setTimeout(600_000);
+    await resolveApprover(personas);
+    const page = await setupPage(browser);
+    try {
+      await sweepStrayPolicies(page);
+    } finally {
+      await page.close();
+    }
+  });
 
   test.beforeEach(async () => {
     // Cases create their own QA-AUTO policies and activities through the UI.
@@ -74,7 +93,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
   // ── Policies (inactive QA-AUTO policies only; runs in parallel) ─────────
 
   test.describe('Policies', () => {
-    /** A one-level policy (L1 "QA review" = Carol), inactive: this worker's fixture. */
+    /** A one-level policy (L1 "QA review" = the second approver), inactive: this worker's fixture. */
     let policyA = '';
 
     test.beforeAll(async ({ browser }) => {
@@ -84,7 +103,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
         const page = await setupPage(browser);
         const name = await createPolicy(page, {
           name: policyName('A'),
-          levels: [{ name: 'QA review', from: 'Users', who: [CAROL] }],
+          levels: [{ name: 'QA review', from: 'Users', who: [people.approver] }],
         });
         await page.close();
         return name;
@@ -291,8 +310,8 @@ test.describe('Planning - Generic Approval Workflow', () => {
       personas,
     }) => {
       await allure.tms(cu('z941abyu8j'), 'TC-LAP-10 (ClickUp)');
-      // carol holds approval.user (Inbox only), not Approvals admin.
       test.skip(!personaCredentials('READONLY'), READONLY_SKIP);
+      // the READONLY persona holds approval.user (Inbox only), not Approvals admin.
       await asPersona(personas, 'READONLY', async (page) => {
         await new ApprovalPoliciesPage(page).expectNoPolicyAccess();
       });
@@ -361,7 +380,9 @@ test.describe('Planning - Generic Approval Workflow', () => {
       await allure.tms(cu('z941abyu8q'), 'TC-CAP-04 (ClickUp)');
       const name = await createPolicy(page, {
         name: policyName('one level'),
-        levels: [{ name: 'QA review', quorum: 'Any one approves', from: 'Users', who: [CAROL] }],
+        levels: [
+          { name: 'QA review', quorum: 'Any one approves', from: 'Users', who: [people.approver] },
+        ],
       });
       await approvalPoliciesPage.findRow(name);
       await approvalPoliciesPage.expectCell(name, 'Applies to', APPLIES_TO);
@@ -374,7 +395,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
       await approvalPoliciesPage.openPolicy(name);
       expect(await approvalPolicyFormPage.levelSummary(1)).toBe('L1 QA review · 1 user');
       await approvalPolicyFormPage.expandLevel(1);
-      await approvalPolicyFormPage.expectApproverChip(CAROL);
+      await approvalPolicyFormPage.expectApproverChip(people.approver);
       await approvalPolicyFormPage.cancel();
     });
 
@@ -406,8 +427,8 @@ test.describe('Planning - Generic Approval Workflow', () => {
       await test.step('Users: each added person shows as a chip', async () => {
         await approvalPolicyFormPage.setApproverSource('Users');
         await approvalPolicyFormPage.expectWhoPlaceholder('Add a person…');
-        await approvalPolicyFormPage.addApprover(CAROL);
-        await approvalPolicyFormPage.expectApproverChip(CAROL);
+        await approvalPolicyFormPage.addApprover(people.approver);
+        await approvalPolicyFormPage.expectApproverChip(people.approver);
       });
     });
 
@@ -468,7 +489,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
       await approvalPolicyFormPage.fillNew({
         name: policyName('escalate'),
         active: false,
-        levels: [{ name: 'L1', from: 'Users', who: [CAROL] }],
+        levels: [{ name: 'L1', from: 'Users', who: [people.approver] }],
       });
       await approvalPolicyFormPage.toggleSwitch('Escalate');
       await approvalPolicyFormPage.expectSwitch('Escalate', true, 'Yes');
@@ -539,7 +560,11 @@ test.describe('Planning - Generic Approval Workflow', () => {
       await approvalPolicyFormPage.addLevel();
       await approvalPolicyFormPage.expectRemoveLevelButtons(2);
       await approvalPolicyFormPage.expandLevel(2);
-      await approvalPolicyFormPage.fillLevel({ name: 'QA L2', from: 'Users', who: [CAROL] });
+      await approvalPolicyFormPage.fillLevel({
+        name: 'QA L2',
+        from: 'Users',
+        who: [people.approver],
+      });
       await approvalPolicyFormPage.removeLevel(2);
       await approvalPolicyFormPage.expectRemoveLevelButtons(0);
       await approvalPolicyFormPage.expandLevel(1);
@@ -552,12 +577,18 @@ test.describe('Planning - Generic Approval Workflow', () => {
       approvalPolicyFormPage,
     }) => {
       await allure.tms(cu('z941abyu91'), 'TC-CAP-13 (ClickUp)');
+      needsApprover();
       const name = await createPolicy(page, {
         name: policyName('two levels'),
         selfApproval: true,
         levels: [
-          { name: 'QA L1', from: 'Users', who: [CAROL] },
-          { name: 'QA L2', quorum: 'Everyone must approve', from: 'Users', who: [CAROL, ALICE] },
+          { name: 'QA L1', from: 'Users', who: [people.approver] },
+          {
+            name: 'QA L2',
+            quorum: 'Everyone must approve',
+            from: 'Users',
+            who: [people.approver, ALICE],
+          },
         ],
       });
       await approvalPoliciesPage.findRow(name);
@@ -582,7 +613,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
       await approvalPolicyFormPage.fillNew({
         name: policyName('priority'),
         active: false,
-        levels: [{ name: 'L1', from: 'Users', who: [CAROL] }],
+        levels: [{ name: 'L1', from: 'Users', who: [people.approver] }],
       });
       await test.step('Blank is refused', async () => {
         await approvalPolicyFormPage.setPriority('');
@@ -635,7 +666,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
       const second = await createPolicy(page, {
         name: policyName('A2'),
         priority: '50',
-        levels: [{ name: 'QA review', from: 'Users', who: [CAROL] }],
+        levels: [{ name: 'QA review', from: 'Users', who: [people.approver] }],
       });
       for (const [name, priority] of [
         [policyA, '100'],
@@ -705,7 +736,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
       await approvalPolicyFormPage.expectIdentityLocked('Planning', 'Activity');
       expect(await approvalPolicyFormPage.levelSummary(1)).toBe('L1 QA review · 1 user');
       await approvalPolicyFormPage.expandLevel(1);
-      await approvalPolicyFormPage.expectApproverChip(CAROL);
+      await approvalPolicyFormPage.expectApproverChip(people.approver);
       await approvalPolicyFormPage.expectSharedTiming(1, 'planning / activity');
       await approvalPolicyFormPage.cancel();
     });
@@ -750,8 +781,8 @@ test.describe('Planning - Generic Approval Workflow', () => {
       const name = await createPolicy(page, {
         name: policyName('B two levels'),
         levels: [
-          { name: 'QA L1', from: 'Users', who: [CAROL] },
-          { name: 'QA L2', from: 'Users', who: [CAROL] },
+          { name: 'QA L1', from: 'Users', who: [people.approver] },
+          { name: 'QA L2', from: 'Users', who: [people.approver] },
         ],
       });
       await approvalPoliciesPage.openPolicy(name);
@@ -780,7 +811,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
           {
             name: 'QA review',
             from: 'Users',
-            who: [CAROL],
+            who: [people.approver],
             daysToComplete: { value: '7', unit: 'hours' },
           },
         ],
@@ -824,79 +855,101 @@ test.describe('Planning - Generic Approval Workflow', () => {
     // the cases run one after another in one worker: two cases' policies
     // must never be active together.
     test.describe.configure({ mode: 'default' });
-    test.skip(!personaCredentials('READONLY'), READONLY_SKIP);
 
-    const LEVEL_CAROL = 'QA L1 carol';
+    const LEVEL_APPROVER = 'QA L1 approver';
     const LEVEL_ALICE = 'QA L1 alice';
-    const LEVEL_BOTH = 'QA L1 alice and carol';
-    const LEVEL_L2 = 'QA L2 carol';
+    const LEVEL_BOTH = 'QA L1 alice and approver';
+    const LEVEL_L2 = 'QA L2 approver';
     const LEVEL_PERMISSION = 'QA L1 approval.user';
-    /** L1 = Carol (any one), 2 hours to complete, priority 20. */
-    let pCarol = '';
-    /** L1 = Alice, self-approval allowed, priority 10 (wins over pCarol). */
+    /** L1 = the second approver (any one), 2 hours to complete, priority 20. */
+    let pApprover = '';
+    /** L1 = Alice, self-approval allowed, priority 10 (wins over pApprover). */
     let pAlice = '';
-    /** L1 = Alice, L2 = Carol, self-approval allowed. */
+    /** L1 = Alice, L2 = the second approver, self-approval allowed. */
     let pTwo = '';
-    /** L1 = Alice + Carol, everyone must approve, self-approval allowed. */
+    /** L1 = Alice + the second approver, everyone must approve, self-approval allowed. */
     let pBoth = '';
     /** L1 = the approval.user permission. */
     let pPermission = '';
-    /** A request left pending under pCarol for the read-only cases. */
+    /** A request left pending under pAlice (Due 2 hours) for the cases that only read it. */
     let r0: CreatedActivity & { request: string };
+    /** A request left pending under pApprover, for the cases that act as the second approver. */
+    let rApprover: (CreatedActivity & { request: string }) | undefined;
 
     test.beforeAll(async ({ browser }) => {
       test.setTimeout(600_000);
       const page = await setupPage(browser);
       // Created once per run and reused after a worker restart (see oncePerRun).
-      ({ pCarol, pAlice, pTwo, pBoth, pPermission } = await oncePerRun('lifecycle', async () => ({
-        pCarol: await createPolicy(page, {
-          name: policyName('carol'),
-          priority: '20',
-          levels: [
-            {
-              name: LEVEL_CAROL,
-              from: 'Users',
-              who: [CAROL],
-              daysToComplete: { value: '2', unit: 'hours' },
-            },
-          ],
+      // The policies that route to the second approver exist only when that login is set
+      // (their cases skip with needsApprover()); the rest run on any machine.
+      const withApprover = async (make: () => Promise<string>) =>
+        people.hasApprover ? make() : '';
+      ({ pApprover, pAlice, pTwo, pBoth, pPermission } = await oncePerRun(
+        'lifecycle',
+        async () => ({
+          pApprover: await withApprover(() =>
+            createPolicy(page, {
+              name: policyName('approver'),
+              priority: '20',
+              levels: [
+                {
+                  name: LEVEL_APPROVER,
+                  from: 'Users',
+                  who: [people.approver],
+                  daysToComplete: { value: '2', unit: 'hours' },
+                },
+              ],
+            }),
+          ),
+          pAlice: await createPolicy(page, {
+            name: policyName('alice'),
+            priority: '10',
+            selfApproval: true,
+            levels: [
+              {
+                name: LEVEL_ALICE,
+                from: 'Users',
+                who: [ALICE],
+                daysToComplete: { value: '2', unit: 'hours' },
+              },
+            ],
+          }),
+          pTwo: await withApprover(() =>
+            createPolicy(page, {
+              name: policyName('two levels'),
+              priority: '20',
+              selfApproval: true,
+              levels: [
+                { name: LEVEL_ALICE, from: 'Users', who: [ALICE] },
+                { name: LEVEL_L2, from: 'Users', who: [people.approver] },
+              ],
+            }),
+          ),
+          pBoth: await withApprover(() =>
+            createPolicy(page, {
+              name: policyName('everyone'),
+              priority: '20',
+              selfApproval: true,
+              levels: [
+                {
+                  name: LEVEL_BOTH,
+                  quorum: 'Everyone must approve',
+                  from: 'Users',
+                  who: [ALICE, people.approver],
+                },
+              ],
+            }),
+          ),
+          pPermission: await createPolicy(page, {
+            name: policyName('permission'),
+            priority: '20',
+            levels: [{ name: LEVEL_PERMISSION, from: 'A permission', who: ['approval.user'] }],
+          }),
         }),
-        pAlice: await createPolicy(page, {
-          name: policyName('alice'),
-          priority: '10',
-          selfApproval: true,
-          levels: [{ name: LEVEL_ALICE, from: 'Users', who: [ALICE] }],
-        }),
-        pTwo: await createPolicy(page, {
-          name: policyName('two levels'),
-          priority: '20',
-          selfApproval: true,
-          levels: [
-            { name: LEVEL_ALICE, from: 'Users', who: [ALICE] },
-            { name: LEVEL_L2, from: 'Users', who: [CAROL] },
-          ],
-        }),
-        pBoth: await createPolicy(page, {
-          name: policyName('everyone'),
-          priority: '20',
-          selfApproval: true,
-          levels: [
-            {
-              name: LEVEL_BOTH,
-              quorum: 'Everyone must approve',
-              from: 'Users',
-              who: [ALICE, CAROL],
-            },
-          ],
-        }),
-        pPermission: await createPolicy(page, {
-          name: policyName('permission'),
-          priority: '20',
-          levels: [{ name: LEVEL_PERMISSION, from: 'A permission', who: ['approval.user'] }],
-        }),
-      })));
-      watchPolicies(pCarol, pAlice, pTwo, pBoth, pPermission);
-      r0 = await sendFresh(page, [pCarol]);
+      ));
+      watchPolicies(...[pApprover, pAlice, pTwo, pBoth, pPermission].filter(Boolean));
+      r0 = await sendFresh(page, [pAlice]);
+      if (pApprover) rApprover = await sendFresh(page, [pApprover]);
       await page.close();
     });
 
@@ -915,11 +968,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
       approvalPanelPage,
     }) => {
       await allure.tms(cu('z941abyun9'), 'TC-XAP-13 (ClickUp)');
-      const others = await approvalPoliciesPage.activePoliciesFor(APPLIES_TO);
-      test.skip(
-        others.length > 0,
-        `An active ${APPLIES_TO} policy not created by this suite is in force (${others.join(', ')}), so a send would go through.`,
-      );
+      await skipWhenRealPolicyActive(approvalPoliciesPage);
       const activity = await createActivity(page);
       await approvalPanelPage.open(activity.path);
       await approvalPanelPage.sendExpectingNoPolicy();
@@ -940,8 +989,8 @@ test.describe('Planning - Generic Approval Workflow', () => {
       await approvalPanelPage.expectRecordStatus('Pending approval');
       await approvalPanelPage.expectPendingBanner(r0.request);
       await approvalPanelPage.expectRequestStatus(`${r0.request} Pending`);
-      await approvalPanelPage.expectChain(`L1 · ${LEVEL_CAROL} Reviewing`);
-      await approvalPanelPage.expectChain('Carol Pending');
+      await approvalPanelPage.expectChain(`L1 · ${LEVEL_ALICE} Reviewing`);
+      await approvalPanelPage.expectChain(`${seat(ALICE)} Pending`);
       await approvalsInboxPage.open();
       await approvalsInboxPage.expectLoaded();
       await approvalsInboxPage.selectTab('Pending');
@@ -962,14 +1011,15 @@ test.describe('Planning - Generic Approval Workflow', () => {
       approvalPanelPage,
     }) => {
       await allure.tms(cu('z941abyuak'), 'TC-XAP-03 (ClickUp)');
+      needsApprover();
       await asPersona(personas, 'READONLY', async (page) => {
         const panel = new ApprovalPanelPage(page);
-        await panel.open(r0.path);
+        await panel.open(rApprover!.path);
         await panel.expectDecisionButtons(['Approve', 'Approve and add levels', 'Reject']);
       });
       // alice is also an Approvals admin, who may decide any request (Approvals
       // app story z941ac172n), so only her Withdraw is checked here.
-      await approvalPanelPage.open(r0.path);
+      await approvalPanelPage.open(rApprover!.path);
       await expect(approvalPanelPage.locators.withdrawButton).toBeVisible();
     });
 
@@ -1093,13 +1143,14 @@ test.describe('Planning - Generic Approval Workflow', () => {
       personas,
     }) => {
       await allure.tms(cu('z941abyua6'), 'TC-LAR-08 (ClickUp)');
+      needsApprover();
       // Skipped in October (approver inbox not built yet, z941abyqhx); the
       // Approvals app (z941ac172n, 2026-11-12) gives approval.user an Inbox.
       await asPersona(personas, 'READONLY', async (page) => {
         const inbox = new ApprovalsInboxPage(page);
-        await inbox.findRow(r0.request);
-        expect(await inbox.cellValue(r0.request, 'Your part')).toBe('Waiting on you');
-        expect(await inbox.cellValue(r0.request, 'Status')).toBe('Pending');
+        await inbox.findRow(rApprover!.request);
+        expect(await inbox.cellValue(rApprover!.request, 'Your part')).toBe('Waiting on you');
+        expect(await inbox.cellValue(rApprover!.request, 'Status')).toBe('Pending');
       });
     });
 
@@ -1108,7 +1159,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
     }) => {
       await allure.tms(cu('z941abyua8'), 'TC-VAR-01 (ClickUp)');
       const request = await openR0(page);
-      await request.expectStatus('Pending', pCarol);
+      await request.expectStatus('Pending', pAlice);
       await request.expectSubject(`Activity ${r0.code} revision 1 - ${r0.name}`);
       await request.expectTextContains(`planning activity ${r0.code}`);
       await request.expectRecordLink(new RegExp(`^${r0.path}\\?returnTo=`));
@@ -1138,7 +1189,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
       await request.openRecord();
       await expect(page).toHaveURL(new RegExp(`${r0.path}\\?returnTo=`));
       await approvalPanelPage.expectPendingBanner(r0.request);
-      await approvalPanelPage.expectChain(`L1 · ${LEVEL_CAROL}`);
+      await approvalPanelPage.expectChain(`L1 · ${LEVEL_ALICE}`);
       await expect(approvalPanelPage.locators.backToApproval).toBeVisible();
     });
 
@@ -1171,26 +1222,32 @@ test.describe('Planning - Generic Approval Workflow', () => {
       approvalPanelPage,
     }) => {
       await allure.tms(cu('z941abyunj'), 'TC-XAP-23 (ClickUp)');
-      const sent = await sendFresh(page, [pCarol]);
+      needsApprover();
+      const sent = await sendFresh(page, [pApprover]);
       const reason = `QA-AUTO reject reason ${uniqueTag('R')}`;
-      await asPersona(personas, 'READONLY', async (carol) => {
-        const panel = new ApprovalPanelPage(carol);
+      await asPersona(personas, 'READONLY', async (approver) => {
+        const panel = new ApprovalPanelPage(approver);
         await panel.open(sent.path);
-        await panel.expectNotification(sent.code, 'for approval', `You are on ${LEVEL_CAROL}`);
+        await panel.expectNotification(sent.code, 'for approval', `You are on ${LEVEL_APPROVER}`);
         await panel.reject(reason);
       });
       await approvalPanelPage.open(sent.path);
       // The bell shortens long items, so the reason is checked by its label only.
-      await approvalPanelPage.expectNotification(sent.code, `${CAROL} rejected`, 'Reason:');
+      await approvalPanelPage.expectNotification(
+        sent.code,
+        `${people.approver} rejected`,
+        'Reason:',
+      );
     });
 
     // ── Decisions ──
 
     test("TC-XAP-04 Someone who isn't an assignee can't decide", async ({ page, personas }) => {
       await allure.tms(cu('z941abyuam'), 'TC-XAP-04 (ClickUp)');
+      needsApprover();
       const sent = await sendFresh(page, [pAlice]);
-      await asPersona(personas, 'READONLY', async (carol) => {
-        const panel = new ApprovalPanelPage(carol);
+      await asPersona(personas, 'READONLY', async (approver) => {
+        const panel = new ApprovalPanelPage(approver);
         await panel.open(sent.path);
         await panel.expectPendingBanner(sent.request);
         // Observation: on dev a reader who isn't on the chain gets no "Approval chain"
@@ -1238,16 +1295,17 @@ test.describe('Planning - Generic Approval Workflow', () => {
       approvalPanelPage,
     }) => {
       await allure.tms(cu('z941abyuap'), 'TC-XAP-06 (ClickUp)');
-      const sent = await sendFresh(page, [pCarol]);
+      needsApprover();
+      const sent = await sendFresh(page, [pApprover]);
       const reason = `QA-AUTO reject reason ${uniqueTag('R')}`;
-      await asPersona(personas, 'READONLY', async (carol) => {
-        const panel = new ApprovalPanelPage(carol);
+      await asPersona(personas, 'READONLY', async (approver) => {
+        const panel = new ApprovalPanelPage(approver);
         await panel.open(sent.path);
         await panel.openRejectExpectingReasonRequired();
         await panel.reject(reason);
       });
       await approvalPanelPage.open(sent.path);
-      await approvalPanelPage.expectRequestStatus(`${sent.request} Rejected by ${CAROL}`);
+      await approvalPanelPage.expectRequestStatus(`${sent.request} Rejected by ${people.approver}`);
       await approvalPanelPage.expectReturnedBanner(sent.request);
       await approvalPanelPage.expectPanelText(reason);
       await approvalPanelPage.expectEditableAgain();
@@ -1259,14 +1317,15 @@ test.describe('Planning - Generic Approval Workflow', () => {
       approvalPanelPage,
     }) => {
       await allure.tms(cu('z941abyuaq'), 'TC-XAP-07 (ClickUp)');
-      const sent = await sendFresh(page, [pCarol]);
+      needsApprover();
+      const sent = await sendFresh(page, [pApprover]);
       await approvalPanelPage.open(sent.path);
       await approvalPanelPage.withdraw('QA-AUTO withdraw');
       await approvalPanelPage.reload();
       await approvalPanelPage.expectRequestStatus(`${sent.request} Withdrawn by ${ALICE}`);
       await approvalPanelPage.expectEditableAgain();
-      await asPersona(personas, 'READONLY', async (carol) => {
-        const panel = new ApprovalPanelPage(carol);
+      await asPersona(personas, 'READONLY', async (approver) => {
+        const panel = new ApprovalPanelPage(approver);
         await panel.open(sent.path);
         await panel.expectRequestStatus(/Withdrawn/);
         await panel.expectDecisionButtons([]);
@@ -1287,12 +1346,13 @@ test.describe('Planning - Generic Approval Workflow', () => {
 
     test('TC-XAP-09 Self-approval is blocked by default', async ({ page, approvalRequestPage }) => {
       await allure.tms(cu('z941abyuat'), 'TC-XAP-09 (ClickUp)');
+      needsApprover();
       await allure.tms(cu('z941ac28wn'), 'TC-XAP-09 bug (ClickUp)');
-      // L1 = Alice + Carol with Self-approval Blocked: alice's own request
-      // should seat only Carol (as on 2026-10-13).
+      // L1 = Alice + the second approver with Self-approval Blocked: alice's own request
+      // should seat only the second approver (as on 2026-10-13).
       const sent = await sendFresh(page, [pBoth], { selfApproval: false });
       await approvalRequestPage.openFromInbox(sent.request);
-      await approvalRequestPage.expectTextContains('Carol Pending');
+      await approvalRequestPage.expectTextContains(`${seat(people.approver)} Pending`);
       // Confirmed bug, ClickUp z941ac28wn (2026-11-23, dev and uat): with
       // Self-approval Blocked the submitter is still seated "Pending".
       // Marked after the part that works.
@@ -1322,20 +1382,21 @@ test.describe('Planning - Generic Approval Workflow', () => {
       approvalRequestPage,
     }) => {
       await allure.tms(cu('z941abyumh'), 'TC-XAP-11 (ClickUp)');
-      const sent = await sendFresh(page, [pCarol], { level1AddLevels: true });
-      await asPersona(personas, 'READONLY', async (carol) => {
-        const panel = new ApprovalPanelPage(carol);
+      needsApprover();
+      const sent = await sendFresh(page, [pApprover], { level1AddLevels: true });
+      await asPersona(personas, 'READONLY', async (approver) => {
+        const panel = new ApprovalPanelPage(approver);
         await panel.open(sent.path);
-        await panel.approveAndAddLevel('QA-AUTO added level', [DAVE]);
+        await panel.approveAndAddLevel('QA-AUTO added level', [people.approver]);
       });
       await approvalRequestPage.openFromInbox(sent.request);
-      await approvalRequestPage.expectStatus('Pending', pCarol);
-      await approvalRequestPage.expectTextContains(`L1 · ${LEVEL_CAROL} Approved`);
+      await approvalRequestPage.expectStatus('Pending', pApprover);
+      await approvalRequestPage.expectTextContains(`L1 · ${LEVEL_APPROVER} Approved`);
       await approvalRequestPage.expectTextContains('L2 · QA-AUTO added level Reviewing');
-      await approvalRequestPage.expectTextContains('Dave Pending');
+      await approvalRequestPage.expectTextContains(`${seat(people.approver)} Pending`);
       await approvalRequestPage.expectTextContains('Added during review');
       await approvalRequestPage.expectHistoryEntry(
-        `Approved and routed by ${CAROL} (${LEVEL_CAROL})`,
+        `Approved and routed by ${people.approver} (${LEVEL_APPROVER})`,
       );
     });
 
@@ -1344,23 +1405,25 @@ test.describe('Planning - Generic Approval Workflow', () => {
       personas,
     }) => {
       await allure.tms(cu('z941abyun5'), 'TC-XAP-12 (ClickUp)');
+      needsApprover();
       try {
-        const sent = await sendFresh(page, [pCarol], { level1AddLevels: false });
-        await asPersona(personas, 'READONLY', async (carol) => {
-          const panel = new ApprovalPanelPage(carol);
+        const sent = await sendFresh(page, [pApprover], { level1AddLevels: false });
+        await asPersona(personas, 'READONLY', async (approver) => {
+          const panel = new ApprovalPanelPage(approver);
           await panel.open(sent.path);
           await panel.expectDecisionButtons(['Approve', 'Reject']);
         });
       } finally {
-        await editPolicy(page, pCarol, { level1AddLevels: true });
+        await editPolicy(page, pApprover, { level1AddLevels: true });
       }
     });
 
     test('TC-XAP-14 Two levels run in order', async ({ page, personas, approvalPanelPage }) => {
       await allure.tms(cu('z941abyuna'), 'TC-XAP-14 (ClickUp)');
+      needsApprover();
       const sent = await sendFresh(page, [pTwo]);
-      await asPersona(personas, 'READONLY', async (carol) => {
-        const panel = new ApprovalPanelPage(carol);
+      await asPersona(personas, 'READONLY', async (approver) => {
+        const panel = new ApprovalPanelPage(approver);
         await panel.open(sent.path);
         await panel.expectDecisionButtons([]);
       });
@@ -1369,8 +1432,8 @@ test.describe('Planning - Generic Approval Workflow', () => {
       await approvalPanelPage.reload();
       await approvalPanelPage.expectRequestStatus(`${sent.request} Pending`);
       await approvalPanelPage.expectChain(`L2 · ${LEVEL_L2} Reviewing`);
-      await asPersona(personas, 'READONLY', async (carol) => {
-        const panel = new ApprovalPanelPage(carol);
+      await asPersona(personas, 'READONLY', async (approver) => {
+        const panel = new ApprovalPanelPage(approver);
         await panel.open(sent.path);
         await panel.expectDecisionButtons(['Approve', 'Approve and add levels', 'Reject']);
         await panel.approve();
@@ -1385,24 +1448,29 @@ test.describe('Planning - Generic Approval Workflow', () => {
       approvalPanelPage,
     }) => {
       await allure.tms(cu('z941abyunb'), 'TC-XAP-15 (ClickUp)');
+      needsApprover();
       await allure.tms(cu('z941ac28wp'), 'TC-XAP-15 bug (ClickUp)');
       const both = { selfApproval: true };
       const first = await sendFresh(page, [pBoth], both);
       const second = await sendFresh(page, [pBoth], both);
-      // Open question, ClickUp z941ac28wp (2026-11-23, dev and uat): Alice's
-      // single approval completes the level "as administrator" and Carol is
-      // Skipped. The case asserts the quorum until that is answered.
-      knownBug('z941ac28wp');
       for (const sent of [first, second]) {
         await approvalPanelPage.open(sent.path);
         await approvalPanelPage.approve();
         await approvalPanelPage.reload();
+      }
+      // ClickUp z941ac28wp (2026-11-23, dev and uat) is an OPEN QUESTION for the
+      // PO, not a confirmed bug: Alice's single approval completes the level "as
+      // administrator" and the second approver is Skipped. The case asserts the
+      // quorum until that is answered; marked after the steps that work.
+      knownBug('z941ac28wp');
+      for (const sent of [first, second]) {
+        await approvalPanelPage.open(sent.path);
         await approvalPanelPage.expectRequestStatus(`${sent.request} Pending`);
         await approvalPanelPage.expectChain('Alice Approved');
-        await approvalPanelPage.expectChain('Carol Pending');
+        await approvalPanelPage.expectChain(`${seat(people.approver)} Pending`);
       }
-      await asPersona(personas, 'READONLY', async (carol) => {
-        const panel = new ApprovalPanelPage(carol);
+      await asPersona(personas, 'READONLY', async (approver) => {
+        const panel = new ApprovalPanelPage(approver);
         await panel.open(first.path);
         await panel.approve();
         await panel.reload();
@@ -1410,7 +1478,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
         await panel.open(second.path);
         await panel.reject('QA-AUTO everyone-must-approve reject');
         await panel.reload();
-        await panel.expectRequestStatus(new RegExp(`Rejected by ${CAROL}`));
+        await panel.expectRequestStatus(new RegExp(`Rejected by ${people.approver}`));
       });
     });
 
@@ -1419,8 +1487,9 @@ test.describe('Planning - Generic Approval Workflow', () => {
       approvalRequestPage,
     }) => {
       await allure.tms(cu('z941abyunc'), 'TC-XAP-16 (ClickUp)');
-      // pCarol (priority 20) and pAlice (10) are both in force for the send.
-      const sent = await sendFresh(page, [pCarol, pAlice]);
+      needsApprover();
+      // pApprover (priority 20) and pAlice (10) are both in force for the send.
+      const sent = await sendFresh(page, [pApprover, pAlice]);
       await approvalRequestPage.openFromInbox(sent.request);
       await approvalRequestPage.expectStatus('Pending', pAlice);
       await approvalRequestPage.expectTextContains(`L1 · ${LEVEL_ALICE}`);
@@ -1434,9 +1503,10 @@ test.describe('Planning - Generic Approval Workflow', () => {
       approvalRequestPage,
     }) => {
       await allure.tms(cu('z941abyund'), 'TC-XAP-17 (ClickUp)');
-      const sent = await sendFresh(page, [pCarol]);
-      await asPersona(personas, 'READONLY', async (carol) => {
-        const panel = new ApprovalPanelPage(carol);
+      needsApprover();
+      const sent = await sendFresh(page, [pApprover]);
+      await asPersona(personas, 'READONLY', async (approver) => {
+        const panel = new ApprovalPanelPage(approver);
         await panel.open(sent.path);
         await panel.reject('QA-AUTO reject before resubmit');
       });
@@ -1444,12 +1514,12 @@ test.describe('Planning - Generic Approval Workflow', () => {
       await activityFormPage.startEditing();
       await activityFormPage.fill({ name: `${sent.name} (resubmitted)` });
       expect(await activityFormPage.saveChanges()).toBe('submitted');
-      const again = await sendUnder(page, [pCarol], sent);
+      const again = await sendUnder(page, [pApprover], sent);
       expect(again).not.toBe(sent.request);
       await approvalRequestPage.openFromInbox(sent.request);
-      await approvalRequestPage.expectStatus('Rejected', pCarol);
+      await approvalRequestPage.expectStatus('Rejected', pApprover);
       await approvalRequestPage.openFromInbox(again);
-      await approvalRequestPage.expectStatus('Pending', pCarol);
+      await approvalRequestPage.expectStatus('Pending', pApprover);
     });
 
     test('TC-XAP-19 Reminders repeat until the level is decided, up to the max', async () => {
@@ -1487,7 +1557,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
       const sent = await sendFresh(page, [pPermission]);
       await approvalRequestPage.openFromInbox(sent.request);
       await approvalRequestPage.expectStatus('Pending', pPermission);
-      await approvalRequestPage.expectTextContains('Carol Pending');
+      await approvalRequestPage.expectTextContains(`${seat(people.approver)} Pending`);
     });
 
     // ── Request page after decisions ──
@@ -1500,9 +1570,10 @@ test.describe('Planning - Generic Approval Workflow', () => {
       approvalRequestPage,
     }) => {
       await allure.tms(cu('z941abyua9'), 'TC-VAR-02 (ClickUp)');
-      const sent = await sendFresh(page, [pCarol]);
-      await asPersona(personas, 'READONLY', async (carol) => {
-        const panel = new ApprovalPanelPage(carol);
+      needsApprover();
+      const sent = await sendFresh(page, [pApprover]);
+      await asPersona(personas, 'READONLY', async (approver) => {
+        const panel = new ApprovalPanelPage(approver);
         await panel.open(sent.path);
         await panel.reject('QA-AUTO reject before rename');
       });
@@ -1521,6 +1592,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
       approvalRequestPage,
     }) => {
       await allure.tms(cu('z941abyuaa'), 'TC-VAR-03 (ClickUp)');
+      needsApprover();
       const sent = await sendFresh(page, [pTwo]);
       await approvalRequestPage.openFromInbox(sent.request);
       await approvalRequestPage.expectTextContains(`L1 · ${LEVEL_ALICE} Reviewing`);
@@ -1532,7 +1604,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
       await approvalRequestPage.expectTextContains(`L1 · ${LEVEL_ALICE} Approved`);
       await approvalRequestPage.expectTextContains('Alice Approved');
       await approvalRequestPage.expectTextContains(`L2 · ${LEVEL_L2} Reviewing`);
-      await approvalRequestPage.expectTextContains('Carol Pending');
+      await approvalRequestPage.expectTextContains(`${seat(people.approver)} Pending`);
     });
 
     test('TC-VAR-04 History lists each event with actor and time', async ({
@@ -1541,9 +1613,10 @@ test.describe('Planning - Generic Approval Workflow', () => {
       approvalRequestPage,
     }) => {
       await allure.tms(cu('z941abyuab'), 'TC-VAR-04 (ClickUp)');
-      const sent = await sendFresh(page, [pCarol]);
-      await asPersona(personas, 'READONLY', async (carol) => {
-        const panel = new ApprovalPanelPage(carol);
+      needsApprover();
+      const sent = await sendFresh(page, [pApprover]);
+      await asPersona(personas, 'READONLY', async (approver) => {
+        const panel = new ApprovalPanelPage(approver);
         await panel.open(sent.path);
         await panel.approve();
       });
@@ -1551,9 +1624,9 @@ test.describe('Planning - Generic Approval Workflow', () => {
       const history = await approvalRequestPage.history();
       const expected = [
         `Sent for approval by ${ALICE}`,
-        `Waiting on ${LEVEL_CAROL}`,
-        `Approved by ${CAROL} (${LEVEL_CAROL})`,
-        `${LEVEL_CAROL} complete`,
+        `Waiting on ${LEVEL_APPROVER}`,
+        `Approved by ${people.approver} (${LEVEL_APPROVER})`,
+        `${LEVEL_APPROVER} complete`,
         'Approved',
       ];
       expect(history.map((h) => expected.find((e) => h.startsWith(e)) ?? h)).toEqual(expected);
@@ -1567,20 +1640,23 @@ test.describe('Planning - Generic Approval Workflow', () => {
       approvalRequestPage,
     }) => {
       await allure.tms(cu('z941abyuaf'), 'TC-VAR-07 (ClickUp)');
+      needsApprover();
       await allure.tms(cu('z941abyqjr'), 'TC-VAR-07 bug (ClickUp)');
       // Bug z941abyqjr (2026-10-14) is still open in ClickUp, but dev shows
       // the reason in History since the Approvals app moved (APR-2026-000058
       // and the 2026-11-13 Approvals app run), so no knownBug() here.
-      const sent = await sendFresh(page, [pCarol]);
+      const sent = await sendFresh(page, [pApprover]);
       const reason = `QA-AUTO reject reason ${uniqueTag('R')}`;
-      await asPersona(personas, 'READONLY', async (carol) => {
-        const panel = new ApprovalPanelPage(carol);
+      await asPersona(personas, 'READONLY', async (approver) => {
+        const panel = new ApprovalPanelPage(approver);
         await panel.open(sent.path);
         await panel.reject(reason);
       });
       await approvalRequestPage.openFromInbox(sent.request);
-      await approvalRequestPage.expectStatus('Rejected', pCarol);
-      await approvalRequestPage.expectHistoryEntry(`Rejected by ${CAROL} (${LEVEL_CAROL})`);
+      await approvalRequestPage.expectStatus('Rejected', pApprover);
+      await approvalRequestPage.expectHistoryEntry(
+        `Rejected by ${people.approver} (${LEVEL_APPROVER})`,
+      );
       await approvalRequestPage.expectHistoryEntry(`Reason: ${reason}`);
     });
 
@@ -1591,17 +1667,18 @@ test.describe('Planning - Generic Approval Workflow', () => {
       approvalRequestPage,
     }) => {
       await allure.tms(cu('z941abyu9c'), 'TC-EAP-04 (ClickUp)');
-      const renamed = `${LEVEL_CAROL} (v2)`;
-      const first = await sendFresh(page, [pCarol], { level1Name: LEVEL_CAROL });
+      needsApprover();
+      const renamed = `${LEVEL_APPROVER} (v2)`;
+      const first = await sendFresh(page, [pApprover], { level1Name: LEVEL_APPROVER });
       let second: string;
       try {
-        second = (await sendFresh(page, [pCarol], { level1Name: renamed })).request;
+        second = (await sendFresh(page, [pApprover], { level1Name: renamed })).request;
       } finally {
-        await editPolicy(page, pCarol, { level1Name: LEVEL_CAROL });
+        await editPolicy(page, pApprover, { level1Name: LEVEL_APPROVER });
       }
       await approvalRequestPage.openFromInbox(first.request);
       const firstVersion = await approvalRequestPage.policyVersion();
-      await approvalRequestPage.expectTextContains(`L1 · ${LEVEL_CAROL} Reviewing`);
+      await approvalRequestPage.expectTextContains(`L1 · ${LEVEL_APPROVER} Reviewing`);
       await approvalRequestPage.expectTextLacks(renamed);
       await approvalRequestPage.openFromInbox(second);
       expect(await approvalRequestPage.policyVersion()).toBeGreaterThan(firstVersion);
@@ -1621,21 +1698,17 @@ test.describe('Planning - Generic Approval Workflow', () => {
         await approvalPolicyFormPage.applyChanges({ active: false });
         await approvalPolicyFormPage.saveOk();
       } finally {
-        await editPolicy(page, pAlice, { active: false });
+        await deactivate(page, [pAlice]);
       }
       await approvalPoliciesPage.open();
       await approvalPoliciesPage.expectLoaded();
       await approvalPoliciesPage.selectTab('Inactive');
       await approvalPoliciesPage.search(pAlice);
       await approvalPoliciesPage.expectCell(pAlice, 'Status', 'Inactive');
-      // r0 started under pCarol, which is inactive between sends: still under review.
+      // r0 started under pAlice, now inactive: still under review.
       await approvalPanelPage.open(r0.path);
       await approvalPanelPage.expectRequestStatus(`${r0.request} Pending`);
-      const others = await approvalPoliciesPage.activePoliciesFor(APPLIES_TO);
-      test.skip(
-        others.length > 0,
-        `An active ${APPLIES_TO} policy not created by this suite is in force (${others.join(', ')}).`,
-      );
+      await skipWhenRealPolicyActive(approvalPoliciesPage);
       const activity = await createActivity(page);
       await approvalPanelPage.open(activity.path);
       await approvalPanelPage.sendExpectingNoPolicy();

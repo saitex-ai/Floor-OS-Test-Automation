@@ -88,10 +88,10 @@ export abstract class MasterDataListPage extends BasePage {
     await expect(this.grid.bodyRows().first()).toBeVisible({ timeout: WAIT.PAGE_LOAD });
   }
 
-  /** The grid has no rows at all (its footer counts zero). */
+  /** The grid has no rows at all (its footer's total, "Showing 0 to 0 of 0", is zero). */
   async gridIsEmpty(): Promise<boolean> {
     const footer = await this.grid.showingText.innerText().catch(() => '');
-    return /\b0\b/.test(footer);
+    return /\bof 0\b/.test(footer);
   }
 
   /** Like expectLoaded, but an empty grid counts as loaded (an environment may hold no records yet). */

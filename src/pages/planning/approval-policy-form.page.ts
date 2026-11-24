@@ -13,7 +13,7 @@ export interface LevelSpec {
   from?: ApproverSource;
   /**
    * What to type into Who, one entry per approver; the option that starts
-   * with it is picked ("Carol Planner", "approval.user", "/companies/…").
+   * with it is picked ("<display name>", "approval.user", "/companies/…").
    */
   who?: string[];
   /** "Approvers may add levels" (on by default). */
@@ -371,8 +371,15 @@ export class ApprovalPolicyFormPage extends BasePage {
     try {
       await this.locators.saveButton.click();
       await expect(this.locators.saveButton).toBeVisible();
-      // Long enough for a save the form didn't stop to go out.
-      await this.page.waitForTimeout(WAIT.PERMISSION_SETTLE);
+      // Watched for the whole window (long enough for a save the form didn't
+      // stop to go out), not read once; a request going out ends it early.
+      const deadline = Date.now() + WAIT.PERMISSION_SETTLE;
+      await expect
+        .poll(() => sent.length > 0 || Date.now() >= deadline, {
+          intervals: [250],
+          timeout: WAIT.PERMISSION_SETTLE + WAIT.SERVER,
+        })
+        .toBe(true);
     } finally {
       this.page.off('request', onRequest);
     }

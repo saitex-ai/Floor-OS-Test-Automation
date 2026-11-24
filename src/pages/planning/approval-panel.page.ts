@@ -136,7 +136,7 @@ export class ApprovalPanelPage extends BasePage {
     return code;
   }
 
-  /** "APR-… Pending" / "APR-… Rejected by Carol Planner History" … */
+  /** "APR-… Pending" / "APR-… Rejected by <approver> History" … */
   async requestStatus(): Promise<string> {
     return spacedText(this.locators.requestStatus);
   }
@@ -150,7 +150,7 @@ export class ApprovalPanelPage extends BasePage {
     await expectSpacedText(this.locators.requestStatus, pattern);
   }
 
-  /** "Approval chain L1 · … Reviewing Carol Pending → L2 · …" */
+  /** "Approval chain L1 · … Reviewing <first name> Pending → L2 · …" */
   async chain(): Promise<string> {
     await expect(this.locators.chain).toBeVisible({ timeout: WAIT.SERVER });
     return spacedText(this.locators.chain);
@@ -258,7 +258,20 @@ export class ApprovalPanelPage extends BasePage {
     await expect(this.locators.dialog).toBeHidden({ timeout: WAIT.SERVER });
   }
 
-  /** "Approve and add levels": one added level of named users ("Dave QCLead", …). */
+  /** Retires an Active (approved) record: Retire, then Retire again to confirm. */
+  async retire(): Promise<void> {
+    await this.locators.retireButton.click();
+    await expect(this.locators.retireCancelButton).toBeVisible();
+    await this.locators.retireButton.click();
+    await expect(this.locators.retireCancelButton).toBeHidden({ timeout: WAIT.SERVER });
+  }
+
+  /** Whether the record offers Retire (it is Active). */
+  async canRetire(): Promise<boolean> {
+    return this.locators.retireButton.isVisible();
+  }
+
+  /** "Approve and add levels": one added level of named users ("<display name>", …). */
   async approveAndAddLevel(levelName: string, people: string[]): Promise<void> {
     await this.locators.approveAndAddLevelsButton.click();
     await this.locators.routeLevelName.fill(levelName);

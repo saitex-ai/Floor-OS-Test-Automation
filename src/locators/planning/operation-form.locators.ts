@@ -34,7 +34,8 @@ export class OperationFormLocators {
 
   /** "Name" since the November builds (was "Operation"). */
   operation(row: Scope): Locator {
-    return row.getByRole('textbox', { name: /^(Name|Operation)$/ });
+    // One field in either build; .first() keeps a row that ever shows both from breaking strict mode.
+    return row.getByRole('textbox', { name: /^(Name|Operation)$/ }).first();
   }
 
   machineType(row: Scope): Locator {
