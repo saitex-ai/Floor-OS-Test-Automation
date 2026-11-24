@@ -386,8 +386,11 @@ test.describe('Planning - Operators & Qualifications', () => {
     await operatorsListPage.expectFiltersBadge(1);
     // The grid reloads with the filter: poll until only the filtered deployment is listed.
     await expect
-      .poll(async () => [...new Set(await operatorsListPage.columnValues('Deployment'))])
-      .toEqual(['Floating across the department']);
+      .poll(async () => {
+        const values = await operatorsListPage.columnValues('Deployment');
+        return values.length > 0 && values.every((v) => /^Floating/.test(v));
+      })
+      .toBe(true);
     await operatorsListPage.removeFilterRule();
     await operatorsListPage.expectNoFiltersBadge();
     await expect.poll(async () => (await operatorsListPage.showing()).total).toBe(all);

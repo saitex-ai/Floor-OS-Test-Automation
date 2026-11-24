@@ -157,9 +157,16 @@ export class OperatorsListPage extends MasterDataListPage {
     await expect(this.grid.previousPageButton).toBeDisabled();
   }
 
-  /** The list is replaced by the "Access restricted" page (a user without Planning access). */
+  /**
+   * A user without access lands on "Access restricted" (Planning, but not
+   * this master) or on the App Launcher (no Planning app); the list never renders.
+   */
   async expectAccessRestricted(): Promise<void> {
-    await expect(this.grid.accessRestricted.first()).toBeVisible({ timeout: WAIT.PAGE_LOAD });
+    await expect(this.grid.accessRestricted.first().or(this.locators.launcherModules)).toBeVisible({
+      timeout: WAIT.PAGE_LOAD,
+    });
+    await expect(this.newButton).toHaveCount(0);
+    await expect(this.grid.bodyRows()).toHaveCount(0);
   }
 
   async expectOperatorRowContains(employeeNo: string, text: string): Promise<void> {

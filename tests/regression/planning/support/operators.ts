@@ -69,7 +69,10 @@ export async function createQaEmployee(page: Page): Promise<QaEmployee> {
  */
 export async function pickEmployee(form: OperatorProfilePage, employee: QaEmployee): Promise<void> {
   await expect(async () => {
-    const options = await form.optionsOf('Employee', employee.employeeNo);
+    // A search with no match shows no options at all: that is "not offered yet" too.
+    const options = await form
+      .optionsOf('Employee', employee.employeeNo)
+      .catch(() => [] as string[]);
     if (!options.some((o) => o.startsWith(`${employee.employeeNo} · `))) {
       await form.reloadNew();
       throw new Error(`${employee.employeeNo} isn't offered yet`);

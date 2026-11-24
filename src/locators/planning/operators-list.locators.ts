@@ -22,8 +22,11 @@ export class OperatorsListLocators {
   readonly description: Locator;
   readonly noMatchHeading: Locator;
   readonly noMatchHint: Locator;
+  /** The App Launcher's module count, where a user without Planning is sent. */
+  readonly launcherModules: Locator;
 
   constructor(private readonly page: Page) {
+    this.launcherModules = page.getByText(/^All Modules \(\d+\)$/);
     this.heading = page.getByRole('heading', { name: 'Operators & Qualifications', level: 1 });
     this.newButton = page.getByRole('button', { name: 'New', exact: true });
     this.allMastersButton = page
