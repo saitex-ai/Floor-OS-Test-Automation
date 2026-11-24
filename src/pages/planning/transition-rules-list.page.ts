@@ -106,8 +106,10 @@ export class TransitionRulesListPage extends MasterDataListPage {
     ]);
     if (!response) {
       // No request: the page served this search from its cache. Don't judge the old grid:
-      // wait for the network to settle, then the caller's own row check decides.
-      await this.page.waitForLoadState('networkidle');
+      // wait until it shows rows or the no-match state, then the caller's own row check decides.
+      await expect(this.grid.bodyRows().first().or(this.l.noMatchState)).toBeVisible({
+        timeout: WAIT.SERVER,
+      });
       return;
     }
     const { items } = (await response.json()) as { items: { code: string }[] };
@@ -347,8 +349,9 @@ export class TransitionRulesListPage extends MasterDataListPage {
   /** Whether the list offers a Duplicate action on a row (right-click menu or row action). */
   async hasDuplicateAction(code: string): Promise<boolean> {
     await this.ruleRow(code).click({ button: 'right' });
-    // Wait for the menu to open first: a menu that opens late must not read as "no Duplicate".
-    await expect(this.l.rowMenu).toBeVisible({ timeout: WAIT.SERVER });
+    // Give a menu time to open first (on dev/uat the row has no menu at all): a menu that
+    // opens late must not read as "no Duplicate". The probe is bounded, then the page is checked.
+    await this.l.rowMenu.waitFor({ state: 'visible', timeout: 3_000 }).catch(() => undefined);
     const offered = (await this.l.duplicateAction.count()) > 0;
     await this.page.keyboard.press('Escape');
     return offered;
