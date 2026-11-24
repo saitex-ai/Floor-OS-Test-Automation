@@ -265,6 +265,11 @@ export class TransitionRulesListPage extends MasterDataListPage {
     return out;
   }
 
+  /** The whole page as a PNG (evidence for a defect on screen). */
+  async fullPageScreenshot(): Promise<Buffer> {
+    return this.page.screenshot({ fullPage: true });
+  }
+
   /** Shows up to 100 rows (the grid defaults to 50). */
   async showAllRows(): Promise<void> {
     if ((await this.showing()).total > 50) await this.setRowsPerPage(100);

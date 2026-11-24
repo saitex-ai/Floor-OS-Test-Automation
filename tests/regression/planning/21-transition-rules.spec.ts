@@ -1355,7 +1355,15 @@ test.describe('Planning - Transition rules', () => {
         await list.showAllRows();
         const cards = await list.summaryCards();
         const rows = await list.rowValues();
-        expect(cards.map((c) => c.label)).toEqual(list.classOrder());
+        const labels = cards.map((c) => c.label);
+        if (labels.join() !== list.classOrder().join()) {
+          // Evidence for the raw-key defect (cards read repeat/similar/new_variant/new_product).
+          await test.info().attach(`summary-cards-labels-${labels.join('_')}`, {
+            body: await list.fullPageScreenshot(),
+            contentType: 'image/png',
+          });
+        }
+        expect(labels).toEqual(list.classOrder());
         for (const card of cards) {
           const mine = rows.filter((r) => r.changeClass === card.label);
           const days = mine.map((r) => r.days).filter((d): d is number => d !== null);
@@ -1495,13 +1503,25 @@ test.describe('Planning - Transition rules', () => {
       }
     });
     await test.step('Change class sorts in class order, and the second click reverses it', async () => {
+      // The grid shows one page (up to 100 rows): with many rules of one class that page can be
+      // a single class (direction "flat"), so the reversal is read from the first row's class too.
+      const shape = async () => {
+        const idx = await classIndexes();
+        return { direction: direction(idx), head: idx[0] };
+      };
       await list.sortBy('Change class');
-      await expect.poll(async () => direction(await classIndexes())).toMatch(/^(asc|desc)$/);
-      const first = direction(await classIndexes());
+      await expect.poll(async () => (await shape()).direction).toMatch(/^(asc|desc|flat)$/);
+      const first = await shape();
       await list.sortBy('Change class');
       await expect
-        .poll(async () => direction(await classIndexes()))
-        .toBe(first === 'asc' ? 'desc' : 'asc');
+        .poll(async () => {
+          const now = await shape();
+          return (
+            now.head !== first.head ||
+            (first.direction !== 'flat' && now.direction !== first.direction)
+          );
+        })
+        .toBe(true);
     });
     await test.step('Priority sorts numerically', async () => {
       await list.sortBy('Priority');
