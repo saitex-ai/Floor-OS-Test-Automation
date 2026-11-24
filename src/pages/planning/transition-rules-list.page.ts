@@ -50,7 +50,7 @@ export class TransitionRulesListPage extends MasterDataListPage {
   /** For a user without access: the list never renders (restricted, or sent away). */
   async expectNoAccess(): Promise<void> {
     // Not gotoAuthenticated(): a user without Planning never gets the app's
-    // user menu (dev 2026-11-17: dave sits on "Loading Planning…" at /).
+    // user menu (dev 2026-11-17: the no-access user sits on "Loading Planning…" at /).
     await this.goto(TRANSITION_RULES_ROUTE);
     await this.expectAccessRestricted();
   }
@@ -245,6 +245,26 @@ export class TransitionRulesListPage extends MasterDataListPage {
     return (await this.rowValues()).map((r) => r.code).filter(Boolean);
   }
 
+  /**
+   * After a search for `term`: each row's rule-cell text (name, then "· CODE") and code.
+   * Used by the start-of-run sweep to read the run tag out of leftover rules' names.
+   */
+  async ruleLabels(term: string): Promise<{ code: string; label: string }[]> {
+    await this.search(term);
+    const headers = (await this.grid.table.getByRole('columnheader').allInnerTexts()).map((h) =>
+      h.trim(),
+    );
+    const rule = headers.indexOf('Rule');
+    const out: { code: string; label: string }[] = [];
+    for (const row of await this.grid.bodyRows().all()) {
+      const cells = await row.getByRole('cell').allInnerTexts();
+      const label = (cells[rule] ?? '').replace(/\s+/g, ' ').trim();
+      const code = label.match(/· ([A-Z0-9][A-Z0-9-]*)(?:· ambiguous)?$/)?.[1] ?? '';
+      if (code) out.push({ code, label });
+    }
+    return out;
+  }
+
   /** Shows up to 100 rows (the grid defaults to 50). */
   async showAllRows(): Promise<void> {
     if ((await this.showing()).total > 50) await this.setRowsPerPage(100);
@@ -261,7 +281,7 @@ export class TransitionRulesListPage extends MasterDataListPage {
     await expect(this.grid.filtersDialog).toBeVisible();
     await this.l.filterField(this.grid.filtersDialog, label).click();
     await this.l.option(value).click();
-    await this.page.keyboard.press('Escape').catch(() => {});
+    await this.page.keyboard.press('Escape');
     if (!(await this.grid.filtersDialog.isVisible())) await this.grid.filtersButton.click();
     await this.grid.applyButton.click();
     await this.closeFilters();
@@ -351,7 +371,10 @@ export class TransitionRulesListPage extends MasterDataListPage {
     await this.ruleRow(code).click({ button: 'right' });
     // Give a menu time to open first (on dev/uat the row has no menu at all): a menu that
     // opens late must not read as "no Duplicate". The probe is bounded, then the page is checked.
-    await this.l.rowMenu.waitFor({ state: 'visible', timeout: 3_000 }).catch(() => undefined);
+    await this.l.rowMenu.waitFor({ state: 'visible', timeout: 3_000 }).then(
+      () => true,
+      () => false,
+    );
     const offered = (await this.l.duplicateAction.count()) > 0;
     await this.page.keyboard.press('Escape');
     return offered;

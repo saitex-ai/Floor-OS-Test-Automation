@@ -934,10 +934,7 @@ export class TransitionRuleEditorPage extends BasePage {
     await expect
       .poll(
         async () =>
-          (await this.l.accessRestricted
-            .first()
-            .isVisible()
-            .catch(() => false)) || !/\/edit$/.test(this.page.url()),
+          (await this.l.accessRestricted.first().isVisible()) || !/\/edit$/.test(this.page.url()),
         { message: 'edit URL refused or redirected', timeout: WAIT.PAGE_LOAD },
       )
       .toBe(true);

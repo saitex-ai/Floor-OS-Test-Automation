@@ -25,7 +25,10 @@ export const TR_TEST_DATA_TAG =
   'QA-AUTO — transition-rules test data (pw-hybrid-framework). Safe to delete.';
 
 // Run id = time + Playwright worker index (each worker loads this module separately).
-const RUN = `${Date.now().toString(36).toUpperCase().slice(-4)}${process.env.TEST_WORKER_INDEX ?? '0'}`;
+// The time is the whole base-36 millisecond stamp (8 characters), so the start-of-run sweep can tell a
+// rule left by an old, killed run from one a parallel worker is still using.
+const STAMP_LENGTH = 8;
+const RUN = `${Date.now().toString(36).toUpperCase()}${process.env.TEST_WORKER_INDEX ?? '0'}`;
 let counter = 0;
 
 /** A tag unique to this run and worker: "QATR<run><n>". */
@@ -122,12 +125,60 @@ async function deactivateRule(page: Page, id: string): Promise<void> {
   await editor.confirmDeactivate();
 }
 
+/** Rules older than this are leftovers of a killed run (a suite run takes minutes). */
+const STALE_AFTER_MS = 3 * 60 * 60 * 1000;
+
+/**
+ * beforeAll for the Transition rules spec: deactivates QA-AUTO rules still
+ * active from an earlier run that was killed before its afterAll. Only rules
+ * whose tag is older than STALE_AFTER_MS are touched, never a parallel
+ * worker's live ones. Fails when a leftover can't be retired.
+ */
+export function sweepStaleRulesBeforeAll(): void {
+  test.beforeAll(async ({ browser }: { browser: Browser }) => {
+    test.setTimeout(600_000);
+    const page = await setupPage(browser);
+    page.setDefaultTimeout(30_000);
+    const failed: string[] = [];
+    try {
+      const list = new TransitionRulesListPage(page);
+      await list.open();
+      await list.expectOpen();
+      await list.selectTab('Active');
+      await list.showAllRows();
+      const stale = (await list.ruleLabels('QATR')).filter(({ label }) => {
+        const stamp = label.match(new RegExp(`QATR([0-9A-Z]{${STAMP_LENGTH}})`))?.[1];
+        return stamp !== undefined && Date.now() - parseInt(stamp, 36) > STALE_AFTER_MS;
+      });
+      for (const { code } of stale) {
+        try {
+          await list.findRule(code);
+          await list.openRule(code);
+          const editor = new TransitionRuleEditorPage(page);
+          await new TransitionRuleViewPage(page).edit();
+          await editor.goToConditions();
+          await editor.openDeactivate();
+          await editor.confirmDeactivate();
+        } catch (error) {
+          failed.push(`${code}: ${String(error).split('\n')[0]}`);
+        }
+      }
+    } finally {
+      await page.close();
+    }
+    if (failed.length)
+      throw new Error(
+        `QA-AUTO sweep: leftover rules could not be deactivated: ${failed.join('; ')}`,
+      );
+  });
+}
+
 /**
  * afterAll for the Transition rules spec: deactivates every rule this file
  * created in this worker that is still active (rules are retired, never
  * deleted). The Active tab, searched by this worker's run tag, says which
- * ones are. Best effort — a rule that can't be deactivated is logged, never
- * a test failure.
+ * ones are. Throws when a rule is still active afterwards, so a leak is a
+ * failure, never a warning.
  */
 export function cleanUpRulesAfterAll(): void {
   test.afterAll(async ({ browser }: { browser: Browser }) => {
@@ -138,6 +189,7 @@ export function cleanUpRulesAfterAll(): void {
     const page = await setupPage(browser);
     page.setDefaultTimeout(30_000);
     const done: string[] = [];
+    const failed: string[] = [];
     try {
       const list = new TransitionRulesListPage(page);
       await list.open();
@@ -151,17 +203,22 @@ export function cleanUpRulesAfterAll(): void {
           await deactivateRule(page, id);
           done.push(code);
         } catch (error) {
-          console.warn(
-            `QA-AUTO cleanup: could not deactivate ${code}: ${String(error).split('\n')[0]}`,
-          );
+          failed.push(`${code}: ${String(error).split('\n')[0]}`);
         }
       }
-    } catch (error) {
-      console.warn(`QA-AUTO cleanup: rules not cleaned: ${String(error).split('\n')[0]}`);
+      // Verify it stuck: none of this worker's rules may still be Active.
+      await list.open();
+      await list.expectOpen();
+      await list.selectTab('Active');
+      await list.showAllRows();
+      const mine = new Set(tracked.map(([, c]) => c));
+      const left = (await list.activeCodes(runTag())).filter((c) => mine.has(c));
+      for (const code of left) if (!failed.some((f) => f.startsWith(code))) failed.push(code);
     } finally {
       await page.close();
       if (done.length)
         console.log(`QA-AUTO cleanup (${path.basename(file)}): deactivated ${done.join(', ')}`);
     }
+    if (failed.length) throw new Error(`QA-AUTO cleanup: rules still active: ${failed.join('; ')}`);
   });
 }

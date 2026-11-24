@@ -12,6 +12,7 @@ import { asPersona, personaCredentials, personaSkipReason, setupPage } from './s
 import {
   TR_TEST_DATA_TAG,
   cleanUpRulesAfterAll,
+  sweepStaleRulesBeforeAll,
   createRule,
   fillNewRule,
   rarePriority,
@@ -70,6 +71,7 @@ function direction(values: number[]): 'asc' | 'desc' | 'flat' | 'mixed' {
 
 test.describe('Planning - Transition rules', () => {
   // Deactivates this file's QA-AUTO rules once its cases are done.
+  sweepStaleRulesBeforeAll();
   cleanUpRulesAfterAll();
 
   let full: SavedRule;
@@ -696,10 +698,9 @@ test.describe('Planning - Transition rules', () => {
       await list.expectRule(rule.code);
     });
     await test.step('A one-centre rule names the centre', async () => {
-      const editorForCentre = new TransitionRuleEditorPage(page);
-      await editorForCentre.openNew();
-      await editorForCentre.chooseOneCentre();
-      const centres = await editorForCentre.scopeOptions();
+      await editor.openNew();
+      await editor.chooseOneCentre();
+      const centres = await editor.scopeOptions();
       // Only a test centre: never attach a rule to a real sewing line.
       const centre = centres.find((c) => /QA-AUTO|Playwright/.test(c));
       test.skip(!centre, 'No QA-AUTO/Playwright sewing-line centre on this environment');
