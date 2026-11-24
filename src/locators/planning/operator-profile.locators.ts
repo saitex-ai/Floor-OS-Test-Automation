@@ -27,7 +27,7 @@ export class OperatorProfileLocators {
   readonly metaLine: Locator;
   /** The note at the bottom of the view: "Owned and written by planning — …". */
   readonly ownershipNote: Locator;
-  /** Bob-style users: "You can change this operator's qualifications below. …". */
+  /** Users with qualification write only: "You can change this operator's qualifications below. …". */
   readonly qualificationOnlyNotice: Locator;
 
   // ── Form, step 1 ────────────────────────────────────────────────────

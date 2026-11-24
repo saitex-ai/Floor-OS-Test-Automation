@@ -129,13 +129,18 @@ export class OperatorsListPage extends MasterDataListPage {
     await expect(this.locators.operatorRow(employeeNo)).toHaveCount(0, { timeout: WAIT.SERVER });
   }
 
-  /** Searching `term` lists `employeeNo`'s row (on whichever page) — see expectSearchFinds. */
+  /**
+   * Searching `term` lists `employeeNo`'s row (on whichever page). A broad
+   * term matches many operators and other workers add more while this runs,
+   * so every attempt re-reads the results from page 1 at 100 rows a page
+   * instead of continuing from wherever the last attempt stopped.
+   */
   async expectSearchFindsOperator(term: string, employeeNo: string): Promise<void> {
     await this.search(term);
     await expect(this.grid.bodyRows().first()).toBeVisible({ timeout: WAIT.SERVER });
-    // A broad term ("floating") matches a lot of operators: page through them 100 at a time.
-    await this.setRowsPerPage(100).catch(() => {});
+    await this.setRowsPerPage(100);
     await expect(async () => {
+      await this.firstPage();
       while ((await this.locators.operatorRow(employeeNo).count()) === 0) {
         expect(
           await this.grid.nextPageButton.isEnabled(),
@@ -145,13 +150,26 @@ export class OperatorsListPage extends MasterDataListPage {
         await this.nextPage();
         await expect.poll(async () => (await this.showing()).from).not.toBe(from);
       }
-    }).toPass({ timeout: 90_000 });
+    }).toPass({ timeout: 60_000, intervals: [1_000, 2_000, 5_000] });
+  }
+
+  async expectPreviousPageDisabled(): Promise<void> {
+    await expect(this.grid.previousPageButton).toBeDisabled();
+  }
+
+  /** The list is replaced by the "Access restricted" page (a user without Planning access). */
+  async expectAccessRestricted(): Promise<void> {
+    await expect(this.grid.accessRestricted.first()).toBeVisible({ timeout: WAIT.PAGE_LOAD });
+  }
+
+  async expectOperatorRowContains(employeeNo: string, text: string): Promise<void> {
+    await expect(this.locators.operatorRow(employeeNo)).toContainText(text);
   }
 
   /** Searching `term` doesn't list `employeeNo` (the results fit one page, or none). */
   async expectSearchMisses(term: string, employeeNo: string): Promise<void> {
     await this.search(term);
-    await this.setRowsPerPage(100).catch(() => {});
+    await this.setRowsPerPage(100);
     await expect(this.locators.operatorRow(employeeNo)).toHaveCount(0, { timeout: WAIT.SERVER });
   }
 
@@ -282,7 +300,7 @@ export class OperatorsListPage extends MasterDataListPage {
   /** "Go to" a page with the pager's page input, if the pager has one. */
   async firstPage(): Promise<void> {
     const first = this.page.getByRole('button', { name: 'First page' });
-    if (await first.isVisible().catch(() => false)) await first.click();
+    if (await first.isVisible()) await first.click();
     else while (await this.grid.previousPageButton.isEnabled()) await this.previousPage();
   }
 

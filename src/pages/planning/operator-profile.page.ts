@@ -488,17 +488,105 @@ export class OperatorProfilePage extends BasePage {
   async openQualificationsStep(): Promise<void> {
     await this.loadingQualifications(() => this.locators.qualificationsStep.click());
     await expect(this.locators.doneButton).toBeVisible({ timeout: WAIT.NAVIGATION });
-    // The add row renders with the loaded table (a user who can't write gets none).
-    await this.locators.addRow
-      .first()
-      .waitFor({ state: 'visible', timeout: WAIT.PAGE_LOAD })
-      .catch(() => {});
+    // The add row renders with the loaded table.
+    await expect(this.locators.addRow.first()).toBeVisible({ timeout: WAIT.PAGE_LOAD });
+  }
+
+  /** The new-operator form's chrome: step 2 in the step list, Cancel, Save & continue. */
+  async expectCreateFormChrome(): Promise<void> {
+    await expect(this.locators.qualificationsStep).toBeVisible();
+    await expect(this.locators.cancelButton).toBeVisible();
+    await expect(this.locators.saveAndContinueButton).toBeVisible();
+  }
+
+  /** The "You can change this operator's qualifications below" notice for a user with qualification write only. */
+  async expectQualificationOnlyNotice(): Promise<void> {
+    await expect(this.locators.qualificationOnlyNotice).toBeVisible();
+  }
+
+  async expectText(text: string): Promise<void> {
+    await expect(this.locators.text(text)).toBeVisible();
+  }
+
+  /** A refused Save & continue leaves the form on step 1: no Done button. */
+  async expectStillOnProfileStep(): Promise<void> {
+    await expect(this.locators.doneButton).toHaveCount(0);
+  }
+
+  /** Cancel by its left edge (the floating AI button covers the right) — the caller answers the leave dialog. */
+  async clickCancel(): Promise<void> {
+    await this.locators.cancelButton.click({ position: { x: 10, y: 10 } });
+  }
+
+  async discardAndLeave(): Promise<void> {
+    await this.locators.discardAndLeaveButton.click();
+  }
+
+  async keepEditing(): Promise<void> {
+    await this.locators.keepEditingButton.click();
+  }
+
+  /** The back link — the caller answers the leave dialog. */
+  async clickBack(): Promise<void> {
+    await this.locators.backLink.first().click();
+  }
+
+  async expectBackLink(): Promise<void> {
+    await expect(this.locators.backLink.first()).toBeVisible();
+  }
+
+  async expectEditProfileButton(): Promise<void> {
+    await expect(this.locators.editProfileButton).toBeVisible();
+  }
+
+  /** No qualification row is open for editing (the row's own Save closed it). */
+  async expectNoRowBeingEdited(): Promise<void> {
+    await expect(this.locators.editingRow).toHaveCount(0);
+  }
+
+  async expectAddRowVisible(): Promise<void> {
+    await expect(this.locators.addRow).toBeVisible();
+  }
+
+  /** The add row is the first row under the header, whatever the sort or search. */
+  async expectAddRowFirst(): Promise<void> {
+    await expect(this.locators.qualificationsTable.getByRole('row').nth(1)).toHaveAttribute(
+      'data-row-key',
+      '__add',
+    );
+  }
+
+  /** The saved row for `code` offers "Edit qualification". */
+  async expectRowEditable(code: string): Promise<void> {
+    await expect(
+      this.locators.qualificationRow(code).getByRole('button', { name: 'Edit qualification' }),
+    ).toBeVisible();
+  }
+
+  /** A new add row: Last assessed shows `today`, and Qualified and Active are both on. */
+  async expectAddRowDefaults(today: string): Promise<void> {
+    const row = this.locators.addRow;
+    await expect(this.locators.rowDate(row, 'Last assessed')).toContainText(today);
+    for (const name of ['Qualified', 'Active'] as const)
+      await expect(this.locators.rowSwitch(row, name)).toHaveAttribute('aria-checked', 'true');
+  }
+
+  /**
+   * Pressing Add on an incomplete row sends nothing and the row says what is
+   * missing (Add itself stays enabled on dev and uat, 2026-11-25).
+   */
+  async expectAddRefusedWith(message: string | RegExp): Promise<void> {
+    expect(await this.addQualification(), 'no qualification POST sent').toBeNull();
+    await expect
+      .poll(async () => (await this.rowMessages()).join(' | '))
+      .toMatch(message instanceof RegExp ? message : new RegExp(message));
   }
 
   /** Step 2's qualifications table ends in an "Add a qualification" row. */
   async expectAddQualificationRow(): Promise<void> {
     await expect(this.locators.addQualificationButton).toBeVisible({ timeout: WAIT.PAGE_LOAD });
-    await expect(this.locators.newRowActivity).toBeVisible();
+    // No Activity picker on the add row since the 2026-11-20 build.
+    await expect(this.locators.newRowActivity).toHaveCount(0);
     await expect(this.locators.newRowTask).toBeVisible();
     await expect(this.locators.doneButton).toBeVisible();
   }

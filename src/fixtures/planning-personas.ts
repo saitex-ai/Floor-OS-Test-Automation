@@ -9,7 +9,7 @@ import { loginAsUser, userCredentials } from './multi-user';
  *   user holding only job.pln-viewer).
  * - NOACCESS: can't open the Planning masters at all.
  * - QUALIFICATION: holds planning.qualification.read / write but not
- *   operator-profile write (bob on dev, 2026-10-21).
+ *   operator-profile write.
  * Cases skip with `personaSkipReason()` when the login isn't set.
  */
 export type Persona = 'READONLY' | 'NOACCESS' | 'QUALIFICATION';
@@ -23,8 +23,7 @@ export function personaSkipReason(persona: Persona): string {
   const who = {
     READONLY: 'a read-only Planning user (e.g. only job.pln-viewer)',
     NOACCESS: 'a user without Planning master-data access',
-    QUALIFICATION:
-      'a Planning user with qualification write but no operator-profile write (e.g. bob)',
+    QUALIFICATION: 'a Planning user with qualification write but no operator-profile write',
   }[persona];
   return `Needs ${who}: set PLANNING_${persona}_USER_${suffix} / PLANNING_${persona}_PASSWORD_${suffix}`;
 }

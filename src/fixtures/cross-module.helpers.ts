@@ -106,16 +106,7 @@ export async function createEmployee(
   await employees.expectRowsLoaded();
   await employees.openNewEmployee();
   await employee.expectOnCreatePage();
-  await employee.locators.fullName.fill(fullName);
-  // The picker's departments can take over 15 s to arrive on a slow dev (2026-11-18).
-  await expect(async () => {
-    if (await employee.locators.departmentDialog.isVisible()) await page.keyboard.press('Escape');
-    await employee.openDepartmentPickerOptions();
-  }).toPass({ timeout: 90_000 });
-  await employee.searchDepartmentPicker(departmentSearch);
-  await employee.locators.departmentOption(department).first().click();
-  await employee.locators.maintainedBy.click();
-  await employee.locators.departmentOption('By hand').click();
+  await employee.fillNewEmployee(fullName, departmentSearch, department);
   const [response] = await Promise.all([
     page.waitForResponse(
       (r) => new URL(r.url()).pathname === '/api/employees' && r.request().method() === 'POST',
@@ -155,7 +146,7 @@ export async function moveEmployeeToAnotherDepartment(
     await employee.cancel();
     return null;
   }
-  await employee.locators.departmentOption(other.trim()).first().click();
+  await employee.pickDepartment(other.trim());
   const [response] = await Promise.all([
     page.waitForResponse(
       (r) =>

@@ -82,7 +82,10 @@ const EXPANDED_COLUMNS = [
 ];
 const PENDING_ROW = 'Save or cancel the open qualification row first.';
 const NO_ACTIVITIES =
-  'No activities are offered for qualifications here (uat has none, 2026-11-17)';
+  'The Activity picker is removed from the qualification rows on the current build (2026-11-20, dev and uat), so no activity qualification can be added. Needs the PO sign-off on ClickUp, or a bug.';
+/** Marks the Activity half of a case as not checked (it shows in the report, not as a pass). */
+const activityHalfNotChecked = () =>
+  test.info().annotations.push({ type: 'activity-half-not-checked', description: NO_ACTIVITIES });
 
 const percent = (v: string) => Number(v.replace('%', ''));
 
@@ -477,7 +480,7 @@ test.describe('Planning - Operators & Qualifications', () => {
     test.skip(total <= 10, `Paging needs more than 10 operators; this environment has ${total}`);
     await operatorsListPage.setRowsPerPage(10);
     await expect.poll(() => operatorsListPage.showing()).toEqual({ from: 1, to: 10, total });
-    await expect(operatorsListPage.grid.previousPageButton).toBeDisabled();
+    await operatorsListPage.expectPreviousPageDisabled();
     await operatorsListPage.nextPage();
     await expect
       .poll(() => operatorsListPage.showing())
@@ -491,9 +494,7 @@ test.describe('Planning - Operators & Qualifications', () => {
   test('TC-COQ-01 Create form layout', async ({ operatorProfilePage }) => {
     await allure.tms(cu('z941abzdru'), 'TC-COQ-01 (ClickUp)');
     await operatorProfilePage.openNew();
-    await expect(
-      operatorProfilePage.locators.text('An employee has at most one profile.'),
-    ).toBeVisible();
+    await operatorProfilePage.expectText('An employee has at most one profile.');
     for (const hint of [
       'The person, in the employee master. An employee has at most one profile',
       'The roster baseline the capacity ledger starts from',
@@ -506,10 +507,8 @@ test.describe('Planning - Operators & Qualifications', () => {
     ])
       await operatorProfilePage.expectFieldHint(hint);
     // Since the stepped form (2026-10-28): the qualifications are step 2.
-    await expect(operatorProfilePage.locators.qualificationsStep).toBeVisible();
     await operatorProfilePage.expectChangesStatus('No changes');
-    await expect(operatorProfilePage.locators.cancelButton).toBeVisible();
-    await expect(operatorProfilePage.locators.saveAndContinueButton).toBeVisible();
+    await operatorProfilePage.expectCreateFormChrome();
   });
 
   test('TC-COQ-02 Fresh form has no pre-selected choices', async ({ operatorProfilePage }) => {
@@ -719,7 +718,7 @@ test.describe('Planning - Operators & Qualifications', () => {
       await operatorProfilePage.fill({ deployment: 'Fixed to one centre' });
       const writes = operatorProfilePage.watchWrites();
       expect((await operatorProfilePage.saveAndContinue()).status).toBe(409);
-      await expect(operatorProfilePage.locators.doneButton).toHaveCount(0);
+      await operatorProfilePage.expectStillOnProfileStep();
       expect(writes.count(), 'only the refused profile POST').toBe(1);
       writes.stop();
     });
@@ -753,11 +752,11 @@ test.describe('Planning - Operators & Qualifications', () => {
     const writes = operatorProfilePage.watchWrites();
     await pickEmployee(operatorProfilePage, employee);
     await operatorProfilePage.fill({ deployment: 'Fixed to one centre' });
-    await operatorProfilePage.locators.cancelButton.click({ position: { x: 10, y: 10 } });
+    await operatorProfilePage.clickCancel();
     expect(await operatorProfilePage.leaveDialogText()).toContain(
       'This operator has changes that are not saved. Leaving now discards them.',
     );
-    await operatorProfilePage.locators.discardAndLeaveButton.click();
+    await operatorProfilePage.discardAndLeave();
     await operatorsListPage.expectLoaded();
     expect(writes.count(), 'nothing saved').toBe(0);
     writes.stop();
@@ -834,11 +833,11 @@ test.describe('Planning - Operators & Qualifications', () => {
   test('TC-VOQ-01 Profile header', async ({ operatorProfilePage }) => {
     await allure.tms(cu('z941abzdrm'), 'TC-VOQ-01 (ClickUp)');
     await operatorProfilePage.openView(rich.id);
-    await expect(operatorProfilePage.locators.backLink.first()).toBeVisible();
+    await operatorProfilePage.expectBackLink();
     await operatorProfilePage.expectHeaderBadge(rich.employeeNo);
     expect(await operatorProfilePage.headingText()).toBe(rich.name);
     await operatorProfilePage.expectHeaderBadge('Fixed to one centre');
-    await expect(operatorProfilePage.locators.editProfileButton).toBeVisible();
+    await operatorProfilePage.expectEditProfileButton();
     await operatorProfilePage.expectMetaLine(
       `${rich.department} · home work centre ${TIME_BASED_CENTRE}`,
     );
@@ -1028,11 +1027,9 @@ test.describe('Planning - Operators & Qualifications', () => {
     await allure.tms(cu('z941abzdqz'), 'TC-EOQ-01 (ClickUp)');
     await operatorProfilePage.openView(rich.id);
     await operatorProfilePage.startEditing();
-    await expect(
-      operatorProfilePage.locators.text(
-        'Saves in place. Retired profiles still resolve for anything that already references them.',
-      ),
-    ).toBeVisible();
+    await operatorProfilePage.expectText(
+      'Saves in place. Retired profiles still resolve for anything that already references them.',
+    );
     await operatorProfilePage.expectEmployeeLocked(
       'Fixed once the profile exists — this record IS the employee',
     );
@@ -1164,11 +1161,11 @@ test.describe('Planning - Operators & Qualifications', () => {
     await operatorProfilePage.openEdit(rich.id);
     const writes = operatorProfilePage.watchWrites();
     await operatorProfilePage.fill({ skillGrade: /^S1 — / });
-    await operatorProfilePage.locators.backLink.first().click();
+    await operatorProfilePage.clickBack();
     expect(await operatorProfilePage.leaveDialogText()).toContain(
       'This operator has changes that are not saved. Leaving now discards them.',
     );
-    await operatorProfilePage.locators.keepEditingButton.click();
+    await operatorProfilePage.keepEditing();
     expect(await operatorProfilePage.fieldValue('Skill grade')).toBe('S1 — entry level');
     expect(await operatorProfilePage.cancel('discard')).toBe(true);
     expect(writes.count(), 'nothing saved').toBe(0);
@@ -1268,18 +1265,8 @@ test.describe('Planning - Operators & Qualifications', () => {
         day: 'numeric',
         year: 'numeric',
       });
-      await expect(
-        operatorProfilePage.locators.rowDate(operatorProfilePage.locators.addRow, 'Last assessed'),
-      ).toContainText(today);
-      for (const name of ['Qualified', 'Active'] as const)
-        await expect(
-          operatorProfilePage.locators.rowSwitch(operatorProfilePage.locators.addRow, name),
-        ).toHaveAttribute('aria-checked', 'true');
-      await expect(
-        operatorProfilePage.locators
-          .qualificationRow(ta())
-          .getByRole('button', { name: 'Edit qualification' }),
-      ).toBeVisible();
+      await operatorProfilePage.expectAddRowDefaults(today);
+      await operatorProfilePage.expectRowEditable(ta());
     });
 
     test('TC-EQQ-03 Add an activity qualification', async ({ operatorProfilePage }) => {
@@ -1312,10 +1299,7 @@ test.describe('Planning - Operators & Qualifications', () => {
       await allure.tms(cu('z941abzdup'), 'TC-EQQ-05 (ClickUp)');
       const before = await operatorProfilePage.qualificationCount();
       await operatorProfilePage.fillQualification({ efficiency: '80', assessedBy: 'HR system' });
-      if (await operatorProfilePage.isAddEnabled()) {
-        expect(await operatorProfilePage.addQualification(), 'nothing sent').toBeNull();
-        expect(await operatorProfilePage.rowMessages()).toContain('Required'); // was "Pick either a task or an activity" before 2026-11-20
-      }
+      await operatorProfilePage.expectAddRefusedWith('Required');
       await operatorProfilePage.expectQualificationCount(before);
       await operatorProfilePage.clearAddRow();
     });
@@ -1364,7 +1348,7 @@ test.describe('Planning - Operators & Qualifications', () => {
       await operatorProfilePage.toastVisible('Qualification saved');
       expect((await operatorProfilePage.qualification(ta())).Efficiency).toBe('72%');
       // Saved by the row's own Save: step 2 has no profile "Save changes" to press.
-      await expect(operatorProfilePage.locators.editingRow).toHaveCount(0);
+      await operatorProfilePage.expectNoRowBeingEdited();
     });
 
     test('TC-EQQ-09 Cancel an inline edit', async ({ operatorProfilePage }) => {
@@ -1395,7 +1379,7 @@ test.describe('Planning - Operators & Qualifications', () => {
       if (activities.length > 0) {
         await operatorProfilePage.fillQualification({ activity: codeOption(activities[0]!) });
         expect(await operatorProfilePage.rowValue('Task')).toBe('—');
-      }
+      } else activityHalfNotChecked();
       await operatorProfilePage.cancelQualificationRow();
       await operatorProfilePage.expectQualificationRow(tb());
     });
@@ -1555,12 +1539,11 @@ test.describe('Planning - Operators & Qualifications', () => {
       const offered = await operatorProfilePage.rowOptions('Task');
       for (const t of lookups.tasks.filter((x) => x.active !== false))
         expect(offered, t.code).toContain(`${t.code} ${t.label}`);
-      // No Activity picker on the screen any more (2026-11-20): nothing to check there.
       const acts = await operatorProfilePage.rowOptions('Activity');
       if (acts.length > 0) {
         for (const a of lookups.activities.filter((x) => x.active !== false))
           expect(acts, a.code).toContain(`${a.code} ${a.label}`);
-      }
+      } else activityHalfNotChecked();
     });
 
     test("TC-EQQ-19 Retired activities and tasks aren't offered", async ({
@@ -1573,8 +1556,12 @@ test.describe('Planning - Operators & Qualifications', () => {
       const codes = (options: string[]) => options.map((o) => o.split(' ')[0]!);
       const tasksOffered = codes(await operatorProfilePage.rowOptions('Task'));
       expect(tasksOffered.filter((c) => retired(lookups.tasks).has(c))).toEqual([]);
-      const activitiesOffered = codes(await operatorProfilePage.rowOptions('Activity'));
-      expect(activitiesOffered.filter((c) => retired(lookups.activities).has(c))).toEqual([]);
+      const activityOptions = await operatorProfilePage.rowOptions('Activity');
+      if (activityOptions.length > 0)
+        expect(codes(activityOptions).filter((c) => retired(lookups.activities).has(c))).toEqual(
+          [],
+        );
+      else activityHalfNotChecked();
     });
 
     test('TC-EQQ-20 Counts update without a reload', async ({
@@ -1601,16 +1588,14 @@ test.describe('Planning - Operators & Qualifications', () => {
       await operatorProfilePage.searchQualifications(ta());
       await expect.poll(async () => (await operatorProfilePage.qualificationRows()).length).toBe(1);
       await operatorProfilePage.expectQualificationRow(ta());
-      await expect(operatorProfilePage.locators.addRow).toBeVisible();
+      await operatorProfilePage.expectAddRowVisible();
       await operatorProfilePage.searchQualifications('');
       await operatorProfilePage.sortQualificationsBy('Efficiency');
       await expect(async () => {
         const values = (await operatorProfilePage.qualificationColumn('Efficiency')).map(percent);
         expect(values).toEqual([...values].sort((a, b) => a - b));
       }).toPass({ timeout: 15_000 });
-      await expect(
-        operatorProfilePage.locators.qualificationsTable.getByRole('row').nth(1),
-      ).toHaveAttribute('data-row-key', '__add');
+      await operatorProfilePage.expectAddRowFirst();
     });
   });
 
@@ -1664,9 +1649,8 @@ test.describe('Planning - Operators & Qualifications', () => {
     await asPersona(personas, 'QUALIFICATION', async (p) => {
       const form = new OperatorProfilePage(p);
       await form.openEdit(operator.id);
-      await expect(form.locators.qualificationOnlyNotice).toBeVisible();
-      for (const field of ['Home work centre', 'Usual shift', 'Skill grade', 'Deployment'])
-        await expect(p.getByRole('combobox', { name: field, exact: true })).toHaveCount(0);
+      await form.expectQualificationOnlyNotice();
+      await form.expectDetailsReadOnly();
       await form.openQualificationsStep();
       await form.fillQualification({
         task: codeOption(task),
@@ -1699,7 +1683,7 @@ test.describe('Planning - Operators & Qualifications', () => {
       ]) {
         await test.step(path, async () => {
           await profile.gotoAuthenticated(path);
-          await expect(list.grid.accessRestricted.first()).toBeVisible({ timeout: 60_000 });
+          await list.expectAccessRestricted();
         });
       }
     });
@@ -1733,7 +1717,7 @@ test.describe('Planning - Operators & Qualifications', () => {
       await list.expectTitle('Người vận hành & Chứng nhận năng lực');
       await list.search(rich.employeeNo);
       await list.expectOperatorRow(rich.employeeNo);
-      await expect(list.locators.operatorRow(rich.employeeNo)).toContainText(rich.name);
+      await list.expectOperatorRowContains(rich.employeeNo, rich.name);
       await form.gotoNew();
       await form.expectHeading('Người vận hành mới');
       await form.expectNoEnglishPickDate();

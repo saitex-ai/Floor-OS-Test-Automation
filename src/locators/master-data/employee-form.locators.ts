@@ -57,4 +57,9 @@ export class EmployeeFormLocators {
   departmentOption(name: string | RegExp): Locator {
     return this.departmentDialog.getByRole('button', { name });
   }
+
+  /** An option button inside the open "Maintained by" picker dialog. */
+  maintainedByOption(name: string | RegExp): Locator {
+    return this.departmentDialog.getByRole('button', { name });
+  }
 }

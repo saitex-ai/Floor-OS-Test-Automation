@@ -137,8 +137,8 @@ export function isoDay(day: number, monthOffset = 0): string {
 /**
  * After this file's cases: retires every operator profile this worker
  * created (Active off) and switches its employee off in Master Data.
- * Best effort — a record that can't be cleaned is logged, never a test
- * failure (its QA-AUTO name still marks it for the backend).
+ * Every record is attempted, then the hook throws if any of them could not
+ * be cleaned (its QA-AUTO name still marks it for the backend).
  */
 export function cleanUpOperatorsAfterAll(): void {
   test.afterAll(async ({ browser }) => {
@@ -148,6 +148,7 @@ export function cleanUpOperatorsAfterAll(): void {
     page.setDefaultTimeout(30_000);
     page.setDefaultNavigationTimeout(120_000);
     const form = new OperatorProfilePage(page);
+    const failures: string[] = [];
     for (const operator of operators.splice(0)) {
       try {
         await form.openEdit(operator.id);
@@ -157,19 +158,19 @@ export function cleanUpOperatorsAfterAll(): void {
           if (status !== 200) throw new Error(`PUT answered ${status}`);
         }
       } catch (error) {
-        console.warn(`cleanup: couldn't retire operator ${operator.employeeNo}: ${String(error)}`);
+        failures.push(`couldn't retire operator ${operator.employeeNo}: ${String(error)}`);
       }
     }
     for (const employee of employees.splice(0)) {
       try {
         await deactivateEmployee(page, employee.name);
       } catch (error) {
-        console.warn(
-          `cleanup: couldn't deactivate employee ${employee.employeeNo}: ${String(error)}`,
-        );
+        failures.push(`couldn't deactivate employee ${employee.employeeNo}: ${String(error)}`);
       }
     }
     await page.close();
+    if (failures.length > 0)
+      throw new Error(`cleanup left QA-AUTO records:\n${failures.join('\n')}`);
   });
 }
 
