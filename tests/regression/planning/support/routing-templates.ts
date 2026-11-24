@@ -211,6 +211,13 @@ export async function oncePerRun<T>(key: string, make: () => Promise<T>): Promis
 // Per worker (module state is per worker): the suite's own approval policies.
 const policies: string[] = [];
 
+/**
+ * The suite's policies' priority ("lower wins"): 100, the highest number the form accepts
+ * ("A whole number from 0 to 100", dev 2026-11-25), so it never outranks a real policy
+ * (9999 is refused). Set explicitly rather than left to the form's default.
+ */
+const POLICY_PRIORITY = '100';
+
 /** A run-unique policy name carrying the QA-AUTO marker. */
 export function policyName(label: string): string {
   return rtName(`${uniqueTag('RT-P')} ${label}`);
@@ -234,12 +241,15 @@ export async function createPolicy(page: Page, name: string): Promise<string> {
     name,
     description: rtName('policy'),
     entityType: 'Routing template',
+    // "Lower wins": the form's maximum, so this policy never outranks a real Routing template policy.
+    priority: POLICY_PRIORITY,
     active: false,
     levels: [{ name: 'QA review', from: 'Users', who: [ALICE] }],
   });
   policies.push(name);
   const outcome = await form.saveOk();
   expect(outcome.status, `create policy ${name}`).toBe(201);
+  expect(outcome.priority, `priority of policy ${name}`).toBe(Number(POLICY_PRIORITY));
   return name;
 }
 
