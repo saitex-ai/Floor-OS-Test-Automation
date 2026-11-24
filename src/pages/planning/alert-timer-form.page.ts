@@ -15,6 +15,7 @@ import type {
   RecordedWrite,
 } from './alert-timers-network';
 import { ensureRoute } from './navigation';
+import { isLauncherLanding } from './alert-timers-access';
 import { WAIT } from './waits';
 
 const LIST = '/planning/master-data/alert-timers';
@@ -132,8 +133,12 @@ export class AlertTimerFormPage extends BasePage {
       .poll(
         async () =>
           (await this.locators.accessRestricted.isVisible().catch(() => false)) ||
-          !new URL(this.page.url()).pathname.startsWith(LIST),
-        { message: 'blocked: "Access restricted" or redirected away', timeout: WAIT.PAGE_LOAD },
+          isLauncherLanding(this.page.url(), LIST),
+        {
+          message:
+            'blocked: "Access restricted", or landed on the app launcher (not the login page)',
+          timeout: WAIT.PAGE_LOAD,
+        },
       )
       .toBe(true);
     await expect(this.locators.saveButton).toHaveCount(0);

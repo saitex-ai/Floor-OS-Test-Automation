@@ -260,13 +260,23 @@ export class AlertTimersNetwork {
    */
   sendSaveToMissingTimer(missingUserId: string): void {
     this.saveHandler = async (route) => {
-      const url = route
-        .request()
-        .url()
-        .replace(/digest-templates\/[0-9a-f-]{36}/, `digest-templates/${missingUserId}`);
+      const original = route.request().url();
+      const url = original.replace(
+        /digest-templates\/[0-9a-f-]{36}/i,
+        `digest-templates/${missingUserId}`,
+      );
+      if (url === original || !url.includes(missingUserId)) {
+        // The id pattern didn't match: letting this through would save to a seeded user's timer.
+        await route.abort('blockedbyclient');
+        this.misdirectedSave = true;
+        return;
+      }
       await route.continue({ url });
     };
   }
+
+  /** True when `sendSaveToMissingTimer` could not redirect a save and blocked it instead. */
+  misdirectedSave = false;
 
   // ── Rewritten reads ─────────────────────────────────────────────────
 

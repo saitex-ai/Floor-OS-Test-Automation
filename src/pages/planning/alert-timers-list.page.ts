@@ -4,6 +4,7 @@ import { AlertTimersListLocators } from '../../locators/planning/alert-timers-li
 import { SECTION_LABELS } from '../../locators/planning/alert-timer-form.locators';
 import type { AlertTimerRow } from './alert-timers-network';
 import { ensureRoute } from './navigation';
+import { isLauncherLanding } from './alert-timers-access';
 import { WAIT } from './waits';
 
 const HUB = '/planning/master-data';
@@ -109,9 +110,12 @@ export class AlertTimersListPage extends MasterDataListPage {
     await expect
       .poll(
         async () =>
-          !new URL(this.page.url()).pathname.startsWith(HUB) ||
+          isLauncherLanding(this.page.url(), HUB) ||
           (await this.locators.hubFilter.isVisible().catch(() => false)),
-        { message: 'the hub loaded, or the user was sent away from it', timeout: WAIT.PAGE_LOAD },
+        {
+          message: 'the hub loaded, or the user landed on the app launcher (not the login page)',
+          timeout: WAIT.PAGE_LOAD,
+        },
       )
       .toBe(true);
     await expect(this.locators.hubTile).toHaveCount(0);
@@ -122,7 +126,7 @@ export class AlertTimersListPage extends MasterDataListPage {
   /** The tabs are exactly `names`, in order (no "Not set"). */
   async expectTabsExactly(names: string[]): Promise<void> {
     await expect(this.grid.tab(names[0]!)).toBeVisible({ timeout: WAIT.SERVER });
-    const tabs = this.page.getByRole('main').getByRole('tablist').first().getByRole('tab');
+    const tabs = this.locators.tabs;
     const labels = (await tabs.allInnerTexts()).map((t) => t.replace(/\s*\d+\s*$/, '').trim());
     expect(labels).toEqual(names);
   }

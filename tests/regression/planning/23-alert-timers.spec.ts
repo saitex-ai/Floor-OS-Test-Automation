@@ -157,11 +157,8 @@ test.describe('Planning - Alert Timers', () => {
     await list.expectLoaded();
     await list.expectTabCountsAddUp(['Real time', 'Daily', 'Weekly', 'Off']);
     const off = firstWhere((t) => !t.isEnabled);
-    if (!off) {
-      // The sum is checked above; only the "counts once" half needs an Off timer.
-      test.info().annotations.push({ type: 'note', description: noTimer('that is Off') });
-      return;
-    }
+    // The sum is checked above; only the "counts once" half needs an Off timer.
+    test.skip(!off, `Sum checked; "counts once" half skipped — ${noTimer('that is Off')}`);
     // The Off row keeps its stored cadence, but is counted (and listed) only under Off.
     await list.search(off!.username!);
     await net.listResponseWith('search', off!.username!);
@@ -670,13 +667,10 @@ test.describe('Planning - Alert Timers', () => {
     // "Next send" comes from the server (nextSendAt), so a simulated save can't show it:
     // check the next occurrence on a real Weekly timer instead.
     const weekly = firstWhere((t) => t.isEnabled && t.cadence === 'weekly');
-    if (!weekly) {
-      test.info().annotations.push({ type: 'note', description: noTimer('on Weekly') });
-      return;
-    }
-    await test.step(`Next send of ${weekly.username}'s real Weekly timer`, async () => {
-      await detail.open(weekly.userId);
-      await detail.expectNextSendScheduled(weekly);
+    test.skip(!weekly, `Create path checked; "Next send" half skipped — ${noTimer('on Weekly')}`);
+    await test.step(`Next send of ${weekly!.username}'s real Weekly timer`, async () => {
+      await detail.open(weekly!.userId);
+      await detail.expectNextSendScheduled(weekly!);
     });
   });
 
@@ -712,8 +706,8 @@ test.describe('Planning - Alert Timers', () => {
 
   test('TC-CAT-24 Loading states', async ({ page }) => {
     await allure.tms(cu('z941abxy6w'), 'TC-CAT-24 (ClickUp)');
-    // The lookups response is held back 10 s to see the loading state.
-    net.delayLookups(10_000);
+    // The lookups response is held back 3 s to see the loading state.
+    net.delayLookups(3_000);
     const form = new AlertTimerFormPage(page);
     await form.gotoNew();
     await form.expectLoadingSkeleton();
@@ -877,6 +871,9 @@ test.describe('Planning - Alert Timers', () => {
     net.sendSaveToMissingTimer(randomUUID());
     const answered = net.writeResponses.length;
     await form.submit(net);
+    // Fail-safe: if the redirect could not be built, the save was blocked, not sent.
+    await expect.poll(() => net.misdirectedSave || net.writeResponses.length > answered).toBe(true);
+    expect(net.misdirectedSave, 'the save could not be redirected to a missing id').toBe(false);
     const response = await net.writeResponseAfter(answered);
     expect(response.status).toBe(404);
     expect(response.body.code).toBe('NOT_FOUND');

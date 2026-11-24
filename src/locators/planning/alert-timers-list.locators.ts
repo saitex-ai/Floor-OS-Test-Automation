@@ -18,6 +18,8 @@ export class AlertTimersListLocators {
   readonly hubFilter: Locator;
   /** The directory-degraded notice ("Names and emails are unavailable right now…"). */
   readonly degradedNotice: Locator;
+  /** The tabs of the first tab list in the page body. */
+  readonly tabs: Locator;
   /** The count cards above the tabs: a term ("Real time") per card. */
   readonly countCardTerms: Locator;
 
@@ -30,6 +32,7 @@ export class AlertTimersListLocators {
     this.degradedNotice = page.getByText('Names and emails are unavailable right now', {
       exact: false,
     });
+    this.tabs = page.getByRole('main').getByRole('tablist').first().getByRole('tab');
     this.countCardTerms = page.getByRole('main').getByRole('term');
   }
 
