@@ -1267,7 +1267,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
       // alice decides it at once, as an Approvals admin if she isn't on it.
       test.skip(
         !(await cuttingRecipeSeedAvailable(page)),
-        'The recipe helper needs the Cutting department and the CUT-BULK activity; this environment has neither (uat: Sewing only).',
+        'The recipe helper needs the Cutting department and an offerable CUT-BULK activity: uat has only Sewing; dev 2026-11-25 has CUT-BULK with a revision open, which "Fills activity" does not offer.',
       );
       await createRecipe(page);
       await addOperation(page, { step: '10', name: 'QA-AUTO approval op', cycleTime: '30' });

@@ -82,6 +82,11 @@ export class RecipeFormLocators {
     return this.page.getByRole('combobox', { name, exact: true });
   }
 
+  /** The "Fills activity" picker's empty result. */
+  noActivityMatch(): Locator {
+    return this.page.getByText('No activity matches that.');
+  }
+
   /** Every option of the open dropdown. */
   options(): Locator {
     return this.page.getByRole('option');

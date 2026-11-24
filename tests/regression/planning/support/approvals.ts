@@ -369,8 +369,10 @@ async function cleanUp(browser: Browser): Promise<void> {
 }
 
 /**
- * Whether the environment has the "Cutting" department the shared recipe
- * helper creates recipes under (uat has only Sewing, and no CUT-BULK activity).
+ * Whether the environment can build the recipe the shared helper creates: it
+ * needs the "Cutting" department (uat has only Sewing) and its CUT-BULK
+ * activity to be offered by "Fills activity" (dev 2026-11-25: not offered
+ * while CUT-BULK has a revision open, "No activity matches that.").
  */
 export async function cuttingRecipeSeedAvailable(page: Page): Promise<boolean> {
   const list = new RecipesListPage(page);
@@ -378,5 +380,6 @@ export async function cuttingRecipeSeedAvailable(page: Page): Promise<boolean> {
   await list.open();
   await list.expectLoadedOrEmpty();
   await list.openNew();
-  return (await form.owningDepartmentNames()).includes('Cutting');
+  if (!(await form.owningDepartmentNames()).includes('Cutting')) return false;
+  return form.fillsActivityOffered('Cutting', 'CUT-BULK');
 }
