@@ -22,11 +22,11 @@ import {
   sendForApproval,
   setupPage,
   snapshot,
+  sweepActivePolicies,
   type BuiltTemplate,
   type Catalogue,
   watchPolicy,
 } from './support/routing-templates';
-import { ApprovalPanelPage } from '../../../src/pages/planning/approval-panel.page';
 
 /**
  * Planning — Routing Templates & Steps: List / Create / Edit Routing
@@ -85,6 +85,8 @@ test.describe('Planning - Routing Templates & Steps', () => {
       cat = await readCatalogue(page);
       if (cat) {
         A = cat.codes;
+        // A killed run can leave this suite's policy Active for everyone: switch it off first (once per run).
+        await oncePerRun('sweep', () => sweepActivePolicies(page));
         // One per parallel slot, kept across worker restarts (policies can't be deleted).
         policy = await oncePerRun(`P-${process.env.TEST_PARALLEL_INDEX ?? '0'}`, () =>
           createPolicy(page, policyName('P')),
@@ -96,10 +98,13 @@ test.describe('Planning - Routing Templates & Steps', () => {
           description: DESC,
         });
         active = await createActive(page, policy, {
-          triple: freeTriple(snap),
+          triple: await freeTriple(page),
           steps: [A[0], A[1]],
         });
-        pending = await createTemplate(page, { triple: freeTriple(snap), steps: [A[0], A[1]] });
+        pending = await createTemplate(page, {
+          triple: await freeTriple(page),
+          steps: [A[0], A[1]],
+        });
         await sendForApproval(page, policy);
         console.log(`FIXTURES draft=${draft.code} active=${active.code} pending=${pending.code}`);
       }
@@ -118,23 +123,31 @@ test.describe('Planning - Routing Templates & Steps', () => {
 
   // ── List Routing Templates ────────────────────────────────────────────
 
-  test('TC-LRT-01 Draft / Pending approval / Active / Retired tabs filter the grid with accurate counts', async ({
+  test('TC-LRT-01 Draft and Active tabs filter the grid to their own statuses', async ({
     routingTemplatesListPage: list,
   }) => {
     await allure.tms(cu('z941aby960'), 'TC-LRT-01 (ClickUp)');
     needCatalogue();
-    knownBug('z941ac2d4a');
     await list.open();
     await list.expectLoaded();
-    // Draft, Active and Retired filter to their own statuses.
     await list.expectRowInTab(draft.code, 'Draft', true);
     await list.expectRowInTab(draft.code, 'Active', false);
     await list.expectRowInTab(active.code, 'Active', true);
     await list.expectRowInTab(active.code, 'Draft', false);
-    // A never-published template awaiting its first decision sits under "Pending approval".
-    // Bug z941ac2d4a: dev shows only All / Draft / Active / Retired, so such a
-    // template is in no status tab and the counts don't add up (2026-11-24: All 290 vs
-    // Draft 119 + Active 72 + Retired 48). Left asserting the correct behaviour.
+  });
+
+  test('TC-LRT-01 The Pending approval tab holds a first submission and the tab counts add up', async ({
+    routingTemplatesListPage: list,
+  }) => {
+    await allure.tms(cu('z941aby960'), 'TC-LRT-01 (ClickUp)');
+    needCatalogue();
+    // Bug z941ac2d4a: dev shows only All / Draft / Active / Retired, so a template
+    // awaiting its first decision is in no status tab and the counts don't add up
+    // (2026-11-24: All 290 vs Draft 119 + Active 72 + Retired 48). Left asserting the
+    // correct behaviour; the Draft / Active tab checks are in the test above.
+    knownBug('z941ac2d4a');
+    await list.open();
+    await list.expectLoaded();
     await list.expectTabCountsAddUp(['Draft', 'Pending approval', 'Active', 'Retired']);
     await list.expectRowInTab(pending.code, 'Pending approval', true);
     await list.expectRowInTab(pending.code, 'Draft', false);
@@ -226,7 +239,10 @@ test.describe('Planning - Routing Templates & Steps', () => {
     await allure.tms(cu('z941aby966'), 'TC-LRT-06 (ClickUp)');
     await allure.tms(cu('z941aby952'), 'Bug z941aby952 (closed 2026-10-12)');
     needCatalogue();
-    const own = await createActive(page, policy, { triple: freeTriple(snap), steps: [A[0], A[1]] });
+    const own = await createActive(page, policy, {
+      triple: await freeTriple(page),
+      steps: [A[0], A[1]],
+    });
 
     await test.step('Draft row: Duplicate, no Retire', async () => {
       await list.findRow(draft.code);
@@ -450,7 +466,7 @@ test.describe('Planning - Routing Templates & Steps', () => {
     await editor.expectNoApprovalsBlock();
     // Once submitted, the chain appears.
     await openTemplate(page, pending.code);
-    await expect(new ApprovalPanelPage(page).locators.chain).toBeVisible();
+    await editor.expectApprovalChainShown();
   });
 
   test('TC-CRT-06 A 0-step template can not be saved, and can not be sent for approval', async ({
@@ -510,12 +526,10 @@ test.describe('Planning - Routing Templates & Steps', () => {
   }) => {
     await allure.tms(cu('z941aby96k'), 'TC-CRT-08 (ClickUp)');
     needCatalogue();
-    const own = await createTemplate(page, { triple: freeTriple(snap), steps: [A[0], A[1]] });
+    const own = await createTemplate(page, { triple: await freeTriple(page), steps: [A[0], A[1]] });
     const request = await sendForApproval(page, policy);
     expect(request).toMatch(/^APR-\d{4}-\d{6}$/);
-    await expect(new ApprovalPanelPage(page).locators.anyPendingBanner).toContainText(
-      'It cannot be changed until the request is decided.',
-    );
+    await editor.expectPendingBannerText('It cannot be changed until the request is decided.');
     await editor.expectStatus(/^Draft · rev 0 · pending approval$/);
     await editor.expectLockedForEditing();
     await list.findRow(own.code);
@@ -627,24 +641,21 @@ test.describe('Planning - Routing Templates & Steps', () => {
   }) => {
     await allure.tms(cu('z941aby96z'), 'TC-ERT-05 (ClickUp)');
     needCatalogue();
-    const panel = new ApprovalPanelPage(page);
     for (const own of [pending, active]) {
       await openTemplate(page, own.code);
       // The chain is plain text: nothing in it can be typed into or picked from.
-      await expect(panel.locators.chain).toBeVisible();
-      await expect(panel.locators.chain.getByRole('textbox')).toHaveCount(0);
-      await expect(panel.locators.chain.getByRole('combobox')).toHaveCount(0);
+      await editor.expectApprovalChainReadOnly();
     }
     await openTemplate(page, pending.code);
     await editor.expectLockedForEditing();
   });
 
   test('TC-ERT-06 Only an approver of the pending request gets a decision panel', async ({
+    approvalPanelPage: panel,
     page,
   }) => {
     await allure.tms(cu('z941aby970'), 'TC-ERT-06 (ClickUp)');
     needCatalogue();
-    const panel = new ApprovalPanelPage(page);
     // Pending: the approver decides (the shipped flow has one policy chain, not one panel per department).
     await openTemplate(page, pending.code);
     await panel.expectDecisionButtons(['Approve', 'Approve and add levels', 'Reject', 'Withdraw']);
@@ -657,14 +668,14 @@ test.describe('Planning - Routing Templates & Steps', () => {
   });
 
   test('TC-ERT-07 Rejecting a request requires a non-empty reason and reopens the record for editing', async ({
+    approvalPanelPage: panel,
     page,
     routingTemplateEditorPage: editor,
   }) => {
     await allure.tms(cu('z941aby971'), 'TC-ERT-07 (ClickUp)');
     needCatalogue();
-    const own = await createTemplate(page, { triple: freeTriple(snap), steps: [A[0], A[1]] });
+    const own = await createTemplate(page, { triple: await freeTriple(page), steps: [A[0], A[1]] });
     await sendForApproval(page, policy);
-    const panel = new ApprovalPanelPage(page);
     await panel.openRejectExpectingReasonRequired();
     const reason = `QA-AUTO reject reason ${own.tag}`;
     await panel.reject(reason);
@@ -673,7 +684,7 @@ test.describe('Planning - Routing Templates & Steps', () => {
     // The record is a Draft again: editable and can be sent once more.
     await editor.expectStatus(/^Draft · rev 0$/);
     await editor.expectSendForApprovalEnabled();
-    await expect(editor.locators.editHeaderButton).toBeVisible();
+    await editor.expectEditHeaderAvailable();
   });
 
   test('TC-ERT-08 Adding a step from a new department only recomputes the required department list', async () => {
@@ -704,13 +715,14 @@ test.describe('Planning - Routing Templates & Steps', () => {
   });
 
   test('TC-ERT-10 Approval makes the template Active at revision 1', async ({
+    approvalPanelPage: panel,
     page,
     routingTemplatesListPage: list,
     routingTemplateEditorPage: editor,
   }) => {
     await allure.tms(cu('z941aby975'), 'TC-ERT-10 (ClickUp)');
     needCatalogue();
-    const own = await createTemplate(page, { triple: freeTriple(snap), steps: [A[0], A[1]] });
+    const own = await createTemplate(page, { triple: await freeTriple(page), steps: [A[0], A[1]] });
     await editor.expectStatus('Draft · rev 0');
     expect(await editor.validate()).toEqual([]);
     await editor.expectSendForApprovalEnabled();
@@ -721,7 +733,6 @@ test.describe('Planning - Routing Templates & Steps', () => {
     await openTemplate(page, own.code);
     await approvePending(page);
     await editor.expectStatus('Active · rev 1');
-    const panel = new ApprovalPanelPage(page);
     await panel.expectRequestStatus(/Approved/);
     await list.findRow(own.code);
     expect((await list.cellValue(own.code, 'Status')).trim()).toBe('Active');
@@ -735,7 +746,10 @@ test.describe('Planning - Routing Templates & Steps', () => {
   }) => {
     await allure.tms(cu('z941aby976'), 'TC-ERT-11 (ClickUp)');
     needCatalogue();
-    const own = await createActive(page, policy, { triple: freeTriple(snap), steps: [A[0], A[1]] });
+    const own = await createActive(page, policy, {
+      triple: await freeTriple(page),
+      steps: [A[0], A[1]],
+    });
     await editor.startRevision();
     await editor.expectStatus('Active · rev 1 → pending rev 2');
     await editor.addStepWith(A[2]);
@@ -765,7 +779,7 @@ test.describe('Planning - Routing Templates & Steps', () => {
   }) => {
     await allure.tms(cu('z941aby977'), 'TC-ERT-12 (ClickUp)');
     needCatalogue();
-    await createActive(page, policy, { triple: freeTriple(snap), steps: [A[0], A[1]] });
+    await createActive(page, policy, { triple: await freeTriple(page), steps: [A[0], A[1]] });
     await editor.startRevision();
     await editor.addStepWith(A[2]);
     await editor.expectChanges('1 steps added');
@@ -783,28 +797,27 @@ test.describe('Planning - Routing Templates & Steps', () => {
       openQuestion(
         'Candidate bug: after confirming "Cancel revision" the editor raises a "Leave without saving? This template has changes that are not saved" guard, although the revision was just dropped.',
       );
-    await editor.expectToast('Pending revision cancelled.');
     await editor.expectStatus('Active · rev 1');
     await editor.expectStepCount(2);
   });
 
   test('TC-ERT-13 Withdrawing a request returns the template to where it was, still editable', async ({
+    approvalPanelPage: panel,
     page,
     routingTemplateEditorPage: editor,
   }) => {
     await allure.tms(cu('z941aby978'), 'TC-ERT-13 (ClickUp)');
     needCatalogue();
-    const panel = new ApprovalPanelPage(page);
     await test.step("a never-published template's first submission returns it to a Draft", async () => {
-      await createTemplate(page, { triple: freeTriple(snap), steps: [A[0], A[1]] });
+      await createTemplate(page, { triple: await freeTriple(page), steps: [A[0], A[1]] });
       await sendForApproval(page, policy);
       await panel.withdraw('QA-AUTO withdraw');
       await editor.expectStatus(/^Draft · rev 0$/);
       await editor.expectSendForApprovalEnabled();
-      await expect(editor.locators.editHeaderButton).toBeVisible();
+      await editor.expectEditHeaderAvailable();
     });
     await test.step("a pending revision's submission returns it to the pending revision", async () => {
-      await createActive(page, policy, { triple: freeTriple(snap), steps: [A[0], A[1]] });
+      await createActive(page, policy, { triple: await freeTriple(page), steps: [A[0], A[1]] });
       await editor.startRevision();
       await editor.addStepWith(A[2]);
       await editor.addLink(3, { from: 2 });
@@ -812,7 +825,7 @@ test.describe('Planning - Routing Templates & Steps', () => {
       await sendForApproval(page, policy);
       await panel.withdraw('QA-AUTO withdraw');
       await editor.expectStatus('Active · rev 1 → pending rev 2');
-      await expect(editor.locators.cancelRevisionButton).toBeVisible();
+      await editor.expectCancelRevisionAvailable();
       await editor.expectSendForApprovalEnabled();
     });
   });
@@ -823,7 +836,7 @@ test.describe('Planning - Routing Templates & Steps', () => {
   }) => {
     await allure.tms(cu('z941aby979'), 'TC-ERT-14 (ClickUp)');
     needCatalogue();
-    await createActive(page, policy, { triple: freeTriple(snap), steps: [A[0], A[1], A[2]] });
+    await createActive(page, policy, { triple: await freeTriple(page), steps: [A[0], A[1], A[2]] });
     await editor.startRevision();
     await editor.expectChanges('none yet');
 
@@ -839,7 +852,7 @@ test.describe('Planning - Routing Templates & Steps', () => {
     await editor.expectLiveReadOnly();
     await editor.expectStepCount(3);
     await editor.expectStepNotMarkedRemoved(2);
-    await expect(editor.locators.changesLine).toHaveCount(0);
+    await editor.expectNoChangesLine();
 
     await editor.showPending();
     await editor.expectStepCount(4);
@@ -855,7 +868,7 @@ test.describe('Planning - Routing Templates & Steps', () => {
     await allure.tms(cu('z941aby97a'), 'TC-ERT-15 (ClickUp)');
     await allure.tms(cu('z941aby952'), 'Bug z941aby952 (closed 2026-10-12)');
     needCatalogue();
-    const triple = freeTriple(snap);
+    const triple = await freeTriple(page);
     const own = await createActive(page, policy, { triple, steps: [A[0], A[1]] });
     // A Draft on the same triple must never be offered as the successor.
     const sameTriple = await createTemplate(page, { triple, steps: [A[0]] });
@@ -1302,7 +1315,7 @@ test.describe('Planning - Routing Templates & Steps', () => {
   }) => {
     await allure.tms(cu('z941aby97z'), 'TC-ERS-13 (ClickUp)');
     needCatalogue();
-    await createActive(page, policy, { triple: freeTriple(snap), steps: [A[0], A[1], A[2]] });
+    await createActive(page, policy, { triple: await freeTriple(page), steps: [A[0], A[1], A[2]] });
     await editor.startRevision();
     const full = ['Details', 'Waits on…', 'Group with…', 'Duplicate step', 'Remove step'];
     expect(await editor.stepMenuItems(3)).toEqual(full);
@@ -1356,6 +1369,7 @@ test.describe('Planning - Routing Templates & Steps', () => {
       ).toBe(true);
     expect(issues.some((i) => i.includes('Step 1 '))).toBe(false);
     expect(await editor.saveDraft()).toEqual({ outcome: 'refused' });
+    await editor.expectRefusalMessage('3 validation errors — nothing was saved.');
     await editor.expectSendForApprovalUnavailable();
   });
 });

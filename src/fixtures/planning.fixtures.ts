@@ -18,6 +18,7 @@ import { RecipeFormPage } from '../pages/planning/recipe-form.page';
 import { RecipeDetailPage } from '../pages/planning/recipe-detail.page';
 import { RoutingTemplatesListPage } from '../pages/planning/routing-templates-list.page';
 import { RoutingTemplateEditorPage } from '../pages/planning/routing-template-editor.page';
+import { ApprovalPanelPage } from '../pages/planning/approval-panel.page';
 import { OperationFormPage } from '../pages/planning/operation-form.page';
 import { OperationsListPage } from '../pages/planning/operations-list.page';
 import { OperationMasterFormPage } from '../pages/planning/operation-master-form.page';
@@ -47,6 +48,7 @@ interface PlanningFixtures {
   recipeDetailPage: RecipeDetailPage;
   routingTemplatesListPage: RoutingTemplatesListPage;
   routingTemplateEditorPage: RoutingTemplateEditorPage;
+  approvalPanelPage: ApprovalPanelPage;
   operationFormPage: OperationFormPage;
   operationsListPage: OperationsListPage;
   operationMasterFormPage: OperationMasterFormPage;
@@ -148,6 +150,10 @@ export const test = base.extend<PlanningFixtures, PlanningWorkerFixtures>({
 
   routingTemplateEditorPage: async ({ page }, use) => {
     await use(new RoutingTemplateEditorPage(page));
+  },
+
+  approvalPanelPage: async ({ page }, use) => {
+    await use(new ApprovalPanelPage(page));
   },
 
   operationFormPage: async ({ page }, use) => {

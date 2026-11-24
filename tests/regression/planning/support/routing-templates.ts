@@ -37,8 +37,9 @@ export function rtName(tag: string): string {
 }
 
 export const NO_CATALOGUE =
-  'Environment gap: the routing-template activity picker lists no activity here ' +
-  '("No activity matches." — uat on 2026-11-17), so no step, and no saved template, can be built';
+  'Environment gap: the cases need steps from three departments and product and wash types to ' +
+  'publish on, but the routing-template activity picker offers only SEWING activities (all QA-AUTO or ' +
+  'test data) and the lookups hold no product or wash types (uat on 2026-11-25)';
 
 /** A cycle kind × product type × wash type, by the labels the editor shows. */
 export interface Triple {
@@ -79,39 +80,50 @@ export async function readCatalogue(page: Page): Promise<Catalogue | null> {
 /** Triples this worker has handed out (module state is per worker). */
 const usedTriples = new Set<string>();
 
+/** A stable hash, so every worker computes the same share of triples for itself. */
+function shareOf(key: string, workers: number): number {
+  let h = 0;
+  for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return h % workers;
+}
+
 /**
- * A random cycle kind × product type × wash type that no Active template
- * uses (both types set, so it never collides with a seeded any-product
- * template). Workers take alternate slots and never reuse a triple;
- * sendForApproval() still refuses a send that would replace a live template.
+ * A random cycle kind × product type × wash type that no live template uses
+ * (both types set, so it never collides with a seeded any-product template).
+ * "Live" is read fresh from the list on every call — Active templates and
+ * first submissions awaiting approval, whoever made them (an approval turns
+ * the latter Active). Each parallel worker draws only from its own stable
+ * share of the triples (a hash of the triple, modulo the worker count), so two
+ * of this suite's workers never pick the same one, and a worker never reuses a
+ * triple. Another run, or a person, can still publish between this read and
+ * the send; sendForApproval() refuses a send that would replace a live template.
  */
-export function freeTriple(snapshot: RoutingTemplatesSnapshot): Triple {
-  const { templates, lookups } = snapshot;
+export async function freeTriple(page: Page): Promise<Triple> {
+  const { templates, lookups } = await snapshot(page);
   const live = new Set(
     templates
-      .filter((t) => t.statusCode === 'active')
+      .filter((t) => t.statusCode === 'active' || t.statusCode === 'pending_approval')
       .map((t) => `${t.cycleKindId}|${t.productType ?? ''}|${t.washType ?? ''}`),
   );
   const kinds = lookups.cycleKinds.filter((k) => k.active);
   const products = lookups.productTypes.filter((p) => p.active !== false);
   const washes = lookups.washTypes.filter((w) => w.active !== false);
-  const free: Triple[] = [];
+  const workers = Math.max(1, test.info().config.workers);
+  const me = Number(process.env.TEST_PARALLEL_INDEX ?? 0) % workers;
+  const mine: Triple[] = [];
   for (const k of kinds)
     for (const p of products)
-      for (const w of washes)
-        if (!live.has(`${k.id}|${p.code}|${w.code}`))
-          free.push({ cycleKind: k.label, productType: p.label, washType: w.label });
-  // Parallel workers take alternate slots, and a worker never reuses a triple, so two of this
-  // suite's templates are never live (or awaiting approval) on the same one.
-  const mine = free.filter(
-    (t, i) =>
-      i % 2 === Number(process.env.TEST_PARALLEL_INDEX ?? 0) % 2 &&
-      !usedTriples.has(`${t.cycleKind}|${t.productType}|${t.washType}`),
-  );
-  const pool = mine.length ? mine : free;
-  if (!pool.length)
-    throw new Error('No cycle kind × product type × wash type is free to publish on');
-  const pick = pool[Math.floor(Math.random() * pool.length)]!;
+      for (const w of washes) {
+        const key = `${k.id}|${p.code}|${w.code}`;
+        const used = usedTriples.has(`${k.label}|${p.label}|${w.label}`);
+        if (!live.has(key) && !used && shareOf(key, workers) === me)
+          mine.push({ cycleKind: k.label, productType: p.label, washType: w.label });
+      }
+  if (!mine.length)
+    throw new Error(
+      `No cycle kind × product type × wash type is free to publish on in worker ${me} of ${workers}'s share`,
+    );
+  const pick = mine[Math.floor(Math.random() * mine.length)]!;
   usedTriples.add(`${pick.cycleKind}|${pick.productType}|${pick.washType}`);
   return pick;
 }
@@ -181,6 +193,13 @@ export const ALICE = 'Alice Planner';
  * runner's pid, in the OS temp dir; a file older than 6 h is ignored.
  */
 export async function oncePerRun<T>(key: string, make: () => Promise<T>): Promise<T> {
+  // Files of earlier runs (over 6 h old) are removed, so the temp folder doesn't collect them.
+  for (const f of fs.readdirSync(os.tmpdir()))
+    if (f.startsWith('pw-routing-templates-')) {
+      const old = path.join(os.tmpdir(), f);
+      if (Date.now() - fs.statSync(old).mtimeMs >= 6 * 60 * 60 * 1000)
+        fs.rmSync(old, { force: true });
+    }
   const file = path.join(os.tmpdir(), `pw-routing-templates-${process.ppid}-${key}.json`);
   if (fs.existsSync(file) && Date.now() - fs.statSync(file).mtimeMs < 6 * 60 * 60 * 1000)
     return JSON.parse(fs.readFileSync(file, 'utf8')) as T;
@@ -237,18 +256,68 @@ async function setPolicyActive(page: Page, name: string, active: boolean): Promi
   await form.saveIfChanged();
 }
 
-/** Switches the policy off; retried (a policy left active routes other people's sends). Never throws. */
+/** What a policy's name carries when this suite made it (rtName's tail). */
+const POLICY_MARKER = 'routing-templates test data';
+
+/**
+ * Switches the policy off and checks that it stuck (the list reads Inactive).
+ * Retried — a policy left active routes other people's sends to the QA chain —
+ * and THROWS when the third attempt still leaves it active.
+ */
 async function deactivate(page: Page, name: string): Promise<void> {
+  const list = new ApprovalPoliciesPage(page);
+  let last = '';
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
       await setPolicyActive(page, name, false);
+      await list.findRow(name);
+      await list.expectCell(name, 'Status', 'Inactive');
       return;
     } catch (error) {
-      console.warn(
-        `QA-AUTO: deactivating "${name}" failed (attempt ${attempt}/3): ${String(error).split('\n')[0]}`,
-      );
+      last = String(error).split('\n')[0]!;
     }
   }
+  throw new Error(
+    `QA-AUTO policy "${name}" is STILL ACTIVE after 3 attempts to switch it off: ${last}`,
+  );
+}
+
+/**
+ * Start-of-run sweep: a killed run (Ctrl-C, CI cancel, a sleeping Mac) can
+ * leave this suite's policy Active, which keeps routing other people's
+ * routing-template sends to the QA chain. Switches off every Active policy
+ * that carries this suite's marker; throws if one stays on. Run once per run.
+ */
+export async function sweepActivePolicies(page: Page): Promise<string[]> {
+  const list = new ApprovalPoliciesPage(page);
+  await list.open();
+  await list.expectLoaded();
+  await list.selectTab('Active');
+  await list.search(POLICY_MARKER);
+  await list.settle();
+  let names: string[] = [];
+  await expect
+    .poll(
+      async () => {
+        if (await list.gridIsEmpty()) {
+          names = [];
+          return true;
+        }
+        // Rows scrolled out of the grid's viewport render empty: skip those.
+        const shown = (await list.columnValues('Policy')).filter(Boolean);
+        names = shown.filter((n) => n.includes(POLICY_MARKER));
+        return shown.every((n) => n.includes(POLICY_MARKER));
+      },
+      { message: `Active policies should all match "${POLICY_MARKER}"`, timeout: WAIT.NAVIGATION },
+    )
+    .toBe(true);
+  for (const name of names) {
+    await deactivate(page, name);
+    console.log(
+      `QA-AUTO sweep (routing-templates): left-over active policy "${name}" switched off`,
+    );
+  }
+  return names;
 }
 
 /**
@@ -285,22 +354,39 @@ export async function sendForApproval(page: Page, policy: string): Promise<strin
     }
     code = await panel.requestCode();
   } catch (error) {
-    await switchOff().catch((cleanup) =>
-      console.warn(`sendForApproval clean-up failed: ${String(cleanup).split('\n')[0]}`),
-    );
+    try {
+      await switchOff();
+    } catch (cleanup) {
+      throw new Error(
+        `${String(error).split('\n')[0]} — AND the clean-up failed: ${String(cleanup).split('\n')[0]}`,
+      );
+    }
     throw error;
   }
   await switchOff();
   return code;
 }
 
-/** Approves the template's pending request (the logged-in user is an Approvals admin). */
+/**
+ * Approves the template's pending request (the logged-in user is an Approvals
+ * admin). Refuses — cancels the dialog and throws — when the Approve dialog
+ * says approving would replace or retire a template: the suite never retires
+ * someone else's live template.
+ */
 export async function approvePending(page: Page): Promise<void> {
   const panel = new ApprovalPanelPage(page);
-  await panel.approve('QA-AUTO routing-templates suite');
-  await expect(new ApprovalPanelPage(page).locators.anyPendingBanner).toHaveCount(0, {
-    timeout: WAIT.SERVER,
-  });
+  const { approveButton, dialog, dialogConfirm } = panel.locators;
+  await approveButton.click();
+  await expect(dialog).toBeVisible();
+  const text = await dialog.innerText();
+  if (/replac|retir/i.test(text)) {
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    throw new Error(`Approving would replace or retire a template — not approved: ${text}`);
+  }
+  await dialog.getByRole('textbox').first().fill('QA-AUTO routing-templates suite');
+  await dialogConfirm.click();
+  await expect(dialog).toBeHidden({ timeout: WAIT.SERVER });
+  await expect(panel.locators.anyPendingBanner).toHaveCount(0, { timeout: WAIT.SERVER });
 }
 
 /**
@@ -375,6 +461,7 @@ export function cleanUpRoutingTemplates(): void {
     test.setTimeout(300_000);
     const page = await setupPage(browser);
     page.setDefaultTimeout(30_000);
+    const stuck: string[] = [];
     try {
       const list = new ApprovalPoliciesPage(page);
       for (const name of policies.splice(0)) {
@@ -385,12 +472,15 @@ export function cleanUpRoutingTemplates(): void {
             console.log(`QA-AUTO cleanup (routing-templates): policy "${name}" deactivated`);
           }
         } catch (error) {
-          console.warn(`QA-AUTO cleanup: policy "${name}": ${String(error).split('\n')[0]}`);
+          stuck.push(`"${name}": ${String(error).split('\n')[0]}`);
         }
       }
     } finally {
       await page.close();
     }
+    // A policy left on keeps routing other people's sends to the QA chain: a failure, never a warning.
+    if (stuck.length)
+      throw new Error(`QA-AUTO approval policy left Active or unverifiable: ${stuck.join('; ')}`);
   });
   cleanUpAfterAll([
     {

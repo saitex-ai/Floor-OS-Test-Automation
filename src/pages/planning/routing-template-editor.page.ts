@@ -37,7 +37,14 @@ export interface LinkValues {
   anyOf?: string;
 }
 
-export type SaveOutcome = { outcome: 'saved'; code: string } | { outcome: 'refused' };
+/**
+ * saved: the save request succeeded. refused: the app's validation refusal (toast "N validation errors —
+ * nothing was saved.", with or without a 4xx from the server). error: neither happened in time, or a 5xx.
+ */
+export type SaveOutcome =
+  | { outcome: 'saved'; code: string }
+  | { outcome: 'refused' }
+  | { outcome: 'error'; detail: string };
 
 const API = /\/api\/planning\/routing-templates/;
 const isSave = (r: Response) =>
@@ -272,6 +279,38 @@ export class RoutingTemplateEditorPage extends BasePage {
 
   async expectNoApprovalsBlock(): Promise<void> {
     await expect(this.locators.approvalsText).toHaveCount(0);
+  }
+
+  /** The Approvals block shows its approval chain. */
+  async expectApprovalChainShown(): Promise<void> {
+    await expect(this.locators.approvalChain).toBeVisible({ timeout: WAIT.SERVER });
+  }
+
+  /** The approval chain is plain text: nothing in it can be typed into or picked from. */
+  async expectApprovalChainReadOnly(): Promise<void> {
+    await this.expectApprovalChainShown();
+    await expect(this.locators.approvalChain.getByRole('textbox')).toHaveCount(0);
+    await expect(this.locators.approvalChain.getByRole('combobox')).toHaveCount(0);
+  }
+
+  /** The "waiting for approval in APR-…" banner carries `text`. */
+  async expectPendingBannerText(text: string | RegExp): Promise<void> {
+    await expect(this.locators.pendingBanner).toContainText(text, { timeout: WAIT.SERVER });
+  }
+
+  /** "Edit header" is offered (the template is editable). */
+  async expectEditHeaderAvailable(): Promise<void> {
+    await expect(this.locators.editHeaderButton).toBeVisible({ timeout: WAIT.SERVER });
+  }
+
+  /** "Cancel revision" is offered (a revision is pending). */
+  async expectCancelRevisionAvailable(): Promise<void> {
+    await expect(this.locators.cancelRevisionButton).toBeVisible({ timeout: WAIT.SERVER });
+  }
+
+  /** The "Changes vs revision N" line is not shown (the Live view has no diff). */
+  async expectNoChangesLine(): Promise<void> {
+    await expect(this.locators.changesLine).toHaveCount(0);
   }
 
   async expectAiProposed(): Promise<void> {
@@ -848,7 +887,25 @@ export class RoutingTemplateEditorPage extends BasePage {
     await this.locators.saveDraftButton.click();
     // The loser of the race settles on its own timeout (both are caught).
     const winner = await Promise.race([saved, refused]);
-    if (winner === null || winner === 'refused' || !winner.ok()) return { outcome: 'refused' };
+    if (winner === 'refused') return { outcome: 'refused' };
+    if (winner === null)
+      return { outcome: 'error', detail: 'no save request and no validation toast' };
+    if (winner.status() >= 500)
+      return { outcome: 'error', detail: `save request answered ${winner.status()}` };
+    if (!winner.ok()) {
+      // The server refused the save (422 validation): the app shows its toast for it too.
+      const shown = await this.locators.refusalToasts
+        .first()
+        .waitFor({ timeout: WAIT.SERVER })
+        .then(() => true)
+        .catch(() => false);
+      return shown
+        ? { outcome: 'refused' }
+        : {
+            outcome: 'error',
+            detail: `save request answered ${winner.status()} with no validation toast`,
+          };
+    }
     return this.afterSave(winner);
   }
 

@@ -58,7 +58,10 @@ export class ApprovalPanelLocators {
     this.retireButton = page.getByRole('button', { name: 'Retire', exact: true });
     this.pendingBanner = page.getByText(/^Waiting for approval in APR-\d{4}-\d{6}\./);
     this.anyPendingBanner = page.getByText(/waiting for approval in APR-\d{4}-\d{6}\./i).first();
-    this.replaceDialog = page.getByRole('alertdialog').or(page.getByRole('dialog')).first();
+    this.replaceDialog = page
+      .getByRole('alertdialog', { name: 'Send for approval?' })
+      .or(page.getByRole('dialog', { name: 'Send for approval?' }))
+      .first();
     this.returnedBanner = page.getByText(/^Draft, returned from approval APR-\d{4}-\d{6}\./);
     // The status row and the chain are rows of separate spans (code, status
     // badge, "by …", History) — read them with spacedText().

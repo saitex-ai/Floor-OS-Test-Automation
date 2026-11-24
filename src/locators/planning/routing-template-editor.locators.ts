@@ -42,6 +42,10 @@ export class RoutingTemplateEditorLocators {
   readonly liveTab: Locator;
   readonly pendingTab: Locator;
   readonly changesLine: Locator;
+  /** The Approvals block's "Approval chain" box (label plus one box per level). */
+  readonly approvalChain: Locator;
+  /** "… waiting for approval in APR-…. It cannot be changed until the request is decided." */
+  readonly pendingBanner: Locator;
   readonly liveReadOnlyNote: Locator;
   readonly criticalPathToggle: Locator;
   readonly graph: Locator;
@@ -103,6 +107,8 @@ export class RoutingTemplateEditorLocators {
     this.pendingTab = revisionTabs.getByRole('tab', { name: /^Pending · rev \d+$/ });
     // The label sits beside the change chips ("1 steps added", …): the line is its parent.
     this.changesLine = page.getByText(/^Changes vs revision \d+/).locator('..');
+    this.approvalChain = page.getByText('Approval chain', { exact: true }).locator('..');
+    this.pendingBanner = page.getByText(/waiting for approval in APR-\d{4}-\d{6}\./i).first();
     this.liveReadOnlyNote = page.getByText(/^Live · revision \d+ - what orders derive from\./);
     this.criticalPathToggle = page.getByRole('button', { name: 'Critical path', exact: true });
     this.graph = page.getByRole('group', { name: 'Step dependency graph' });
