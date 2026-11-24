@@ -1576,6 +1576,9 @@ test.describe('Planning - Transition rules', () => {
     await allure.tms(cu('z941aby4eu'), 'TC-LTR-08 (ClickUp)');
     await list.open();
     await list.expectOpen();
+    // Active tab: the subtitle matches every rule earlier runs left behind (they are retired
+    // after each run, but they pile up on All), which would push this worker's rule off the page.
+    await list.selectTab('Active');
     await list.showAllRows();
     for (const [what, term] of [
       ['code', full.code],
