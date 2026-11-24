@@ -54,4 +54,9 @@ export class AlertTimerDetailLocators {
   headerBadge(text: string): Locator {
     return this.heading.locator('xpath=..').getByText(text, { exact: true });
   }
+
+  /** Text anywhere in the page body, matched exactly. */
+  mainText(text: string): Locator {
+    return this.main.getByText(text, { exact: true });
+  }
 }

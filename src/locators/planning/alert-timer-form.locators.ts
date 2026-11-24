@@ -54,6 +54,8 @@ export class AlertTimerFormLocators {
   readonly editTheirTimerLink: Locator;
   readonly noEmailHint: Locator;
   readonly accessRestricted: Locator;
+  /** The App Launcher's "Pinned Modules" heading: where a user with no Planning app lands. */
+  readonly launcherHeading: Locator;
 
   constructor(private readonly page: Page) {
     this.main = page.getByRole('main').first();
@@ -88,6 +90,7 @@ export class AlertTimerFormLocators {
     this.editTheirTimerLink = page.getByRole('link', { name: 'Edit their alert timer' });
     this.noEmailHint = page.getByText('No email on this account', { exact: true });
     this.accessRestricted = page.getByText('Access restricted', { exact: true });
+    this.launcherHeading = page.getByRole('heading', { name: 'Pinned Modules' });
   }
 
   deliveryTab(cadence: Cadence): Locator {
@@ -146,5 +149,15 @@ export class AlertTimerFormLocators {
   /** A toast in the shell's Notifications region. */
   toast(text: string | RegExp): Locator {
     return this.page.getByRole('region', { name: /Notifications/ }).getByText(text);
+  }
+
+  /** The panel's heading, shown instead of the form for a blocked person. */
+  blockedHeading(): Locator {
+    return this.blockedPanel.getByRole('heading');
+  }
+
+  /** Text in the page body ("<name> already has an alert timer"). */
+  mainText(text: string, exact = false): Locator {
+    return this.main.getByText(text, { exact });
   }
 }

@@ -107,7 +107,7 @@ export class AlertTimerDetailPage extends BasePage {
 
   /** The Delivery value includes the cadence's description, e.g. "This timer is off…". */
   async expectDeliveryNote(text: string): Promise<void> {
-    await expect(this.locators.main.getByText(text, { exact: true })).toBeVisible();
+    await expect(this.locators.mainText(text)).toBeVisible();
   }
 
   async expectSectionsNote(text: string): Promise<void> {

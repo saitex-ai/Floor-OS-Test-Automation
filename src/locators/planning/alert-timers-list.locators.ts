@@ -18,6 +18,8 @@ export class AlertTimersListLocators {
   readonly hubFilter: Locator;
   /** The directory-degraded notice ("Names and emails are unavailable right now…"). */
   readonly degradedNotice: Locator;
+  /** The App Launcher's "Pinned Modules" heading: where a user with no Planning app lands. */
+  readonly launcherHeading: Locator;
   /** The tabs of the first tab list in the page body. */
   readonly tabs: Locator;
   /** The count cards above the tabs: a term ("Real time") per card. */
@@ -32,6 +34,7 @@ export class AlertTimersListLocators {
     this.degradedNotice = page.getByText('Names and emails are unavailable right now', {
       exact: false,
     });
+    this.launcherHeading = page.getByRole('heading', { name: 'Pinned Modules' });
     this.tabs = page.getByRole('main').getByRole('tablist').first().getByRole('tab');
     this.countCardTerms = page.getByRole('main').getByRole('term');
   }
@@ -58,5 +61,22 @@ export class AlertTimersListLocators {
     return this.page
       .locator('[role="cell"]:first-child, td:first-child')
       .filter({ has: this.page.getByText(username, { exact: true }) });
+  }
+
+  /** The cells of `username`'s row (`rowLocator` is that row). */
+  cells(rowLocator: Locator): Locator {
+    return rowLocator.getByRole('cell');
+  }
+
+  /** An inline Edit control (button or link) inside a row. */
+  rowEditControls(rowLocator: Locator): Locator {
+    return rowLocator
+      .getByRole('button', { name: /edit/i })
+      .or(rowLocator.getByRole('link', { name: /edit/i }));
+  }
+
+  /** The username text in the first cell of a row. */
+  usernameIn(rowLocator: Locator, username: string): Locator {
+    return this.cells(rowLocator).first().getByText(username, { exact: true });
   }
 }

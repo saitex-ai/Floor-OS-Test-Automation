@@ -4,7 +4,6 @@ import { AlertTimersListLocators } from '../../locators/planning/alert-timers-li
 import { SECTION_LABELS } from '../../locators/planning/alert-timer-form.locators';
 import type { AlertTimerRow } from './alert-timers-network';
 import { ensureRoute } from './navigation';
-import { isLauncherLanding } from './alert-timers-access';
 import { WAIT } from './waits';
 
 const HUB = '/planning/master-data';
@@ -107,17 +106,10 @@ export class AlertTimersListPage extends MasterDataListPage {
    * to the launcher before the hub renders.
    */
   async expectNoHubTile(): Promise<void> {
-    await expect
-      .poll(
-        async () =>
-          isLauncherLanding(this.page.url(), HUB) ||
-          (await this.locators.hubFilter.isVisible().catch(() => false)),
-        {
-          message: 'the hub loaded, or the user landed on the app launcher (not the login page)',
-          timeout: WAIT.PAGE_LOAD,
-        },
-      )
-      .toBe(true);
+    // The landing: the Master Data hub (filter box) without the tile, or the App Launcher.
+    await expect(this.locators.hubFilter.or(this.locators.launcherHeading)).toBeVisible({
+      timeout: WAIT.PAGE_LOAD,
+    });
     await expect(this.locators.hubTile).toHaveCount(0);
   }
 
@@ -177,7 +169,7 @@ export class AlertTimersListPage extends MasterDataListPage {
 
   private async expectRowCells(row: AlertTimerRow): Promise<void> {
     const username = row.username!;
-    const cells = this.rowFor(username).first().getByRole('cell');
+    const cells = this.locators.cells(this.rowFor(username).first());
     await expect(cells.nth(2), `${username} pill`).toHaveText(pillFor(row));
     expect(pillFor(row)).toMatch(PILL);
     const sections = (await cells.nth(3).innerText()).split(',').map((s) => s.trim());
@@ -216,14 +208,24 @@ export class AlertTimersListPage extends MasterDataListPage {
   async expectNoRowEdit(username: string): Promise<void> {
     const row = this.rowFor(username);
     await expect(row).toBeVisible();
-    await expect(row.getByRole('button', { name: /edit/i })).toHaveCount(0);
-    await expect(row.getByRole('link', { name: /edit/i })).toHaveCount(0);
+    await expect(this.locators.rowEditControls(row)).toHaveCount(0);
   }
 
   /** The "New alert timer" toolbar button is there and usable. */
   async expectNewAvailable(): Promise<void> {
     await expect(this.heading).toBeVisible({ timeout: WAIT.PAGE_LOAD });
     expect(await becomesUsable(this.newButton), '"New alert timer" usable').toBe(true);
+  }
+
+  /** The landing for a user without read access: "Access restricted" in place, or the App Launcher. */
+  override async expectAccessRestricted(): Promise<void> {
+    await expect(this.locators.grid.accessRestricted.or(this.locators.launcherHeading)).toBeVisible(
+      {
+        timeout: WAIT.PAGE_LOAD,
+      },
+    );
+    await expect(this.newButton).toHaveCount(0);
+    await expect(this.grid.bodyRows()).toHaveCount(0);
   }
 
   /** A read-only user gets no usable "New alert timer". */
@@ -268,9 +270,7 @@ export class AlertTimersListPage extends MasterDataListPage {
   }
 
   private userCell(username: string): Locator {
-    return this.rowFor(username).first().getByRole('cell').first().getByText(username, {
-      exact: true,
-    });
+    return this.locators.usernameIn(this.rowFor(username).first(), username);
   }
 }
 

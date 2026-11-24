@@ -15,7 +15,6 @@ import type {
   RecordedWrite,
 } from './alert-timers-network';
 import { ensureRoute } from './navigation';
-import { isLauncherLanding } from './alert-timers-access';
 import { WAIT } from './waits';
 
 const LIST = '/planning/master-data/alert-timers';
@@ -127,20 +126,11 @@ export class AlertTimerFormPage extends BasePage {
     await ensureRoute(this.page, path);
   }
 
-  /** "Access restricted" instead of the form, or sent away from the screen. */
+  /** The landing for a user without write access: "Access restricted" in place, or the App Launcher. */
   async expectAccessRestricted(): Promise<void> {
-    await expect
-      .poll(
-        async () =>
-          (await this.locators.accessRestricted.isVisible().catch(() => false)) ||
-          isLauncherLanding(this.page.url(), LIST),
-        {
-          message:
-            'blocked: "Access restricted", or landed on the app launcher (not the login page)',
-          timeout: WAIT.PAGE_LOAD,
-        },
-      )
-      .toBe(true);
+    await expect(this.locators.accessRestricted.or(this.locators.launcherHeading)).toBeVisible({
+      timeout: WAIT.PAGE_LOAD,
+    });
     await expect(this.locators.saveButton).toHaveCount(0);
     await expect(this.locators.addButton).toHaveCount(0);
   }
@@ -263,7 +253,7 @@ export class AlertTimerFormPage extends BasePage {
   /** The form stays hidden: a panel with `title` and `text` instead, and Add disabled. */
   async expectBlockedPerson(title: string, text: string | RegExp): Promise<void> {
     const l = this.locators;
-    await expect(l.blockedPanel.getByRole('heading')).toHaveText(title, { timeout: WAIT.SERVER });
+    await expect(l.blockedHeading()).toHaveText(title, { timeout: WAIT.SERVER });
     await expect(l.blockedPanel).toContainText(text);
     await this.expectNoForm();
   }
@@ -271,7 +261,7 @@ export class AlertTimerFormPage extends BasePage {
   /** An `already_set` person: who, their current timer, and a link to its Edit page. */
   async expectAlreadySetPerson(c: AlertTimerCandidate): Promise<void> {
     const l = this.locators;
-    await expect(l.main.getByText(`${c.name} already has an alert timer`)).toBeVisible({
+    await expect(l.mainText(`${c.name} already has an alert timer`)).toBeVisible({
       timeout: WAIT.SERVER,
     });
     await expect(l.editTheirTimerLink).toHaveAttribute(
@@ -551,9 +541,7 @@ export class AlertTimerFormPage extends BasePage {
   /** Edit shows the person as fixed context (heading + username), with no Employee picker. */
   async expectFixedPerson(row: AlertTimerRow): Promise<void> {
     await expect(this.locators.heading).toHaveText(row.displayName ?? row.userId);
-    await expect(
-      this.locators.main.getByText(row.username ?? row.userId, { exact: true }).first(),
-    ).toBeVisible();
+    await expect(this.locators.mainText(row.username ?? row.userId, true).first()).toBeVisible();
     await expect(this.locators.employeePicker).toHaveCount(0);
   }
 

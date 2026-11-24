@@ -25,6 +25,9 @@ import { WorkCentreDetailPage } from '../pages/planning/work-centre-detail.page'
 import { MachineDetailPage } from '../pages/planning/machine-detail.page';
 import { MaintenanceWindowFormPage } from '../pages/planning/maintenance-window-form.page';
 import { CalendarDetailPage } from '../pages/planning/calendar-detail.page';
+import { AlertTimersListPage } from '../pages/planning/alert-timers-list.page';
+import { AlertTimerFormPage } from '../pages/planning/alert-timer-form.page';
+import { AlertTimerDetailPage } from '../pages/planning/alert-timer-detail.page';
 
 interface PlanningFixtures {
   planningPage: PlanningPage;
@@ -52,6 +55,9 @@ interface PlanningFixtures {
   machineDetailPage: MachineDetailPage;
   maintenanceWindowFormPage: MaintenanceWindowFormPage;
   calendarDetailPage: CalendarDetailPage;
+  alertTimersListPage: AlertTimersListPage;
+  alertTimerFormPage: AlertTimerFormPage;
+  alertTimerDetailPage: AlertTimerDetailPage;
 }
 
 interface PlanningWorkerFixtures {
@@ -172,6 +178,15 @@ export const test = base.extend<PlanningFixtures, PlanningWorkerFixtures>({
 
   calendarDetailPage: async ({ page }, use) => {
     await use(new CalendarDetailPage(page));
+  },
+  alertTimersListPage: async ({ page }, use) => {
+    await use(new AlertTimersListPage(page));
+  },
+  alertTimerFormPage: async ({ page }, use) => {
+    await use(new AlertTimerFormPage(page));
+  },
+  alertTimerDetailPage: async ({ page }, use) => {
+    await use(new AlertTimerDetailPage(page));
   },
 });
 

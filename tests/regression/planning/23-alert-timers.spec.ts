@@ -43,7 +43,7 @@ import { asPersona, personaCredentials, personaSkipReason, setupPage } from './s
  * Records are picked from what the environment has (beforeAll): saved
  * timers by cadence / state, and one Employee-picker candidate per status.
  * A case that needs a record the environment lacks skips with the reason
- * (uat, 2026-11-17: no saved timers; the picker offers only alice, as
+ * (uat, 2026-11-17: no saved timers; the picker offers only the write-permission login, as
  * "No Planning access", and one employee without an account).
  */
 const cu = (id: string) => `https://app.clickup.com/t/${id}`;
@@ -103,10 +103,9 @@ test.describe('Planning - Alert Timers', () => {
   // ── List ──────────────────────────────────────────────────────────────
 
   test(`TC-LAT-01 "Alert timers" tile appears under Planning Master Data's Organisation category`, async ({
-    page,
+    alertTimersListPage: list,
   }) => {
     await allure.tms(cu('z941abxy5e'), 'TC-LAT-01 (ClickUp)');
-    const list = new AlertTimersListPage(page);
     await list.openHub();
     await list.expectHubTile();
     await list.openFromHubTile();
@@ -124,12 +123,11 @@ test.describe('Planning - Alert Timers', () => {
     });
   });
 
-  test('TC-LAT-03 List shows saved timers only', async ({ page }) => {
+  test('TC-LAT-03 List shows saved timers only', async ({ alertTimersListPage: list }) => {
     await allure.tms(cu('z941abxy5j'), 'TC-LAT-03 (ClickUp)');
     const ready = candidates.get('ready')?.candidate;
     test.skip(!ready, noCandidate('ready'));
     // A "ready" person has Planning access and no timer: no row at all, in any tab.
-    const list = new AlertTimersListPage(page);
     await list.open();
     await list.expectLoaded();
     expect((await net.timers()).map((t) => t.userId)).not.toContain(ready!.userId);
@@ -140,19 +138,19 @@ test.describe('Planning - Alert Timers', () => {
   });
 
   test('TC-LAT-04 Count cards/tabs are All, Real time, Daily, Weekly, Off — no "Not set"', async ({
-    page,
+    alertTimersListPage: list,
   }) => {
     await allure.tms(cu('z941abxy5k'), 'TC-LAT-04 (ClickUp)');
-    const list = new AlertTimersListPage(page);
     await list.open();
     await list.expectLoaded();
     await list.expectTabsExactly(['All', 'Real time', 'Daily', 'Weekly', 'Off']);
     await list.expectCountCards(['Real time', 'Daily', 'Weekly', 'Off']);
   });
 
-  test('TC-LAT-05 Tab counts sum to All, and an Off row counts once', async ({ page }) => {
+  test('TC-LAT-05 Tab counts sum to All, and an Off row counts once', async ({
+    alertTimersListPage: list,
+  }) => {
     await allure.tms(cu('z941abxy5m'), 'TC-LAT-05 (ClickUp)');
-    const list = new AlertTimersListPage(page);
     await list.open();
     await list.expectLoaded();
     await list.expectTabCountsAddUp(['Real time', 'Daily', 'Weekly', 'Off']);
@@ -169,10 +167,9 @@ test.describe('Planning - Alert Timers', () => {
     await list.expectRowNotShown(off!.username!);
   });
 
-  test('TC-LAT-06 Columns and their content', async ({ page }) => {
+  test('TC-LAT-06 Columns and their content', async ({ alertTimersListPage: list }) => {
     await allure.tms(cu('z941abxy5n'), 'TC-LAT-06 (ClickUp)');
     test.skip(timers.length === 0, noTimer('to show'));
-    const list = new AlertTimersListPage(page);
     await list.open();
     await list.expectLoaded();
     await list.expectColumnHeaders([
@@ -188,34 +185,36 @@ test.describe('Planning - Alert Timers', () => {
     await list.expectUsernameMonospace(timers[0]!.username!);
   });
 
-  test('TC-LAT-07 Warning icon/indicator for a disabled account', async ({ page }) => {
+  test('TC-LAT-07 Warning icon/indicator for a disabled account', async ({
+    alertTimersListPage: list,
+  }) => {
     await allure.tms(cu('z941abxy5p'), 'TC-LAT-07 (ClickUp)');
     const disabled = firstWhere((t) => t.warnings.includes('account_disabled'));
     test.skip(!disabled, noTimer('for a disabled account'));
-    const list = new AlertTimersListPage(page);
     await list.open();
     await list.expectRowsLoaded();
     await list.expectDisabledBadge(disabled!.username!);
   });
 
-  test('TC-LAT-08 Row click opens Details; no per-row Edit', async ({ page }) => {
+  test('TC-LAT-08 Row click opens Details; no per-row Edit', async ({
+    alertTimersListPage: list,
+    alertTimerDetailPage: detail,
+  }) => {
     await allure.tms(cu('z941abxy5q'), 'TC-LAT-08 (ClickUp)');
     const row = enabled()[0];
     test.skip(!row, noTimer('to open'));
-    const list = new AlertTimersListPage(page);
     await list.open();
     await list.expectRowsLoaded();
     await list.expectNoRowEdit(row!.username!);
     await list.openTimer(row!);
-    await new AlertTimerDetailPage(page).expectOnDetails(row!.userId);
+    await detail.expectOnDetails(row!.userId);
   });
 
   test('TC-LAT-09 "New alert timer" only shown with write permission', async ({
-    page,
     personas,
+    alertTimersListPage: list,
   }) => {
     await allure.tms(cu('z941abxy5r'), 'TC-LAT-09 (ClickUp)');
-    const list = new AlertTimersListPage(page);
     await list.open();
     await list.expectNewAvailable();
     test.skip(!personaCredentials('READONLY'), personaSkipReason('READONLY'));
@@ -227,21 +226,23 @@ test.describe('Planning - Alert Timers', () => {
     });
   });
 
-  test('TC-LAT-10 Directory-degraded banner and fallback display', async ({ page }) => {
+  test('TC-LAT-10 Directory-degraded banner and fallback display', async ({
+    alertTimersListPage: list,
+  }) => {
     await allure.tms(cu('z941abxy5t'), 'TC-LAT-10 (ClickUp)');
     test.skip(timers.length === 0, noTimer('to show'));
     // Simulated: the list response is rewritten to the directory-down shape.
     net.degradeDirectory();
-    const list = new AlertTimersListPage(page);
     await list.open();
     await list.expectDegraded(timers);
   });
 
-  test('TC-LAT-11 Search matches username, display name, email, or group', async ({ page }) => {
+  test('TC-LAT-11 Search matches username, display name, email, or group', async ({
+    alertTimersListPage: list,
+  }) => {
     await allure.tms(cu('z941abxy5u'), 'TC-LAT-11 (ClickUp)');
     const row = firstWhere((t) => !!(t.displayName && t.email && t.groups.length));
     test.skip(!row, noTimer('with a name, email and group'));
-    const list = new AlertTimersListPage(page);
     await list.open();
     await list.expectRowsLoaded();
     await list.expectSearchPlaceholder('Search by user, name, email or group');
@@ -264,10 +265,11 @@ test.describe('Planning - Alert Timers', () => {
     });
   });
 
-  test('TC-LAT-12 Column sort (User/Group/Alert timer/Last saved)', async ({ page }) => {
+  test('TC-LAT-12 Column sort (User/Group/Alert timer/Last saved)', async ({
+    alertTimersListPage: list,
+  }) => {
     await allure.tms(cu('z941abxy5v'), 'TC-LAT-12 (ClickUp)');
     test.skip(timers.length < 2, noTimer('pair to sort'));
-    const list = new AlertTimersListPage(page);
     await list.open();
     await list.expectRowsLoaded();
     const groupOrder = await net.groupOrder();
@@ -294,33 +296,32 @@ test.describe('Planning - Alert Timers', () => {
 
   // ── Details ───────────────────────────────────────────────────────────
 
-  test('TC-VAT-01 Read-only detail content, Daily cadence', async ({ page }) => {
+  test('TC-VAT-01 Read-only detail content, Daily cadence', async ({
+    alertTimerDetailPage: detail,
+  }) => {
     await allure.tms(cu('z941abxy5w'), 'TC-VAT-01 (ClickUp)');
     const daily = firstWhere((t) => t.isEnabled && t.cadence === 'daily');
     test.skip(!daily, noTimer('on Daily'));
-    const detail = new AlertTimerDetailPage(page);
     await detail.open(daily!.userId);
     await detail.expectShows(daily!);
     await detail.expectNextSendScheduled(daily!);
     await detail.expectDeliveryNote('Alerts are bundled into one digest at the time you choose.');
   });
 
-  test('TC-VAT-02 "Next send" for Real time', async ({ page }) => {
+  test('TC-VAT-02 "Next send" for Real time', async ({ alertTimerDetailPage: detail }) => {
     await allure.tms(cu('z941abxy5x'), 'TC-VAT-02 (ClickUp)');
     const realTime = firstWhere((t) => t.isEnabled && t.cadence === 'real_time');
     test.skip(!realTime, noTimer('on Real time'));
-    const detail = new AlertTimerDetailPage(page);
     await detail.open(realTime!.userId);
     await detail.expectShows(realTime!);
     await detail.expectNextSend('Sent as alerts are raised');
     await detail.expectSectionsNote('Real time sends alerts from these sections only');
   });
 
-  test('TC-VAT-03 Read-only detail content, Off', async ({ page }) => {
+  test('TC-VAT-03 Read-only detail content, Off', async ({ alertTimerDetailPage: detail }) => {
     await allure.tms(cu('z941abxy5y'), 'TC-VAT-03 (ClickUp)');
     const off = firstWhere((t) => !t.isEnabled);
     test.skip(!off, noTimer('that is Off'));
-    const detail = new AlertTimerDetailPage(page);
     await detail.open(off!.userId);
     // expectShows also checks the retained sections and channels are still listed.
     await detail.expectShows(off!);
@@ -329,11 +330,13 @@ test.describe('Planning - Alert Timers', () => {
     await detail.expectSectionsNote('The timer is off, so nothing is sent from these sections.');
   });
 
-  test('TC-VAT-04 Edit action only with write permission', async ({ page, personas }) => {
+  test('TC-VAT-04 Edit action only with write permission', async ({
+    personas,
+    alertTimerDetailPage: detail,
+  }) => {
     await allure.tms(cu('z941abxy5z'), 'TC-VAT-04 (ClickUp)');
     const row = enabled()[0];
     test.skip(!row, noTimer('to open'));
-    const detail = new AlertTimerDetailPage(page);
     await detail.open(row!.userId);
     await detail.expectLoaded();
     await detail.openEdit(row!.userId);
@@ -345,26 +348,24 @@ test.describe('Planning - Alert Timers', () => {
     });
   });
 
-  test('TC-VAT-05 email_missing warning banner', async ({ page }) => {
+  test('TC-VAT-05 email_missing warning banner', async ({ alertTimerDetailPage: detail }) => {
     await allure.tms(cu('z941abxy61'), 'TC-VAT-05 (ClickUp)');
     const row = enabled()[0];
     test.skip(!row, noTimer('to open'));
     // Simulated: no seeded timer carries this warning; it's added to the real response.
     net.addWarnings(row!.userId, ['email_missing']);
-    const detail = new AlertTimerDetailPage(page);
     await detail.open(row!.userId);
     await detail.expectWarning(
       'This person has no email address any more. Alerts go to their in-app inbox instead.',
     );
   });
 
-  test('TC-VAT-06 no_planning_access warning banner', async ({ page }) => {
+  test('TC-VAT-06 no_planning_access warning banner', async ({ alertTimerDetailPage: detail }) => {
     await allure.tms(cu('z941abxy62'), 'TC-VAT-06 (ClickUp)');
     const row = enabled()[0];
     test.skip(!row, noTimer('to open'));
     // Simulated: no seeded timer carries this warning; it's added to the real response.
     net.addWarnings(row!.userId, ['no_planning_access']);
-    const detail = new AlertTimerDetailPage(page);
     await detail.open(row!.userId);
     await detail.expectWarning(
       'This person no longer has Planning access. Nothing is sent until IT support restores it.',
@@ -372,13 +373,12 @@ test.describe('Planning - Alert Timers', () => {
     await detail.expectAccountStatus('No Planning access');
   });
 
-  test('TC-VAT-07 account_disabled warning banner', async ({ page }) => {
+  test('TC-VAT-07 account_disabled warning banner', async ({ alertTimerDetailPage: detail }) => {
     await allure.tms(cu('z941abxy63'), 'TC-VAT-07 (ClickUp)');
     // Agreed on review (2026-10-05): the build, like the prototype, has no banner for a
     // disabled account — a "Disabled" badge and "Account status: Disabled" instead.
     const disabled = firstWhere((t) => t.warnings.includes('account_disabled'));
     test.skip(!disabled, noTimer('for a disabled account'));
-    const detail = new AlertTimerDetailPage(page);
     await detail.open(disabled!.userId);
     await detail.expectLoaded();
     await detail.expectHeaderBadge('Disabled');
@@ -386,29 +386,28 @@ test.describe('Planning - Alert Timers', () => {
     await detail.expectNoWarning();
   });
 
-  test('TC-VAT-08 404 for a person with no timer', async ({ page }) => {
+  test('TC-VAT-08 404 for a person with no timer', async ({ alertTimerDetailPage: detail }) => {
     await allure.tms(cu('z941abxy64'), 'TC-VAT-08 (ClickUp)');
-    const detail = new AlertTimerDetailPage(page);
     await detail.open(randomUUID());
     await detail.expectNoTimerMessage();
   });
 
-  test('TC-VAT-09 Details is fail-soft when the directory is down', async ({ page }) => {
+  test('TC-VAT-09 Details is fail-soft when the directory is down', async ({
+    alertTimerDetailPage: detail,
+  }) => {
     await allure.tms(cu('z941abxy65'), 'TC-VAT-09 (ClickUp)');
     const row = enabled()[0];
     test.skip(!row, noTimer('to open'));
     // Simulated: the details response is rewritten to the directory-down shape.
     net.degradeDirectory();
-    const detail = new AlertTimerDetailPage(page);
     await detail.open(row!.userId);
     await detail.expectDegraded(row!);
   });
 
   // ── New ───────────────────────────────────────────────────────────────
 
-  test('TC-CAT-01 Employee dropdown: minimum length', async ({ page }) => {
+  test('TC-CAT-01 Employee dropdown: minimum length', async ({ alertTimerFormPage: form }) => {
     await allure.tms(cu('z941abxy66'), 'TC-CAT-01 (ClickUp)');
-    const form = new AlertTimerFormPage(page);
     await form.openNew();
     await form.openPicker();
     const opening = await net.candidates('');
@@ -427,9 +426,8 @@ test.describe('Planning - Alert Timers', () => {
     });
   });
 
-  test('TC-CAT-02 Candidate option content', async ({ page }) => {
+  test('TC-CAT-02 Candidate option content', async ({ alertTimerFormPage: form }) => {
     await allure.tms(cu('z941abxy67'), 'TC-CAT-02 (ClickUp)');
-    const form = new AlertTimerFormPage(page);
     await form.openNew();
     await form.openPicker();
     const opening = await net.candidates('');
@@ -440,23 +438,22 @@ test.describe('Planning - Alert Timers', () => {
     await form.expectOptionsDescribe(await net.candidates(term));
   });
 
-  test('TC-CAT-03 Picking a ready candidate enables the form', async ({ page }) => {
+  test('TC-CAT-03 Picking a ready candidate enables the form', async ({
+    alertTimerFormPage: form,
+  }) => {
     await allure.tms(cu('z941abxy68'), 'TC-CAT-03 (ClickUp)');
-    const form = new AlertTimerFormPage(page);
     const found = await newFormWith(form, 'ready');
     await form.expectReadyPerson(found.candidate);
   });
 
-  test('TC-CAT-04 Picking an already_set candidate', async ({ page }) => {
+  test('TC-CAT-04 Picking an already_set candidate', async ({ alertTimerFormPage: form }) => {
     await allure.tms(cu('z941abxy69'), 'TC-CAT-04 (ClickUp)');
-    const form = new AlertTimerFormPage(page);
     const found = await newFormWith(form, 'already_set');
     await form.expectAlreadySetPerson(found.candidate);
   });
 
-  test('TC-CAT-05 Picking an account_disabled candidate', async ({ page }) => {
+  test('TC-CAT-05 Picking an account_disabled candidate', async ({ alertTimerFormPage: form }) => {
     await allure.tms(cu('z941abxy6a'), 'TC-CAT-05 (ClickUp)');
-    const form = new AlertTimerFormPage(page);
     await newFormWith(form, 'account_disabled');
     await form.expectBlockedPerson(
       'Account disabled',
@@ -464,9 +461,8 @@ test.describe('Planning - Alert Timers', () => {
     );
   });
 
-  test('TC-CAT-06 Picking a no_planning_access candidate', async ({ page }) => {
+  test('TC-CAT-06 Picking a no_planning_access candidate', async ({ alertTimerFormPage: form }) => {
     await allure.tms(cu('z941abxy6b'), 'TC-CAT-06 (ClickUp)');
-    const form = new AlertTimerFormPage(page);
     await newFormWith(form, 'no_planning_access');
     await form.expectBlockedPerson(
       'No Planning access',
@@ -475,9 +471,8 @@ test.describe('Planning - Alert Timers', () => {
     await form.expectNoPersonFacts();
   });
 
-  test('TC-CAT-07 Picking a no_account candidate', async ({ page }) => {
+  test('TC-CAT-07 Picking a no_account candidate', async ({ alertTimerFormPage: form }) => {
     await allure.tms(cu('z941abxy6c'), 'TC-CAT-07 (ClickUp)');
-    const form = new AlertTimerFormPage(page);
     await newFormWith(form, 'no_account');
     await form.expectBlockedPerson(
       'No sign-in account',
@@ -485,11 +480,12 @@ test.describe('Planning - Alert Timers', () => {
     );
   });
 
-  test('TC-CAT-08 Candidate search failure is not fail-soft', async ({ page }) => {
+  test('TC-CAT-08 Candidate search failure is not fail-soft', async ({
+    alertTimerFormPage: form,
+  }) => {
     await allure.tms(cu('z941abxy6d'), 'TC-CAT-08 (ClickUp)');
     // Simulated: candidate searches answer 503 DIRECTORY_UNAVAILABLE.
     net.failCandidateSearches();
-    const form = new AlertTimerFormPage(page);
     await form.openNew();
     await form.openPicker();
     await form.searchPicker('te');
@@ -497,9 +493,8 @@ test.describe('Planning - Alert Timers', () => {
     await form.expectOptionCount(0);
   });
 
-  test('TC-CAT-09 Search below minimum length', async ({ page }) => {
+  test('TC-CAT-09 Search below minimum length', async ({ alertTimerFormPage: form }) => {
     await allure.tms(cu('z941abxy6e'), 'TC-CAT-09 (ClickUp)');
-    const form = new AlertTimerFormPage(page);
     await form.openNew();
     await form.openPicker();
     const opening = await net.candidates('');
@@ -509,18 +504,18 @@ test.describe('Planning - Alert Timers', () => {
     await form.expectOptionsDescribe(opening);
   });
 
-  test('TC-CAT-10 Delivery segmented control', async ({ page }) => {
+  test('TC-CAT-10 Delivery segmented control', async ({ alertTimerFormPage: form }) => {
     await allure.tms(cu('z941abxy6f'), 'TC-CAT-10 (ClickUp)');
-    const form = new AlertTimerFormPage(page);
     await newFormWith(form, 'ready');
     await form.expectCadence('Real time');
     for (const cadence of ['Daily', 'Weekly', 'Real time'] as const)
       await form.chooseCadence(cadence);
   });
 
-  test('TC-CAT-11 "Turn off" link and its label flip, values retained', async ({ page }) => {
+  test('TC-CAT-11 "Turn off" link and its label flip, values retained', async ({
+    alertTimerFormPage: form,
+  }) => {
     await allure.tms(cu('z941abxy6g'), 'TC-CAT-11 (ClickUp)');
-    const form = new AlertTimerFormPage(page);
     await newFormWith(form, 'ready');
     await form.fill({
       cadence: 'Weekly',
@@ -535,9 +530,8 @@ test.describe('Planning - Alert Timers', () => {
     expect(await form.state()).toEqual(before);
   });
 
-  test('TC-CAT-12 When fields shown per cadence', async ({ page }) => {
+  test('TC-CAT-12 When fields shown per cadence', async ({ alertTimerFormPage: form }) => {
     await allure.tms(cu('z941abxy6h'), 'TC-CAT-12 (ClickUp)');
-    const form = new AlertTimerFormPage(page);
     await newFormWith(form, 'ready');
     for (const cadence of ['Real time', 'Daily', 'Weekly'] as const) {
       await form.chooseCadence(cadence);
@@ -545,9 +539,10 @@ test.describe('Planning - Alert Timers', () => {
     }
   });
 
-  test('TC-CAT-13 Time select only offers the 15-minute grid', async ({ page }) => {
+  test('TC-CAT-13 Time select only offers the 15-minute grid', async ({
+    alertTimerFormPage: form,
+  }) => {
     await allure.tms(cu('z941abxy6j'), 'TC-CAT-13 (ClickUp)');
-    const form = new AlertTimerFormPage(page);
     await newFormWith(form, 'ready');
     await form.chooseCadence('Daily');
     const grid = Array.from({ length: 96 }, (_, i) => {
@@ -557,53 +552,51 @@ test.describe('Planning - Alert Timers', () => {
     expect(await form.timeOptions()).toEqual(grid);
   });
 
-  test('TC-CAT-14 Unticking the last channel is refused', async ({ page }) => {
+  test('TC-CAT-14 Unticking the last channel is refused', async ({ alertTimerFormPage: form }) => {
     await allure.tms(cu('z941abxy6k'), 'TC-CAT-14 (ClickUp)');
-    const form = new AlertTimerFormPage(page);
     await newFormWith(form, 'ready');
     await form.tryToUntickLastChannel();
   });
 
-  test('TC-CAT-15 Email channel disabled when the principal has no email', async ({ page }) => {
+  test('TC-CAT-15 Email channel disabled when the principal has no email', async ({
+    alertTimerFormPage: form,
+  }) => {
     await allure.tms(cu('z941abxy6m'), 'TC-CAT-15 (ClickUp)');
     const ready = candidates.get('ready')?.candidate;
     test.skip(!ready, noCandidate('ready'));
     // Simulated: the ready person comes back from the directory with no email.
     net.dropCandidateEmail(ready!.userId!);
-    const form = new AlertTimerFormPage(page);
     await newFormWith(form, 'ready');
     await form.expectEmailChannelUnavailable();
   });
 
-  test('TC-CAT-16 Sections required for every cadence, including Real time', async ({ page }) => {
+  test('TC-CAT-16 Sections required for every cadence, including Real time', async ({
+    alertTimerFormPage: form,
+  }) => {
     await allure.tms(cu('z941abxy6n'), 'TC-CAT-16 (ClickUp)');
-    const form = new AlertTimerFormPage(page);
     await newFormWith(form, 'ready');
     await form.expectCadence('Real time');
     await form.untickEverySection();
   });
 
-  test('TC-CAT-17 Sections reordering', async ({ page }) => {
+  test('TC-CAT-17 Sections reordering', async ({ alertTimerFormPage: form }) => {
     await allure.tms(cu('z941abxy6p'), 'TC-CAT-17 (ClickUp)');
     // Agreed on review (2026-10-05): like the prototype, sections keep one fixed order and
     // can't be reordered — the LLD's drag / arrow reordering was never built.
-    const form = new AlertTimerFormPage(page);
     await newFormWith(form, 'ready');
     await form.setSection('Prep completion', true);
     await form.setSection('Delivery risks', true);
     await form.expectSectionsInFixedOrder();
   });
 
-  test('TC-CAT-18 Save label on New', async ({ page }) => {
+  test('TC-CAT-18 Save label on New', async ({ alertTimerFormPage: form }) => {
     await allure.tms(cu('z941abxy6q'), 'TC-CAT-18 (ClickUp)');
-    const form = new AlertTimerFormPage(page);
     await newFormWith(form, 'ready');
     await form.expectSubmitLabel('Add alert timer');
   });
 
-  test('TC-CAT-19 Happy path: create a Real time timer', async ({ page }) => {
+  test('TC-CAT-19 Happy path: create a Real time timer', async ({ alertTimerFormPage: form }) => {
     await allure.tms(cu('z941abxy6r'), 'TC-CAT-19 (ClickUp)');
-    const form = new AlertTimerFormPage(page);
     const { candidate } = await newFormWith(form, 'ready');
     await form.fill({ cadence: 'Real time', sections: ['Capacity'], channels: ['In-app'] });
     // The server's answer is simulated (no real timer is created — see the file comment).
@@ -630,9 +623,11 @@ test.describe('Planning - Alert Timers', () => {
     await form.expectOnList();
   });
 
-  test('TC-CAT-20 Happy path: create a Weekly timer', async ({ page }) => {
+  test('TC-CAT-20 Happy path: create a Weekly timer', async ({
+    alertTimerFormPage: form,
+    alertTimerDetailPage: detail,
+  }) => {
     await allure.tms(cu('z941abxy6t'), 'TC-CAT-20 (ClickUp)');
-    const form = new AlertTimerFormPage(page);
     const { candidate } = await newFormWith(form, 'ready');
     await form.fill({
       cadence: 'Weekly',
@@ -661,7 +656,6 @@ test.describe('Planning - Alert Timers', () => {
     });
     await form.expectToast('Alert timer added.');
     await form.expectOnList();
-    const detail = new AlertTimerDetailPage(page);
     await detail.open(candidate.userId!);
     await detail.expectShows(net.lastSaved!);
     // "Next send" comes from the server (nextSendAt), so a simulated save can't show it:
@@ -674,11 +668,10 @@ test.describe('Planning - Alert Timers', () => {
     });
   });
 
-  test('TC-CAT-21 409 ALREADY_EXISTS race', async ({ page }) => {
+  test('TC-CAT-21 409 ALREADY_EXISTS race', async ({ alertTimerFormPage: form }) => {
     await allure.tms(cu('z941abxy6u'), 'TC-CAT-21 (ClickUp)');
     const other = enabled()[0];
     test.skip(!other, noTimer('to land on'));
-    const form = new AlertTimerFormPage(page);
     await newFormWith(form, 'ready');
     // Simulated: another admin's timer for this person won the race (the server's 409 names it).
     net.answerSaveWithError(409, {
@@ -690,9 +683,10 @@ test.describe('Planning - Alert Timers', () => {
     await form.expectAddedElsewhereNotice(other!.userId);
   });
 
-  test('TC-CAT-23 503 on save shows a retry-worthy message', async ({ page }) => {
+  test('TC-CAT-23 503 on save shows a retry-worthy message', async ({
+    alertTimerFormPage: form,
+  }) => {
     await allure.tms(cu('z941abxy6v'), 'TC-CAT-23 (ClickUp)');
-    const form = new AlertTimerFormPage(page);
     await newFormWith(form, 'ready');
     // Simulated: the directory is down when the save checks access.
     net.answerSaveWithError(503, {
@@ -704,21 +698,19 @@ test.describe('Planning - Alert Timers', () => {
     await form.expectStillOnNew();
   });
 
-  test('TC-CAT-24 Loading states', async ({ page }) => {
+  test('TC-CAT-24 Loading states', async ({ alertTimerFormPage: form }) => {
     await allure.tms(cu('z941abxy6w'), 'TC-CAT-24 (ClickUp)');
     // The lookups response is held back 3 s to see the loading state.
     net.delayLookups(3_000);
-    const form = new AlertTimerFormPage(page);
     await form.gotoNew();
     await form.expectLoadingSkeleton();
     await form.expectNewReady();
   });
 
   test('TC-CAT-25 NO_PLANNING_ACCESS re-checked at save, not just at pick time', async ({
-    page,
+    alertTimerFormPage: form,
   }) => {
     await allure.tms(cu('z941abxy6x'), 'TC-CAT-25 (ClickUp)');
-    const form = new AlertTimerFormPage(page);
     await newFormWith(form, 'ready');
     // Simulated: the person lost their Planning role after being picked; the save is refused.
     net.answerSaveWithError(403, {
@@ -733,29 +725,29 @@ test.describe('Planning - Alert Timers', () => {
 
   // ── Edit ──────────────────────────────────────────────────────────────
 
-  test('TC-EAT-01 No Employee dropdown on Edit', async ({ page }) => {
+  test('TC-EAT-01 No Employee dropdown on Edit', async ({ alertTimerFormPage: form }) => {
     await allure.tms(cu('z941abxy6y'), 'TC-EAT-01 (ClickUp)');
     const row = enabled()[0];
     test.skip(!row, noTimer('to edit'));
-    const form = new AlertTimerFormPage(page);
     await form.openEdit(row!.userId);
     await form.expectFixedPerson(row!);
   });
 
-  test('TC-EAT-02 Save label on Edit', async ({ page }) => {
+  test('TC-EAT-02 Save label on Edit', async ({ alertTimerFormPage: form }) => {
     await allure.tms(cu('z941abxy6z'), 'TC-EAT-02 (ClickUp)');
     const row = enabled()[0];
     test.skip(!row, noTimer('to edit'));
-    const form = new AlertTimerFormPage(page);
     await form.openEdit(row!.userId);
     await form.expectSubmitLabel('Save');
   });
 
-  test('TC-EAT-03 Editing every field persists', async ({ page }) => {
+  test('TC-EAT-03 Editing every field persists', async ({
+    alertTimerFormPage: form,
+    alertTimerDetailPage: detail,
+  }) => {
     await allure.tms(cu('z941abxy70'), 'TC-EAT-03 (ClickUp)');
     const row = firstWhere((t) => t.isEnabled && !!t.email);
     test.skip(!row, noTimer('with an email to edit'));
-    const form = new AlertTimerFormPage(page);
     await form.openEdit(row!.userId);
     // A value different from the stored one in every field.
     const cadence = row!.cadence === 'weekly' ? 'Daily' : 'Weekly';
@@ -790,14 +782,13 @@ test.describe('Planning - Alert Timers', () => {
     expect([...sent.body.sections].sort()).not.toEqual([...row!.sections].sort());
     expect([...sent.body.channels].sort()).not.toEqual([...row!.channels].sort());
     await form.expectToast('Alert timer saved.');
-    const detail = new AlertTimerDetailPage(page);
     await detail.expectOnDetails(row!.userId);
     await detail.expectShows(net.lastSaved!);
     expect(net.lastSaved!.version).toBe(row!.version + 1);
   });
 
   test('TC-EAT-04 Turning Off, then back on, restores prior values with no re-entry', async ({
-    page,
+    alertTimerFormPage: form,
   }) => {
     await allure.tms(cu('z941abxy71'), 'TC-EAT-04 (ClickUp)');
     const row = enabled()[0];
@@ -809,7 +800,6 @@ test.describe('Planning - Alert Timers', () => {
       sections: row!.sections,
       channels: row!.channels,
     };
-    const form = new AlertTimerFormPage(page);
     await form.openEdit(row!.userId);
     const before = await form.state();
     // The server's answers are simulated; the saved Off timer is served back to the next Edit.
@@ -831,20 +821,18 @@ test.describe('Planning - Alert Timers', () => {
     });
   });
 
-  test('TC-EAT-05 No "reset to not set" control anywhere', async ({ page }) => {
+  test('TC-EAT-05 No "reset to not set" control anywhere', async ({ alertTimerFormPage: form }) => {
     await allure.tms(cu('z941abxy72'), 'TC-EAT-05 (ClickUp)');
     const row = enabled()[0];
     test.skip(!row, noTimer('to edit'));
-    const form = new AlertTimerFormPage(page);
     await form.openEdit(row!.userId);
     await form.expectNoResetControl();
   });
 
-  test('TC-EAT-06 409 VERSION_CONFLICT', async ({ page }) => {
+  test('TC-EAT-06 409 VERSION_CONFLICT', async ({ alertTimerFormPage: form }) => {
     await allure.tms(cu('z941abxy73'), 'TC-EAT-06 (ClickUp)');
     const row = enabled()[0];
     test.skip(!row, noTimer('to edit'));
-    const form = new AlertTimerFormPage(page);
     await form.openEdit(row!.userId);
     await form.setSection('Prep completion', !row!.sections.includes('prep_completion'));
     // Simulated: someone else saved this timer first (the server's 409 carries the new version).
@@ -859,11 +847,12 @@ test.describe('Planning - Alert Timers', () => {
     await form.reloadAfterConflict();
   });
 
-  test('TC-EAT-07 404 on PUT when the row no longer exists', async ({ page }) => {
+  test('TC-EAT-07 404 on PUT when the row no longer exists', async ({
+    alertTimerFormPage: form,
+  }) => {
     await allure.tms(cu('z941abxy74'), 'TC-EAT-07 (ClickUp)');
     const row = enabled()[0];
     test.skip(!row, noTimer('to edit'));
-    const form = new AlertTimerFormPage(page);
     await form.openEdit(row!.userId);
     await form.setSection('Prep completion', !row!.sections.includes('prep_completion'));
     // Real server: the save goes to an id with no timer (as if the row had gone), so its own
@@ -881,11 +870,12 @@ test.describe('Planning - Alert Timers', () => {
     await form.expectOnEdit(row!.userId);
   });
 
-  test('TC-EAT-08 Rules re-enforced on every update, not just create', async ({ page }) => {
+  test('TC-EAT-08 Rules re-enforced on every update, not just create', async ({
+    alertTimerFormPage: form,
+  }) => {
     await allure.tms(cu('z941abxy75'), 'TC-EAT-08 (ClickUp)');
     const row = firstWhere((t) => !t.isEnabled) ?? enabled()[0];
     test.skip(!row, noTimer('to edit'));
-    const form = new AlertTimerFormPage(page);
     await form.openEdit(row!.userId);
     if (row!.isEnabled) await form.turnOff();
     // While Off, Sections / Channels are hidden: an Off timer can't be edited into an invalid state.

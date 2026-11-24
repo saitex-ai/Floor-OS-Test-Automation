@@ -106,7 +106,13 @@ export class AlertTimersNetwork {
     page.on('response', async (response) => {
       const method = response.request().method();
       if (method === 'GET' || !response.url().includes('/api/planning/digest-templates')) return;
-      const body = (await response.json().catch(() => ({}))) as WriteResponse['body'];
+      let body: WriteResponse['body'];
+      try {
+        body = (await response.json()) as WriteResponse['body'];
+      } catch {
+        // Not JSON (e.g. a gateway page): surface it as its own code, never as an empty answer.
+        body = { code: 'NON_JSON_RESPONSE' };
+      }
       this.writeResponses.push({ status: response.status(), body });
     });
   }
