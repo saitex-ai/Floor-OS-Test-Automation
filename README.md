@@ -127,6 +127,8 @@ npm run test:crm:dev
 npm run test:mill:dev
 ```
 
+> The Planning Alert Timers regression suite makes requests from Node itself. Dev's certificate comes from a private authority that Node doesn't read from the macOS keychain, so `NODE_USE_SYSTEM_CA=1` must be set — the `test:planning` / `test:planning:dev` scripts already do; set it yourself when calling `npx playwright test` directly.
+
 Everything, one environment:
 
 ```bash
