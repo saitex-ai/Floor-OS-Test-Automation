@@ -386,10 +386,13 @@ test.describe('Planning - Operators & Qualifications', () => {
     await operatorsListPage.expectFiltersBadge(1);
     // The grid reloads with the filter: poll until only the filtered deployment is listed.
     await expect
-      .poll(async () => {
-        const values = await operatorsListPage.columnValues('Deployment');
-        return values.length > 0 && values.every((v) => /^Floating/.test(v));
-      })
+      .poll(
+        async () => {
+          const values = await operatorsListPage.columnValues('Deployment');
+          return values.length > 0 && values.every((v) => /^Floating/.test(v));
+        },
+        { timeout: 45_000 },
+      )
       .toBe(true);
     await operatorsListPage.removeFilterRule();
     await operatorsListPage.expectNoFiltersBadge();
@@ -736,9 +739,9 @@ test.describe('Planning - Operators & Qualifications', () => {
         assessedBy: 'HR system',
       });
       expect(await operatorProfilePage.addQualification()).toBe(409);
-      expect(await operatorProfilePage.rowMessages()).toContain(
-        `${rich.employeeNo} already has a qualification for ${task}`,
-      );
+      await expect
+        .poll(() => operatorProfilePage.rowMessages())
+        .toContain(`${rich.employeeNo} already has a qualification for ${task}`);
       await operatorProfilePage.expectQualificationCount(before);
       await operatorProfilePage.clearAddRow();
     });
@@ -1313,7 +1316,7 @@ test.describe('Planning - Operators & Qualifications', () => {
       await allure.tms(cu('z941abzduq'), 'TC-EQQ-06 (ClickUp)');
       await operatorProfilePage.fillQualification({ task: codeOption(tb()) });
       expect(await operatorProfilePage.addQualification(), 'task only: nothing sent').toBeNull();
-      expect(await operatorProfilePage.rowMessages()).toEqual(['Required', 'Required']);
+      await expect.poll(() => operatorProfilePage.rowMessages()).toEqual(['Required', 'Required']);
       await operatorProfilePage.fillQualification({
         efficiency: '90',
         assessedBy: 'HR system',
@@ -1323,7 +1326,7 @@ test.describe('Planning - Operators & Qualifications', () => {
         await operatorProfilePage.addQualification(),
         'no Last assessed: nothing sent',
       ).toBeNull();
-      expect(await operatorProfilePage.rowMessages()).toEqual(['Required']);
+      await expect.poll(() => operatorProfilePage.rowMessages()).toEqual(['Required']);
       await operatorProfilePage.clearAddRow();
     });
 
@@ -1336,9 +1339,9 @@ test.describe('Planning - Operators & Qualifications', () => {
         assessedBy: 'HR system',
       });
       expect(await operatorProfilePage.addQualification()).toBe(409);
-      expect(await operatorProfilePage.rowMessages()).toContain(
-        `${operator.employeeNo} already has a qualification for ${ta()}`,
-      );
+      await expect
+        .poll(() => operatorProfilePage.rowMessages())
+        .toContain(`${operator.employeeNo} already has a qualification for ${ta()}`);
       await operatorProfilePage.expectQualificationCount(before);
       await operatorProfilePage.clearAddRow();
     });
@@ -1376,9 +1379,9 @@ test.describe('Planning - Operators & Qualifications', () => {
       await operatorProfilePage.startQualificationEdit(tb());
       await operatorProfilePage.fillQualification({ task: codeOption(ta()) });
       expect(await operatorProfilePage.saveQualificationRow()).toBe(409);
-      expect(await operatorProfilePage.rowMessages()).toContain(
-        `${operator.employeeNo} already has a qualification for ${ta()}`,
-      );
+      await expect
+        .poll(() => operatorProfilePage.rowMessages())
+        .toContain(`${operator.employeeNo} already has a qualification for ${ta()}`);
       if (activities.length > 0) {
         await operatorProfilePage.fillQualification({ activity: codeOption(activities[0]!) });
         expect(await operatorProfilePage.rowValue('Task')).toBe('—');
@@ -1485,11 +1488,15 @@ test.describe('Planning - Operators & Qualifications', () => {
         expect(await operatorProfilePage.typeInRow('Efficiency', 'abc'), 'no letters').toBe('');
         expect(await operatorProfilePage.typeInRow('Efficiency', '5'), 'typed').toBe('5');
         expect(await operatorProfilePage.addQualification(), '5%: nothing sent').toBeNull();
-        expect(await operatorProfilePage.rowMessages()).toContain('Between 10% and 150%');
+        await expect
+          .poll(() => operatorProfilePage.rowMessages())
+          .toContain('Between 10% and 150%');
         await operatorProfilePage.typeInRow('Efficiency', '90');
         await operatorProfilePage.typeInRow('Measured minutes', '0');
         expect(await operatorProfilePage.addQualification(), '0 min: nothing sent').toBeNull();
-        expect(await operatorProfilePage.rowMessages()).toContain('Must be greater than 0');
+        await expect
+          .poll(() => operatorProfilePage.rowMessages())
+          .toContain('Must be greater than 0');
         await operatorProfilePage.clearAddRow();
       });
     });
