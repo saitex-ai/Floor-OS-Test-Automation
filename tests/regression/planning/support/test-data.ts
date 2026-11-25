@@ -67,6 +67,8 @@ import {
   MachineFormPage,
   type MachineStatus,
 } from '../../../../src/pages/planning/machine-form.page';
+import { FacilityFormPage } from '../../../../src/pages/planning/facility-form.page';
+import { ensureQaFacility } from '../../../../src/pages/planning/qa-facility';
 import { MachineDetailPage } from '../../../../src/pages/planning/machine-detail.page';
 import {
   MaintenanceWindowFormPage,
@@ -419,6 +421,18 @@ export function machineTagFor(tag: string): string {
   return `${tag} — Planning regression test data (pw-hybrid-framework). Safe to delete.`;
 }
 
+let qaFacilityLabel: string | undefined;
+
+/**
+ * The QA-AUTO facility every QA machine goes in (Facility is required on the
+ * Machine form). Created on the first run on an environment, found by name
+ * after that; looked up once per worker.
+ */
+export async function qaFacility(page: Page): Promise<string> {
+  qaFacilityLabel ??= await ensureQaFacility(new FacilityFormPage(page), new MachineFormPage(page));
+  return qaFacilityLabel;
+}
+
 /**
  * Creates a machine on `workCentre` and returns the asset code dev generated
  * for it (MC-0001…). The list's search doesn't cover system links, so the
@@ -432,9 +446,11 @@ export async function createMachine(
 ): Promise<string> {
   const tag = uniqueTag('QA-M', workCentre);
   const form = new MachineFormPage(page);
+  const facility = await qaFacility(page);
   await form.open();
   await form.fillRequired({
     machineType: QA_MACHINE_TYPE,
+    facility,
     workCentre,
     status: options.status,
   });

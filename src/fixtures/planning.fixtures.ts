@@ -12,6 +12,7 @@ import { OperatorsListPage } from '../pages/planning/operators-list.page';
 import { OperatorProfilePage } from '../pages/planning/operator-profile.page';
 import { MachinesListPage } from '../pages/planning/machines-list.page';
 import { MachineFormPage } from '../pages/planning/machine-form.page';
+import { FacilityFormPage } from '../pages/planning/facility-form.page';
 import { ActivitiesListPage } from '../pages/planning/activities-list.page';
 import { ActivityFormPage } from '../pages/planning/activity-form.page';
 import { DifficultyGradeListPage } from '../pages/planning/difficulty-grade-list.page';
@@ -45,6 +46,7 @@ interface PlanningFixtures {
   operatorProfilePage: OperatorProfilePage;
   machinesListPage: MachinesListPage;
   machineFormPage: MachineFormPage;
+  facilityFormPage: FacilityFormPage;
   activitiesListPage: ActivitiesListPage;
   activityFormPage: ActivityFormPage;
   difficultyGradeListPage: DifficultyGradeListPage;
@@ -132,6 +134,10 @@ export const test = base.extend<PlanningFixtures, PlanningWorkerFixtures>({
 
   machineFormPage: async ({ page }, use) => {
     await use(new MachineFormPage(page));
+  },
+
+  facilityFormPage: async ({ page }, use) => {
+    await use(new FacilityFormPage(page));
   },
 
   activitiesListPage: async ({ page }, use) => {
