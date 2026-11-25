@@ -3,6 +3,7 @@ import { BasePage } from '../base.page';
 import { MODULES } from '../../config/modules';
 import { CostingLocators } from '../../locators/costing/costing.locators';
 import { CostingScreensLocators } from '../../locators/costing/costing-screens.locators';
+import { COSTING_REMOTE_LOAD_TIMEOUT } from './costing-timeouts';
 
 /**
  * A Costing screen reached from the left navigation: its link text, its
@@ -60,7 +61,7 @@ export class CostingPage extends BasePage {
 
   async expectLoaded(): Promise<void> {
     await expect(this.page).toHaveURL(new RegExp(`${MODULES['costing'].path}`));
-    await expect(this.locators.heading).toBeVisible();
+    await expect(this.locators.heading).toBeVisible({ timeout: COSTING_REMOTE_LOAD_TIMEOUT });
     await expect(this.locators.selectScreenHint).toBeVisible();
   }
 
@@ -82,14 +83,15 @@ export class CostingPage extends BasePage {
   }
 
   /**
-   * Opens a list's first row and waits for its detail page. Retried: on dev
+   * Opens a list's first row by its ID cell (`id`, e.g. /^CST-\d{4}-\d+$/)
+   * and waits for its detail page. Retried: on dev
    * the grid re-renders once its data settles, and a click that lands
    * before that doesn't open the row.
    */
-  async openFirstRow(detailUrl: RegExp): Promise<void> {
+  async openFirstRow(id: RegExp, detailUrl: RegExp): Promise<void> {
     await this.expectRows();
     await expect(async () => {
-      await this.screens.firstRowCell.click();
+      await this.screens.firstRowIdCell(id).click();
       await expect(this.page).toHaveURL(detailUrl, { timeout: 3_000 });
     }).toPass({ timeout: 30_000 });
   }
