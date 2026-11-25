@@ -75,7 +75,7 @@ export class ApprovalPoliciesPage extends MasterDataListPage {
   /** `column` of `name`'s row, re-read until it shows `expected` (a save refetches the grid). */
   async expectCell(name: string, column: string, expected: string | RegExp): Promise<void> {
     await expect
-      .poll(() => this.cellValue(name, column), { timeout: WAIT.SERVER })
+      .poll(() => this.cellValue(name, column), { timeout: WAIT.NAVIGATION })
       .toMatch(typeof expected === 'string' ? new RegExp(`^${escapeRegExp(expected)}$`) : expected);
   }
 
