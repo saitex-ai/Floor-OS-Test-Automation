@@ -209,4 +209,17 @@ export class ApprovalPoliciesPage extends MasterDataListPage {
     await expect(this.grid.bodyRows()).toHaveCount(0);
     await expect(this.heading).toHaveCount(0);
   }
+
+  async expectRowsPerPage(size: string): Promise<void> {
+    await expect(this.grid.rowsPerPage).toContainText(size);
+  }
+
+  async expectNextPageEnabled(enabled: boolean): Promise<void> {
+    if (enabled) await expect(this.grid.nextPageButton).toBeEnabled();
+    else await expect(this.grid.nextPageButton).toBeDisabled();
+  }
+
+  async expectPreviousPageDisabled(): Promise<void> {
+    await expect(this.grid.previousPageButton).toBeDisabled();
+  }
 }

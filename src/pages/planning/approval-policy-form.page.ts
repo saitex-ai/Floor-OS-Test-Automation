@@ -567,4 +567,12 @@ export class ApprovalPolicyFormPage extends BasePage {
   async expectQuorum(value: Quorum): Promise<void> {
     await expect(this.locators.quorum).toContainText(value);
   }
+
+  async expectLevelNameValue(name: string): Promise<void> {
+    await expect(this.locators.levelName).toHaveValue(name);
+  }
+
+  async expectEntityTypeDisabled(): Promise<void> {
+    await expect(this.locators.entityType).toBeDisabled();
+  }
 }

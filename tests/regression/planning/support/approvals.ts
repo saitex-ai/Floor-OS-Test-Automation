@@ -337,12 +337,11 @@ async function cleanUp(browser: Browser): Promise<void> {
       try {
         const panel = new ApprovalPanelPage(page);
         await panel.open(activity.path);
-        if (await panel.locators.withdrawButton.isVisible()) {
+        if (await panel.canWithdraw()) {
           await panel.withdraw('QA-AUTO generic-approval suite cleanup');
           await panel.reload();
         }
-        if (await panel.locators.deleteDraftButton.isVisible())
-          await new ActivityFormPage(page).deleteDraft();
+        if (await panel.canDeleteDraft()) await new ActivityFormPage(page).deleteDraft();
         done.push(activity.code);
       } catch (error) {
         problems.push(`${activity.code}: ${String(error).split('\n')[0]}`);

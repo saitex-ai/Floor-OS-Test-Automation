@@ -297,13 +297,12 @@ test.describe('Planning - Generic Approval Workflow', () => {
       await allure.tms(cu('z941abyu8h'), 'TC-LAP-09 (ClickUp)');
       await approvalPoliciesPage.open();
       await approvalPoliciesPage.expectLoaded();
-      await expect(approvalPoliciesPage.grid.rowsPerPage).toContainText('25');
+      await approvalPoliciesPage.expectRowsPerPage('25');
       const { from, to, total } = await approvalPoliciesPage.showing();
       expect(from).toBe(total === 0 ? 0 : 1); // an empty grid (uat before any suite runs) shows 0-0 of 0
       expect(to).toBe(Math.min(25, total));
-      if (total <= 25) await expect(approvalPoliciesPage.grid.nextPageButton).toBeDisabled();
-      else await expect(approvalPoliciesPage.grid.nextPageButton).toBeEnabled();
-      await expect(approvalPoliciesPage.grid.previousPageButton).toBeDisabled();
+      await approvalPoliciesPage.expectNextPageEnabled(total > 25);
+      await approvalPoliciesPage.expectPreviousPageDisabled();
     });
 
     test("TC-LAP-10 A user without Approvals admin rights can't reach Policies", async ({
@@ -568,7 +567,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
       await approvalPolicyFormPage.removeLevel(2);
       await approvalPolicyFormPage.expectRemoveLevelButtons(0);
       await approvalPolicyFormPage.expandLevel(1);
-      await expect(approvalPolicyFormPage.locators.levelName).toHaveValue('QA L1');
+      await approvalPolicyFormPage.expectLevelNameValue('QA L1');
     });
 
     test('TC-CAP-13 Create a two-level policy with "Everyone must approve" on L2', async ({
@@ -648,7 +647,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
       await approvalPoliciesPage.open();
       await approvalPoliciesPage.expectLoaded();
       await approvalPoliciesPage.openNew();
-      await expect(approvalPolicyFormPage.locators.entityType).toBeDisabled();
+      await approvalPolicyFormPage.expectEntityTypeDisabled();
       const apps = await approvalPolicyFormPage.sourceAppOptions();
       expect(apps).toContain('Planning');
       expect(apps).not.toContain('planing');
@@ -1020,7 +1019,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
       // alice is also an Approvals admin, who may decide any request (Approvals
       // app story z941ac172n), so only her Withdraw is checked here.
       await approvalPanelPage.open(rApprover!.path);
-      await expect(approvalPanelPage.locators.withdrawButton).toBeVisible();
+      await approvalPanelPage.expectWithdrawVisible();
     });
 
     test('TC-LAR-01 The Inbox opens from the Approvals app', async ({
@@ -1190,7 +1189,7 @@ test.describe('Planning - Generic Approval Workflow', () => {
       await expect(page).toHaveURL(new RegExp(`${r0.path}\\?returnTo=`));
       await approvalPanelPage.expectPendingBanner(r0.request);
       await approvalPanelPage.expectChain(`L1 · ${LEVEL_ALICE}`);
-      await expect(approvalPanelPage.locators.backToApproval).toBeVisible();
+      await approvalPanelPage.expectBackToApprovalVisible();
     });
 
     test('TC-XAP-18 Due date follows Days to complete', async ({ approvalsInboxPage }) => {

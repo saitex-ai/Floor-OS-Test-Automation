@@ -295,4 +295,20 @@ export class ApprovalPanelPage extends BasePage {
     }).toPass({ timeout: WAIT.NAVIGATION });
     await this.page.keyboard.press('Escape');
   }
+
+  async expectWithdrawVisible(): Promise<void> {
+    await expect(this.locators.withdrawButton).toBeVisible();
+  }
+
+  async expectBackToApprovalVisible(): Promise<void> {
+    await expect(this.locators.backToApproval).toBeVisible();
+  }
+
+  async canWithdraw(): Promise<boolean> {
+    return this.locators.withdrawButton.isVisible();
+  }
+
+  async canDeleteDraft(): Promise<boolean> {
+    return this.locators.deleteDraftButton.isVisible();
+  }
 }
