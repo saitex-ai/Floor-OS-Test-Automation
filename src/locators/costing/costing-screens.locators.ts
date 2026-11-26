@@ -20,6 +20,7 @@ export class CostingScreensLocators {
   // Create Setup wizard (/costing/company-costing-setup/new)
   readonly selectCompanyHeading: Locator;
   readonly selectCompanyPicker: Locator;
+  /** Appears once a company is picked, already at 2 decimals (dev 2026-11-24). */
   readonly decimalPositionPicker: Locator;
   readonly setupContinueButton: Locator;
   /** Wizard steps 2–5, locked until a company is picked. */
@@ -43,6 +44,8 @@ export class CostingScreensLocators {
   readonly newCostingRequestHeading: Locator;
   readonly sampleRequestPicker: Locator;
   readonly techpackPicker: Locator;
+  /** The "Costing" back button above the form; it returns to the list. */
+  readonly backToCostingButton: Locator;
 
   /** The open picker popup's options (company, decimals, sample request). */
   readonly pickerOptions: Locator;
@@ -61,6 +64,8 @@ export class CostingScreensLocators {
   readonly submittedTab: Locator;
   readonly confirmedTab: Locator;
   readonly overdueTab: Locator;
+  /** Toolbar magnifier icon; the search box only opens once it is clicked. */
+  readonly searchButton: Locator;
   readonly searchBox: Locator;
   /** The first row's request ID button ("FYR-2026-00929"), which opens it. */
   readonly firstFyrIdButton: Locator;
@@ -112,6 +117,8 @@ export class CostingScreensLocators {
     // Named by their field labels ("Sample request *", "Existing Techpack *").
     this.sampleRequestPicker = page.getByRole('button', { name: /^Sample request/ });
     this.techpackPicker = page.getByRole('button', { name: /^Existing Techpack/ });
+    // exact: only this back button; the side nav's "Costing" entry is a link.
+    this.backToCostingButton = page.getByRole('button', { name: 'Costing', exact: true });
 
     this.pickerOptions = page.getByRole('option');
 
@@ -130,6 +137,8 @@ export class CostingScreensLocators {
     this.submittedTab = page.getByRole('tab', { name: /^Submitted\s*\d/ });
     this.confirmedTab = page.getByRole('tab', { name: /^Confirmed\s*\d/ });
     this.overdueTab = page.getByRole('tab', { name: /^Overdue\s*\d/ });
+    // exact: the side nav's "Search ⌘K" launcher is a button too.
+    this.searchButton = page.getByRole('button', { name: 'Search', exact: true });
     this.searchBox = page.getByRole('textbox', { name: 'Search' });
     this.firstFyrIdButton = page.getByRole('button', { name: /^FYR-\d{4}-\d+$/ }).first();
     this.firstFcrIdButton = page.getByRole('button', { name: /^FCR-\d{4}-\d+$/ }).first();
@@ -154,11 +163,20 @@ export class CostingScreensLocators {
   }
 
   /**
-   * A plain-text cell (the third: after the row checkbox and Buyer) of a
-   * list's first row — clicking it opens the row, and it holds no button
-   * of its own (e.g. the Costing list's "Assign analyst").
+   * The first row's ID cell, found by its text ("CST-2026-00087",
+   * "CIA-2026-00063") rather than its column position, so an added or
+   * reordered column doesn't move it. Anchored, so the row checkbox
+   * ("Select row CST-…") and "Assign analyst for CST-…" cells don't match.
    */
-  get firstRowCell(): Locator {
-    return this.tableRows.first().getByRole('cell').nth(2);
+  firstRowIdCell(id: RegExp): Locator {
+    return this.tableRows.first().getByRole('cell', { name: id });
+  }
+
+  /**
+   * A page's level-1 heading, e.g. "FYR-2026-00929" or "CST-… | Cost Sheet".
+   * Not exact: a request's heading carries its status too ("FYR-2026-00932 Submitted").
+   */
+  pageHeading(name: string | RegExp): Locator {
+    return this.page.getByRole('heading', { level: 1, name });
   }
 }

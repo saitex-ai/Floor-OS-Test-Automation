@@ -59,7 +59,7 @@ test.describe('Costing Smoke', () => {
       await expect(s.createSetupButton).toBeVisible();
     });
 
-    test('SM-COST-03: Create Setup unlocks Continue only once a company and decimal position are picked', async () => {
+    test('SM-COST-03: Create Setup unlocks Continue once a company is picked, with the decimal position at 2', async () => {
       const s = costingPage.screens;
       await costingPage.openScreen('companyCostingSetup');
       await s.createSetupButton.click();
@@ -71,14 +71,14 @@ test.describe('Costing Smoke', () => {
       for (const step of await s.lockedSetupSteps.all()) {
         await expect(step).toBeDisabled();
       }
-      // Positive control: picking a company alone keeps Continue locked;
-      // adding the decimal position unlocks it. Picking is form state only —
+      // No decimal position until a company is picked. Since dev's
+      // 2026-11-24 build a new setup starts at 2 decimals, so picking a
+      // company alone unlocks Continue. Picking is form state only —
       // Continue is never pressed.
+      await expect(s.decimalPositionPicker).toHaveCount(0);
       await s.selectCompanyPicker.click();
       await s.pickerOptions.first().click();
-      await expect(s.setupContinueButton).toBeDisabled();
-      await s.decimalPositionPicker.click();
-      await s.pickerOptions.first().click();
+      await expect(s.decimalPositionPicker).toHaveText(/^2 – 0\.00/);
       await expect(s.setupContinueButton).toBeEnabled();
       // Leave without creating anything.
       await s.cancelSetupButton.click();
@@ -118,6 +118,9 @@ test.describe('Costing Smoke', () => {
       await s.sampleRequestPicker.click();
       await s.pickerOptions.first().click();
       await expect(s.techpackPicker).toBeEnabled();
+      // Leave without creating anything, back to the Costing list.
+      await s.backToCostingButton.click();
+      await expect(page).toHaveURL(/\/costing\/costing-requests$/);
     });
 
     test('SM-COST-07: Ticking a costing offers Send for approval, and clearing the selection removes it', async () => {
@@ -145,11 +148,9 @@ test.describe('Costing Smoke', () => {
     test('SM-COST-09: A costing opens its cost sheet with every tab', async () => {
       const s = costingPage.screens;
       await costingPage.openScreen('costingRequests');
-      await costingPage.openFirstRow(/\/costing\/costing-requests\/CST-[\w-]+$/);
+      await costingPage.openFirstRow(/^CST-\d{4}-\d+$/, /\/costing\/costing-requests\/CST-[\w-]+$/);
       const costingId = new URL(page.url()).pathname.split('/').pop()!;
-      await expect(
-        page.getByRole('heading', { level: 1, name: `${costingId} | Cost Sheet` }),
-      ).toBeVisible();
+      await expect(s.pageHeading(`${costingId} | Cost Sheet`)).toBeVisible();
       await expect(s.costSheetTabs).toHaveText([
         'Overview',
         'BOM Items',
@@ -172,11 +173,14 @@ test.describe('Costing Smoke', () => {
       await expect(s.inProgressTab).toBeVisible();
       await expect(s.submittedTab).toBeVisible();
       await expect(s.overdueTab).toBeVisible();
+      // The search box sits behind the toolbar's magnifier icon.
+      await expect(s.searchBox).toBeHidden();
+      await s.searchButton.click();
       await expect(s.searchBox).toBeVisible();
       const fyrId = await s.firstFyrIdButton.innerText();
       await s.firstFyrIdButton.click();
       await expect(page).toHaveURL(new RegExp(`/costing/fabric-yield-requests/${fyrId}$`));
-      await expect(page.getByRole('heading', { level: 1, name: fyrId })).toBeVisible();
+      await expect(s.pageHeading(fyrId)).toBeVisible();
     });
 
     test('SM-COST-11: Fabric Cost Requests loads with its status tabs and opens a request', async () => {
@@ -190,7 +194,7 @@ test.describe('Costing Smoke', () => {
       const fcrId = await s.firstFcrIdButton.innerText();
       await s.firstFcrIdButton.click();
       await expect(page).toHaveURL(new RegExp(`/costing/fabric-cost-requests/${fcrId}$`));
-      await expect(page.getByRole('heading', { level: 1, name: fcrId })).toBeVisible();
+      await expect(s.pageHeading(fcrId)).toBeVisible();
     });
   });
 
@@ -201,8 +205,8 @@ test.describe('Costing Smoke', () => {
       await expect(s.allTab).toHaveAttribute('aria-selected', 'true');
       await expect(s.pendingTab).toBeVisible();
       await expect(s.cmApprovedTab).toBeVisible();
-      await costingPage.openFirstRow(/\/costing\/approvals\/[\w-]+$/);
-      await expect(page.getByRole('heading', { level: 1, name: /\| Approval$/ })).toBeVisible();
+      await costingPage.openFirstRow(/^CIA-\d{4}-\d+$/, /\/costing\/approvals\/[\w-]+$/);
+      await expect(s.pageHeading(/\| Approval$/)).toBeVisible();
       await expect(s.commonDetailsHeading).toBeVisible();
       await expect(s.costingSummaryHeading).toBeVisible();
     });
