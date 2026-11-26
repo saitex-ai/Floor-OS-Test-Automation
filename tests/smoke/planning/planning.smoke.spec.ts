@@ -80,7 +80,8 @@ test.describe('Planning module', () => {
     facilityFormPage,
   }) => {
     // Facility is required since the 2026-11 build and has no default: the machine goes in a
-    // QA-AUTO facility (created on the first run on an environment, reused after), on a QA work centre where there is one (a work centre is only referenced, never edited).
+    // QA-AUTO facility (created on the first run on an environment, reused after) and on a QA
+    // work centre. Never a real one.
     const facility = await ensureQaFacility(facilityFormPage, machineFormPage);
     await machinesListPage.open();
     await machinesListPage.expectLoaded();
@@ -89,7 +90,10 @@ test.describe('Planning module', () => {
     // The Work centre list follows the facility, so it is read after the facility is set.
     await machineFormPage.setFacility(facility);
     const workCentre = await machineFormPage.findWorkCentre(/^(QA-WC|PWWC)/);
-    test.skip(!workCentre, 'This environment has no work centre to assign the machine to');
+    test.skip(
+      !workCentre,
+      'No QA work centre (QA-WC / PWWC prefix) exists on this environment to assign the machine to',
+    );
     await machineFormPage.fillRequired({ facility, workCentre: workCentre ?? undefined });
     // A machine has no name, so a system link carries the QA-AUTO marker.
     await machineFormPage.addSystemLink(

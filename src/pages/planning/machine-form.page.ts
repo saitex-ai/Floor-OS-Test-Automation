@@ -175,15 +175,11 @@ export class MachineFormPage extends BasePage {
   }
 
   /**
-   * A work centre to put the machine on, other than "In store": the first one matching
-   * `preferred` (QA test data), else the first one offered. It is only referenced, never
-   * edited. Null when the environment has no work centre at all.
+   * A QA work centre to put the machine on: the first option matching `preferred`, or null
+   * when there is none. Never falls back to a real work centre.
    */
   async findWorkCentre(preferred: RegExp): Promise<string | null> {
-    const options = (await this.optionsOf(this.locators.workCentre)).filter(
-      (o) => o !== 'In store',
-    );
-    return options.find((o) => preferred.test(o)) ?? options[0] ?? null;
+    return (await this.optionsOf(this.locators.workCentre)).find((o) => preferred.test(o)) ?? null;
   }
 
   async setWorkCentre(workCentre: string | RegExp): Promise<void> {
