@@ -168,4 +168,32 @@ export class EmployeeFormPage extends BasePage {
   async expectRequiredErrorCount(count: number): Promise<void> {
     await expect(this.page.getByText('Required')).toHaveCount(count);
   }
+
+  /** Clicks a department in the open Department picker. */
+  async pickDepartment(department: string | RegExp): Promise<void> {
+    await this.locators.departmentOption(department).first().click();
+  }
+
+  /**
+   * Fills the create form: full name, the department the picker offers as
+   * `department` after searching `departmentSearch` (the picker pages its
+   * options: 15 of 58 on dev, 2026-11-17), and Maintained by "By hand".
+   */
+  async fillNewEmployee(
+    fullName: string,
+    departmentSearch: string,
+    department: RegExp,
+  ): Promise<void> {
+    await this.locators.fullName.fill(fullName);
+    // The picker's departments can take over 15 s to arrive on a slow dev (2026-11-18).
+    await expect(async () => {
+      if (await this.locators.departmentDialog.isVisible())
+        await this.page.keyboard.press('Escape');
+      await this.openDepartmentPickerOptions();
+    }).toPass({ timeout: 90_000 });
+    await this.searchDepartmentPicker(departmentSearch);
+    await this.pickDepartment(department);
+    await this.locators.maintainedBy.click();
+    await this.locators.maintainedByOption('By hand').click();
+  }
 }
