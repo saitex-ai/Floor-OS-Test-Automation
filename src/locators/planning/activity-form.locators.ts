@@ -114,4 +114,9 @@ export class ActivityFormLocators {
   option(name: string): Locator {
     return this.page.getByRole('option', { name, exact: true });
   }
+
+  /** Every option of the open dropdown. */
+  options(): Locator {
+    return this.page.getByRole('option');
+  }
 }

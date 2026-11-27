@@ -39,7 +39,9 @@ export class RecipeDetailLocators {
     this.risksHeading = page.getByRole('heading', { name: 'Known risks it carries' });
     // A tooltip button's name since the 2026-10-28 dev deploy (was an inline line).
     this.risksHelp = fieldHelp(page, /named, visible buffers? instead of informal padding/);
-    this.operationsHeading = page.getByRole('heading', { name: /^Operations \(\d+\)/ });
+    this.operationsHeading = page.getByRole('heading', {
+      name: /^Operations( and activities)? \(\d+\)/,
+    });
     this.operationsSearch = page.getByRole('searchbox', { name: /^Search operations/ });
     this.operationsStep = page.getByRole('list', { name: 'Steps' }).getByRole('button', {
       name: /^Operations/,

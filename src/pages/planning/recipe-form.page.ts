@@ -1,5 +1,6 @@
 import { type Locator, type Page, expect } from '@playwright/test';
 import { BasePage } from '../base.page';
+import { escapeRegExp } from '../../locators/planning/master-data-list.locators';
 import { RecipeFormLocators } from '../../locators/planning/recipe-form.locators';
 import { submitStepped, type SubmitResult } from './form-submit';
 import { WAIT } from './waits';
@@ -220,5 +221,39 @@ export class RecipeFormPage extends BasePage {
 
   async expectCodeTaken(): Promise<void> {
     await expect(this.locators.codeTakenMessage.first()).toBeVisible({ timeout: WAIT.SERVER });
+  }
+
+  /**
+   * The departments the "Owning department" dropdown offers, by first word
+   * ("Cutting", "Sewing"); closes the dropdown again.
+   */
+  async owningDepartmentNames(): Promise<string[]> {
+    await this.locators.owningDepartment.click();
+    const options = this.locators.options();
+    await expect(options.first()).toBeVisible({ timeout: WAIT.NAVIGATION });
+    const names = (await options.allInnerTexts()).map((t) => t.trim().split(/\s|\n/)[0]!);
+    await this.page.keyboard.press('Escape');
+    return names;
+  }
+
+  /**
+   * Whether "Fills activity" offers an activity matching `term` once the
+   * Owning department is `department`; closes the dropdown again.
+   */
+  async fillsActivityOffered(department: string, term: string): Promise<boolean> {
+    await this.select(this.locators.owningDepartment, department);
+    await this.locators.fillsActivity.click();
+    await this.page.keyboard.type(term);
+    // The list is unfiltered for a moment after typing: wait for the matching
+    // option or the empty message, not for just any option.
+    const option = this.locators
+      .options()
+      .filter({ hasText: new RegExp(`^${escapeRegExp(term)}`) });
+    await expect(option.first().or(this.locators.noActivityMatch())).toBeVisible({
+      timeout: WAIT.NAVIGATION,
+    });
+    const offered = (await option.count()) > 0;
+    await this.page.keyboard.press('Escape');
+    return offered;
   }
 }
