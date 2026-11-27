@@ -14,14 +14,19 @@ export interface MachineFieldValues {
   code?: string;
   /** A Machine type option, e.g. /^BTK · / — the first one offered if omitted. */
   machineType?: string | RegExp;
+  /** A Facility option, e.g. "FAC-0001 · QA-AUTO …". Required by the form, with no default: callers must say which. */
+  facility: string | RegExp;
   /** Which real work centre to assign — defaults to the first available if omitted. */
   workCentre?: string | RegExp;
   /** Defaults to "Active". */
   status?: MachineStatus;
 }
 
-/** The fields an empty create flags as "Required" (the asset code is generated since 2026-10-16). */
-export const MACHINE_REQUIRED = ['machineType', 'workCentre', 'status'] as const;
+/**
+ * The fields an empty create flags as "Required" (the asset code is generated since
+ * 2026-10-16; Facility became a required field in the 2026-11 build). Checked on dev and uat 2026-11-25.
+ */
+export const MACHINE_REQUIRED = ['machineType', 'facility', 'workCentre', 'status'] as const;
 export type MachineRequiredField = (typeof MACHINE_REQUIRED)[number];
 
 /**
@@ -86,6 +91,7 @@ export class MachineFormPage extends BasePage {
     const l = this.locators;
     return {
       machineType: l.machineType,
+      facility: l.facility,
       workCentre: l.workCentre,
       status: l.status,
     }[field];
@@ -127,6 +133,7 @@ export class MachineFormPage extends BasePage {
   async fillRequired(values: MachineFieldValues): Promise<void> {
     if (values.code !== undefined) await this.locators.assetCode.fill(values.code);
     await this.setMachineType(values.machineType ?? /.+/);
+    await this.setFacility(values.facility);
     await this.setWorkCentre(values.workCentre ?? /.+/);
     await this.setStatus(values.status ?? 'Active');
   }
@@ -147,6 +154,32 @@ export class MachineFormPage extends BasePage {
       options.filter((o) => !/^\S+ · \S/.test(o)),
       'options without a type code · name',
     ).toEqual([]);
+  }
+
+  async setFacility(facility: string | RegExp): Promise<void> {
+    await this.pick(this.locators.facility, facility);
+  }
+
+  /** Every option the picker offers, trimmed; closes the picker again. */
+  private async optionsOf(combo: Locator): Promise<string[]> {
+    await this.openPicker(combo, this.locators.options().first());
+    const options = (await this.locators.options().allInnerTexts()).map((o) => o.trim());
+    await this.page.keyboard.press('Escape');
+    await expect(this.locators.options()).toHaveCount(0);
+    return options;
+  }
+
+  /** The first Facility whose label matches `marker` (e.g. /QA-AUTO/), or null when none does. */
+  async findFacility(marker: RegExp): Promise<string | null> {
+    return (await this.optionsOf(this.locators.facility)).find((o) => marker.test(o)) ?? null;
+  }
+
+  /**
+   * A QA work centre to put the machine on: the first option matching `preferred`, or null
+   * when there is none. Never falls back to a real work centre.
+   */
+  async findWorkCentre(preferred: RegExp): Promise<string | null> {
+    return (await this.optionsOf(this.locators.workCentre)).find((o) => preferred.test(o)) ?? null;
   }
 
   async setWorkCentre(workCentre: string | RegExp): Promise<void> {

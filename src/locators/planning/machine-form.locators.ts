@@ -14,6 +14,7 @@ export class MachineFormLocators {
   readonly codeGeneratedHelp: Locator;
   readonly codeFixedHelp: Locator;
   readonly machineType: Locator;
+  readonly facility: Locator;
   readonly workCentre: Locator;
   readonly status: Locator;
   readonly inServiceSinceLabel: Locator;
@@ -42,6 +43,8 @@ export class MachineFormLocators {
     // Was a free-text "Machine class" textbox until the 2026-10-14 dev deploy; now a
     // combobox of the Machine type master ("BTK · Bartack", …) with no empty choice.
     this.machineType = page.getByRole('combobox', { name: 'Machine type', exact: true });
+    // Required since the 2026-11 build; the Work centre list follows it ("Choose the facility first.").
+    this.facility = page.getByRole('combobox', { name: 'Facility', exact: true });
     this.workCentre = page.getByRole('combobox', { name: 'Work centre', exact: true });
     this.status = page.getByRole('combobox', { name: 'Status', exact: true });
     this.inServiceSinceLabel = page.getByText('In service since', { exact: true });

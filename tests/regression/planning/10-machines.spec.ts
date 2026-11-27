@@ -15,6 +15,7 @@ import {
   OTHER_MACHINE_TYPE,
   QA_MACHINE_TYPE,
   openMachine,
+  qaFacility,
   personaCredentials,
   personaSkipReason,
   setupPage,
@@ -135,6 +136,7 @@ test.describe('Planning - Machines', () => {
     }
   });
 
+  // The detail page and form call it "Type-specific properties" in the 2026-11 build (was "Class-specific").
   test('TC-CM-05 Class-specific properties are typed key/value rows, not raw JSON', async ({
     page,
     machinesListPage,
@@ -146,13 +148,14 @@ test.describe('Planning - Machines', () => {
     await machinesListPage.findRow(machine);
     await machinesListPage.expectRowContains(machine, 'capacity_kg: 350');
     await openMachine(page, machine);
-    await machineDetailPage.expectValueContains('Class-specific properties', 'capacity_kg: 350');
+    await machineDetailPage.expectValueContains('Type-specific properties', 'capacity_kg: 350');
     await machineDetailPage.startEditing();
     await machineFormPage.expectOnEditPage();
     await machineFormPage.expectPropertiesAsRows(1);
   });
 
   test('TC-CM-06 Cancel discards the form without creating a record', async ({
+    page,
     machineFormPage,
     machinesListPage,
   }) => {
@@ -160,8 +163,13 @@ test.describe('Planning - Machines', () => {
     // A machine has no code until saved: its system-link tag marks it, and
     // the centre's machines must not include it.
     const tag = uniqueTag('QA-M', centre);
+    const facility = await qaFacility(page);
     await machineFormPage.open();
-    await machineFormPage.fillRequired({ machineType: QA_MACHINE_TYPE, workCentre: centre });
+    await machineFormPage.fillRequired({
+      machineType: QA_MACHINE_TYPE,
+      facility,
+      workCentre: centre,
+    });
     await machineFormPage.addSystemLink('QA-AUTO', machineTagFor(tag));
     await machineFormPage.cancel();
     await machinesListPage.expectLoaded();
@@ -234,7 +242,7 @@ test.describe('Planning - Machines', () => {
       ['Work centre', other],
       ['Status', 'Down'],
       ['In service since', /^\d{4}-\d{2}-\d{2}$/],
-      ['Class-specific properties', 'capacity_kg: 400'],
+      ['Type-specific properties', 'capacity_kg: 400'],
     ] as const)
       await test.step(`${label} persisted`, async () => {
         await machineDetailPage.expectValue(label, value);
@@ -450,7 +458,7 @@ test.describe('Planning - Machines', () => {
       'Work centre',
       'Status',
       'In service since',
-      'Class-specific properties',
+      'Type-specific properties',
       'Asset register & telemetry',
     ]);
     await machineDetailPage.expectWindowsSection();
